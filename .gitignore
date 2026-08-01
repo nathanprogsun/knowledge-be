@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+# Ignore all ignored files
+.*
+
+# except these files
+!.env.example
+!.gitignore
+!.github/
+
