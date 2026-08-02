@@ -16,14 +16,14 @@ from pydantic import BaseModel, ConfigDict, Field
 T = TypeVar("T")
 
 
-class Pagination(BaseModel):  # type: ignore[explicit-any]
+class Pagination(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     page: int = Field(ge=1, default=1)
     page_size: int = Field(ge=1, le=1000, default=20)
 
 
-class PaginationResponse(BaseModel, Generic[T]):  # type: ignore[explicit-any]
+class PaginationResponse(BaseModel, Generic[T]):
     model_config = ConfigDict(frozen=True)
 
     total: int

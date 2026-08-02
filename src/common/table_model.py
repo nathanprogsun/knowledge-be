@@ -14,7 +14,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 
-class TableModel(BaseModel):  # type: ignore[explicit-any]
+class TableModel(BaseModel):
     """Base for row shapes used by repositories.
 
     Subclasses define column-equivalent fields. Use `model_dump()` to obtain
