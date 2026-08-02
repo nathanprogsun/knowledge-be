@@ -20,7 +20,11 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-config.set_main_option("sqlalchemy.url", get_settings().database_url)
+# Inject the URL into a fresh dict so it never round-trips through
+# ConfigParser interpolation (which would choke on URL-encoded `%`
+# characters in passwords).
+section: dict[str, str] = dict(config.get_section(config.config_ini_section, {}))
+section["sqlalchemy.url"] = get_settings().database_url
 
 target_metadata: object = None
 
@@ -33,7 +37,7 @@ def do_run_migrations(connection: Connection) -> None:
 
 async def run_migrations_online() -> None:
     connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        section,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
@@ -44,7 +48,7 @@ async def run_migrations_online() -> None:
 
 def run_migrations_offline() -> None:
     context.configure(
-        url=config.get_main_option("sqlalchemy.url"),
+        url=get_settings().database_url,
         target_metadata=target_metadata,  # type: ignore[arg-type]
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},

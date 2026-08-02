@@ -1,21 +1,30 @@
 """Application settings — single source of truth for runtime configuration.
 
-Loaded from environment variables prefixed `KNOWLEDGE_BE_` and an optional
-`.env` file. Read via `get_settings()` which memoizes a process-wide
-singleton via `functools.lru_cache` (no module-level mutable globals).
+Loaded from environment variables and an optional `.env` file (no prefix;
+the canonical variable names match the keys exactly). Read via
+`get_settings()` which memoizes a process-wide singleton via
+`functools.lru_cache` (no module-level mutable globals).
+
+Database URL composition: when `DATABASE_URL_OVERRIDE` is not set,
+`database_url` is auto-built from the `DB_*` component variables
+(`DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME`,
+`DB_DRIVER`). The password component is URL-encoded so values
+containing reserved characters (`!`, `@`, `#`, …) round-trip safely.
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
+from urllib.parse import quote
 
+from pydantic import computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
-        env_prefix="KNOWLEDGE_BE_",
+        env_prefix="",
         extra="ignore",
         case_sensitive=False,
     )
@@ -23,7 +32,18 @@ class Settings(BaseSettings):
     app_name: str = "knowledge-be"
     environment: str = "development"
 
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/knowledge_be"
+    # Database connection components — consumed by `database_url` below.
+    db_user: str = "postgres"
+    db_password: str = "postgres"
+    db_host: str = "localhost"
+    db_port: int = 5432
+    db_name: str = "knowledge_be"
+    db_driver: str = "postgresql+asyncpg"
+
+    # Optional explicit override for `database_url`. When set, the
+    # computed URL below falls back to this value verbatim.
+    database_url_override: str | None = None
+
     redis_url: str = "redis://localhost:6379"
 
     jwt_secret_key: str = "change-me"
@@ -43,6 +63,16 @@ class Settings(BaseSettings):
     docreader_transport: str = "grpc"
 
     system_aes_key: str = ""
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def database_url(self) -> str:
+        """Composed asyncpg URL from DB_* components (or DATABASE_URL_OVERRIDE)."""
+        if self.database_url_override is not None:
+            return self.database_url_override
+        user = quote(self.db_user, safe="")
+        password = quote(self.db_password, safe="")
+        return f"{self.db_driver}://{user}:{password}@{self.db_host}:{self.db_port}/{self.db_name}"
 
 
 @lru_cache(maxsize=1)
