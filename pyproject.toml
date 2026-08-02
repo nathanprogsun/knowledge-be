@@ -54,7 +54,15 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 addopts = ["--strict-markers", "--strict-config"]
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # passlib transitively imports the stdlib `crypt` module, which
+    # emits DeprecationWarning on Python 3.12+. The deprecation is
+    # scheduled for 3.13 removal; suppress until passlib ships a fix
+    # upstream.
+    "ignore::DeprecationWarning:crypt",
+    "ignore:.*'crypt' is deprecated.*:DeprecationWarning",
+]
 
 [tool.coverage.run]
 source = ["src"]
