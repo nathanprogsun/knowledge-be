@@ -2,7 +2,7 @@
 
 Maps the auth-related methods from
 `internal/application/service/user.go::userService` (the upstream places
-these on `userService`, not a separate `authService`). Operations:
+these on `userService` rather than a separate `authService`). Operations:
 
 - ``login`` — verify email + bcrypt password, mint an access/refresh
   pair, persist both rows in ``auth_tokens``.
@@ -12,6 +12,11 @@ these on `userService`, not a separate `authService`). Operations:
   fresh pair.
 - ``logout`` — bulk-revoke every outstanding token for the user.
 - ``revoke_token`` — mark a single token revoked (by raw token value).
+
+Service methods take ``AsyncSession`` per call (created by the web
+layer's ``get_async_session`` dependency and committed via
+``session_scope``). The service no longer holds a ``session_factory``;
+the web layer owns the transactional boundary.
 
 The service depends on Protocols (``UserLookup``, ``TokenStore``) rather
 than the concrete repository classes so tests can swap in fakes
@@ -24,12 +29,14 @@ from __future__ import annotations
 import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.common.exception import UnauthorizedError
-from src.common.session_provider import session_scope
+from src.core.auth.types import (
+    UserDTO,  # noqa: TC001  (used both as annotation and runtime attribute)
+)
 from src.db.dao.auth_tokens_repository import AuthTokenRepository
 from src.db.dao.users_repository import UserRepository
 from src.db.models.auth.auth_tokens import AuthTokenRow
@@ -41,9 +48,6 @@ from src.util.security import (
     verify_password,
 )
 
-if TYPE_CHECKING:
-    from src.core.auth.types import UserDTO
-
 
 class UserLookup(Protocol):
     """Read-side dependency for AuthService: a subset of UserRepository."""
@@ -51,6 +55,8 @@ class UserLookup(Protocol):
     async def find_by_email(self, session: AsyncSession, email: str) -> UserDTO | None: ...
 
     async def find_by_id(self, session: AsyncSession, user_id: str) -> UserDTO | None: ...
+
+    async def insert(self, session: AsyncSession, row: object) -> None: ...
 
 
 class TokenStore(Protocol):
@@ -79,84 +85,81 @@ class LoginResult:
 
 
 class AuthService:
-    """Stateless auth service — session_factory held for transactional scopes."""
+    """Stateless auth service — session is opened per request by the caller."""
 
     def __init__(
         self,
         *,
-        session_factory: async_sessionmaker[AsyncSession],
         user_repository: UserLookup | None = None,
         token_repository: TokenStore | None = None,
     ) -> None:
-        self._session_factory: async_sessionmaker[AsyncSession] = session_factory
-        self._users: UserLookup = user_repository or UserRepository()
-        self._tokens: TokenStore = token_repository or AuthTokenRepository()
+        self._users = user_repository or UserRepository()
+        self._tokens = token_repository or AuthTokenRepository()
 
-    async def login(self, *, email: str, password: str) -> LoginResult:
+    async def login(self, session: AsyncSession, *, email: str, password: str) -> LoginResult:
         """Verify email + password, mint and persist an access/refresh pair."""
-        async with session_scope(self._session_factory) as session:
-            user = await self._users.find_by_email(session, email)
-            if user is None or not user.is_active:
-                raise UnauthorizedError(
-                    code="auth.invalid_credentials",
-                    message="Email or password is incorrect",
-                )
-            if user.password_hash is None or not verify_password(password, user.password_hash):
-                raise UnauthorizedError(
-                    code="auth.invalid_credentials",
-                    message="Email or password is incorrect",
-                )
-            return await self._mint_pair(session, user)
+        user = await self._users.find_by_email(session, email)
+        if user is None or not user.is_active:
+            raise UnauthorizedError(
+                code="auth.invalid_credentials",
+                message="Email or password is incorrect",
+            )
+        if user.password_hash is None or not verify_password(password, user.password_hash):
+            raise UnauthorizedError(
+                code="auth.invalid_credentials",
+                message="Email or password is incorrect",
+            )
+        return await self._mint_pair(session, user)
 
-    async def validate_token(self, *, token: str) -> tuple[UserDTO, int | None]:
+    async def validate_token(
+        self, session: AsyncSession, *, token: str
+    ) -> tuple[UserDTO, int | None]:
         """Return ``(user, active_tenant_id)`` for a valid access token."""
-        async with session_scope(self._session_factory) as session:
-            return await self._validate_token(session, token)
+        return await self._validate_token(session, token)
 
-    async def refresh(self, *, refresh_token: str) -> LoginResult:
+    async def refresh(self, session: AsyncSession, *, refresh_token: str) -> LoginResult:
         """Verify a refresh token, revoke the old row, mint a fresh pair."""
-        async with session_scope(self._session_factory) as session:
-            try:
-                claims = decode_token(refresh_token)
-            except TokenError as exc:
-                raise UnauthorizedError(
-                    code="auth.invalid_refresh_token",
-                    message="Refresh token is invalid",
-                ) from exc
-            if claims.get("type") != "refresh":
-                raise UnauthorizedError(
-                    code="auth.invalid_refresh_token",
-                    message="Not a refresh token",
-                )
-            user_id = claims.get("user_id")
-            if not isinstance(user_id, str):
-                raise UnauthorizedError(
-                    code="auth.invalid_refresh_token",
-                    message="Refresh token is missing user_id",
-                )
-            record = await self._tokens.find_by_token_value(session, refresh_token)
-            if record is None or record.is_revoked:
-                raise UnauthorizedError(
-                    code="auth.invalid_refresh_token",
-                    message="Refresh token is revoked",
-                )
-            if record.token_type != "refresh_token":
-                raise UnauthorizedError(
-                    code="auth.invalid_refresh_token",
-                    message="Not a refresh token",
-                )
-            # Revoke the old refresh row.
-            await self._tokens.revoke(session, record.id)
-            # Load the user and mint a new pair.
-            user = await self._users.find_by_id(session, user_id)
-            if user is None or not user.is_active:
-                raise UnauthorizedError(
-                    code="auth.invalid_refresh_token",
-                    message="User no longer exists",
-                )
-            return await self._mint_pair(session, user)
+        try:
+            claims = decode_token(refresh_token)
+        except TokenError as exc:
+            raise UnauthorizedError(
+                code="auth.invalid_refresh_token",
+                message="Refresh token is invalid",
+            ) from exc
+        if claims.get("type") != "refresh":
+            raise UnauthorizedError(
+                code="auth.invalid_refresh_token",
+                message="Not a refresh token",
+            )
+        user_id = claims.get("user_id")
+        if not isinstance(user_id, str):
+            raise UnauthorizedError(
+                code="auth.invalid_refresh_token",
+                message="Refresh token is missing user_id",
+            )
+        record = await self._tokens.find_by_token_value(session, refresh_token)
+        if record is None or record.is_revoked:
+            raise UnauthorizedError(
+                code="auth.invalid_refresh_token",
+                message="Refresh token is revoked",
+            )
+        if record.token_type != "refresh_token":
+            raise UnauthorizedError(
+                code="auth.invalid_refresh_token",
+                message="Not a refresh token",
+            )
+        # Revoke the old refresh row.
+        await self._tokens.revoke(session, record.id)
+        # Load the user and mint a new pair.
+        user = await self._users.find_by_id(session, user_id)
+        if user is None or not user.is_active:
+            raise UnauthorizedError(
+                code="auth.invalid_refresh_token",
+                message="User no longer exists",
+            )
+        return await self._mint_pair(session, user)
 
-    async def logout(self, *, token: str) -> int:
+    async def logout(self, session: AsyncSession, *, token: str) -> int:
         """Bulk-revoke every outstanding token for the token's owner.
 
         Returns the number of rows that flipped from active to revoked.
@@ -164,29 +167,27 @@ class AuthService:
         not) is accepted as long as it decodes, so clients can end the
         session even after the access token TTL.
         """
-        async with session_scope(self._session_factory) as session:
-            try:
-                claims = decode_token(token)
-            except TokenError as exc:
-                raise UnauthorizedError(
-                    code="auth.invalid_token",
-                    message="Token is invalid",
-                ) from exc
-            user_id = claims.get("user_id")
-            if not isinstance(user_id, str):
-                raise UnauthorizedError(
-                    code="auth.invalid_token",
-                    message="Token is missing user_id",
-                )
-            return await self._tokens.revoke_all_for_user(session, user_id)
+        try:
+            claims = decode_token(token)
+        except TokenError as exc:
+            raise UnauthorizedError(
+                code="auth.invalid_token",
+                message="Token is invalid",
+            ) from exc
+        user_id = claims.get("user_id")
+        if not isinstance(user_id, str):
+            raise UnauthorizedError(
+                code="auth.invalid_token",
+                message="Token is missing user_id",
+            )
+        return await self._tokens.revoke_all_for_user(session, user_id)
 
-    async def revoke_token(self, *, token: str) -> int:
+    async def revoke_token(self, session: AsyncSession, *, token: str) -> int:
         """Revoke a single token (looked up by raw value). Returns row count."""
-        async with session_scope(self._session_factory) as session:
-            record = await self._tokens.find_by_token_value(session, token)
-            if record is None:
-                return 0
-            return await self._tokens.revoke(session, record.id)
+        record = await self._tokens.find_by_token_value(session, token)
+        if record is None:
+            return 0
+        return await self._tokens.revoke(session, record.id)
 
     # ── Internal helpers ────────────────────────────────────────────
 
