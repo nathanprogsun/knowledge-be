@@ -12,6 +12,7 @@ external clients. The boundary translation lives in
 from __future__ import annotations
 
 from datetime import datetime
+from typing import ClassVar
 
 from pydantic import Field
 
@@ -21,7 +22,7 @@ from src.common.table_model import TableModel
 class User(TableModel):
     """One row of the `users` table."""
 
-    table: str = "users"
+    table: ClassVar[str] = "users"
 
     id: str
     username: str

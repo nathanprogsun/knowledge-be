@@ -81,6 +81,8 @@ class GenericRepository(Generic[ModelType]):
 
     @cached_property
     def _table(self) -> str:
+        # ``table`` is a ClassVar[str] on each concrete subclass; mypy
+        # can't see it through the generic ``ModelType`` bound.
         return self.model_class.table  # type: ignore[attr-defined,no-any-return]
 
     @cached_property

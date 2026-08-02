@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 
 import pytest
 from sqlalchemy.ext.asyncio import (
@@ -27,6 +26,7 @@ from src.core.auth.service import AuthService, LoginResult
 from src.core.auth.types import UserInfo
 from src.db.dao.auth_tokens_repository import AuthTokenRepository
 from src.db.dao.users_repository import UserRepository
+from src.db.models.auth.auth_tokens import AuthToken
 from src.db.models.auth.users import User
 from src.util.security import (
     TokenError,
@@ -36,10 +36,6 @@ from src.util.security import (
     hash_password,
     verify_password,
 )
-
-if TYPE_CHECKING:
-    from src.db.models.auth.auth_tokens import AuthToken
-
 
 # ── In-memory session factory ────────────────────────────────────────
 

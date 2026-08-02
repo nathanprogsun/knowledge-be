@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.core.contracts.tenants import (  # noqa: TC001  (pydantic resolves these at runtime)
+from src.core.contracts.tenants import (
     Membership,
     Tenant,
 )
@@ -88,7 +88,7 @@ class LoginResponse(BaseModel):
     success: bool
     message: str
     user: AuthUser
-    active_tenant: Tenant
+    active_tenant: Tenant | None = Field(default=None)
     memberships: list[Membership] = Field(default_factory=list)
     token: str
     refresh_token: str

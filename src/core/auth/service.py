@@ -49,10 +49,10 @@ from datetime import UTC, datetime
 
 from src.common.exception import NotFoundError, UnauthorizedError
 from src.core.auth.types import UserInfo
-from src.db.dao.auth_tokens_repository import (  # noqa: TC001  (type annotation in __init__)
+from src.db.dao.auth_tokens_repository import (
     AuthTokenRepository,
 )
-from src.db.dao.users_repository import UserRepository  # noqa: TC001  (type annotation in __init__)
+from src.db.dao.users_repository import UserRepository
 from src.db.models.auth.auth_tokens import AuthToken
 from src.util.security import (
     TokenError,
