@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+TenantRole = Literal["owner", "admin", "contributor", "viewer"]
 
 
 class RetrieverEngineEntry(BaseModel):
@@ -18,18 +21,42 @@ class RetrieverEnginesConfig(BaseModel):
     engines: list[RetrieverEngineEntry]
 
 
+class Membership(BaseModel):
+    """A user's role inside one tenant — mirrors ``types.Membership``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tenant_id: int
+    tenant_name: str
+    role: TenantRole
+
+
 class Tenant(BaseModel):
+    """HTTP wire shape for a tenant — mirrors ``handler/dto/tenant.go::TenantResponse``.
+
+    Field set matches the Go ``TenantResponse`` struct (17 fields); see
+    ``internal/handler/dto/tenant.go``. All config blobs are optional —
+    they're filled only when the caller's role allows them to see
+    workspace-level secrets.
+    """
+
     model_config = ConfigDict(frozen=True)
 
     id: int
     name: str
     description: str | None = Field(default=None)
-    api_key: str | None = Field(default=None)
     status: str
     retriever_engines: RetrieverEnginesConfig | None = Field(default=None)
     business: str | None = Field(default=None)
     storage_quota: int | None = Field(default=None)
     storage_used: int | None = Field(default=None)
+    context_config: dict[str, object] | None = Field(default=None)
+    web_search_config: dict[str, object] | None = Field(default=None)
+    parser_engine_config: dict[str, object] | None = Field(default=None)
+    credentials: dict[str, object] | None = Field(default=None)
+    storage_engine_config: dict[str, object] | None = Field(default=None)
+    chat_history_config: dict[str, object] | None = Field(default=None)
+    retrieval_config: dict[str, object] | None = Field(default=None)
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = Field(default=None)
@@ -186,6 +213,7 @@ __all__ = [
     "APIPrincipalConfig",
     "CreateAPIKeyRequest",
     "CreateTenantRequest",
+    "Membership",
     "RetrieverEngineEntry",
     "RetrieverEnginesConfig",
     "SearchTenantsQuery",
@@ -200,6 +228,7 @@ __all__ = [
     "TenantKVStorageEngineConfig",
     "TenantKVWebSearchConfig",
     "TenantList",
+    "TenantRole",
     "UpdateAPIPrincipalConfigRequest",
     "UpdateTenantRequest",
 ]

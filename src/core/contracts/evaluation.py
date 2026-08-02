@@ -6,6 +6,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class EvalSummaryConfig(BaseModel):
+    """Mirrors ``types/session.go::SummaryConfig`` (13 fields).
+
+    Field names + types match the Go struct 1:1; ``thinking`` is a
+    nullable bool that opts the eval run into extended-thinking mode
+    for models that support it.
+    """
+
     model_config = ConfigDict(frozen=True)
 
     max_tokens: int | None = Field(default=0)
@@ -20,6 +27,7 @@ class EvalSummaryConfig(BaseModel):
     temperature: float | None = Field(default=0.3)
     seed: int | None = Field(default=0)
     max_completion_tokens: int | None = Field(default=2048)
+    thinking: bool | None = Field(default=None)
 
 
 class EvalTaskParams(BaseModel):
