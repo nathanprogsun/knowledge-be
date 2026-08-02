@@ -15,7 +15,7 @@ automatically exercises these invariants without further test edits.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any, get_type_hints
+from typing import Any, Literal, get_type_hints
 
 import pytest
 from pydantic import BaseModel, ValidationError
@@ -72,14 +72,20 @@ def _dummy_for(annotation: Any) -> Any:
 
     Recurses into nested contract models so a single dummy can satisfy
     fields whose type is another contract class. Annotations are resolved
-    via ``typing.get_type_hints`` (which materialises ``ForwardRef``s from
-    the ``from __future__ import annotations`` strings).
+    via ``typing.get_type_hints`` (which materialises ``ForwardRef``s
+    from the ``from __future__ import annotations`` strings).
     """
     origin = getattr(annotation, "__origin__", None)
     if origin is list:
         return []
     if origin is dict:
         return {}
+    if origin is Literal:
+        # Pydantic Literal types expose their choices via __args__; pick
+        # the first member so required-only construction succeeds.
+        args = getattr(annotation, "__args__", ())
+        if args:
+            return args[0]
     if annotation is str:
         return "x"
     if annotation is int:
