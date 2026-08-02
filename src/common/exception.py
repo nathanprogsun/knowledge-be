@@ -25,8 +25,11 @@ class ApplicationError(Exception):
         self,
         message: str | None = None,
         *,
+        code: str | None = None,
         details: dict[str, object] | None = None,
     ) -> None:
+        if code is not None:
+            self.code = code
         if message is not None:
             self.message = message
         if details is not None:
