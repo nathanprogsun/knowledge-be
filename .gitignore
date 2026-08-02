@@ -225,4 +225,6 @@ __marimo__/
 !.env.example
 !.gitignore
 !.github/
+!.pre-commit-config.yaml
+!.pyrightconfig.json
 
