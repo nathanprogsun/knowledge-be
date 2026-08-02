@@ -15,7 +15,7 @@ automatically exercises these invariants without further test edits.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any, get_type_hints
+from typing import Any, Literal, get_type_hints
 
 import pytest
 from pydantic import BaseModel, ValidationError
@@ -80,6 +80,12 @@ def _dummy_for(annotation: Any) -> Any:
         return []
     if origin is dict:
         return {}
+    if origin is Literal:
+        # Pydantic Literal types expose their choices via __args__; pick the
+        # first member so required-only construction succeeds.
+        args = getattr(annotation, "__args__", ())
+        if args:
+            return args[0]
     if annotation is str:
         return "x"
     if annotation is int:

@@ -37,48 +37,106 @@ class AgentQuestionSuggestions(BaseModel):
     follow_ups: AgentQuestionSuggestionsFollowUps | None = Field(default=None)
 
 
-class AgentConfig(BaseModel):
+class ParserEngineRule(BaseModel):
+    """Per-file-type parser dispatch rule (mirrors ``types.ParserEngineRule``)."""
+
     model_config = ConfigDict(frozen=True)
 
+    file_types: list[str]
+    engine: str
+
+
+class AgentConfig(BaseModel):
+    """Mirrors ``internal/types/custom_agent.go::CustomAgentConfig``.
+
+    The runtime ``types/agent.go::AgentConfig`` fields tagged
+    ``json:"-"`` are intentionally excluded (they are request-scoped
+    runtime only, never serialized).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    # ── Basic settings ────────────────────────────────────────────
     agent_mode: str | None = Field(default=None)
+    agent_type: str | None = Field(default=None)
     system_prompt: str | None = Field(default=None)
     system_prompt_id: str | None = Field(default=None)
     context_template: str | None = Field(default=None)
     context_template_id: str | None = Field(default=None)
+
+    # ── Model settings ─────────────────────────────────────────────
     model_id: str | None = Field(default=None)
     rerank_model_id: str | None = Field(default=None)
     temperature: float | None = Field(default=0.7)
     max_completion_tokens: int | None = Field(default=2048)
     thinking: bool | None = Field(default=None)
+    citation_enabled: bool | None = Field(default=None)
+    query_understand_model_id: str | None = Field(default=None)
+
+    # ── Agent-mode settings ────────────────────────────────────────
     max_iterations: int | None = Field(default=10)
+    llm_call_timeout: int | None = Field(default=0)
     allowed_tools: list[str] | None = Field(default=None)
     mcp_selection_mode: str | None = Field(default=None)
     mcp_services: list[str] | None = Field(default=None)
+    mcp_auth_wait_timeout: int | None = Field(default=0)
+
+    # ── Skills settings ───────────────────────────────────────────
     skills_selection_mode: str | None = Field(default=None)
     selected_skills: list[str] | None = Field(default=None)
+
+    # ── Knowledge-base settings ────────────────────────────────────
     kb_selection_mode: str | None = Field(default=None)
     knowledge_bases: list[str] | None = Field(default=None)
     retrieve_kb_only_when_mentioned: bool = False
-    supported_file_types: list[str] | None = Field(default=None)
+    retain_retrieval_history: bool = False
+
+    # ── Image / audio / multimodal ────────────────────────────────
     image_upload_enabled: bool = False
     vlm_model_id: str | None = Field(default=None)
+    audio_upload_enabled: bool = False
+    asr_model_id: str | None = Field(default=None)
     image_storage_provider: str | None = Field(default=None)
+
+    # ── File-type restriction ─────────────────────────────────────
+    supported_file_types: list[str] | None = Field(default=None)
+
+    # ── Chat attachment parsing ────────────────────────────────────
+    chat_parser_engine_rules: list[ParserEngineRule] | None = Field(default=None)
+    attachment_image_understanding: bool = False
+    attachment_ocr_max_pages: int | None = Field(default=0)
+    attachment_parse_wait_timeout_sec: int | None = Field(default=0)
+
+    # ── Data analysis ─────────────────────────────────────────────
+    data_analysis_enabled: bool = False
+
+    # ── FAQ strategy ──────────────────────────────────────────────
     faq_priority_enabled: bool = True
     faq_direct_answer_threshold: float | None = Field(default=0.9)
     faq_score_boost: float | None = Field(default=1.2)
+
+    # ── Web search ────────────────────────────────────────────────
     web_search_enabled: bool = True
     web_search_max_results: int | None = Field(default=5)
     web_search_provider_id: str | None = Field(default=None)
     web_fetch_enabled: bool = False
     web_fetch_top_n: int | None = Field(default=3)
+
+    # ── Multi-turn ───────────────────────────────────────────────
     multi_turn_enabled: bool = True
     history_turns: int | None = Field(default=5)
+
+    # ── Retrieval strategy ────────────────────────────────────────
     embedding_top_k: int | None = Field(default=10)
     keyword_threshold: float | None = Field(default=0.3)
     vector_threshold: float | None = Field(default=0.5)
     rerank_top_k: int | None = Field(default=5)
     rerank_threshold: float | None = Field(default=0.5)
-    question_suggestions: AgentQuestionSuggestions | None = Field(default=None)
+
+    # ── Advanced ──────────────────────────────────────────────────
+    parallel_tool_calls: bool = False
+    max_context_tokens: int | None = Field(default=None)
+    max_tool_output_chars: int | None = Field(default=None)
     enable_query_expansion: bool = True
     enable_rewrite: bool = True
     rewrite_prompt_system: str | None = Field(default=None)
@@ -86,6 +144,10 @@ class AgentConfig(BaseModel):
     fallback_strategy: str | None = Field(default="model")
     fallback_response: str | None = Field(default=None)
     fallback_prompt: str | None = Field(default=None)
+    intent_prompts: dict[str, str] | None = Field(default=None)
+
+    # ── Conversation question suggestions ────────────────────────
+    question_suggestions: AgentQuestionSuggestions | None = Field(default=None)
 
 
 class Agent(BaseModel):
@@ -150,5 +212,6 @@ __all__ = [
     "AgentQuestionSuggestionsStarters",
     "CreateAgentRequest",
     "ListAgentsResponse",
+    "ParserEngineRule",
     "UpdateAgentRequest",
 ]

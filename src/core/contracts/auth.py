@@ -4,6 +4,11 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.core.contracts.tenants import (  # noqa: TC001  (pydantic resolves these at runtime)
+    Membership,
+    Tenant,
+)
+
 
 class RegisterRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -33,14 +38,6 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
-class AuthTenant(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    id: int
-    name: str
-    api_key: str
-
-
 class AuthUser(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -56,21 +53,50 @@ class AuthUser(BaseModel):
 
 
 class RegisterResponse(BaseModel):
+    """Mirrors ``handler/dto/auth.go::AuthRegisterResponse``.
+
+    Field names match the Go DTO (``active_tenant`` not ``tenant``); the
+    ``memberships`` list carries the caller's role across every tenant
+    they belong to.
+    """
+
     model_config = ConfigDict(frozen=True)
 
     success: bool
     message: str
     user: AuthUser
-    tenant: AuthTenant
+    active_tenant: Tenant
+    memberships: list[Membership] = Field(default_factory=list)
 
 
 class LoginResponse(BaseModel):
+    """Mirrors ``handler/dto/auth.go::AuthLoginResponse``."""
+
     model_config = ConfigDict(frozen=True)
 
     success: bool
     message: str
     user: AuthUser
-    tenant: AuthTenant
+    active_tenant: Tenant
+    memberships: list[Membership] = Field(default_factory=list)
+    token: str
+    refresh_token: str
+
+
+class OIDCCallbackResponse(BaseModel):
+    """Mirrors ``handler/dto/auth.go::AuthOIDCCallbackResponse``.
+
+    Same shape as ``LoginResponse`` — the OIDC code-exchange path ends
+    in the same downstream session-establishment state.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    message: str
+    user: AuthUser
+    active_tenant: Tenant
+    memberships: list[Membership] = Field(default_factory=list)
     token: str
     refresh_token: str
 
@@ -115,16 +141,18 @@ class MeResponse(BaseModel):
 
     success: bool
     user: AuthUser
+    active_tenant: Tenant | None = Field(default=None)
+    memberships: list[Membership] = Field(default_factory=list)
 
 
 __all__ = [
-    "AuthTenant",
     "AuthUser",
     "ChangePasswordRequest",
     "LoginRequest",
     "LoginResponse",
     "MeResponse",
     "OIDCAuthorizeURLResponse",
+    "OIDCCallbackResponse",
     "OIDCMetaConfig",
     "RefreshTokenRequest",
     "RefreshTokenResponse",

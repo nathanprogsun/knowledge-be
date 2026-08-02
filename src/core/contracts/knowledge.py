@@ -12,6 +12,28 @@ class ChunkingParserEngineRule(BaseModel):
     engine: str
 
 
+class WikiConfig(BaseModel):
+    """Mirrors ``types.WikiConfig`` — wiki-ingest knobs for a KB."""
+
+    model_config = ConfigDict(frozen=True)
+
+    synthesis_model_id: str | None = Field(default=None)
+    max_pages_per_ingest: int | None = Field(default=0)
+    extraction_granularity: str | None = Field(default=None)
+    content_instructions: str | None = Field(default=None)
+
+
+class IndexingStrategy(BaseModel):
+    """Mirrors ``types.IndexingStrategy`` — which pipelines are active for a KB."""
+
+    model_config = ConfigDict(frozen=True)
+
+    vector_enabled: bool = False
+    keyword_enabled: bool = False
+    wiki_enabled: bool = False
+    graph_enabled: bool = False
+
+
 class ChunkingConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -87,6 +109,16 @@ class QuestionGenerationConfig(BaseModel):
 
 
 class KnowledgeBase(BaseModel):
+    """Mirrors ``internal/types/knowledgebase.go::KnowledgeBase``.
+
+    Field set matches the Go struct: storage columns (persisted) plus
+    response-only enrichments (knowledge_count, chunk_count,
+    processing_count, share_count, creator_name, my_permission,
+    vector_store_name/source/engine_type/status) stamped in by the list
+    handler. ``is_processing`` and ``share_count`` are runtime-only
+    fields flagged ``gorm:"-"`` upstream.
+    """
+
     model_config = ConfigDict(frozen=True)
 
     id: str
@@ -95,6 +127,8 @@ class KnowledgeBase(BaseModel):
     type: str
     is_temporary: bool = False
     tenant_id: int
+    creator_id: str | None = Field(default=None)
+    creator_name: str | None = Field(default=None)
     chunking_config: ChunkingConfig | None = Field(default=None)
     image_processing_config: ImageProcessingConfig | None = Field(default=None)
     embedding_model_id: str | None = Field(default=None)
@@ -102,10 +136,13 @@ class KnowledgeBase(BaseModel):
     vlm_config: VLMConfig | None = Field(default=None)
     asr_config: ASRConfig | None = Field(default=None)
     storage_provider_config: StorageProviderConfig | None = Field(default=None)
+    storage_backend_id: str | None = Field(default=None)
     storage_config: LegacyStorageConfig | None = Field(default=None)
     extract_config: ExtractConfig | None = Field(default=None)
     faq_config: FAQConfig | None = Field(default=None)
     question_generation_config: QuestionGenerationConfig | None = Field(default=None)
+    wiki_config: WikiConfig | None = Field(default=None)
+    indexing_strategy: IndexingStrategy | None = Field(default=None)
     vector_store_id: str | None = Field(default=None)
     vector_store_name: str | None = Field(default=None)
     vector_store_source: str | None = Field(default=None)
@@ -116,6 +153,8 @@ class KnowledgeBase(BaseModel):
     knowledge_count: int = 0
     chunk_count: int = 0
     processing_count: int = 0
+    is_processing: bool = False
+    share_count: int = 0
     my_permission: str | None = Field(default=None)
     created_at: datetime
     updated_at: datetime
@@ -675,6 +714,7 @@ __all__ = [
     "FAQSimilarQuestionsRequest",
     "HybridSearchRequest",
     "ImageProcessingConfig",
+    "IndexingStrategy",
     "Knowledge",
     "KnowledgeBase",
     "KnowledgeBatchDeleteRequest",
@@ -706,4 +746,5 @@ __all__ = [
     "UpdateKnowledgeRequest",
     "UpdateTagRequest",
     "VLMConfig",
+    "WikiConfig",
 ]
