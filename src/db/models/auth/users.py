@@ -1,10 +1,12 @@
-"""Row shape for the `users` table.
+"""Storage row for the `users` table.
 
-Mirrors `internal/types/user.go` field-for-field: a globally-unique user
-with username + email as natural keys, an opaque bcrypt hash, a nullable
-`tenant_id` for users that exist before being provisioned into a
-workspace, an `is_system_admin` flag independent of tenant roles, and a
-`preferences` JSON blob (Postgres `JSONB`) carrying per-user UI knobs.
+Mirrors `internal/types/user.go::User`. The Python `User` and the Python
+`UserInfo` (in `src/core/auth/types.py`) are layered: ``User`` is the
+full storage row (including ``password_hash``) used inside the
+repository and service; ``UserInfo`` is the wire-side projection (no
+``password_hash``, no ``deleted_at``) returned to the web layer and
+external clients. The boundary translation lives in
+``UserRepository._to_info``.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from pydantic import Field
 from src.common.table_model import TableModel
 
 
-class UserRow(TableModel):
+class User(TableModel):
     """One row of the `users` table."""
 
     table: str = "users"
@@ -36,4 +38,4 @@ class UserRow(TableModel):
     deleted_at: datetime | None = None
 
 
-__all__ = ["UserRow"]
+__all__ = ["User"]
