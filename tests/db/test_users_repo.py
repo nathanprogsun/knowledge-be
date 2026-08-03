@@ -27,7 +27,6 @@ from testcontainers.community.postgres import PostgresContainer
 from testcontainers.core.exceptions import ContainerStartException
 
 from src.common.exception import ConflictError, NotFoundError
-from src.core.auth.types import UserInfo, UserPreferences
 from src.db.dao.users_repository import UserRepository
 from src.db.models.auth.users import User
 
@@ -169,26 +168,25 @@ async def test_duplicate_insert_raises_conflict(session: AsyncSession) -> None:
         await repo.insert(duplicate)
 
 
-async def test_update_replaces_fields(session: AsyncSession) -> None:
+async def test_update_by_primary_key_replaces_fields(session: AsyncSession) -> None:
     repo = UserRepository(session)
     row = _sample_row()
     await repo.insert(row)
     await session.commit()
 
-    updated = UserInfo(
-        id=row.id,
-        username="alice2",
-        email="alice2@example.com",
-        avatar="https://example.com/a.png",
-        tenant_id=row.tenant_id,
-        is_active=row.is_active,
-        can_access_all_tenants=True,
-        is_system_admin=True,
-        preferences=UserPreferences(last_active_tenant_id=42),
-        created_at=row.created_at,
-        updated_at=row.updated_at,
+    now = datetime.now(UTC)
+    updated = await repo.update_by_primary_key_or_fail(
+        {"id": row.id},
+        {
+            "username": "alice2",
+            "email": "alice2@example.com",
+            "avatar": "https://example.com/a.png",
+            "can_access_all_tenants": True,
+            "is_system_admin": True,
+            "preferences": {"last_active_tenant_id": 42},
+            "updated_at": now,
+        },
     )
-    await repo.update(updated)
     await session.commit()
 
     found = await repo.find_by_id(row.id)
@@ -198,26 +196,30 @@ async def test_update_replaces_fields(session: AsyncSession) -> None:
     assert found.avatar == "https://example.com/a.png"
     assert found.can_access_all_tenants is True
     assert found.is_system_admin is True
-    assert found.preferences.last_active_tenant_id == 42
+    assert found.preferences == {"last_active_tenant_id": 42}
+    assert updated.id == row.id
 
 
-async def test_update_missing_user_raises_not_found(session: AsyncSession) -> None:
+async def test_update_by_primary_key_missing_returns_none(session: AsyncSession) -> None:
     repo = UserRepository(session)
-    dto = UserInfo(
-        id="missing",
-        username="x",
-        email="x@example.com",
-        avatar=None,
-        tenant_id=None,
-        is_active=True,
-        can_access_all_tenants=False,
-        is_system_admin=False,
-        preferences=UserPreferences(),
-        created_at=datetime(2026, 1, 1, tzinfo=UTC),
-        updated_at=datetime(2026, 1, 1, tzinfo=UTC),
+    now = datetime.now(UTC)
+    result = await repo.update_by_primary_key(
+        {"id": "missing"},
+        {"username": "x", "updated_at": now},
     )
+    assert result is None
+
+
+async def test_update_by_primary_key_or_fail_missing_raises(
+    session: AsyncSession,
+) -> None:
+    repo = UserRepository(session)
+    now = datetime.now(UTC)
     with pytest.raises(NotFoundError):
-        await repo.update(dto)
+        await repo.update_by_primary_key_or_fail(
+            {"id": "missing"},
+            {"username": "x", "updated_at": now},
+        )
 
 
 async def test_update_password(session: AsyncSession) -> None:
@@ -226,17 +228,15 @@ async def test_update_password(session: AsyncSession) -> None:
     await repo.insert(row)
     await session.commit()
 
-    await repo.update_password(row.id, "new-digest")
+    await repo.update_by_primary_key_or_fail(
+        {"id": row.id},
+        {"password_hash": "new-digest", "updated_at": datetime.now(UTC)},
+    )
     await session.commit()
 
     found = await repo.find_by_id(row.id)
     assert found is not None
-
-
-async def test_update_password_missing_raises_not_found(session: AsyncSession) -> None:
-    repo = UserRepository(session)
-    with pytest.raises(NotFoundError):
-        await repo.update_password("missing", "x")
+    assert found.password_hash == "new-digest"
 
 
 async def test_soft_delete_excludes_from_reads(session: AsyncSession) -> None:
@@ -245,7 +245,11 @@ async def test_soft_delete_excludes_from_reads(session: AsyncSession) -> None:
     await repo.insert(row)
     await session.commit()
 
-    await repo.soft_delete(row.id)
+    now = datetime.now(UTC)
+    await repo.update_by_primary_key_or_fail(
+        {"id": row.id},
+        {"deleted_at": now, "updated_at": now},
+    )
     await session.commit()
 
     with pytest.raises(NotFoundError):
@@ -254,10 +258,14 @@ async def test_soft_delete_excludes_from_reads(session: AsyncSession) -> None:
         await repo.find_by_email(row.email)
 
 
-async def test_soft_delete_missing_raises_not_found(session: AsyncSession) -> None:
+async def test_soft_delete_missing_returns_none(session: AsyncSession) -> None:
     repo = UserRepository(session)
-    with pytest.raises(NotFoundError):
-        await repo.soft_delete("missing")
+    now = datetime.now(UTC)
+    result = await repo.update_by_primary_key(
+        {"id": "missing"},
+        {"deleted_at": now, "updated_at": now},
+    )
+    assert result is None
 
 
 async def test_list_paginates(session: AsyncSession) -> None:
@@ -296,7 +304,11 @@ async def test_list_excludes_soft_deleted(session: AsyncSession) -> None:
     )
     await session.commit()
 
-    await repo.soft_delete("usr-drop")
+    now = datetime.now(UTC)
+    await repo.update_by_primary_key_or_fail(
+        {"id": "usr-drop"},
+        {"deleted_at": now, "updated_at": now},
+    )
     await session.commit()
 
     listed = await repo.list(limit=10, offset=0)
@@ -323,7 +335,7 @@ async def test_preferences_round_trips(session: AsyncSession) -> None:
 
     found = await repo.find_by_id("usr-1")
     assert found is not None
-    assert found.preferences.last_active_tenant_id == 7
+    assert found.preferences == {"last_active_tenant_id": 7}
 
 
 async def test_empty_preferences_default(session: AsyncSession) -> None:
@@ -333,7 +345,7 @@ async def test_empty_preferences_default(session: AsyncSession) -> None:
 
     found = await repo.find_by_id("usr-1")
     assert found is not None
-    assert found.preferences.last_active_tenant_id is None
+    assert found.preferences == {}
 
 
 __all__ = []

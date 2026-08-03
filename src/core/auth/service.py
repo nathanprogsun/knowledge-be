@@ -49,10 +49,10 @@ from datetime import UTC, datetime
 
 from src.common.exception import NotFoundError, UnauthorizedError
 from src.core.auth.types import UserInfo
-from src.db.dao.auth_tokens_repository import (  # noqa: TC001  (type annotation in __init__)
+from src.db.dao.auth_tokens_repository import (
     AuthTokenRepository,
 )
-from src.db.dao.users_repository import UserRepository  # noqa: TC001  (type annotation in __init__)
+from src.db.dao.users_repository import UserRepository
 from src.db.models.auth.auth_tokens import AuthToken
 from src.util.security import (
     TokenError,
@@ -94,7 +94,7 @@ class AuthService:
     async def login(self, *, email: str, password: str) -> LoginResult:
         """Verify email + password, mint and persist an access/refresh pair."""
         try:
-            user_row = await self._users_repo.find_by_email_with_credentials(email)
+            user_row = await self._users_repo.find_by_email(email)
         except NotFoundError:
             # Same message as the wrong-password branch so a caller cannot
             # tell a missing email from a wrong password.
@@ -112,8 +112,7 @@ class AuthService:
                 code="auth.invalid_credentials",
                 message="Email or password is incorrect",
             )
-        info = UserInfo.model_validate(user_row.model_dump(exclude={"password_hash", "deleted_at"}))
-        return await self._mint_pair(info)
+        return await self._mint_pair(UserInfo.map_from_db(user_row))
 
     async def validate_token(self, *, token: str) -> tuple[UserInfo, int | None]:
         """Return ``(user, active_tenant_id)`` for a valid access token."""
@@ -171,7 +170,7 @@ class AuthService:
                 code="auth.invalid_refresh_token",
                 message="User no longer exists",
             )
-        return await self._mint_pair(user)
+        return await self._mint_pair(UserInfo.map_from_db(user))
 
     async def logout(self, *, token: str) -> int:
         """Bulk-revoke every outstanding token for the token's owner.
@@ -296,7 +295,7 @@ class AuthService:
             )
         tenant_id_raw = claims.get("tenant_id")
         tenant_id = tenant_id_raw if isinstance(tenant_id_raw, int) else None
-        return user, tenant_id
+        return UserInfo.map_from_db(user), tenant_id
 
 
 __all__ = ["AuthService", "LoginResult"]

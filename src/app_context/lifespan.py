@@ -95,6 +95,16 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Register the ApplicationError -> HTTP status handler.
+    from src.web.exception_handler import register_exception_handlers
+
+    register_exception_handlers(application)
+
+    # Mount domain routers.
+    from src.web.api.auth.router import router as auth_router
+
+    application.include_router(auth_router)
+
     @application.get("/health", tags=["meta"])
     async def health() -> dict[str, str]:
         return {"status": "ok"}

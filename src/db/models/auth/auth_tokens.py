@@ -9,6 +9,7 @@ and survives replay attacks via the ``is_revoked`` flag.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import ClassVar
 
 from src.common.table_model import TableModel
 
@@ -16,7 +17,9 @@ from src.common.table_model import TableModel
 class AuthToken(TableModel):
     """One row of the `auth_tokens` table."""
 
-    table: str = "auth_tokens"
+    table: ClassVar[str] = "auth_tokens"
+    primary_keys: ClassVar[tuple[str, ...]] = ("id",)
+    json_columns: ClassVar[tuple[str, ...]] = ()
 
     id: str
     user_id: str
