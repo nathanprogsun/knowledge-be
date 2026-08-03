@@ -102,9 +102,11 @@ def create_app() -> FastAPI:
 
     # Mount domain routers.
     from src.web.api.auth.router import router as auth_router
+    from src.web.api.system.router import router as system_router
     from src.web.api.tenants.router import router as tenants_router
 
     application.include_router(auth_router)
+    application.include_router(system_router)
     application.include_router(tenants_router)
 
     @application.get("/health", tags=["meta"])
