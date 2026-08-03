@@ -35,9 +35,7 @@ def get_system_setting_service(session: SessionDep) -> SystemSettingService:
     )
 
 
-SystemSettingServiceDep = Annotated[
-    SystemSettingService, Depends(get_system_setting_service)
-]
+SystemSettingServiceDep = Annotated[SystemSettingService, Depends(get_system_setting_service)]
 
 
 def get_audit_log_service(session: SessionDep) -> AuditLogService:
