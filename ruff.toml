@@ -21,8 +21,7 @@ select = [
 ignore = [
     "E501",   # line-too-long (handled by formatter)
     "ISC001", # single-line implicit string concat (conflicts with formatter)
-    # TC rules suggest moving imports into `if TYPE_CHECKING:` blocks.
-    # AGENTS.md §6.2 bans TYPE_CHECKING entirely. Ignore all TC rules.
+    # The project bans `if TYPE_CHECKING:` blocks, so ignore all TC rules.
     "TC001",
     "TC002",
     "TC003",
@@ -32,7 +31,7 @@ ignore = [
 ]
 
 [lint.isort]
-known-first-party = ["src"]
+known-first-party = ["src", "tests"]
 
 [format]
 quote-style = "double"

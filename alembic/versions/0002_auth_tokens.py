@@ -1,14 +1,9 @@
 """Create the `auth_tokens` table.
 
-Mirrors the upstream schema in
-`migrations/versioned/000001_agent.up.sql` (Postgres) and
-`migrations/sqlite/000000_init.up.sql` (SQLite). Tokens are stored
-verbatim in the `token` column (no hashing at rest) — the upstream
-choice — so that `ValidateToken` can resolve them in O(1) by exact
-match.
-
-`is_revoked = TRUE` rows are kept (not soft-deleted) so audit logs
-and replay-attack checks remain possible.
+Tokens are stored verbatim in the `token` column (no hashing at rest)
+so `ValidateToken` resolves them in O(1) by exact match.
+`is_revoked = TRUE` rows are kept (not soft-deleted) for audit and
+replay-attack checks.
 """
 
 from __future__ import annotations

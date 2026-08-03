@@ -1,20 +1,4 @@
-"""Pure helpers for password hashing and JWT signing.
-
-Two responsibilities:
-
-- ``hash_password`` / ``verify_password`` use the ``bcrypt`` library
-  directly. ``passlib`` 1.7.4 is incompatible with bcrypt 4+ (its
-  broken ``__about__`` version detection raises a fake ``AttributeError``),
-  so we use the underlying library.
-- ``create_access_token`` / ``create_refresh_token`` / ``decode_token``
-  use ``python-jose`` with HS256, matching the upstream
-  ``github.com/golang-jwt/jwt/v5`` claim layout.
-
-The JWT secret is loaded lazily from ``Settings.jwt_secret_key``; on
-first call a fresh ``Settings`` instance is built via ``get_settings``
-and the secret is cached on the module level. The cache is invalidated
-by ``reset_secret_cache()`` so tests that mutate the env can re-read.
-"""
+"""Pure helpers for password hashing and JWT signing."""
 
 from __future__ import annotations
 
@@ -27,7 +11,7 @@ from jose import JWTError, jwt
 
 from src.settings import get_settings
 
-# bcrypt cost — upstream uses ``bcrypt.DefaultCost`` (10).
+# bcrypt cost factor.
 _BCRYPT_ROUNDS: Final = 10
 
 # Secret cache (reset by ``reset_secret_cache`` for tests).
@@ -45,9 +29,8 @@ def _secret() -> str:
     if _cached_secret is None:
         secret = get_settings().jwt_secret_key
         if not secret or secret == "change-me":
-            # Match the upstream behavior: if no secret is configured,
-            # generate an ephemeral one. Restart of the process
-            # invalidates all outstanding tokens.
+            # If no secret is configured, generate an ephemeral one.
+            # Restart of the process invalidates all outstanding tokens.
             secret = secrets.token_urlsafe(32)
         _cached_secret = secret
     return _cached_secret
@@ -84,12 +67,7 @@ def create_access_token(
     tenant_id: int | None,
     ttl: timedelta = ACCESS_TOKEN_TTL,
 ) -> tuple[str, datetime]:
-    """Mint an HS256 access JWT. Returns ``(token, expires_at)``.
-
-    Claim layout mirrors the upstream ``generateTokensForTenant``:
-    ``user_id``, ``email``, ``tenant_id``, ``exp``, ``iat``, ``jti``,
-    ``type="access"``.
-    """
+    """Mint an HS256 access JWT. Returns ``(token, expires_at)``."""
     now = datetime.now(UTC)
     expires_at = now + ttl
     claims: dict[str, Any] = {

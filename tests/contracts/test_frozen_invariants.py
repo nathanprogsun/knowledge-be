@@ -1,15 +1,8 @@
 """Invariants for every contract in `src.core.contracts`.
 
-Each PR-0.5 contract module declares a set of frozen Pydantic models that
-mirror the HTTP wire shape. These tests guard three invariants:
-
-1. `model_config["frozen"]` is `True` — instances are immutable.
-2. The model can be constructed with only its required fields filled.
-3. Mutating any field of an instance raises (`ValidationError` in v2).
-
-The tests are auto-parameterised across every exported class in every
-contract module — adding a new model anywhere under `src.core.contracts`
-automatically exercises these invariants without further test edits.
+Guards three invariants on every frozen Pydantic model: `frozen=True`,
+required-only construction succeeds, and any post-init assignment raises
+`ValidationError`.
 """
 
 from __future__ import annotations

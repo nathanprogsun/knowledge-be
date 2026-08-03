@@ -1,10 +1,8 @@
 """Web-layer tests for the auth router (login/refresh/logout).
 
-Per AGENTS.md §9, web routers are tested via ``httpx.AsyncClient``
-against the app. The ``AuthService`` dependency is overridden with a
-service backed by in-memory fake repos so the tests exercise the full
-HTTP path (routing, serialization, exception handling) without touching
-a real database.
+Exercises the full HTTP path (routing, serialization, exception
+handling) against the app with ``AuthService`` overridden to use
+in-memory fake repos.
 """
 
 from __future__ import annotations

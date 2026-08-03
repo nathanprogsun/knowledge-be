@@ -1,33 +1,8 @@
 """OIDC SSO service - authorization URL + code-exchange login.
 
-Mirrors the OIDC branch of the upstream ``userService``
-(``internal/application/service/user.go``): ``GetOIDCAuthorizationURL``
-and ``LoginWithOIDC`` (existing-user bind only - new-user provisioning
-is deferred until the ``Register`` flow + tenant services land).
-
-Scope (per PR-4 plan)
----------------------
-
-- Discovery / code exchange / userinfo resolution live in the ``ai``
-  layer (:class:`src.ai.oidc_client.OidcClient`); this service
-  orchestrates them.
-- State signing (HMAC-SHA256, base64url) ports
-  ``internal/utils/oidc_state.go`` inline - it is OIDC-specific and has
-  no second consumer yet (YAGNI: extract to ``util`` when one appears).
-- An OIDC login that resolves to an existing local user mints a local
-  access/refresh pair via :func:`src.core.auth.service.mint_token_pair`
-  (shared with password login).
-- A login whose email is unknown to the local store raises
-  ``ExternalServiceError(code="oidc.provisioning_unavailable")``; the
-  provisioning path (``provisionOIDCUser`` / ``generateOIDCUsername``)
-  is intentionally not ported.
-
-Layering
---------
-
-``core`` -> ``ai`` + ``util`` + ``common`` + ``db`` (constructor
-injection of repos). The service never imports ``web``/``fastapi`` and
-raises ``ApplicationError`` subclasses only (AGENTS.md §5).
+Existing-user bind only; unknown emails raise
+``oidc.provisioning_unavailable``. Never imports ``web``/``fastapi``;
+raises ``ApplicationError`` subclasses only.
 """
 
 from __future__ import annotations
@@ -56,7 +31,7 @@ from src.db.dao.users_repository import UserRepository
 from src.settings import get_settings
 from src.util.security import _secret
 
-# ── State signing (ports internal/utils/oidc_state.go) ───────────────
+# ── State signing ────────────────────────────────────────────────────
 
 _STATE_MAX_AGE_SECONDS: int = 600  # 10 minutes
 _STATE_FUTURE_TOLERANCE_SECONDS: int = 60
@@ -72,7 +47,7 @@ class OIDCStatePayload:
 
 
 def _b64url(data: bytes) -> str:
-    """base64url without padding (mirrors Go ``base64.RawURLEncoding``)."""
+    """base64url without padding."""
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
 
 
@@ -86,9 +61,8 @@ def _state_secret() -> str:
     """HMAC key for OIDC state.
 
     Shares the JWT signing secret (cached, with an ephemeral-random
-    fallback when ``JWT_SECRET_KEY`` is unset or ``"change-me"``) - mirrors
-    the upstream ``oidcStateSigningKey`` which reads ``JWT_SECRET`` and
-    falls back to a random 32-byte key, never a known constant.
+    fallback when ``JWT_SECRET_KEY`` is unset or ``"change-me"``) - never
+    a known constant.
     """
     return _secret()
 
@@ -151,8 +125,7 @@ class OIDCAuthorizationURL:
     """Result of :meth:`OidcService.get_authorization_url`.
 
     ``nonce`` is not part of the wire response; the web layer binds it to
-    an HttpOnly cookie and verifies it on callback (mirrors the upstream
-    ``oidcNonceCookieName`` flow).
+    an HttpOnly cookie and verifies it on callback.
     """
 
     provider_display_name: str
@@ -165,13 +138,11 @@ class OIDCAuthorizationURL:
 class OIDCCallbackResult:
     """Result of :meth:`OidcService.login_with_oidc`.
 
-    Mirrors the upstream ``OIDCCallbackResponse`` shape: ``success=False``
-    with a ``message`` is a legitimate non-error outcome (the bound user
-    is disabled) returned rather than raised, so the web layer serialises
-    the HTTP 200 ``{success:false, message}`` body the upstream produces.
-    ``active_tenant`` / ``memberships`` are intentionally absent: tenant
-    resolution is deferred to the tenant PRs (PR-5~PR-7); the web layer
-    fills ``OIDCCallbackResponse.active_tenant=None`` / ``memberships=[]``.
+    ``success=False`` with a ``message`` is a legitimate non-error outcome
+    (the bound user is disabled) returned rather than raised, so the web
+    layer serialises the HTTP 200 ``{success:false, message}`` body.
+    ``active_tenant`` / ``memberships`` are intentionally absent; the web
+    layer fills them with ``None`` / ``[]``.
     """
 
     success: bool
@@ -204,9 +175,9 @@ class _OIDCConfig:
 class OidcService:
     """Request-scoped OIDC SSO orchestrator.
 
-    Constructed per request (mirrors ``AuthService``): repos hold the
-    per-request ``AsyncSession``; the ``OidcClient`` is stateless and may
-    be shared. The service never touches the session directly.
+    Constructed per request: repos hold the per-request ``AsyncSession``;
+    the ``OidcClient`` is stateless and may be shared. The service never
+    touches the session directly.
     """
 
     def __init__(
@@ -296,10 +267,8 @@ class OidcService:
                 code="oidc.provisioning_unavailable",
             ) from None
         if not user_row.is_active:
-            # Mirrors the upstream ``LoginWithOIDC`` which returns
-            # ``{Success:false, Message:"Account is disabled"}`` with nil
-            # error (HTTP 200 success-shape body) - not a raise - so the
-            # web layer can produce the same non-error 200 response.
+            # Returns success=False as a non-error outcome (HTTP 200 body),
+            # not a raise, so the web layer produces the same response.
             return OIDCCallbackResult(success=False, message="Account is disabled")
         result: LoginResult = await mint_token_pair(
             tokens_repo=self._tokens_repo,
