@@ -10,13 +10,23 @@ from __future__ import annotations
 
 from src.web.deps.auth import AuthServiceDep, get_auth_service
 from src.web.deps.session import SessionDep, get_async_session
+from src.web.deps.system import (
+    AuditLogServiceDep,
+    SystemSettingServiceDep,
+    get_audit_log_service,
+    get_system_setting_service,
+)
 from src.web.deps.tenants import TenantServiceDep, get_tenant_service
 
 __all__ = [
+    "AuditLogServiceDep",
     "AuthServiceDep",
     "SessionDep",
+    "SystemSettingServiceDep",
     "TenantServiceDep",
     "get_async_session",
+    "get_audit_log_service",
     "get_auth_service",
+    "get_system_setting_service",
     "get_tenant_service",
 ]
