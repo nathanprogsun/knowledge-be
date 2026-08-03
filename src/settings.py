@@ -64,6 +64,24 @@ class Settings(BaseSettings):
 
     system_aes_key: str = ""
 
+    # ── OIDC SSO ──────────────────────────────────────────────────────
+    # Mirrors upstream ``config.OIDCAuthConfig``. Endpoints may be left
+    # blank when ``oidc_discovery_url`` is set - the OIDC client fills
+    # them from the discovery document at request time.
+    oidc_enable: bool = False
+    oidc_issuer_url: str = ""
+    oidc_discovery_url: str = ""
+    oidc_provider_display_name: str = ""
+    oidc_client_id: str = ""
+    oidc_client_secret: str = ""
+    oidc_authorization_endpoint: str = ""
+    oidc_token_endpoint: str = ""
+    oidc_user_info_endpoint: str = ""
+    oidc_scopes: list[str] = ["openid", "profile", "email"]
+    # Claim keys to read username/email from the userinfo / id_token.
+    oidc_user_info_mapping_username: str = "name"
+    oidc_user_info_mapping_email: str = "email"
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def database_url(self) -> str:
