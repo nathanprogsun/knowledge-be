@@ -86,3 +86,19 @@ A change that fails any gate cannot merge.
 - All I/O is `async`.
 - Services and DAOs are `async def`.
 - Blocking calls via `asyncio.to_thread` or workers.
+
+## 9. DB-row → service-DTO projection (`map_from_db`)
+
+Service-output DTOs that mirror a storage row expose a
+`map_from_db(cls, db: <StorageModel>) -> Self` classmethod performing
+the boundary translation. The db layer never references the wire DTO
+(§1); the service calls ``XxxInfo.map_from_db(row)``.
+
+- Defined on the DTO (in ``core``), not on the ``TableModel``.
+- Strips sensitive / storage-only columns (e.g. ``password_hash``,
+  ``deleted_at``); the exclude-set is a module-level ``frozenset`` next
+  to the DTO.
+- Hydrates nested typed sub-models from JSON-backed columns via a
+  ``from_json`` classmethod that accepts both parsed ``dict`` and raw
+  JSON ``str`` (driver-portability).
+- ``web`` receives the projected DTO; it never calls ``map_from_db``.

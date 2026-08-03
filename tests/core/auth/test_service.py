@@ -67,37 +67,31 @@ class FakeUserRepository:
 
     Holds the session in ``__init__`` (mirroring the real repo's
     contract) but never executes against it — reads/writes hit the
-    in-memory ``users`` dict instead.
+    in-memory ``users`` dict instead. Method signatures mirror the
+    real ``UserRepository``: finders return storage ``User`` rows
+    (the service projects them to ``UserInfo`` via
+    ``UserInfo.map_from_db``).
     """
 
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
         self.users: dict[str, User] = {}  # storage rows (with password_hash)
 
-    async def find_by_email(self, email: str) -> UserInfo:
-        for u in self.users.values():
-            if u.email == email:
-                return _to_info(u)
-        raise NotFoundError(code="user.not_found", message=f"User {email} not found")
-
-    async def find_by_id(self, user_id: str) -> UserInfo:
-        user = self.users.get(user_id)
-        if user is None:
-            raise NotFoundError(code="user.not_found", message=f"User {user_id} not found")
-        return _to_info(user)
-
-    async def find_by_email_with_credentials(self, email: str) -> User:
+    async def find_by_email(self, email: str) -> User:
         for u in self.users.values():
             if u.email == email:
                 return u
         raise NotFoundError(code="user.not_found", message=f"User {email} not found")
 
-    async def insert(self, row: object) -> None:
-        return None
+    async def find_by_id(self, user_id: str) -> User:
+        user = self.users.get(user_id)
+        if user is None:
+            raise NotFoundError(code="user.not_found", message=f"User {user_id} not found")
+        return user
 
-
-def _to_info(user: User) -> UserInfo:
-    return UserInfo.model_validate(user.model_dump(exclude={"password_hash", "deleted_at"}))
+    async def insert(self, row: User) -> User:
+        self.users[row.id] = row
+        return row
 
 
 class FakeAuthTokenRepository:
@@ -108,9 +102,10 @@ class FakeAuthTokenRepository:
         self.tokens: dict[str, AuthToken] = {}
         self.by_value: dict[str, str] = {}
 
-    async def insert(self, row: AuthToken) -> None:
+    async def insert(self, row: AuthToken) -> AuthToken:
         self.tokens[row.id] = row
         self.by_value[row.token] = row.id
+        return row
 
     async def find_by_token_value(self, token: str) -> AuthToken:
         token_id = self.by_value.get(token)

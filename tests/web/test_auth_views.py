@@ -18,7 +18,6 @@ from httpx import ASGITransport, AsyncClient
 
 from src.app_context.lifespan import create_app
 from src.core.auth.service import AuthService
-from src.core.auth.types import UserInfo
 from src.db.models.auth.auth_tokens import AuthToken
 from src.db.models.auth.users import User
 from src.util.security import hash_password
@@ -28,12 +27,17 @@ from src.web.deps import get_auth_service
 
 
 class _FakeUserRepo:
-    """In-memory ``UserRepository`` replacement."""
+    """In-memory ``UserRepository`` replacement.
+
+    Finders return storage ``User`` rows (the service projects them to
+    ``UserInfo`` via ``UserInfo.map_from_db``), mirroring the real repo
+    contract.
+    """
 
     def __init__(self) -> None:
         self.users: dict[str, User] = {}
 
-    async def find_by_email_with_credentials(self, email: str) -> User:
+    async def find_by_email(self, email: str) -> User:
         for u in self.users.values():
             if u.email == email:
                 return u
@@ -41,16 +45,17 @@ class _FakeUserRepo:
 
         raise NotFoundError(code="user.not_found", message=f"User {email} not found")
 
-    async def find_by_id(self, user_id: str) -> UserInfo:
+    async def find_by_id(self, user_id: str) -> User:
         user = self.users.get(user_id)
         if user is None:
             from src.common.exception import NotFoundError
 
             raise NotFoundError(code="user.not_found", message=f"User {user_id} not found")
-        return UserInfo.model_validate(user.model_dump(exclude={"password_hash", "deleted_at"}))
+        return user
 
-    async def insert(self, row: object) -> None:
-        pass
+    async def insert(self, row: User) -> User:
+        self.users[row.id] = row
+        return row
 
 
 class _FakeTokenRepo:
@@ -60,9 +65,10 @@ class _FakeTokenRepo:
         self.tokens: dict[str, AuthToken] = {}
         self._by_value: dict[str, str] = {}
 
-    async def insert(self, row: AuthToken) -> None:
+    async def insert(self, row: AuthToken) -> AuthToken:
         self.tokens[row.id] = row
         self._by_value[row.token] = row.id
+        return row
 
     async def find_by_token_value(self, token: str) -> AuthToken:
         tid = self._by_value.get(token)

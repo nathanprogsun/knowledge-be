@@ -18,6 +18,8 @@ class AuthToken(TableModel):
     """One row of the `auth_tokens` table."""
 
     table: ClassVar[str] = "auth_tokens"
+    primary_keys: ClassVar[tuple[str, ...]] = ("id",)
+    json_columns: ClassVar[tuple[str, ...]] = ()
 
     id: str
     user_id: str

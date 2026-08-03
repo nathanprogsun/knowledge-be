@@ -5,8 +5,8 @@ Mirrors `internal/types/user.go::User`. The Python `User` and the Python
 full storage row (including ``password_hash``) used inside the
 repository and service; ``UserInfo`` is the wire-side projection (no
 ``password_hash``, no ``deleted_at``) returned to the web layer and
-external clients. The boundary translation lives in
-``UserRepository._to_info``.
+external clients. The boundary translation (``UserInfo.map_from_db``)
+lives in the auth service, not the repository, per AGENTS.md §1.
 """
 
 from __future__ import annotations
@@ -23,6 +23,8 @@ class User(TableModel):
     """One row of the `users` table."""
 
     table: ClassVar[str] = "users"
+    primary_keys: ClassVar[tuple[str, ...]] = ("id",)
+    json_columns: ClassVar[tuple[str, ...]] = ("preferences",)
 
     id: str
     username: str
