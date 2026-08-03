@@ -1,9 +1,8 @@
 """Storage row for the `auth_tokens` table.
 
-Mirrors ``internal/types/user.go::AuthToken``. Tokens are stored verbatim
-in the ``token`` column (no hashing at rest) — the upstream choice. The
-plaintext storage keeps ``validate_by_token_value`` O(1) by exact match
-and survives replay attacks via the ``is_revoked`` flag.
+Tokens are stored verbatim in the `token` column (no hashing at rest),
+so `validate_by_token_value` resolves them in O(1) by exact match and
+replay attacks are blocked via the `is_revoked` flag.
 """
 
 from __future__ import annotations

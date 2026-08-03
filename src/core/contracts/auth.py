@@ -39,12 +39,11 @@ class ChangePasswordRequest(BaseModel):
 
 
 class AuthUser(BaseModel):
-    """HTTP wire user — mirrors Go ``types.User`` as serialized on the wire.
+    """HTTP wire representation of an authenticated user.
 
-    The upstream ``AuthLoginResponse.User`` is typed ``*types.User``; the
-    ``password_hash`` column is ``json:"-"`` (never serialized), so the
-    wire shape is the full storage struct minus the hash. ``is_system_admin``,
-    ``preferences`` and ``deleted_at`` all round-trip over the wire.
+    The password hash is intentionally omitted from this serialized model.
+    ``is_system_admin``, ``preferences``, and ``deleted_at`` are included in
+    the wire representation.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -64,11 +63,10 @@ class AuthUser(BaseModel):
 
 
 class RegisterResponse(BaseModel):
-    """Mirrors ``handler/dto/auth.go::AuthRegisterResponse``.
+    """Registration response containing the user, active tenant, and memberships.
 
-    Field names match the Go DTO (``active_tenant`` not ``tenant``); the
-    ``memberships`` list carries the caller's role across every tenant
-    they belong to.
+    ``active_tenant`` identifies the current tenant, while ``memberships``
+    carries the caller's role for each tenant they belong to.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -81,7 +79,7 @@ class RegisterResponse(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    """Mirrors ``handler/dto/auth.go::AuthLoginResponse``."""
+    """Login response containing session tokens and tenant context."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -95,10 +93,10 @@ class LoginResponse(BaseModel):
 
 
 class OIDCCallbackResponse(BaseModel):
-    """Mirrors ``handler/dto/auth.go::AuthOIDCCallbackResponse``.
+    """OIDC callback response containing session tokens and tenant context.
 
-    Same shape as ``LoginResponse`` — the OIDC code-exchange path ends
-    in the same downstream session-establishment state.
+    It has the same shape as ``LoginResponse`` because both flows establish
+    an authenticated session.
     """
 
     model_config = ConfigDict(frozen=True)

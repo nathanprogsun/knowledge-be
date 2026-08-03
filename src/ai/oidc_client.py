@@ -1,40 +1,7 @@
 """OIDC HTTP client - discovery, code exchange, userinfo fetch.
 
-Mirrors the network-side of the upstream OIDC flow in
-``internal/application/service/user.go`` (``populateOIDCEndpoints`` /
-``exchangeOIDCCode`` / ``fetchOIDCUserInfo`` / ``decodeJWTClaims``).
-
-This module lives in the ``ai`` layer: it imports only ``common`` and
-``util`` (AGENTS.md §1) and returns its own result dataclasses
-(``OIDCDiscoveryDocument`` / ``OIDCTokenResponse`` / ``OIDCUserInfoClaims``).
-The ``core`` layer (``OidcService``) maps these onto domain DTOs - the
-``ai`` layer never references ``core`` or ``db`` types.
-
-SSRF hardening
---------------
-
-Every endpoint URL is validated by :func:`validate_ssrf_safe_url` before
-the request is dispatched - porting the upstream ``ValidateURLForSSRF``
-core: scheme must be http/https, no IP literals, no restricted
-hostnames/suffixes (``localhost``, ``.internal``, ``.local`` …), and DNS
-resolution must not land on private/loopback/link-local/reserved IPs.
-The ``SSRF_WHITELIST`` env var (exact host / ``*.suffix`` / IP / CIDR)
-bypasses the heavy checks. DNS resolution runs in a thread
-(``asyncio.to_thread``) so the event loop is not blocked.
-
-Known gap vs. the upstream: the Go ``NewSSRFSafeHTTPClient`` pins the
-resolved IP via a custom ``net.Dialer`` to defeat DNS rebinding across
-the validation→request window; httpx has no equivalent transport hook,
-so this client validates at call time only. Acceptable for PR-4; the
-rebinding hardening is tracked as a follow-up.
-
-id_token signature
-------------------
-
-``decode_jwt_claims_unverified`` base64-decodes the payload **without**
-verifying the provider signature, matching the upstream
-``decodeJWTClaims``. Proper id_token verification (JWKS) is a follow-up;
-this keeps behaviour aligned with the Go source.
+Validates provider URLs at call time to avoid SSRF; decodes id_token
+claims without signature verification. Returns own result dataclasses.
 """
 
 from __future__ import annotations
@@ -55,9 +22,9 @@ import httpx
 from src.common.exception import ApplicationError, ExternalServiceError, ValidationError
 
 # ── JSON value type ──────────────────────────────────────────────────
-# Recursive alias so claim dicts never need ``Any`` / ``object``
-# (AGENTS.md §1). The string forward refs resolve through the module
-# namespace; ``from __future__ import annotations`` is not required for
+# Recursive alias so claim dicts never need ``Any`` / ``object``.
+# The string forward refs resolve through the module namespace;
+# ``from __future__ import annotations`` is not required for
 # ``TypeAlias`` runtime evaluation but keeps mypy happy with the cycle.
 
 JsonScalar: TypeAlias = str | int | float | bool | None
@@ -188,7 +155,7 @@ def _is_ip_like_hostname(hostname: str) -> bool:
     Covers the common forms: bare decimal (``2130706433``), dotted hex
     (``0x7f.0.0.1``), dotted octal (``0177.0.0.1``). Not exhaustive - the
     main SSRF vector (direct dotted-decimal) is caught by
-    ``ipaddress.ip_address`` upstream.
+    ``ipaddress.ip_address``.
     """
     if hostname.isdigit():
         try:
@@ -216,7 +183,6 @@ def _is_ip_like_hostname(hostname: str) -> bool:
 async def validate_ssrf_safe_url(raw_url: str) -> None:
     """Raise ``ValidationError`` if ``raw_url`` is not SSRF-safe.
 
-    Mirrors the upstream ``ValidateURLForSSRF`` + ``isSSRFSafeURL`` core.
     DNS resolution runs in a worker thread; everything else is cheap.
     """
     if not raw_url:
@@ -292,9 +258,9 @@ def _resolve_host(hostname: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6A
 def decode_jwt_claims_unverified(id_token: str) -> dict[str, JsonValue]:
     """Decode the payload claims of ``id_token`` without signature check.
 
-    Mirrors the upstream ``decodeJWTClaims``: split on ``.``, base64url-
-    decode the payload segment, JSON-parse. Returns an empty dict on any
-    malformed input (the caller treats missing claims as a soft failure).
+    Split on ``.``, base64url-decode the payload segment, JSON-parse.
+    Returns an empty dict on any malformed input (the caller treats
+    missing claims as a soft failure).
     """
     parts = id_token.split(".")
     if len(parts) < 2:
@@ -457,13 +423,8 @@ class OidcClient:
     ) -> OIDCUserInfoClaims:
         """Merge id_token + userinfo claims, project ``subject``/``username``/``email``.
 
-        Mirrors the upstream ``resolveOIDCUserInfo``: id_token claims are
-        decoded first; the userinfo endpoint (when configured and an access
-        token is present) is fetched and merged on top. The userinfo fetch
-        is best-effort - on failure the id_token claims alone suffice
-        (matching the upstream warn-and-continue). If neither source yields
-        any claims, ``ExternalServiceError`` is raised rather than silently
-        returning an empty projection.
+        Userinfo fetch is best-effort; on failure id_token claims suffice.
+        Raises ``ExternalServiceError`` if no claims are available.
         """
         claims: dict[str, JsonValue] = {}
         if id_token:
@@ -471,8 +432,7 @@ class OidcClient:
         if user_info_endpoint and access_token:
             # Best-effort: any ApplicationError from fetch_userinfo (HTTP
             # failure via ExternalServiceError, or SSRF block via
-            # ValidationError) falls back to id_token claims - matching the
-            # upstream warn-and-continue which catches any fetch error.
+            # ValidationError) falls back to id_token claims.
             with contextlib.suppress(ApplicationError):
                 claims.update(
                     await self.fetch_userinfo(
@@ -527,7 +487,7 @@ class OidcClient:
 
 
 def _as_str(value: JsonValue) -> str:
-    """Coerce a claim value to a trimmed string (mirrors ``extractClaimAsString``)."""
+    """Coerce a claim value to a trimmed string."""
     if value is None:
         return ""
     if isinstance(value, str):

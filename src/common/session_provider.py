@@ -1,8 +1,8 @@
 """Async session context manager with commit/rollback semantics.
 
 DAO functions accept an `AsyncSession` and never commit or rollback
-themselves (see project conventions in AGENTS.md). `session_scope` is the
-canonical wrapper used by service-layer code to bound a unit of work.
+themselves. `session_scope` is the canonical wrapper used by service
+code to bound a unit of work.
 """
 
 from __future__ import annotations

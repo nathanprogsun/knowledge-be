@@ -1,34 +1,9 @@
 """Auth-token persistence — raw SQL only, no ORM.
 
-Maps the methods declared in the upstream
-``internal/types/interfaces/user.go::AuthTokenRepository`` interface.
 ``insert`` and ``find_by_token_value`` lean on ``GenericRepository``;
-``revoke`` / ``revoke_all_for_user`` / ``delete_expired`` are
-domain-specific (they use conditional UPDATE/DELETE that return row
-counts rather than model instances). Every query uses named
-``bindparams``. ``is_revoked = TRUE`` rows are kept (not soft-deleted)
-so audit logs and replay-attack checks remain possible.
-
-Session ownership
------------------
-
-Per the cookiecutter-fastapi pattern, the repository holds its
-``AsyncSession`` in ``__init__`` (inherited from ``GenericRepository``).
-
-Error semantics
----------------
-
-``find_by_token_value`` raises ``NotFoundError(code="token.not_found")``
-when no row matches — mirroring the upstream ``ErrTokenNotFound``
-sentinel. Services translate this into domain errors (e.g. a revoked
-or unknown refresh token becomes an ``UnauthorizedError``).
-
-SQL style
----------
-
-Statements are inlined in each method (``text(...).bindparams(...)``)
-rather than hoisted to module constants — this mirrors the
-cookiecutter-fastapi DAO style and keeps the SQL next to its logic.
+``revoke`` / ``revoke_all_for_user`` / ``delete_expired`` use
+conditional UPDATE / DELETE that return row counts. ``is_revoked = TRUE``
+rows are kept (not soft-deleted) so audit logs remain possible.
 """
 
 from __future__ import annotations
@@ -45,8 +20,8 @@ from src.db.models.auth.auth_tokens import AuthToken
 
 
 class AuthTokenRepository(GenericRepository[AuthToken]):
-    """Auth-token SQL — domain-specific queries live here, common CRUD
-    on the base class.
+    """Auth-token SQL — common CRUD on the base class, domain
+    revocation / cleanup queries here.
     """
 
     model_class = AuthToken
@@ -54,9 +29,9 @@ class AuthTokenRepository(GenericRepository[AuthToken]):
     async def find_by_token_value(self, token: str) -> AuthToken:
         """Look up a token by its raw value.
 
-        Raises ``NotFoundError`` when no row matches (including revoked
-        rows — those are returned normally so the caller can check the
-        ``is_revoked`` flag).
+        Revoked rows are returned normally so the caller can inspect
+        the ``is_revoked`` flag; only an absent row raises
+        ``NotFoundError``.
         """
         result = await self.find_unique_by_column_values(
             {"token": token},
