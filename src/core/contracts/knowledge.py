@@ -13,7 +13,7 @@ class ChunkingParserEngineRule(BaseModel):
 
 
 class WikiConfig(BaseModel):
-    """Mirrors ``types.WikiConfig`` — wiki-ingest knobs for a KB."""
+    """Wiki-ingest settings for a knowledge base."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -24,7 +24,7 @@ class WikiConfig(BaseModel):
 
 
 class IndexingStrategy(BaseModel):
-    """Mirrors ``types.IndexingStrategy`` — which pipelines are active for a KB."""
+    """Flags indicating which knowledge-base pipelines are active."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -109,14 +109,11 @@ class QuestionGenerationConfig(BaseModel):
 
 
 class KnowledgeBase(BaseModel):
-    """Mirrors ``internal/types/knowledgebase.go::KnowledgeBase``.
+    """Knowledge-base representation with persisted data and response enrichments.
 
-    Field set matches the Go struct: storage columns (persisted) plus
-    response-only enrichments (knowledge_count, chunk_count,
-    processing_count, share_count, creator_name, my_permission,
-    vector_store_name/source/engine_type/status) stamped in by the list
-    handler. ``is_processing`` and ``share_count`` are runtime-only
-    fields flagged ``gorm:"-"`` upstream.
+    List responses may include counts, creator details, permissions, and
+    vector-store status. ``is_processing`` and ``share_count`` are runtime-only
+    response fields.
     """
 
     model_config = ConfigDict(frozen=True)

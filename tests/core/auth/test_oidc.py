@@ -1,16 +1,9 @@
 """Unit tests for ``src.core.auth.oidc.OidcService``.
 
-Covers the PR-4 scope: authorization-URL building + signed-state
-round-trip, and the existing-user bind path of ``login_with_oidc``.
-New-user provisioning is asserted to raise
-``ExternalServiceError(code="oidc.provisioning_unavailable")`` - it is
-deferred until the Register flow + tenant services land.
-
-The ``OidcClient`` is replaced by an in-memory fake so no HTTP is hit;
-the real ``UserRepository`` / ``AuthTokenRepository`` are also faked
-(mirroring ``tests/core/auth/test_service.py``). ``mint_token_pair`` runs
-for real (real JWT signing against a test ``JWT_SECRET_KEY``) so the
-issued access/refresh tokens are verifiable end-to-end.
+Covers authorization-URL building + signed-state round-trip and the
+existing-user bind path; new-user provisioning raises
+``oidc.provisioning_unavailable``. ``OidcClient`` and repos are faked;
+``mint_token_pair`` runs for real.
 """
 
 from __future__ import annotations
@@ -276,11 +269,7 @@ async def test_login_with_oidc_missing_email_raises() -> None:
 
 
 async def test_login_with_oidc_inactive_user_returns_failure() -> None:
-    """Inactive user -> success=False (HTTP 200 body), not a raise.
-
-    Mirrors upstream ``LoginWithOIDC`` returning
-    ``{Success:false, Message:"Account is disabled"}`` with nil error.
-    """
+    """Inactive user -> success=False (HTTP 200 body), not a raise."""
     users = _FakeUsersRepo()
     _seed_user(users, email="alice@example.com", is_active=False)
     tokens = _FakeTokensRepo()

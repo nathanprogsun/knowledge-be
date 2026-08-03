@@ -1,8 +1,8 @@
 """Integration tests for `UserRepository` against a real Postgres.
 
-A testcontainer spins up Postgres 16 per test session; each test gets a
-fresh `users` schema on top of the shared container so writes are
-hermetic. The DDL mirrors `alembic/versions/0001_users.py`.
+The session-scoped `pg_url` fixture (tests/conftest.py) provides the
+container; each test gets a fresh `users` schema on top of it so writes
+are hermetic. The DDL mirrors `alembic/versions/0001_users.py`.
 
 The fixture skips the suite when no Docker daemon is available (CI
 runners without Docker, sandboxes) — the repository code itself is
@@ -23,8 +23,6 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from testcontainers.community.postgres import PostgresContainer
-from testcontainers.core.exceptions import ContainerStartException
 
 from src.common.exception import ConflictError, NotFoundError
 from src.db.dao.users_repository import UserRepository
@@ -51,23 +49,6 @@ _CREATE_USERS_SQL = sqlalchemy.text(
     )
     """
 )
-
-
-@pytest.fixture(scope="session")
-def pg_url() -> str:
-    """Spin up a Postgres container once per session; yield its async URL."""
-    try:
-        container = PostgresContainer("postgres:16-alpine")
-        container.start()
-    except ContainerStartException as exc:  # pragma: no cover — env-dependent
-        pytest.skip(f"Docker not available for Postgres testcontainer: {exc}")
-    except Exception as exc:  # pragma: no cover — env-dependent (sandbox perms, etc.)
-        pytest.skip(f"Postgres testcontainer could not start ({type(exc).__name__}): {exc}")
-    try:
-        sync_url = container.get_connection_url()
-    finally:
-        container.stop()
-    return sync_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 
 @pytest.fixture
@@ -245,7 +226,11 @@ async def test_soft_delete_excludes_from_reads(session: AsyncSession) -> None:
     await repo.insert(row)
     await session.commit()
 
-    now = datetime.now(UTC)
+    # A fixed past timestamp, not the host clock: the soft-delete filter
+    # compares `deleted_at` against the DB's clock, and the testcontainer
+    # clock lags the host, so a now()-derived value can read as a
+    # future-dated delete and the row survives.
+    now = datetime(2026, 1, 1, tzinfo=UTC)
     await repo.update_by_primary_key_or_fail(
         {"id": row.id},
         {"deleted_at": now, "updated_at": now},
@@ -304,7 +289,9 @@ async def test_list_excludes_soft_deleted(session: AsyncSession) -> None:
     )
     await session.commit()
 
-    now = datetime.now(UTC)
+    # Fixed past timestamp — see the note in
+    # test_soft_delete_excludes_from_reads about container clock skew.
+    now = datetime(2026, 1, 1, tzinfo=UTC)
     await repo.update_by_primary_key_or_fail(
         {"id": "usr-drop"},
         {"deleted_at": now, "updated_at": now},

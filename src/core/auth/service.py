@@ -1,45 +1,4 @@
-"""Auth service — login, token lifecycle, logout.
-
-Maps the auth-related methods on
-``internal/application/service/user.go::userService`` (the upstream places
-these on ``userService`` rather than a separate ``authService``).
-Operations:
-
-- ``login`` — verify email + bcrypt password, mint an access/refresh
-  pair, persist both rows in ``auth_tokens``.
-- ``validate_token`` — decode the JWT, reject revoked/refresh tokens,
-  load the user, return ``(UserInfo, active_tenant_id)``.
-- ``refresh`` — verify a refresh token, revoke the old row, mint a
-  fresh pair.
-- ``logout`` — bulk-revoke every outstanding token for the user.
-- ``revoke_token`` — mark a single token revoked (by raw token value).
-
-Session and repository ownership
---------------------------------
-
-Per the cookiecutter-fastapi pattern (and AGENTS.md §7.2), the
-service depends **only** on its repositories — it does not hold a
-``AsyncSession``. Each repository owns its ``AsyncSession`` in
-``__init__`` (all repos share the same per-request session); the
-service calls ``self._users_repo.xxx(...)`` / ``self._tokens_repo.xxx(...)``
-and never touches the session directly.
-
-Construction flow (web layer, next PR):
-
-    async with session_scope(session_factory) as session:
-        users_repo = UserRepository(session)
-        tokens_repo = AuthTokenRepository(session)
-        svc = AuthService(
-            users_repo=users_repo,
-            tokens_repo=tokens_repo,
-        )
-        result = await svc.login(email=..., password=...)
-
-Repository dependencies are passed in via the constructor — the service
-never instantiates ``UserRepository()`` or ``AuthTokenRepository()``
-itself. ``app_context/lifespan.py`` (next PR) builds the concrete
-repos at startup; the request factory threads the shared session.
-"""
+"""Auth service - login, token lifecycle, logout."""
 
 from __future__ import annotations
 
@@ -82,9 +41,8 @@ async def mint_token_pair(
     """Mint an access/refresh JWT pair and persist both rows in ``auth_tokens``.
 
     Shared by ``AuthService`` (password login / refresh) and ``OidcService``
-    (OIDC login). Mirrors the mint step of the upstream
-    ``generateTokensForTenant``: two ``auth_tokens`` rows (access + refresh)
-    bound to ``info.id``.
+    (OIDC login): two ``auth_tokens`` rows (access + refresh) bound to
+    ``info.id``.
     """
     access, access_exp = create_access_token(
         user_id=info.id,
@@ -127,12 +85,7 @@ async def mint_token_pair(
 
 
 class AuthService:
-    """Stateless auth service — session is owned for the request lifetime.
-
-    A new instance is constructed by the web layer per request via
-    ``Depends(get_auth_service)``. Repository dependencies are injected;
-    the service does not instantiate them.
-    """
+    """Stateless auth service - session is owned for the request lifetime."""
 
     def __init__(
         self,
@@ -228,9 +181,8 @@ class AuthService:
         """Bulk-revoke every outstanding token for the token's owner.
 
         Returns the number of rows that flipped from active to revoked.
-        Mirrors the upstream ``Logout`` semantics: any JWT (expired or
-        not) is accepted as long as it decodes, so clients can end the
-        session even after the access token TTL.
+        Any JWT (expired or not) is accepted as long as it decodes, so
+        clients can end the session even after the access token TTL.
         """
         try:
             claims = decode_token(token)

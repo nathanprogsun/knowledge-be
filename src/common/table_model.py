@@ -1,34 +1,11 @@
 """Pydantic-based TableModel - the project's chosen ORM substitute.
 
 Persistence is done with raw SQL via `sqlalchemy.text()` and named
-`bindparams`; see project conventions in AGENTS.md. TableModels are
-frozen Pydantic models that double as row shapes and bindparam dicts.
-
-Repositories receive an `AsyncSession`, build SQL with `sqlalchemy.text(...)`,
-and pass `row.model_dump()` (or a subset) as bindparams. Subclasses must
-remain frozen and use concrete field types.
-
-The ``table`` attribute on every subclass is a ``ClassVar[str]`` - it is
-metadata (the SQL table name), not a DB column. Using ``ClassVar``
-ensures Pydantic v2 does NOT treat it as a model field, so it stays out
-of ``model_fields`` / ``model_dump()`` / INSERT + SELECT column lists.
-
-Primary-key metadata
---------------------
-
-Every subclass declares its primary-key column name(s) via the
-``primary_keys: ClassVar[tuple[str, ...]]`` attribute (defaults to
-``("id",)``). ``GenericRepository`` reads it to build WHERE-by-pk,
-ON CONFLICT, and validate clauses. Multi-column primary keys are
-supported by listing every column in declaration order.
-
-JSON columns
-------------
-
-Subclasses declare which columns are JSON/JSONB via the
-``json_columns: ClassVar[tuple[str, ...]]`` attribute. The repository
-attaches ``bindparam(col, type_=JSONB)`` to those so the driver does
-not require implicit ``json.dumps``.
+`bindparams`. TableModels are frozen Pydantic models that double as
+row shapes and bindparam dicts. Repositories receive an `AsyncSession`,
+build SQL with `sqlalchemy.text(...)`, and pass `row.model_dump()` (or
+a subset) as bindparams. Subclasses must remain frozen and use concrete
+field types.
 """
 
 from __future__ import annotations
@@ -82,7 +59,7 @@ class TableModel(BaseModel):
     def ordered_primary_keys(cls) -> tuple[str, ...]:
         """Primary-key column names in declaration order.
 
-        Raises ``ValidationError`` if a declared pk is not a model field —
+        Raises ``ValidationError`` if a declared pk is not a model field -
         this catches schema drift at class-creation time rather than at
         SQL execution.
         """
@@ -135,8 +112,8 @@ class TableModel(BaseModel):
         Accepts a list, dict keys, or any iterable of column names. Raises
         ``ValidationError`` on the first unknown column so DAOs fail fast
         on bad input rather than at SQL execution time. ``ValidationError``
-        is an ``ApplicationError`` subclass (AGENTS.md §5): callers in the
-        ``web`` layer translate it to a 4xx response.
+        is an ``ApplicationError`` subclass: callers in the ``web`` layer
+        translate it to a 4xx response.
         """
         fields = cls.column_fields()
         keys = columns.keys() if isinstance(columns, Mapping) else columns

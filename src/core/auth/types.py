@@ -1,26 +1,9 @@
-"""Internal DTOs for the `auth` domain.
+"""Internal DTOs for the auth domain.
 
-These are service-output projections, not the HTTP wire shape. The
-HTTP wire shape is in ``src/core/contracts/auth.py::AuthUser``.
-
-`UserInfo` mirrors ``internal/types/user.go::UserInfo``: a stripped view
-of the `users` row with the sensitive fields (``password_hash``,
-``deleted_at``) removed. Services return ``UserInfo`` to the web layer
-once authentication is complete; the password hash never leaves the
-auth service.
-
-`UserPreferences` mirrors ``types.UserPreferences``.
-
-DB-row projection convention
------------------------------
-
-Each service-output DTO that mirrors a storage row exposes a
-``map_from_db(cls, db) -> Self`` classmethod performing the boundary
-translation: stripping storage-only / sensitive columns, hydrating
-nested typed sub-models from JSON-backed dicts, and defensively
-``json.loads``-ing raw-string JSON that some drivers surface. The
-service layer calls ``UserInfo.map_from_db(user)``; the db layer never
-references the wire DTO (AGENTS.md §1).
+Service-output projections, not the HTTP wire shape. The HTTP wire shape
+lives in ``src/core/contracts/auth.py::AuthUser``. ``UserInfo`` is a
+stripped view of the ``users`` row with the sensitive fields
+(``password_hash``, ``deleted_at``) removed.
 """
 
 from __future__ import annotations
@@ -51,9 +34,7 @@ class UserPreferences(BaseModel):
     def from_json(cls, raw: dict[str, object] | str | None) -> UserPreferences:
         """Build from the JSON-backed ``preferences`` column value.
 
-        Postgres (asyncpg) returns a parsed ``dict``; some drivers / a
-        raw ``text`` column surface a JSON string. We accept both and
-        ``json.loads`` the latter defensively.
+        Accepts both a parsed ``dict`` and a raw JSON string.
         """
         if raw is None or raw == "":
             return cls()
@@ -63,14 +44,7 @@ class UserPreferences(BaseModel):
 
 
 class UserInfo(BaseModel):
-    """Wire-side projection of a `users` row.
-
-    Mirrors ``internal/types/user.go::UserInfo``: the same field set as
-    the storage ``User`` minus the sensitive columns
-    (``password_hash``, ``deleted_at``). The service owns the
-    ``User`` row during the login flow, then returns this
-    ``UserInfo`` to the web layer.
-    """
+    """Wire-side projection of a ``users`` row (sensitive columns stripped)."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -88,13 +62,7 @@ class UserInfo(BaseModel):
 
     @classmethod
     def map_from_db(cls, db: User) -> Self:
-        """Project a storage ``User`` row to the wire-side ``UserInfo``.
-
-        Strips ``password_hash`` (sensitive) and ``deleted_at``
-        (storage-only soft-delete flag). Hydrates the typed
-        :class:`UserPreferences` from the JSON-backed ``preferences``
-        column value via :meth:`UserPreferences.from_json`.
-        """
+        """Project a storage ``User`` row to the wire-side ``UserInfo``."""
         record = db.model_dump(exclude=set(_USER_EXCLUDE_COLUMNS))
         record["preferences"] = UserPreferences.from_json(record.get("preferences"))
         return cls.model_validate(record)

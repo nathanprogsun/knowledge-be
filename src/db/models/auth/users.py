@@ -1,12 +1,9 @@
 """Storage row for the `users` table.
 
-Mirrors `internal/types/user.go::User`. The Python `User` and the Python
-`UserInfo` (in `src/core/auth/types.py`) are layered: ``User`` is the
-full storage row (including ``password_hash``) used inside the
-repository and service; ``UserInfo`` is the wire-side projection (no
-``password_hash``, no ``deleted_at``) returned to the web layer and
-external clients. The boundary translation (``UserInfo.map_from_db``)
-lives in the auth service, not the repository, per AGENTS.md §1.
+The Python `User` and the wire-side projection `UserInfo` (in
+`src/core/auth/types.py`) are layered: `User` is the full storage row
+(including `password_hash`); `UserInfo` drops `password_hash` and
+`deleted_at`. The boundary translation lives in the auth service.
 """
 
 from __future__ import annotations

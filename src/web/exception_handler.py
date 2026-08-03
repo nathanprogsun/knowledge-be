@@ -1,13 +1,8 @@
 """Exception handler mapping ``ApplicationError`` subclasses to HTTP status.
 
-Per AGENTS.md §6.6, ``web`` is the ONLY layer that knows about HTTP status.
-Services raise ``ApplicationError`` subclasses; this single handler converts
-them to JSON responses in the ``ErrorResponse`` wire shape
-(see ``src/core/contracts/shared.py``).
-
-The MRO walk lets subclasses of ``ExternalServiceError`` (e.g.
-``AIProviderError``, ``StorageBackendError``) inherit their parent's status
-without each appearing in the map explicitly.
+The web layer is the only layer that maps errors to HTTP status. The
+MRO walk lets subclasses inherit their parent's status without each
+appearing in the map explicitly.
 """
 
 from __future__ import annotations

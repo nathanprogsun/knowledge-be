@@ -1,65 +1,12 @@
-"""Generic CRUD helpers for raw-SQL TableModel repositories.
+"""Generic raw-SQL CRUD helpers for ``TableModel`` repositories.
 
-Concrete repositories (``UserRepository``, ``AuthTokenRepository``, …)
-inherit from ``GenericRepository[TheirModelType]`` and pick up the
-boilerplate ``insert`` / ``insert_or_none`` / ``find_by_*`` /
-``update_by_primary_key`` implementations. Domain-specific queries
-(``find_by_email``, ``soft_delete``, ``revoke``, …) stay on the
+Concrete repositories inherit from ``GenericRepository[TheirModelType]``
+and pick up ``insert`` / ``insert_or_none`` / ``find_by_*`` /
+``update_by_primary_key``. Domain-specific queries stay on the
 concrete subclasses.
 
-Why a base class? Without it, every concrete repo repeats the same
-INSERT / SELECT-by-column / UPDATE-by-pk SQL — about 40-60 lines per
-repo, varying only in the model type. Pushing the common shape behind
-``Generic[ModelType]`` keeps each concrete repo focused on what is
-actually unique.
-
-Why raw SQL? Per AGENTS.md §6.5, this project deliberately avoids the
-SQLAlchemy ORM — every query uses ``sqlalchemy.text()`` with named
-``bindparams``. ``GenericRepository`` follows that rule.
-
-JSON columns
-------------
-
-Models declare JSON/JSONB columns via ``json_columns: ClassVar``.
-``GenericRepository`` attaches ``bindparam(col, type_=JSON)`` for those
-columns on every INSERT and UPDATE. The bind type is
-``JSON().with_variant(JSONB, "postgresql")`` so Postgres uses ``JSONB``
-and the SQLite test dialect uses ``JSON`` — both serialise Python
-``dict``/``list`` automatically.
-
-Soft-delete / archived filtering
--------------------------------
-
-Finders accept ``exclude_deleted_or_archived: bool``. When the model has
-``deleted_at`` / ``archived_at`` columns, the WHERE clause filters rows
-whose timestamp is in the past — mirroring the cookiecutter-fastapi
-``GenericRepository`` semantics (rows are deleted when ``deleted_at`` is
-not null and not in the future).
-
-Error semantics
----------------
-
-``find_*_or_fail`` methods raise ``NotFoundError`` when no row matches.
-``insert`` (no-conflict variant) raises ``ConflictError`` only when the
-caller converts an ``IntegrityError`` — but ``insert_or_none`` uses
-``ON CONFLICT DO NOTHING`` and returns ``None`` instead, which is the
-preferred path.
-
-Session ownership
-------------------
-
-Per the cookiecutter-fastapi pattern, every repository holds its own
-``AsyncSession`` in ``__init__``. The web layer constructs a new repo
-per request via ``Depends(get_xxx_repository)``; tests construct one
-per test.
-
-- A repository is request-scoped — never share an instance across
-  requests.
-- A repository is the **only** layer that opens SQL sessions.
-- Services hold repositories (and the same session) and never call
-  ``session_factory`` or ``session_scope`` themselves.
-- Repositories never commit/rollback — the web-layer session
-  dependency owns the transaction boundary.
+Every query is raw ``sqlalchemy.text()`` with named ``bindparams`` —
+no ORM. Soft-delete and archived filters are applied at every read.
 """
 
 from __future__ import annotations
@@ -80,22 +27,16 @@ from src.common.table_model import TableModel
 
 ModelType = TypeVar("ModelType", bound=TableModel)
 
-# Concrete union of every Python value a ``TableModel`` field may hold —
-# used to type bind parameters without falling back to the forbidden
-# ``Any``/``object`` annotations (AGENTS.md §1).
+# Concrete union of every Python value a ``TableModel`` field may hold.
 BindValue: TypeAlias = str | int | float | bool | datetime | None
 
-# Bind type for JSON columns: JSONB on Postgres, JSON on other dialects
-# (e.g. SQLite in tests). ``with_variant`` makes the dialect pick at
-# compile time.
+# JSONB on Postgres, JSON on other dialects (e.g. SQLite in tests).
 _JSON_BIND_TYPE = JSON().with_variant(JSONB(), "postgresql")
 
 
 class GenericRepository(Generic[ModelType]):
-    """Boilerplate-free raw-SQL CRUD for ``TableModel`` rows.
-
-    Subclasses declare their model via the ``model_class`` class
-    attribute; ``__init__`` takes only the per-request session.
+    """Raw-SQL CRUD for ``TableModel`` rows. Subclasses set
+    ``model_class``; the per-request session comes from ``__init__``.
     """
 
     model_class: type[ModelType]

@@ -25,8 +25,6 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from testcontainers.community.postgres import PostgresContainer
-from testcontainers.core.exceptions import ContainerStartException
 
 from src.app_context.lifespan import create_app
 from src.util.security import hash_password
@@ -79,20 +77,6 @@ _SEED_USER_SQL = sqlalchemy.text(
         :is_active, '{}'::jsonb, :created_at, :updated_at)
     """
 )
-
-
-@pytest.fixture(scope="module")
-def pg_url() -> str:
-    try:
-        container = PostgresContainer("postgres:16-alpine")
-        container.start()
-    except (ContainerStartException, Exception) as exc:
-        pytest.skip(f"Docker not available for Postgres testcontainer: {exc}")
-    try:
-        sync_url = container.get_connection_url()
-    finally:
-        container.stop()
-    return sync_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 
 @pytest.fixture

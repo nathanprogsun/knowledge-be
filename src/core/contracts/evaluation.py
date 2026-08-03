@@ -6,11 +6,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class EvalSummaryConfig(BaseModel):
-    """Mirrors ``types/session.go::SummaryConfig`` (13 fields).
+    """Summary-generation settings for an evaluation task.
 
-    Field names + types match the Go struct 1:1; ``thinking`` is a
-    nullable bool that opts the eval run into extended-thinking mode
-    for models that support it.
+    The nullable ``thinking`` flag enables extended-thinking mode for compatible
+    models.
     """
 
     model_config = ConfigDict(frozen=True)
