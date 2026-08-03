@@ -106,7 +106,7 @@ class OIDCCallbackResponse(BaseModel):
     success: bool
     message: str
     user: AuthUser
-    active_tenant: Tenant
+    active_tenant: Tenant | None = Field(default=None)
     memberships: list[Membership] = Field(default_factory=list)
     token: str
     refresh_token: str

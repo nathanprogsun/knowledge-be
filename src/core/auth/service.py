@@ -74,6 +74,58 @@ class LoginResult:
     refresh_expires_at: datetime
 
 
+async def mint_token_pair(
+    *,
+    tokens_repo: AuthTokenRepository,
+    info: UserInfo,
+) -> LoginResult:
+    """Mint an access/refresh JWT pair and persist both rows in ``auth_tokens``.
+
+    Shared by ``AuthService`` (password login / refresh) and ``OidcService``
+    (OIDC login). Mirrors the mint step of the upstream
+    ``generateTokensForTenant``: two ``auth_tokens`` rows (access + refresh)
+    bound to ``info.id``.
+    """
+    access, access_exp = create_access_token(
+        user_id=info.id,
+        email=info.email,
+        tenant_id=info.tenant_id,
+    )
+    refresh, refresh_exp = create_refresh_token(user_id=info.id)
+    now = datetime.now(UTC)
+    await tokens_repo.insert(
+        AuthToken(
+            id=f"atk-{secrets.token_hex(8)}",
+            user_id=info.id,
+            token=access,
+            token_type="access_token",
+            expires_at=access_exp,
+            is_revoked=False,
+            created_at=now,
+            updated_at=now,
+        ),
+    )
+    await tokens_repo.insert(
+        AuthToken(
+            id=f"atk-{secrets.token_hex(8)}",
+            user_id=info.id,
+            token=refresh,
+            token_type="refresh_token",
+            expires_at=refresh_exp,
+            is_revoked=False,
+            created_at=now,
+            updated_at=now,
+        ),
+    )
+    return LoginResult(
+        user=info,
+        access_token=access,
+        access_expires_at=access_exp,
+        refresh_token=refresh,
+        refresh_expires_at=refresh_exp,
+    )
+
+
 class AuthService:
     """Stateless auth service — session is owned for the request lifetime.
 
@@ -206,44 +258,7 @@ class AuthService:
     # ── Internal helpers ────────────────────────────────────────────
 
     async def _mint_pair(self, info: UserInfo) -> LoginResult:
-        access, access_exp = create_access_token(
-            user_id=info.id,
-            email=info.email,
-            tenant_id=info.tenant_id,
-        )
-        refresh, refresh_exp = create_refresh_token(user_id=info.id)
-        now = datetime.now(UTC)
-        await self._tokens_repo.insert(
-            AuthToken(
-                id=f"atk-{secrets.token_hex(8)}",
-                user_id=info.id,
-                token=access,
-                token_type="access_token",
-                expires_at=access_exp,
-                is_revoked=False,
-                created_at=now,
-                updated_at=now,
-            ),
-        )
-        await self._tokens_repo.insert(
-            AuthToken(
-                id=f"atk-{secrets.token_hex(8)}",
-                user_id=info.id,
-                token=refresh,
-                token_type="refresh_token",
-                expires_at=refresh_exp,
-                is_revoked=False,
-                created_at=now,
-                updated_at=now,
-            ),
-        )
-        return LoginResult(
-            user=info,
-            access_token=access,
-            access_expires_at=access_exp,
-            refresh_token=refresh,
-            refresh_expires_at=refresh_exp,
-        )
+        return await mint_token_pair(tokens_repo=self._tokens_repo, info=info)
 
     async def _validate_token(self, token: str) -> tuple[UserInfo, int | None]:
         try:
@@ -298,4 +313,4 @@ class AuthService:
         return UserInfo.map_from_db(user), tenant_id
 
 
-__all__ = ["AuthService", "LoginResult"]
+__all__ = ["AuthService", "LoginResult", "mint_token_pair"]
