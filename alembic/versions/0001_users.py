@@ -1,22 +1,8 @@
 """Create the `users` table.
 
-Consolidates the three upstream migrations that built up `users`:
-
-  - `migrations/versioned/000001_agent.up.sql` — initial CREATE TABLE
-  - `migrations/versioned/000049_user_preferences.up.sql` — `preferences`
-    JSONB column
-  - `migrations/versioned/000053_system_admin_and_settings.up.sql` —
-    `is_system_admin` column
-
-The Python rewrite starts from a clean schema, so all three land in a
-single migration rather than three sequential ones.
-
-`password_hash` carries the bcrypt digest produced by passlib. `tenant_id`
-is intentionally nullable so user records that pre-date tenant
-provisioning (typical of self-registration) round-trip cleanly without
-violating the FK. `preferences` uses `JSONB` on Postgres (the project's
-deployment target) via `JSON().with_variant(JSONB, "postgresql")` so the
-migration is dialect-portable.
+`password_hash` carries the bcrypt digest. `tenant_id` is nullable so
+pre-provisioning records round-trip without violating the FK.
+`preferences` is JSONB on Postgres via the dialect-portable variant.
 """
 
 from __future__ import annotations

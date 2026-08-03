@@ -1,11 +1,8 @@
 """Unit tests for `AuthService` + `src.util.security`.
 
-Per AGENTS.md §9, core services are tested with Protocol-based fakes
-where they materially reduce test setup. For ``AuthService`` we exercise
-both styles: ``FakeUserRepository`` / ``FakeAuthTokenRepository`` for the
-auth-flow tests, and a real ``UserRepository``/``AuthTokenRepository``
-in ``test_login_uses_real_repositories`` to guard against drift
-between the AuthService signature and the concrete repos.
+Exercises the service with both in-memory fakes and the concrete
+repositories to guard against drift between the AuthService signature
+and the real repo signatures.
 """
 
 from __future__ import annotations

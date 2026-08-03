@@ -1,19 +1,4 @@
-"""Auth HTTP endpoints - login, refresh, logout.
-
-Maps the three auth endpoints from ``internal/handler/auth.go`` whose
-service-layer support already exists in ``AuthService`` (PR-2):
-
-- ``POST /auth/login`` - email + password -> ``LoginResponse``
-- ``POST /auth/refresh`` - refresh token -> ``RefreshTokenResponse``
-- ``POST /auth/logout`` - Bearer token -> ``{success, message}``
-
-The remaining auth endpoints (register, /me, /change-password, OIDC)
-depend on tenant service (PR-5), auth middleware (PR-12), or
-``AuthService`` extensions not yet implemented; they land in later PRs.
-
-Wire-shape conversion (``UserInfo`` -> ``AuthUser``, ``LoginResult`` ->
-``LoginResponse``) lives in this module so the router stays declarative.
-"""
+"""Auth HTTP endpoints - login, refresh, logout."""
 
 from __future__ import annotations
 
@@ -37,7 +22,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 class LogoutResponse(BaseModel):
-    """Wire shape for ``POST /auth/logout`` - matches Go's inline ``gin.H``."""
+    """Wire shape for ``POST /auth/logout``."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -49,12 +34,7 @@ class LogoutResponse(BaseModel):
 
 
 def _user_info_to_auth_user(info: UserInfo) -> AuthUser:
-    """Project the service-layer ``UserInfo`` to the wire ``AuthUser``.
-
-    ``deleted_at`` is always ``None`` on the wire - the service strips it
-    before returning ``UserInfo``. ``preferences`` is re-serialised from
-    the typed ``UserPreferences`` model to the wire ``dict[str, object]``.
-    """
+    """Project the service-layer ``UserInfo`` to the wire ``AuthUser``."""
     return AuthUser(
         id=info.id,
         username=info.username,
@@ -79,12 +59,7 @@ async def login(
     body: LoginRequest,
     auth_service: AuthServiceDep,
 ) -> LoginResponse:
-    """Authenticate with email + password and receive an access/refresh pair.
-
-    The ``active_tenant`` field is ``null`` until the tenant service
-    (PR-5) is wired in; the Go handler populates it from the user's
-    active tenant, which we don't yet resolve.
-    """
+    """Authenticate with email + password and return an access/refresh pair."""
     result = await auth_service.login(email=body.email, password=body.password)
     return LoginResponse(
         success=True,
@@ -120,8 +95,8 @@ async def logout(
     """Revoke every outstanding token for the Bearer token's owner.
 
     Accepts ``Authorization: Bearer <jwt>``. Expired or invalid tokens
-    are accepted as long as they decode - mirroring the Go handler so
-    clients can log out even after the access token TTL.
+    are accepted as long as they decode, so clients can log out even
+    after the access token TTL.
     """
     if not authorization:
         raise _missing_auth_header()

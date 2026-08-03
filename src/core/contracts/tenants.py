@@ -22,7 +22,7 @@ class RetrieverEnginesConfig(BaseModel):
 
 
 class Membership(BaseModel):
-    """A user's role inside one tenant — mirrors ``types.Membership``."""
+    """A user's role inside one tenant."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -32,12 +32,10 @@ class Membership(BaseModel):
 
 
 class Tenant(BaseModel):
-    """HTTP wire shape for a tenant — mirrors ``handler/dto/tenant.go::TenantResponse``.
+    """HTTP wire shape for a tenant.
 
-    Field set matches the Go ``TenantResponse`` struct (17 fields); see
-    ``internal/handler/dto/tenant.go``. All config blobs are optional —
-    they're filled only when the caller's role allows them to see
-    workspace-level secrets.
+    All configuration blobs are optional and are populated only when the
+    caller's role permits access to workspace-level secrets.
     """
 
     model_config = ConfigDict(frozen=True)

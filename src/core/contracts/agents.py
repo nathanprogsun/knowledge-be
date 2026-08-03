@@ -38,7 +38,7 @@ class AgentQuestionSuggestions(BaseModel):
 
 
 class ParserEngineRule(BaseModel):
-    """Per-file-type parser dispatch rule (mirrors ``types.ParserEngineRule``)."""
+    """Per-file-type parser dispatch rule."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -47,11 +47,10 @@ class ParserEngineRule(BaseModel):
 
 
 class AgentConfig(BaseModel):
-    """Mirrors ``internal/types/custom_agent.go::CustomAgentConfig``.
+    """Configuration for a customizable agent.
 
-    The runtime ``types/agent.go::AgentConfig`` fields tagged
-    ``json:"-"`` are intentionally excluded — they are request-scoped
-    runtime only, never serialized.
+    Fields used only during request execution are intentionally excluded from
+    this serialized model.
     """
 
     model_config = ConfigDict(frozen=True)

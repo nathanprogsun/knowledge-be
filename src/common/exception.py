@@ -1,14 +1,9 @@
-"""Application error hierarchy — single contract for all raised domain errors.
+"""Application error hierarchy - single contract for all raised domain errors.
 
-Rules:
-- `core`, `db`, `ai`, `workers` MUST raise `ApplicationError` subclasses only.
-- `web` translates `ApplicationError` subclasses to HTTP status via one
-  exception handler (added in a later PR).
-- Each subclass carries `code` (stable string for clients), `message`
-  (human-readable), and optional `details`.
-
-Naming note: `PermissionError` collides with the Python builtin, so we
-expose `PermissionDeniedError` in the standard hierarchy.
+Each subclass carries `code` (stable string for clients), `message`
+(human-readable), and optional `details`. `PermissionError` would
+collide with the Python builtin, so the standard hierarchy exposes
+`PermissionDeniedError` instead.
 """
 
 from __future__ import annotations

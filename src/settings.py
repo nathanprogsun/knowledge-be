@@ -65,9 +65,9 @@ class Settings(BaseSettings):
     system_aes_key: str = ""
 
     # ── OIDC SSO ──────────────────────────────────────────────────────
-    # Mirrors upstream ``config.OIDCAuthConfig``. Endpoints may be left
-    # blank when ``oidc_discovery_url`` is set - the OIDC client fills
-    # them from the discovery document at request time.
+    # Endpoints may be left blank when ``oidc_discovery_url`` is set -
+    # the OIDC client fills them from the discovery document at request
+    # time.
     oidc_enable: bool = False
     oidc_issuer_url: str = ""
     oidc_discovery_url: str = ""
