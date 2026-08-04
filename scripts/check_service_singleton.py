@@ -71,19 +71,14 @@ APP_CONTEXT_REL = Path("app_context")
 def _is_service_file(parts: tuple[str, ...]) -> bool:
     """True for files that may declare Service classes.
 
-    Matches:
-        core/<domain>/service.py
-        core/<domain>/service/__init__.py
-        core/<domain>/service/<anything>.py
+    Matches any module under ``core/`` whose filename is ``service.py`` or
+    ends with ``_service.py``, plus modules named after a service domain
+    (e.g. ``oidc.py`` declaring ``OidcService``). Cheap over-approximation:
+    every ``core/**`` file is scanned for ``*Service`` class defs.
     """
     if not parts or parts[0] != "core":
         return False
-    for p in parts:
-        if p == "service":
-            return True
-        if p.startswith("service."):
-            return True
-    return False
+    return True
 
 
 def _strip_annotation_to_name(node: ast.AST | None) -> str | None:
