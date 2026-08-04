@@ -19,7 +19,11 @@ from src.core.tenants.api_key_service import TenantAPIKeyService
 from src.core.tenants.kv_service import TenantKVService
 from src.db.models.tenants.tenant_api_keys import TenantAPIKey
 from src.db.models.tenants.tenant_kv import TenantKV
-from src.web.deps import get_tenant_api_key_service, get_tenant_kv_service
+from src.web.deps import (
+    get_current_user_context,
+    get_tenant_api_key_service,
+    get_tenant_kv_service,
+)
 from tests.fakes.tenant_api_keys import FakeTenantAPIKeyRepository
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
@@ -69,6 +73,7 @@ def app(
     kv_repo: _FakeKVRepo,
 ) -> FastAPI:
     application = create_app()
+    application.dependency_overrides[get_current_user_context] = lambda: None
     application.dependency_overrides[get_tenant_api_key_service] = lambda: TenantAPIKeyService(
         api_keys_repo=api_key_repo,  # type: ignore[arg-type]
     )

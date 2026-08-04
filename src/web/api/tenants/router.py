@@ -24,6 +24,7 @@ from src.web.api.tenants.views import (
     tenant_list_envelope,
 )
 from src.web.deps import (
+    CurrentUserContextDep,
     TenantAPIKeyServiceDep,
     TenantKVServiceDep,
     TenantMemberServiceDep,
@@ -84,6 +85,7 @@ async def search_tenants(
 
 @router.get("", response_model=TenantListEnvelope)
 async def list_my_tenants(
+    _ctx: CurrentUserContextDep,
     tenant_service: TenantServiceDep,
     member_service: TenantMemberServiceDep,
 ) -> TenantListEnvelope:
@@ -173,6 +175,7 @@ async def update_api_principal_config(
 
 @router.get("/kv/{key}", response_model=JsonObject)
 async def get_tenant_kv(
+    _ctx: CurrentUserContextDep,
     key: str,
     kv_service: TenantKVServiceDep,
 ) -> JsonObject:
@@ -194,6 +197,7 @@ async def get_tenant_kv(
 
 @router.put("/kv/{key}", response_model=JsonObject)
 async def put_tenant_kv(
+    _ctx: CurrentUserContextDep,
     key: str,
     body: JsonObject,
     kv_service: TenantKVServiceDep,
