@@ -14,6 +14,7 @@ from src.db.models.tenants.tenant_invitations import (
     STATUS_EXPIRED,
     STATUS_PENDING,
     TenantInvitation,
+    is_expired,
 )
 
 
@@ -59,7 +60,7 @@ class FakeTenantInvitationRepository:
     async def sweep_expired(self, now: datetime) -> int:
         swept = 0
         for key, row in list(self.rows.items()):
-            if row.status == STATUS_PENDING and row.deleted_at is None and row.is_expired(now):
+            if row.status == STATUS_PENDING and row.deleted_at is None and is_expired(row, now):
                 self.rows[key] = row.model_copy(
                     update={
                         "status": STATUS_EXPIRED,

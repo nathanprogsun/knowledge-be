@@ -32,6 +32,7 @@ from src.db.models.tenants.tenant_invitations import (
     STATUS_PENDING,
     STATUS_REVOKED,
     TenantInvitation,
+    is_expired,
 )
 
 # Default TTL for an invitation: seven days.
@@ -172,7 +173,7 @@ class TenantInvitationService:
         """Resolve a share-link token; reject unknown or expired links."""
         await self._sweep()
         row = await self._invitations_repo.find_pending_by_token(token.strip())
-        if row is None or row.is_expired(datetime.now(UTC)):
+        if row is None or is_expired(row, datetime.now(UTC)):
             raise NotFoundError(
                 code="tenant_invitation.invalid_token",
                 message="Invitation token is invalid or has been revoked",
@@ -317,7 +318,7 @@ class TenantInvitationService:
                 code="tenant_invitation.forbidden",
                 message="Only the invitee can accept or decline this invitation",
             )
-        if row.is_expired(datetime.now(UTC)):
+        if is_expired(row, datetime.now(UTC)):
             # The sweep above normally catches this; a row can still age
             # past its expiry between that UPDATE and this read.
             raise ConflictError(

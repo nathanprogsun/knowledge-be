@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.common.json import JsonObject
+
 
 class Session(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -111,7 +113,7 @@ class KnowledgeReference(BaseModel):
     score: float | None = Field(default=None)
     match_type: int | None = Field(default=None)
     sub_chunk_id: list[str] | None = Field(default=None)
-    metadata: dict[str, object] | None = Field(default=None)
+    metadata: JsonObject | None = Field(default=None)
     chunk_type: str | None = Field(default=None)
     parent_chunk_id: str | None = Field(default=None)
     image_info: str | None = Field(default=None)
@@ -128,12 +130,12 @@ class Message(BaseModel):
     role: str
     content: str
     knowledge_references: list[KnowledgeReference] | None = Field(default=None)
-    agent_steps: list[dict[str, object]] | None = Field(default=None)
+    agent_steps: list[JsonObject] | None = Field(default=None)
     is_completed: bool = True
     is_fallback: bool = False
     agent_duration_ms: int | None = Field(default=None)
-    mentioned_items: list[dict[str, object]] | None = Field(default=None)
-    images: list[dict[str, object]] | None = Field(default=None)
+    mentioned_items: list[JsonObject] | None = Field(default=None)
+    images: list[JsonObject] | None = Field(default=None)
     channel: str | None = Field(default=None)
     created_at: datetime
     updated_at: datetime
@@ -273,7 +275,7 @@ class SuggestionSet(BaseModel):
     position: str
     status: str
     language: str | None = Field(default=None)
-    config_snapshot: dict[str, object] | None = Field(default=None)
+    config_snapshot: JsonObject | None = Field(default=None)
     questions: list[SuggestionQuestion] | None = Field(default=None)
     created_at: datetime | None = Field(default=None)
     updated_at: datetime | None = Field(default=None)

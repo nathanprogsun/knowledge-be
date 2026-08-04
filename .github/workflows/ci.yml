@@ -1,0 +1,47 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality-gate:
+    name: lint / format / typecheck / test / check
+    runs-on: ubuntu-latest
+    env:
+      PYTHON_VERSION: "3.11"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.10.9"
+
+      - name: Install Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Sync dependencies
+        run: uv sync --all-extras
+
+      - name: Lint (ruff check)
+        run: uv run ruff check .
+
+      - name: Format (ruff format --check)
+        run: uv run ruff format --check .
+
+      - name: Typecheck (mypy --strict)
+        run: uv run mypy
+
+      - name: Test (pytest)
+        run: uv run pytest -q
+        env:
+          # Integration tests that need a Docker Postgres skip when absent.
+          TEST_SKIP_DOCKER: "1"
+
+      - name: Anti-drift checks
+        run: make check

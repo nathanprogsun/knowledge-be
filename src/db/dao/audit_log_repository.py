@@ -14,11 +14,12 @@ Every query uses named ``bindparams``. ``details`` is bound as
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, cast
+from typing import cast
 
 from sqlalchemy import text
 from sqlalchemy.engine import CursorResult
 
+from src.common.json import BindParams, SqlValue
 from src.db.dao.generic_repository import GenericRepository
 from src.db.models.system.audit_log import AuditLog
 
@@ -53,7 +54,7 @@ class AuditLogRepository(GenericRepository[AuditLog]):
         """
         capped_limit = max(1, min(limit, 100))
         conditions: list[str] = ["tenant_id = :tenant_id"]
-        params: dict[str, Any] = {"tenant_id": tenant_id, "limit": capped_limit}
+        params: BindParams = {"tenant_id": tenant_id, "limit": capped_limit}
         if after_id > 0:
             conditions.append("id < :after_id")
             params["after_id"] = after_id
@@ -116,7 +117,7 @@ class AuditLogRepository(GenericRepository[AuditLog]):
         """Retention primitive — removes rows with ``created_at < cutoff``."""
         stmt = text("delete from audit_logs where created_at < :cutoff").bindparams(cutoff=cutoff)
         result = cast(
-            CursorResult[Any],
+            CursorResult[SqlValue],
             await self._session.execute(stmt),
         )
         return result.rowcount or 0

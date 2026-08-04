@@ -11,6 +11,7 @@ from typing import cast
 
 from sqlalchemy import CursorResult, text
 
+from src.common.json import BindParams, SqlValue
 from src.db.dao.generic_repository import GenericRepository
 from src.db.models.tenants.tenant_members import TenantMember
 
@@ -190,7 +191,7 @@ class TenantMemberRepository(GenericRepository[TenantMember]):
     async def _select_members(
         self,
         conditions: str,
-        params: dict[str, object],
+        params: BindParams,
     ) -> list[TenantMember]:
         stmt = text(
             f"select * from {self._table} where {conditions} and {_LIVE} order by {_MEMBER_ORDER}"
@@ -198,22 +199,22 @@ class TenantMemberRepository(GenericRepository[TenantMember]):
         result = await self._session.execute(stmt)
         return [self._hydrate(m) for m in result.mappings().all()]
 
-    async def _update_live(self, set_clause: str, params: dict[str, object]) -> int:
+    async def _update_live(self, set_clause: str, params: BindParams) -> int:
         stmt = text(
             f"update {self._table} set {set_clause} "
             f"where user_id = :user_id and tenant_id = :tenant_id and {_LIVE}"
         ).bindparams(**params)
         result = await self._session.execute(stmt)
-        return cast("CursorResult[object]", result).rowcount
+        return cast("CursorResult[SqlValue]", result).rowcount
 
     def _search_fragments(
         self,
         tenant_id: int,
         search: str | None,
-    ) -> tuple[str, str, dict[str, object]]:
+    ) -> tuple[str, str, BindParams]:
         """Build (join, where, params) for the filtered listing queries."""
         where = f"{self._table}.tenant_id = :tenant_id and {self._table}.{_LIVE}"
-        params: dict[str, object] = {"tenant_id": tenant_id}
+        params: BindParams = {"tenant_id": tenant_id}
         term = (search or "").strip()
         if not term:
             return "", where, params

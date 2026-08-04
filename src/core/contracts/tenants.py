@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.common.json import JsonObject
+
 TenantRole = Literal["owner", "admin", "contributor", "viewer"]
 
 
@@ -48,13 +50,13 @@ class Tenant(BaseModel):
     business: str | None = Field(default=None)
     storage_quota: int | None = Field(default=None)
     storage_used: int | None = Field(default=None)
-    context_config: dict[str, object] | None = Field(default=None)
-    web_search_config: dict[str, object] | None = Field(default=None)
-    parser_engine_config: dict[str, object] | None = Field(default=None)
-    credentials: dict[str, object] | None = Field(default=None)
-    storage_engine_config: dict[str, object] | None = Field(default=None)
-    chat_history_config: dict[str, object] | None = Field(default=None)
-    retrieval_config: dict[str, object] | None = Field(default=None)
+    context_config: JsonObject | None = Field(default=None)
+    web_search_config: JsonObject | None = Field(default=None)
+    parser_engine_config: JsonObject | None = Field(default=None)
+    credentials: JsonObject | None = Field(default=None)
+    storage_engine_config: JsonObject | None = Field(default=None)
+    chat_history_config: JsonObject | None = Field(default=None)
+    retrieval_config: JsonObject | None = Field(default=None)
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = Field(default=None)
@@ -93,23 +95,24 @@ class UpdateTenantRequest(BaseModel):
 class TenantAPIKey(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    id: str
+    id: int
+    scope_type: str
     name: str
-    role: str
-    token: str | None = Field(default=None)
-    key_prefix: str | None = Field(default=None)
-    knowledge_base_ids: list[str] | None = Field(default=None)
-    expires_at_unix: int | None = Field(default=None)
+    full_access: bool
+    knowledge_base_ids: list[str] = Field(default_factory=list)
+    capabilities: list[str] = Field(default_factory=list)
+    last_used_at: datetime | None = Field(default=None)
+    expires_at: datetime | None = Field(default=None)
     created_at: datetime
-    revoked_at: datetime | None = Field(default=None)
 
 
 class CreateAPIKeyRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     name: str
-    role: str
+    full_access: bool = False
     knowledge_base_ids: list[str] | None = Field(default=None)
+    capabilities: list[str] | None = Field(default=None)
     expires_at_unix: int | None = Field(default=None)
 
 
@@ -150,8 +153,8 @@ class TenantKVAgentConfig(BaseModel):
     temperature: float
     system_prompt: str
     use_custom_system_prompt: bool = False
-    available_tools: list[dict[str, object]] | None = Field(default=None)
-    available_placeholders: list[dict[str, object]] | None = Field(default=None)
+    available_tools: list[JsonObject] | None = Field(default=None)
+    available_placeholders: list[JsonObject] | None = Field(default=None)
 
 
 class TenantKVWebSearchConfig(BaseModel):
@@ -183,14 +186,14 @@ class TenantKVRetrievalConfig(BaseModel):
 class TenantKVParserEngineConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    engines: list[dict[str, object]] | None = Field(default=None)
+    engines: list[JsonObject] | None = Field(default=None)
 
 
 class TenantKVStorageEngineConfig(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     default_provider: str | None = Field(default=None)
-    providers: list[dict[str, object]] | None = Field(default=None)
+    providers: list[JsonObject] | None = Field(default=None)
 
 
 class TenantKVChatHistoryConfig(BaseModel):
@@ -204,7 +207,7 @@ class TenantKVChatHistoryConfig(BaseModel):
 class TenantKVPromptTemplates(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    templates: list[dict[str, object]]
+    templates: list[JsonObject]
 
 
 __all__ = [

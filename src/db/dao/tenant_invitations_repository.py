@@ -17,6 +17,7 @@ from typing import cast
 
 from sqlalchemy import CursorResult, text
 
+from src.common.json import BindParams, SqlValue
 from src.db.dao.generic_repository import GenericRepository
 from src.db.models.tenants.tenant_invitations import (
     STATUS_EXPIRED,
@@ -78,7 +79,7 @@ class TenantInvitationRepository(GenericRepository[TenantInvitation]):
             pending=STATUS_PENDING,
         )
         result = await self._session.execute(stmt)
-        return cast("CursorResult[object]", result).rowcount
+        return cast("CursorResult[SqlValue]", result).rowcount
 
     async def sweep_expired(self, now: datetime) -> int:
         """Flip every overdue pending row to expired; return rows affected."""
@@ -88,7 +89,7 @@ class TenantInvitationRepository(GenericRepository[TenantInvitation]):
             f"where status = :pending and expires_at < :now and {_LIVE}"
         ).bindparams(expired=STATUS_EXPIRED, pending=STATUS_PENDING, now=now)
         result = await self._session.execute(stmt)
-        return cast("CursorResult[object]", result).rowcount
+        return cast("CursorResult[SqlValue]", result).rowcount
 
     async def increment_accepted_count(self, invitation_id: int) -> int:
         """Bump ``accepted_count`` by one; return rows affected."""
@@ -97,7 +98,7 @@ class TenantInvitationRepository(GenericRepository[TenantInvitation]):
             f"where id = :id and {_LIVE}"
         ).bindparams(id=invitation_id)
         result = await self._session.execute(stmt)
-        return cast("CursorResult[object]", result).rowcount
+        return cast("CursorResult[SqlValue]", result).rowcount
 
     # ── Reads ───────────────────────────────────────────────────────
 
@@ -179,10 +180,10 @@ class TenantInvitationRepository(GenericRepository[TenantInvitation]):
     @staticmethod
     def _list_conditions(
         scope: str,
-        params: dict[str, object],
+        params: BindParams,
         *,
         include_terminal: bool,
-    ) -> tuple[str, dict[str, object]]:
+    ) -> tuple[str, BindParams]:
         where = f"{scope} and {_LIVE}"
         if include_terminal:
             return where, params
@@ -191,13 +192,13 @@ class TenantInvitationRepository(GenericRepository[TenantInvitation]):
     async def _select_page(
         self,
         where: str,
-        params: dict[str, object],
+        params: BindParams,
         *,
         limit: int | None,
         offset: int,
     ) -> list[TenantInvitation]:
         stmt_text = f"select * from {self._table} where {where} order by {_INVITATION_ORDER}"
-        page_params: dict[str, object] = dict(params)
+        page_params: BindParams = dict(params)
         if limit is not None:
             stmt_text += " limit :limit offset :offset"
             page_params["limit"] = limit
@@ -205,7 +206,7 @@ class TenantInvitationRepository(GenericRepository[TenantInvitation]):
         result = await self._session.execute(text(stmt_text).bindparams(**page_params))
         return [self._hydrate(m) for m in result.mappings().all()]
 
-    async def _count(self, where: str, params: dict[str, object]) -> int:
+    async def _count(self, where: str, params: BindParams) -> int:
         stmt = text(f"select count(*) from {self._table} where {where}").bindparams(**params)
         return int((await self._session.execute(stmt)).scalar_one())
 

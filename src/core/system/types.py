@@ -23,6 +23,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.common.json import JsonObject, JsonValue
 from src.db.models.system.audit_log import AuditLog
 from src.db.models.system.system_setting import SystemSetting
 
@@ -45,7 +46,7 @@ class AuditLogInfo(BaseModel):
     request_path: str = ""
     request_method: str = ""
     outcome: str = "success"
-    details: dict[str, object] = Field(default_factory=dict)
+    details: JsonObject = Field(default_factory=dict)
     created_at: datetime
 
     @classmethod
@@ -71,7 +72,7 @@ class SystemSettingInfo(BaseModel):
 
     id: int
     key: str
-    value: dict[str, object] | list[str] | list[object] | str | int | bool
+    value: JsonObject | list[str] | list[JsonValue] | str | int | bool
     value_type: str
     category: str
     description: str = ""

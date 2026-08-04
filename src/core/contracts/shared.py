@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.common.json import JsonObject
+
 
 class ErrorDetail(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -76,8 +78,8 @@ class SSEResponseChunk(BaseModel):
     response_type: str
     content: str | None = Field(default=None)
     done: bool
-    data: dict[str, object] | None = Field(default=None)
-    knowledge_references: list[dict[str, object]] | None = Field(default=None)
+    data: JsonObject | None = Field(default=None)
+    knowledge_references: list[JsonObject] | None = Field(default=None)
 
 
 __all__ = [

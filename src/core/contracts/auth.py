@@ -4,6 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.common.json import JsonObject
 from src.core.contracts.tenants import (
     Membership,
     Tenant,
@@ -56,7 +57,7 @@ class AuthUser(BaseModel):
     is_active: bool
     can_access_all_tenants: bool = False
     is_system_admin: bool = False
-    preferences: dict[str, object] = Field(default_factory=dict)
+    preferences: JsonObject = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = Field(default=None)
@@ -74,7 +75,7 @@ class RegisterResponse(BaseModel):
     success: bool
     message: str
     user: AuthUser
-    active_tenant: Tenant
+    active_tenant: Tenant | None = Field(default=None)
     memberships: list[Membership] = Field(default_factory=list)
 
 

@@ -19,6 +19,7 @@ from sqlalchemy import JSON, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import CursorResult
 
+from src.common.exception import DataError
 from src.db.dao.generic_repository import GenericRepository
 from src.db.models.system.system_setting import SystemSetting
 
@@ -66,8 +67,6 @@ class SystemSettingRepository(GenericRepository[SystemSetting]):
         mapping = result.mappings().first()
         if mapping is None:
             # Upsert always returns a row; treat absence as a data error.
-            from src.common.exception import DataError
-
             raise DataError(
                 code="db.upsert_no_row",
                 message="system_settings upsert returned no row",

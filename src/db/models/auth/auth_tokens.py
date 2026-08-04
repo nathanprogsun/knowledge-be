@@ -19,6 +19,8 @@ class AuthToken(TableModel):
     table: ClassVar[str] = "auth_tokens"
     primary_keys: ClassVar[tuple[str, ...]] = ("id",)
     json_columns: ClassVar[tuple[str, ...]] = ()
+    # ``id`` is application-assigned (string), so it participates in INSERT.
+    db_generated_columns: ClassVar[tuple[str, ...]] = ()
 
     id: str
     user_id: str

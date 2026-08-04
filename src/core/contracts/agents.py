@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.common.json import JsonObject
+
 
 class AgentQuestionSuggestionsStarters(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -193,13 +195,13 @@ class ListAgentsResponse(BaseModel):
 class AgentPlaceholderGroup(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    all: list[dict[str, object]]
-    system_prompt: list[dict[str, object]]
-    agent_system_prompt: list[dict[str, object]]
-    context_template: list[dict[str, object]]
-    rewrite_system_prompt: list[dict[str, object]]
-    rewrite_prompt: list[dict[str, object]]
-    fallback_prompt: list[dict[str, object]]
+    all: list[JsonObject]
+    system_prompt: list[JsonObject]
+    agent_system_prompt: list[JsonObject]
+    context_template: list[JsonObject]
+    rewrite_system_prompt: list[JsonObject]
+    rewrite_prompt: list[JsonObject]
+    fallback_prompt: list[JsonObject]
 
 
 __all__ = [

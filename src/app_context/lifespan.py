@@ -5,53 +5,33 @@ This module owns:
 - `lifespan`: async context manager that initializes and tears down
   long-lived resources (DB engine, HTTP client, ARQ pool) and populates
   `app.state.lifespan_service`.
-- `LifeSpanService`: dataclass registry of all domain services. Each domain
-  service lands here as a singleton; web routers obtain them via the
-  `get_xxx_from_lifespan` factories below.
+- `LifeSpanService` and the `get_*_from_lifespan` factories live in
+  `src.app_context.registry` (a dedicated module so `web.deps` can import
+  the accessors without creating an import cycle with the app factory).
 
-Why a registry: avoids module-level globals while keeping DI explicit and
-testable (monkeypatch `app.state.lifespan_service` in tests).
+The router modules are imported at module top (not inside `create_app`) so
+the anti-drift layer check can verify web -> core -> db directionality
+without function-level imports. The routers themselves only reference
+`web.deps`, which imports the DI accessors from `registry` — breaking the
+former `lifespan` <-> `web.deps` cycle.
 """
 
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
-from typing import cast
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.app_context.registry import LifeSpanService
 from src.app_logging import configure_logging, logger
 from src.db.base import DatabaseEngine
 from src.settings import get_settings
-
-
-@dataclass
-class LifeSpanService:
-    """Registry of singleton services.
-
-    Populated during `lifespan` startup. Access via `get_xxx_from_lifespan`
-    factories; never import this class directly from `web/` modules.
-    """
-
-    db_engine: DatabaseEngine | None = None
-
-
-def get_lifespan_service(app: FastAPI) -> LifeSpanService:
-    """Return the lifespan service attached to the FastAPI app."""
-    if not hasattr(app.state, "lifespan_service"):
-        raise RuntimeError("LifeSpanService is not initialized — was the lifespan started?")
-    return cast(LifeSpanService, app.state.lifespan_service)
-
-
-def get_db_engine_from_lifespan(app: FastAPI) -> DatabaseEngine:
-    """DI factory for the database engine."""
-    service = get_lifespan_service(app)
-    if service.db_engine is None:
-        raise RuntimeError("DatabaseEngine is not initialized.")
-    return service.db_engine
+from src.web.api.auth.router import router as auth_router
+from src.web.api.system.router import router as system_router
+from src.web.api.tenants.router import router as tenants_router
+from src.web.exception_handler import register_exception_handlers
 
 
 @asynccontextmanager
@@ -95,15 +75,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Register the ApplicationError -> HTTP status handler.
-    from src.web.exception_handler import register_exception_handlers
-
     register_exception_handlers(application)
-
-    # Mount domain routers.
-    from src.web.api.auth.router import router as auth_router
-    from src.web.api.system.router import router as system_router
-    from src.web.api.tenants.router import router as tenants_router
 
     application.include_router(auth_router)
     application.include_router(system_router)
@@ -121,10 +93,7 @@ app = create_app()
 
 
 __all__ = [
-    "LifeSpanService",
     "app",
     "create_app",
-    "get_db_engine_from_lifespan",
-    "get_lifespan_service",
     "lifespan",
 ]

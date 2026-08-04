@@ -26,6 +26,7 @@ from datetime import UTC, datetime
 from typing import cast
 
 from src.common.exception import ValidationError
+from src.common.json import JsonObject, JsonValue
 from src.core.system.audit_actions import AuditAction, AuditOutcome
 from src.core.system.registry import SettingSpec, all_keys, get_spec
 from src.core.system.types import SystemSettingInfo
@@ -264,7 +265,7 @@ class SystemSettingService:
 def _encode_for_type(
     spec: SettingSpec,
     raw_value: int | str | bool | list[str],
-) -> dict[str, object] | list[object] | str | int | bool:
+) -> JsonObject | list[JsonValue] | str | int | bool:
     """Normalise ``raw_value`` against the registry's declared type.
 
     Raises ``ValidationError`` on type mismatch.

@@ -13,8 +13,9 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.common.json import JsonObject
 from src.db.models.tenants.tenant_api_keys import TenantAPIKey
-from src.db.models.tenants.tenant_invitations import TenantInvitation
+from src.db.models.tenants.tenant_invitations import TenantInvitation, is_share_link
 from src.db.models.tenants.tenant_members import TenantMember
 from src.db.models.tenants.tenants import Tenant
 
@@ -66,7 +67,7 @@ class RetrieverEngines(BaseModel):
     @classmethod
     def from_json(
         cls,
-        raw: dict[str, object] | list[dict[str, object]] | str | None,
+        raw: JsonObject | list[JsonObject] | str | None,
     ) -> RetrieverEngines:
         """Build from the column value, accepting every persisted shape.
 
@@ -96,13 +97,13 @@ class TenantInfo(BaseModel):
     business: str | None = Field(default=None)
     storage_quota: int | None = Field(default=None)
     storage_used: int | None = Field(default=None)
-    context_config: dict[str, object] | None = Field(default=None)
-    web_search_config: dict[str, object] | None = Field(default=None)
-    parser_engine_config: dict[str, object] | None = Field(default=None)
-    credentials: dict[str, object] | None = Field(default=None)
-    storage_engine_config: dict[str, object] | None = Field(default=None)
-    chat_history_config: dict[str, object] | None = Field(default=None)
-    retrieval_config: dict[str, object] | None = Field(default=None)
+    context_config: JsonObject | None = Field(default=None)
+    web_search_config: JsonObject | None = Field(default=None)
+    parser_engine_config: JsonObject | None = Field(default=None)
+    credentials: JsonObject | None = Field(default=None)
+    storage_engine_config: JsonObject | None = Field(default=None)
+    chat_history_config: JsonObject | None = Field(default=None)
+    retrieval_config: JsonObject | None = Field(default=None)
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = Field(default=None)
@@ -199,7 +200,7 @@ class TenantInvitationInfo(BaseModel):
     def map_from_db(cls, db: TenantInvitation) -> Self:
         """Project a storage row, dropping the token and soft-delete mark."""
         record = db.model_dump(exclude=set(_INVITATION_EXCLUDE_COLUMNS))
-        record["is_share_link"] = db.is_share_link
+        record["is_share_link"] = is_share_link(db)
         return cls.model_validate(record)
 
 

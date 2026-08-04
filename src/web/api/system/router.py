@@ -33,6 +33,7 @@ from datetime import datetime
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.common.json import JsonObject, JsonValue
 from src.core.system.audit_service import AuditLogListResult
 from src.core.system.types import AuditLogInfo, SystemSettingInfo
 from src.web.deps import (
@@ -53,7 +54,7 @@ class SystemSettingResponse(BaseModel):
 
     id: int
     key: str
-    value: dict[str, object] | list[str] | list[object] | str | int | bool
+    value: JsonObject | list[str] | list[JsonValue] | str | int | bool
     value_type: str
     category: str
     description: str = ""
@@ -106,7 +107,7 @@ class AuditLogEntryResponse(BaseModel):
     request_path: str = ""
     request_method: str = ""
     outcome: str = "success"
-    details: dict[str, object] = Field(default_factory=dict)
+    details: JsonObject = Field(default_factory=dict)
     created_at: datetime
 
 

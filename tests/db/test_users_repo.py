@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from src.common.exception import ConflictError, NotFoundError
+from src.common.json import JsonObject
 from src.db.dao.users_repository import UserRepository
 from src.db.models.auth.users import User
 
@@ -74,7 +75,7 @@ def _sample_row(
     tenant_id: int | None = None,
     is_active: bool = True,
     is_system_admin: bool = False,
-    preferences: dict[str, object] | None = None,
+    preferences: JsonObject | None = None,
 ) -> User:
     now = datetime(2026, 1, 1, tzinfo=UTC)
     return User(

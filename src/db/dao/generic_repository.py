@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.elements import BindParameter
 
 from src.common.exception import DataError, NotFoundError, ValidationError
+from src.common.json import BindParams, SqlValue
 from src.common.table_model import TableModel
 
 ModelType = TypeVar("ModelType", bound=TableModel)
@@ -66,14 +67,14 @@ class GenericRepository(Generic[ModelType]):
     def _hydrate(self, mapping: RowMapping) -> ModelType:
         return cast(
             "ModelType",
-            self.model_class.from_row(cast("Mapping[str, object]", mapping)),
+            self.model_class.from_row(cast("Mapping[str, SqlValue]", mapping)),
         )
 
     def _hydrate_opt(self, mapping: RowMapping | None) -> ModelType | None:
         return self._hydrate(mapping) if mapping is not None else None
 
     @staticmethod
-    def _require_non_empty_query(column_to_query: dict[str, object]) -> None:
+    def _require_non_empty_query(column_to_query: BindParams) -> None:
         """Reject empty query dicts — they would produce ``where`` with
         no condition, which is a no-op full scan at best and broken SQL
         at worst (when soft-delete fragments are appended). Callers who
@@ -236,7 +237,7 @@ class GenericRepository(Generic[ModelType]):
 
     async def find_by_primary_key(
         self,
-        primary_key_to_value: dict[str, object],
+        primary_key_to_value: BindParams,
         *,
         exclude_deleted_or_archived: bool = True,
     ) -> ModelType | None:
@@ -260,7 +261,7 @@ class GenericRepository(Generic[ModelType]):
 
     async def find_by_primary_key_or_fail(
         self,
-        primary_key_to_value: dict[str, object],
+        primary_key_to_value: BindParams,
         *,
         exclude_deleted_or_archived: bool = True,
         not_found_code: str = "resource.not_found",
@@ -304,7 +305,7 @@ class GenericRepository(Generic[ModelType]):
 
     async def find_unique_by_column_values(
         self,
-        column_to_query: dict[str, object],
+        column_to_query: BindParams,
         *,
         exclude_deleted_or_archived: bool = True,
     ) -> ModelType | None:
@@ -319,7 +320,7 @@ class GenericRepository(Generic[ModelType]):
         self._require_non_empty_query(column_to_query)
         self.model_class.validate_in_columns(column_to_query)
         where_parts: list[str] = []
-        params: dict[str, object] = {}
+        params: BindParams = {}
         for col, val in column_to_query.items():
             if val is None:
                 where_parts.append(f'"{col}" is null')
@@ -343,7 +344,7 @@ class GenericRepository(Generic[ModelType]):
 
     async def find_unique_by_column_values_or_fail(
         self,
-        column_to_query: dict[str, object],
+        column_to_query: BindParams,
         *,
         exclude_deleted_or_archived: bool = True,
         not_found_code: str = "resource.not_found",
@@ -363,7 +364,7 @@ class GenericRepository(Generic[ModelType]):
 
     async def find_all_by_column_values(
         self,
-        column_to_query: dict[str, object],
+        column_to_query: BindParams,
         *,
         exclude_deleted_or_archived: bool = True,
     ) -> list[ModelType]:
@@ -371,7 +372,7 @@ class GenericRepository(Generic[ModelType]):
         self._require_non_empty_query(column_to_query)
         self.model_class.validate_in_columns(column_to_query)
         where_parts: list[str] = []
-        params: dict[str, object] = {}
+        params: BindParams = {}
         for col, val in column_to_query.items():
             if val is None:
                 where_parts.append(f'"{col}" is null')
@@ -396,8 +397,8 @@ class GenericRepository(Generic[ModelType]):
 
     async def update_by_primary_key(
         self,
-        primary_key_to_value: dict[str, object],
-        column_to_update: dict[str, object],
+        primary_key_to_value: BindParams,
+        column_to_update: BindParams,
         *,
         exclude_deleted_or_archived: bool = True,
     ) -> ModelType | None:
@@ -420,7 +421,7 @@ class GenericRepository(Generic[ModelType]):
         pk_cols = self.model_class.ordered_primary_keys()
         where_pk = " and ".join(f'"{c}" = :{c}' for c in pk_cols)
         set_clause = ", ".join(f'"{k}" = :u_{k}' for k in column_to_update)
-        update_params: dict[str, object] = {f"u_{k}": v for k, v in column_to_update.items()}
+        update_params: BindParams = {f"u_{k}": v for k, v in column_to_update.items()}
         soft = self._soft_delete_where_fragment(
             self.model_class,
             exclude_deleted_or_archived=exclude_deleted_or_archived,
@@ -444,8 +445,8 @@ class GenericRepository(Generic[ModelType]):
 
     async def update_by_primary_key_or_fail(
         self,
-        primary_key_to_value: dict[str, object],
-        column_to_update: dict[str, object],
+        primary_key_to_value: BindParams,
+        column_to_update: BindParams,
         *,
         exclude_deleted_or_archived: bool = True,
     ) -> ModelType:

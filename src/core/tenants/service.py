@@ -8,8 +8,10 @@ repository owns the per-request session.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import cast
 
 from src.common.exception import NotFoundError, ValidationError
+from src.common.json import BindParams, JsonObject, JsonValue
 from src.core.tenants.types import TenantInfo
 from src.db.dao.tenants_repository import TenantRepository
 from src.db.models.tenants.tenants import DEFAULT_STORAGE_QUOTA_BYTES, Tenant
@@ -35,7 +37,7 @@ class TenantService:
         name: str,
         description: str | None = None,
         business: str = "",
-        retriever_engines: dict[str, object] | list[dict[str, object]] | None = None,
+        retriever_engines: JsonObject | list[JsonObject] | None = None,
         storage_quota: int | None = None,
     ) -> TenantInfo:
         """Create a workspace in ``active`` status.
@@ -116,7 +118,7 @@ class TenantService:
         name: str | None = None,
         description: str | None = None,
         business: str | None = None,
-        retriever_engines: dict[str, object] | list[dict[str, object]] | None = None,
+        retriever_engines: JsonObject | list[JsonObject] | None = None,
         storage_quota: int | None = None,
         status: str | None = None,
     ) -> TenantInfo:
@@ -148,12 +150,12 @@ class TenantService:
         name: str | None,
         description: str | None,
         business: str | None,
-        retriever_engines: dict[str, object] | list[dict[str, object]] | None,
+        retriever_engines: JsonObject | list[JsonObject] | None,
         storage_quota: int | None,
         status: str | None,
-    ) -> dict[str, object]:
+    ) -> BindParams:
         """Collect the supplied columns, validating the ones with rules."""
-        columns: dict[str, object] = {}
+        columns: BindParams = {}
         if name is not None:
             clean_name = name.strip()
             if not clean_name:
@@ -167,7 +169,7 @@ class TenantService:
         if business is not None:
             columns["business"] = business
         if retriever_engines is not None:
-            columns["retriever_engines"] = retriever_engines
+            columns["retriever_engines"] = cast(JsonValue, retriever_engines)
         if storage_quota is not None:
             columns["storage_quota"] = storage_quota
         if status is not None:
@@ -191,6 +193,40 @@ class TenantService:
         return row is not None
 
     # ── Storage counters ────────────────────────────────────────────
+
+    async def get_api_principal_config(self, tenant_id: int) -> JsonObject | None:
+        """Return the workspace's API-principal config, or ``None`` when unset."""
+        self._require_valid_id(tenant_id)
+        row = await self._tenants_repo.find_by_id(tenant_id)
+        return row.api_principal_config
+
+    async def update_api_principal_config(
+        self,
+        tenant_id: int,
+        *,
+        config: JsonObject,
+    ) -> JsonObject:
+        """Persist the workspace's API-principal config; return the stored value."""
+        self._require_valid_id(tenant_id)
+        updated = await self._tenants_repo.update_by_primary_key(
+            {"id": tenant_id},
+            {
+                "api_principal_config": config,
+                "updated_at": datetime.now(UTC),
+            },
+        )
+        if updated is None:
+            raise NotFoundError(
+                code="tenant.not_found",
+                message=f"Tenant {tenant_id} not found",
+            )
+        stored_config = updated.api_principal_config
+        if stored_config is None:
+            raise NotFoundError(
+                code="tenant.principal_config_unset",
+                message="Tenant principal config is not set",
+            )
+        return stored_config
 
     async def adjust_storage_used(self, tenant_id: int, *, delta: int) -> int:
         """Add ``delta`` bytes to the workspace's used storage."""

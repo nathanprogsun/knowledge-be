@@ -16,6 +16,7 @@ from typing import cast
 from sqlalchemy import CursorResult, text
 
 from src.common.exception import NotFoundError
+from src.common.json import BindParams, SqlValue
 from src.db.dao.generic_repository import GenericRepository
 from src.db.models.tenants.tenants import Tenant
 
@@ -124,14 +125,14 @@ class TenantRepository(GenericRepository[Tenant]):
     async def _select_page(
         self,
         where_sql: str,
-        params: dict[str, object],
+        params: BindParams,
         *,
         limit: int | None,
         offset: int,
     ) -> list[Tenant]:
         """Run ``select * ... order by created_at desc`` with optional paging."""
         stmt_text = f"select * from {self._table} {where_sql} order by created_at desc"
-        page_params: dict[str, object] = dict(params)
+        page_params: BindParams = dict(params)
         if limit is not None:
             stmt_text += " limit :limit offset :offset"
             page_params["limit"] = limit
@@ -143,14 +144,14 @@ class TenantRepository(GenericRepository[Tenant]):
     def _build_search_conditions(
         keyword: str | None,
         tenant_id: int | None,
-    ) -> tuple[str, dict[str, object]]:
+    ) -> tuple[str, BindParams]:
         """Build the WHERE body and its bindparams for :meth:`search`."""
         has_id = tenant_id is not None and tenant_id > 0
         has_keyword = bool(keyword)
         if not has_id and not has_keyword:
             return "", {}
 
-        params: dict[str, object] = {}
+        params: BindParams = {}
         parts: list[str] = []
         if has_id:
             parts.append("id = :tenant_id")
@@ -213,7 +214,7 @@ class TenantRepository(GenericRepository[Tenant]):
             f"set storage_quota = :quota_bytes, updated_at = :updated_at {soft}"
         ).bindparams(quota_bytes=quota_bytes, updated_at=updated_at)
         result = await self._session.execute(stmt)
-        return cast("CursorResult[object]", result).rowcount
+        return cast("CursorResult[SqlValue]", result).rowcount
 
 
 __all__ = ["TenantRepository", "escape_like_keyword"]

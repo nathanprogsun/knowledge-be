@@ -20,6 +20,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import ClassVar
 
+from src.common.json import JsonObject, JsonValue
 from src.common.table_model import TableModel
 
 
@@ -32,7 +33,7 @@ class SystemSetting(TableModel):
 
     id: int
     key: str
-    value: dict[str, object] | list[object] | str | int | bool
+    value: JsonObject | list[JsonValue] | str | int | bool
     value_type: str
     category: str
     description: str = ""
@@ -41,18 +42,6 @@ class SystemSetting(TableModel):
     last_modified_by: str = ""
     created_at: datetime
     updated_at: datetime
-
-    @classmethod
-    def insert_sql_column_list(cls) -> tuple[str, ...]:
-        """Exclude ``id`` from INSERT — Postgres BIGSERIAL fills it.
-
-        ``upsert`` constructs its own SQL (it does not funnel through
-        this method), so callers who do not have a persisted ``id``
-        (e.g. first write) can pass ``id=0`` and the upsert SQL still
-        omits the column. Existing rows reuse their persisted ``id``
-        directly inside the upsert statement.
-        """
-        return tuple(c for c in cls.column_fields() if c != "id")
 
 
 __all__ = ["SystemSetting"]

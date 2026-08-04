@@ -14,6 +14,7 @@ from typing import cast
 from sqlalchemy import CursorResult, text
 
 from src.common.exception import NotFoundError
+from src.common.json import BindParams, SqlValue
 from src.db.dao.generic_repository import GenericRepository
 from src.db.models.tenants.tenant_api_keys import TenantAPIKey
 
@@ -107,7 +108,7 @@ class TenantAPIKeyRepository(GenericRepository[TenantAPIKey]):
     async def _select_live(
         self,
         conditions: str,
-        params: dict[str, object],
+        params: BindParams,
     ) -> list[TenantAPIKey]:
         stmt = text(
             f"select * from {self._table} "
@@ -120,18 +121,18 @@ class TenantAPIKeyRepository(GenericRepository[TenantAPIKey]):
         self,
         set_clause: str,
         conditions: str,
-        params: dict[str, object],
+        params: BindParams,
     ) -> int:
         stmt = text(
             f"update {self._table} set {set_clause} where {conditions} and revoked_at is null"
         ).bindparams(**params)
         result = await self._session.execute(stmt)
-        return cast("CursorResult[object]", result).rowcount
+        return cast("CursorResult[SqlValue]", result).rowcount
 
     async def _revoke_where(
         self,
         conditions: str,
-        params: dict[str, object],
+        params: BindParams,
         revoked_at: datetime,
     ) -> None:
         affected = await self._update_live(

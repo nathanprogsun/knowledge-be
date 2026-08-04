@@ -25,13 +25,20 @@ TERMINAL_STATUSES: frozenset[str] = frozenset(
     {STATUS_ACCEPTED, STATUS_DECLINED, STATUS_REVOKED, STATUS_EXPIRED}
 )
 
-# Columns the database assigns itself; excluded from INSERT.
-_DB_GENERATED_COLUMNS: frozenset[str] = frozenset({"id"})
-
 
 def is_terminal_status(status: str) -> bool:
     """Whether the invitation can no longer change state."""
     return status in TERMINAL_STATUSES
+
+
+def is_share_link(invitation: TenantInvitation) -> bool:
+    """Whether the invitation is a reusable share link (no specific invitee)."""
+    return not invitation.invitee_user_id
+
+
+def is_expired(invitation: TenantInvitation, at: datetime) -> bool:
+    """Whether the invitation is past its expiry at the given time."""
+    return invitation.expires_at < at
 
 
 class TenantInvitation(TableModel):
@@ -56,20 +63,6 @@ class TenantInvitation(TableModel):
     updated_at: datetime
     deleted_at: datetime | None = None
 
-    @classmethod
-    def insert_sql_column_list(cls) -> tuple[str, ...]:
-        """Every column except the DB-generated `id`."""
-        return tuple(c for c in cls.column_fields() if c not in _DB_GENERATED_COLUMNS)
-
-    @property
-    def is_share_link(self) -> bool:
-        """Share-link rows carry a token and no specific invitee."""
-        return not self.invitee_user_id
-
-    def is_expired(self, at: datetime) -> bool:
-        """Whether the row is past its expiry at the given time."""
-        return self.expires_at < at
-
 
 __all__ = [
     "STATUS_ACCEPTED",
@@ -79,5 +72,7 @@ __all__ = [
     "STATUS_REVOKED",
     "TERMINAL_STATUSES",
     "TenantInvitation",
+    "is_expired",
+    "is_share_link",
     "is_terminal_status",
 ]
