@@ -10,8 +10,10 @@ from __future__ import annotations
 
 from src.web.deps.auth import (
     AuthServiceDep,
+    CurrentUserContextDep,
     OidcServiceDep,
     get_auth_service,
+    get_current_user_context,
     get_oidc_service,
 )
 from src.web.deps.session import SessionDep, get_async_session
@@ -35,6 +37,7 @@ from src.web.deps.tenants import (
 __all__ = [
     "AuditLogServiceDep",
     "AuthServiceDep",
+    "CurrentUserContextDep",
     "OidcServiceDep",
     "SessionDep",
     "SystemSettingServiceDep",
@@ -45,6 +48,7 @@ __all__ = [
     "get_async_session",
     "get_audit_log_service",
     "get_auth_service",
+    "get_current_user_context",
     "get_oidc_service",
     "get_system_setting_service",
     "get_tenant_api_key_service",
