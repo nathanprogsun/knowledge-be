@@ -10,9 +10,9 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Request
 
-from src.common.oidc_client import OidcClient
+from src.app_context.registry import get_oidc_client_from_lifespan
 from src.core.auth.oidc import OidcService
 from src.core.auth.service import AuthService
 from src.db.dao.auth_tokens_repository import AuthTokenRepository
@@ -28,14 +28,19 @@ def get_auth_service(session: SessionDep) -> AuthService:
     return AuthService(users_repo=users_repo, tokens_repo=tokens_repo)
 
 
-def get_oidc_service(session: SessionDep) -> OidcService:
-    """Build a per-request ``OidcService`` with fresh repos + a shared client."""
+def get_oidc_service(request: Request, session: SessionDep) -> OidcService:
+    """Build a per-request ``OidcService``.
+
+    Repos are request-scoped (they bind the per-request session); the
+    ``OidcClient`` is the APP-scope singleton from the lifespan registry
+    so its pooled ``httpx.AsyncClient`` is shared across requests.
+    """
     users_repo = UserRepository(session)
     tokens_repo = AuthTokenRepository(session)
     return OidcService(
         users_repo=users_repo,
         tokens_repo=tokens_repo,
-        oidc_client=OidcClient(),
+        oidc_client=get_oidc_client_from_lifespan(request.app),
     )
 
 
