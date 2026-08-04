@@ -23,10 +23,8 @@ from src.core.auth.permissions import TenantAPIKeyScope
 def get_tenant_role(request: Request) -> str:
     """Return the caller's tenant role, or ``""`` when unset.
 
-    Defaults to viewer-level when absent would be safer, but the Go
-    upstream uses ``TenantRoleViewer`` as the default. Here we return
-    empty string so ``TenantRole.has_permission("", min)`` returns
-    ``False`` for any non-empty min — fail closed.
+    Returns empty string so ``TenantRole.has_permission("", min)``
+    returns ``False`` for any non-empty min — fail closed.
     """
     role: str = request.state.tenant_role if hasattr(request.state, "tenant_role") else ""
     return role or ""

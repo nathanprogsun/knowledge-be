@@ -1,6 +1,6 @@
 """Audit middleware — inject AuditLogService into the request state.
 
-Maps ``internal/middleware/audit_provider.go``. The middleware stashes
+The middleware stashes
 the ``AuditLogService`` on ``request.state`` so RBAC guards can pull it
 out without needing the service threaded into their signatures.
 

@@ -1,7 +1,7 @@
 """RBAC middleware — tenant-scoped role gates.
 
-Maps ``internal/middleware/rbac.go``: three guard types that gate
-endpoints by the caller's tenant role or system-admin flag.
+Three guard types that gate endpoints by the caller's tenant role
+or system-admin flag.
 
 - :func:`require_role` — minimum tenant role; API-key principals
   short-circuit (authorized by the API Key Gate).
@@ -14,10 +14,10 @@ All three raise ``PermissionDeniedError`` (403) on failure and emit a
 durable audit row via the injected ``AuditLogService`` (when available),
 subject to the 1-minute sliding-window dedup inside the service.
 
-The RBAC enforcement flag (``tenant.rbac_enforced``) mirrors the Go
-``cfg.Tenant.EnableRBAC`` switch. When false the guards log but do not
-reject — preserving today's behaviour during the rollout window. The
-system-admin guard is always enforced regardless of the flag.
+The RBAC enforcement flag (``tenant.rbac_enforced``) controls whether
+the guards reject or log-only. When false the guards log but do not
+reject. The system-admin guard is always enforced regardless of the
+flag.
 """
 
 from __future__ import annotations
@@ -116,8 +116,6 @@ async def require_role(
     tenant_id = _tenant_id(request)
 
     # Fail-open during rollout (enforcement off).
-    # PR-12 stub: enforcement is always on for now; the flag will be
-    # wired to a SystemSetting in a later PR.
     await _emit_denied_audit(
         audit_svc=audit_svc,
         tenant_id=tenant_id,
