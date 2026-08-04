@@ -15,21 +15,13 @@ import os
 import socket
 import urllib.parse
 from dataclasses import dataclass
-from typing import TypeAlias
+from typing import cast
 
 import httpx
 
+from src.ai.oidc_types import OIDCClaimsDict
 from src.common.exception import ApplicationError, ExternalServiceError, ValidationError
-
-# ── JSON value type ──────────────────────────────────────────────────
-# Recursive alias so claim dicts never need ``Any`` / ``object``.
-# The string forward refs resolve through the module namespace;
-# ``from __future__ import annotations`` is not required for
-# ``TypeAlias`` runtime evaluation but keeps mypy happy with the cycle.
-
-JsonScalar: TypeAlias = str | int | float | bool | None
-JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
-
+from src.common.json import JsonValue
 
 # ── Result dataclasses ──────────────────────────────────────────────
 
@@ -62,7 +54,7 @@ class OIDCUserInfoClaims:
     subject: str
     username: str
     email: str
-    claims: dict[str, JsonValue]
+    claims: OIDCClaimsDict
 
 
 # ── SSRF guard ───────────────────────────────────────────────────────
@@ -255,7 +247,7 @@ def _resolve_host(hostname: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6A
 # ── JWT claim decoding ──────────────────────────────────────────────
 
 
-def decode_jwt_claims_unverified(id_token: str) -> dict[str, JsonValue]:
+def decode_jwt_claims_unverified(id_token: str) -> OIDCClaimsDict:
     """Decode the payload claims of ``id_token`` without signature check.
 
     Split on ``.``, base64url-decode the payload segment, JSON-parse.
@@ -392,7 +384,7 @@ class OidcClient:
         *,
         userinfo_endpoint: str,
         access_token: str,
-    ) -> dict[str, JsonValue]:
+    ) -> OIDCClaimsDict:
         """GET the userinfo endpoint with a bearer token, return claims."""
         await validate_ssrf_safe_url(userinfo_endpoint)
         try:
@@ -428,16 +420,16 @@ class OidcClient:
         """
         claims: dict[str, JsonValue] = {}
         if id_token:
-            claims.update(decode_jwt_claims_unverified(id_token))
+            claims.update(cast(dict[str, JsonValue], decode_jwt_claims_unverified(id_token)))
         if user_info_endpoint and access_token:
-            # Best-effort: any ApplicationError from fetch_userinfo (HTTP
-            # failure via ExternalServiceError, or SSRF block via
-            # ValidationError) falls back to id_token claims.
             with contextlib.suppress(ApplicationError):
                 claims.update(
-                    await self.fetch_userinfo(
-                        userinfo_endpoint=user_info_endpoint,
-                        access_token=access_token,
+                    cast(
+                        dict[str, JsonValue],
+                        await self.fetch_userinfo(
+                            userinfo_endpoint=user_info_endpoint,
+                            access_token=access_token,
+                        ),
                     )
                 )
         if not claims:
@@ -463,7 +455,7 @@ class OidcClient:
 
     # ── Shared response handling ────────────────────────────────────
 
-    async def _read_json(self, response: httpx.Response, *, label: str) -> dict[str, JsonValue]:
+    async def _read_json(self, response: httpx.Response, *, label: str) -> OIDCClaimsDict:
         """Read + JSON-decode a 2xx response; raise ``ExternalServiceError`` otherwise."""
         if response.status_code < 200 or response.status_code >= 300:
             snippet = response.text[:2048].strip()
@@ -486,13 +478,21 @@ class OidcClient:
         return decoded
 
 
-def _as_str(value: JsonValue) -> str:
-    """Coerce a claim value to a trimmed string."""
+def _as_str(value: object) -> str:
+    """Coerce a claim value to a trimmed string.
+
+    Accepts ``str`` or ``None``; rejects every other type with
+    ``TypeError`` so claim misconfiguration (e.g. ``email_claim``
+    pointing at an array such as ``groups``) fails fast instead of
+    silently producing a Python ``repr`` string like ``"['a', 'b']"``.
+    """
     if value is None:
         return ""
     if isinstance(value, str):
         return value.strip()
-    return str(value).strip()
+    raise TypeError(
+        f"expected str or None, got {type(value).__name__}: {value!r}"
+    )
 
 
 __all__ = [
