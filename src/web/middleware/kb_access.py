@@ -1,21 +1,19 @@
 """KB Access middleware — KB membership / share-fallback guard.
 
-Maps ``internal/middleware/kb_access.go``. The guard resolves whether
-the caller may access a specific knowledge base:
+The guard resolves whether the caller may access a specific
+knowledge base:
 
 1. KB belongs to caller's tenant → grant own access.
 2. Org-shared KB → grant min(share, role) cap.
 3. Shared agent carries the KB → grant Viewer (read-only).
 
-PR-12 scope: **stub**. The full implementation depends on the
-KnowledgeBase domain (stage 4), the Organization domain (stage 7), and
-the AgentShare domain (stage 7). Until those land, this module
-provides only the data structures and a placeholder guard that
-raises ``NotImplementedError`` so callers know the guard is not yet
-wired.
+**Stub**: the full implementation depends on the KnowledgeBase,
+Organization, and AgentShare domains. Until those are available, this
+module provides only the data structures and a placeholder guard that
+raises ``NotImplementedError``.
 
 The ``KBAccess`` data class and ``KBIDResolver`` type alias are
-defined now so downstream PRs can reference them without redefining the
+defined now so future code can reference them without redefining the
 contract.
 """
 
@@ -51,13 +49,12 @@ async def require_kb_access(
 ) -> KBAccess:
     """Gate: resolve and check KB access for the caller.
 
-    PR-12: stub — raises ``NotImplementedError``. The full resolution
-    (tenant ownership → org share → agent share) lands in stage 4
-    alongside the KnowledgeBase domain.
+    Stub — raises ``NotImplementedError``. The full resolution (tenant
+    ownership → org share → agent share) will be implemented alongside
+    the KnowledgeBase domain.
     """
     raise NotImplementedError(
-        "KB access guard is a stub in PR-12; it will be implemented "
-        "in stage 4 (KnowledgeBase domain)."
+        "KB access guard is not yet implemented; it requires the KnowledgeBase domain service."
     )
 
 

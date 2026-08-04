@@ -1,10 +1,7 @@
 """Permission types and role hierarchy for tenant-scoped RBAC.
 
-Mirrors ``internal/types/tenant_member.go::TenantRole`` and
-``internal/types/tenant_api_key.go::APIKeyCapability`` /
-``TenantAPIKeyScope``. These types are the shared vocabulary the
-middleware (``src/web/middleware/``) and service layer use to gate
-endpoints.
+These types are the shared vocabulary the middleware
+(``src/web/middleware/``) and service layer use to gate endpoints.
 
 Role hierarchy (numeric level, higher = more privileged):
 
@@ -44,8 +41,7 @@ class TenantRoleLevel(IntEnum):
 class TenantRole:
     """Tenant-scoped role constants (dot-free string literals).
 
-    Mirrors ``internal/types/tenant_member.go``. Each value is the
-    string stored in ``tenant_members.role``.
+    Mirrors the ``tenant_members.role`` column values.
     """
 
     OWNER: Final[str] = "owner"
@@ -82,7 +78,6 @@ class TenantRole:
 class APIKeyCapability:
     """Additive capability grants for scoped API keys.
 
-    Mirrors ``internal/types/tenant_api_key.go::APIKeyCapability``.
     A capability never widens which knowledge bases a key may touch;
     KB scoping is enforced downstream by KB-access guards.
     """
@@ -131,8 +126,8 @@ class TenantAPIKeyScope:
     the ``tenant_api_keys`` row and stashes it on the request context;
     downstream guards read it to decide route admission.
 
-    Unlike the Go struct, this is a plain class (not a Pydantic model)
-    because it is a request-scoped value object, not a serialised DTO.
+    This is a plain class (not a Pydantic model) because it is a
+    request-scoped value object, not a serialised DTO.
     """
 
     __slots__ = (

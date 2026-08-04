@@ -1,6 +1,6 @@
 """API Key Gate middleware — route-policy-based API-key authorization.
 
-Maps ``internal/middleware/api_key_gate.go``. API-key authorization is
+API-key authorization is
 a **separate authority** from the JWT role/ownership guards. Every
 API-key-accessible route declares one policy in the
 ``APIKeyRouteAuthorizer`` registry; the gate is the single place that
