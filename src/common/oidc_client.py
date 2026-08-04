@@ -69,6 +69,24 @@ _RESTRICTED_HOSTNAMES: frozenset[str] = frozenset(
     }
 )
 
+# HTTP headers stripped on cross-host redirects, mirroring Go's
+# `stripRedirectSensitiveHeaders` (WeKnora internal/utils/security.go).
+# Connector tokens must not leak to a third party because the IdP (or
+# any intermediary) can return a redirect to attacker-controlled host.
+_REDIRECT_STRIPPED_HEADERS: frozenset[str] = frozenset(
+    {
+        "authorization",
+        "cookie",
+        "x-auth-token",
+        "x-api-key",
+        "api-key",
+    }
+)
+
+# Toggles `httpx`'s own redirect-following off. Re-validated manually
+# on each hop, exactly like Go's `newSSRFCheckRedirect`.
+_MAX_REDIRECTS = 10
+
 _RESTRICTED_SUFFIXES: tuple[str, ...] = (
     ".internal",
     ".local",
@@ -175,10 +193,13 @@ def _is_ip_like_hostname(hostname: str) -> bool:
 async def validate_ssrf_safe_url(raw_url: str) -> None:
     """Raise ``ValidationError`` if ``raw_url`` is not SSRF-safe.
 
-    DNS resolution runs in a worker thread; everything else is cheap.
+    Mirrors WeKnora's Go ``isSSRFSafeURL`` (internal/utils/security.go):
+    empty URL is rejected, DNS resolution is fail-closed (unknown host
+    cannot be proven safe), and every redirect target is re-validated
+    separately by the HTTP client.
     """
     if not raw_url:
-        return
+        raise ValidationError("URL is empty", code="oidc.ssrf_blocked")
     if len(raw_url) > _MAX_URL_LENGTH:
         raise ValidationError("URL exceeds maximum length", code="oidc.ssrf_blocked")
     parsed = urllib.parse.urlparse(raw_url)
@@ -212,7 +233,8 @@ async def validate_ssrf_safe_url(raw_url: str) -> None:
         pass
     if _is_ip_like_hostname(hostname_lower):
         raise ValidationError("IP-like hostname format is not allowed", code="oidc.ssrf_blocked")
-    # DNS resolution - must not land on a restricted IP.
+    # DNS resolution - must not land on a restricted IP. Fail-closed:
+    # if we cannot resolve the hostname, we cannot prove it is safe.
     infos = await asyncio.to_thread(_resolve_host, hostname)
     for resolved in infos:
         if _is_restricted_ip(resolved):
@@ -223,11 +245,18 @@ async def validate_ssrf_safe_url(raw_url: str) -> None:
 
 
 def _resolve_host(hostname: str) -> list[ipaddress.IPv4Address | ipaddress.IPv6Address]:
-    """Resolve ``hostname`` to IP address objects (empty list on failure)."""
+    """Resolve ``hostname`` to IP address objects.
+
+    Raises ``ValidationError`` on resolution failure - mirrors Go's
+    ``net.LookupIP`` failure path (fail-closed).
+    """
     try:
         entries = socket.getaddrinfo(hostname, None)
-    except OSError:
-        return []
+    except OSError as exc:
+        raise ValidationError(
+            f"DNS resolution failed for hostname {hostname}: cannot verify it is safe",
+            code="oidc.ssrf_blocked",
+        ) from exc
     ips: list[ipaddress.IPv4Address | ipaddress.IPv6Address] = []
     seen: set[str] = set()
     for entry in entries:
@@ -277,10 +306,25 @@ def _default_client(
     transport: httpx.AsyncBaseTransport | None,
     timeout: float,
 ) -> httpx.AsyncClient:
-    """Construct the underlying httpx client (no redirect following)."""
+    """Construct the underlying httpx client (no redirect following).
+
+    Redirects are intentionally disabled at the client level: every hop
+    is re-validated manually by :meth:`OidcClient._send`, mirroring Go's
+    ``newSSRFCheckRedirect`` in WeKnora's ``internal/utils/security.go``.
+    """
     if transport is not None:
-        return httpx.AsyncClient(transport=transport, timeout=timeout)
-    return httpx.AsyncClient(timeout=timeout)
+        return httpx.AsyncClient(transport=transport, timeout=timeout, follow_redirects=False)
+    return httpx.AsyncClient(timeout=timeout, follow_redirects=False)
+
+
+def _same_http_origin(a: httpx.URL, b: httpx.URL) -> bool:
+    return a.scheme.lower() == b.scheme.lower() and a.host.lower() == b.host.lower()
+
+
+def _strip_redirect_sensitive_headers(request: httpx.Request) -> None:
+    for header in _REDIRECT_STRIPPED_HEADERS:
+        if header in request.headers:
+            del request.headers[header]
 
 
 class OidcClient:
@@ -302,19 +346,60 @@ class OidcClient:
     async def aclose(self) -> None:
         await self._client.aclose()
 
+    async def _send(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        data: dict[str, str] | None = None,
+    ) -> httpx.Response:
+        """Send with manual redirect handling + SSRF re-validation per hop.
+
+        Aligned with Go's ``newSSRFCheckRedirect``: cap redirects at
+        ``_MAX_REDIRECTS``, strip connector credentials on cross-host
+        hops, and re-run ``validate_ssrf_safe_url`` on every Location
+        before sending.
+        """
+        original = httpx.Request(method, url, headers=headers, data=data)
+        for hop in range(_MAX_REDIRECTS + 1):
+            await validate_ssrf_safe_url(str(original.url))
+            try:
+                response = await self._client.send(original)
+            except httpx.HTTPError as exc:
+                raise ExternalServiceError(
+                    f"OIDC request failed: {exc}",
+                    code="oidc.exchange_failed",
+                ) from exc
+            if not response.is_redirect:
+                return response
+            if hop >= _MAX_REDIRECTS:
+                raise ExternalServiceError(
+                    f"stopped after {_MAX_REDIRECTS} redirects",
+                    code="oidc.redirect_blocked",
+                )
+            location = response.headers.get("Location")
+            if not location:
+                raise ExternalServiceError(
+                    "redirect response missing Location header",
+                    code="oidc.redirect_blocked",
+                )
+            next_url = urllib.parse.urljoin(str(original.url), location)
+            next_request = httpx.Request(method, next_url, headers=original.headers)
+            if not _same_http_origin(original.url, next_request.url):
+                _strip_redirect_sensitive_headers(next_request)
+            original = next_request
+        raise ExternalServiceError(
+            f"stopped after {_MAX_REDIRECTS} redirects",
+            code="oidc.redirect_blocked",
+        )
+
     # ── Discovery ────────────────────────────────────────────────────
 
     async def discover_endpoints(self, discovery_url: str) -> OIDCDiscoveryDocument:
         """Fetch ``.well-known/openid-configuration`` and return endpoints."""
-        await validate_ssrf_safe_url(discovery_url)
-        try:
-            response = await self._client.get(discovery_url, headers={"Accept": "application/json"})
-        except httpx.HTTPError as exc:
-            raise ExternalServiceError(
-                f"failed to load OIDC discovery document: {exc}",
-                code="oidc.discovery_failed",
-            ) from exc
-        body = await self._read_json(response, label="discovery")
+        response = await self._send("GET", discovery_url, headers={"Accept": "application/json"})
+        body = self._read_json(response, label="discovery")
         authorization = _as_str(body.get("authorization_endpoint"))
         token = _as_str(body.get("token_endpoint"))
         userinfo = _as_str(body.get("userinfo_endpoint"))
@@ -341,7 +426,6 @@ class OidcClient:
         redirect_uri: str,
     ) -> OIDCTokenResponse:
         """POST the authorization-code grant and return the token response."""
-        await validate_ssrf_safe_url(token_endpoint)
         form: dict[str, str] = {
             "grant_type": "authorization_code",
             "code": code,
@@ -349,21 +433,16 @@ class OidcClient:
             "client_id": client_id,
             "client_secret": client_secret,
         }
-        try:
-            response = await self._client.post(
-                token_endpoint,
-                data=form,
-                headers={
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Accept": "application/json",
-                },
-            )
-        except httpx.HTTPError as exc:
-            raise ExternalServiceError(
-                f"failed to exchange OIDC code: {exc}",
-                code="oidc.exchange_failed",
-            ) from exc
-        body = await self._read_json(response, label="token exchange")
+        response = await self._send(
+            "POST",
+            token_endpoint,
+            data=form,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json",
+            },
+        )
+        body = self._read_json(response, label="token exchange")
         access_token = _as_str(body.get("access_token"))
         id_token = _as_str(body.get("id_token"))
         if not access_token and not id_token:
@@ -386,21 +465,15 @@ class OidcClient:
         access_token: str,
     ) -> OIDCClaimsDict:
         """GET the userinfo endpoint with a bearer token, return claims."""
-        await validate_ssrf_safe_url(userinfo_endpoint)
-        try:
-            response = await self._client.get(
-                userinfo_endpoint,
-                headers={
-                    "Authorization": f"Bearer {access_token}",
-                    "Accept": "application/json",
-                },
-            )
-        except httpx.HTTPError as exc:
-            raise ExternalServiceError(
-                f"failed to fetch OIDC userinfo: {exc}",
-                code="oidc.userinfo_failed",
-            ) from exc
-        return await self._read_json(response, label="userinfo")
+        response = await self._send(
+            "GET",
+            userinfo_endpoint,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/json",
+            },
+        )
+        return self._read_json(response, label="userinfo")
 
     # ── Userinfo projection ──────────────────────────────────────────
 
@@ -461,7 +534,7 @@ class OidcClient:
         "userinfo": "oidc.userinfo_failed",
     }
 
-    async def _read_json(self, response: httpx.Response, *, label: str) -> dict[str, JsonValue]:
+    def _read_json(self, response: httpx.Response, *, label: str) -> dict[str, JsonValue]:
         """Read + JSON-decode a 2xx response; raise ``ExternalServiceError`` otherwise."""
         code = self._ERROR_CODE_BY_LABEL.get(label, "oidc.exchange_failed")
         if response.status_code < 200 or response.status_code >= 300:
