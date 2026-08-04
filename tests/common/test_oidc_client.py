@@ -1,4 +1,4 @@
-"""Unit tests for ``src.ai.oidc_client``.
+"""Unit tests for ``src.common.oidc_client``.
 
 Happy-path HTTP calls use ``httpx.MockTransport`` so no real network is
 hit; the discovery/exchange/userinfo URLs live under ``idp.example.com``
@@ -17,14 +17,14 @@ from collections.abc import Mapping
 import httpx
 import pytest
 
-from src.ai.oidc_client import (
+from src.common.exception import ExternalServiceError, ValidationError
+from src.common.oidc_client import (
     OidcClient,
     OIDCDiscoveryDocument,
     OIDCTokenResponse,
     decode_jwt_claims_unverified,
     validate_ssrf_safe_url,
 )
-from src.common.exception import ExternalServiceError, ValidationError
 
 _DISCOVERY_URL = "https://idp.example.com/.well-known/openid-configuration"
 _AUTHORIZE = "https://idp.example.com/authorize"
@@ -289,7 +289,7 @@ def test_decode_jwt_claims_unverified_malformed_returns_empty() -> None:
 
 
 def test_as_str_returns_trimmed_string() -> None:
-    from src.ai.oidc_client import _as_str
+    from src.common.oidc_client import _as_str
 
     assert _as_str("hello") == "hello"
     assert _as_str("  hello  ") == "hello"
@@ -297,7 +297,7 @@ def test_as_str_returns_trimmed_string() -> None:
 
 
 def test_as_str_returns_empty_for_none() -> None:
-    from src.ai.oidc_client import _as_str
+    from src.common.oidc_client import _as_str
 
     assert _as_str(None) == ""
 
@@ -316,7 +316,7 @@ def test_as_str_returns_empty_for_none() -> None:
     ],
 )
 def test_as_str_rejects_non_string_non_none(value: object) -> None:
-    from src.ai.oidc_client import _as_str
+    from src.common.oidc_client import _as_str
 
     with pytest.raises(TypeError) as exc_info:
         _as_str(value)

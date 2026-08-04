@@ -7,9 +7,8 @@
 
 ```
 web      → core, common, app_context
-core     → db, ai, common, util
+core     → db, common, util
 db       → common, db/models, db/dbengine
-ai       → common, util
 workers  → core, common, util
 *        → common, util
 ```
@@ -17,16 +16,16 @@ workers  → core, common, util
 Forbidden:
 - `web` calling `db` directly.
 - `core` handling HTTP concerns (`Request`, `Response`, `HTTPException`).
-- `db` containing business logic or calling `ai`.
-- `ai` calling `core` or `db`.
-- `workers` calling `db` or `ai` directly.
+- `db` containing business logic.
+- `workers` calling `db` directly.
 - Function-level imports anywhere.
 - `Any` / `object` type annotations.
 - Module-level mutable globals.
 
 ## 2. Code conventions
 
-- Python ≥ 3.11 (use `match`, `type X = ...`, PEP 695 generics).
+- Python ≥ 3.11 (use `match`; `type X = ...` and PEP 695 generics only
+  once the floor moves to ≥ 3.12 — until then use plain `TypeAlias`).
 - All imports at file top, in `stdlib → third-party → first-party` groups.
 - Every variable, parameter, return type, class attribute must have an
   explicit annotation.

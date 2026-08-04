@@ -13,7 +13,6 @@ from datetime import UTC, datetime
 
 import pytest
 
-from src.ai.oidc_client import OIDCTokenResponse, OIDCUserInfoClaims
 from src.common.exception import (
     ExternalServiceError,
     NotFoundError,
@@ -21,6 +20,7 @@ from src.common.exception import (
     UnauthorizedError,
     ValidationError,
 )
+from src.common.oidc_client import OIDCTokenResponse, OIDCUserInfoClaims
 from src.core.auth.oidc import (
     OidcService,
     OIDCStatePayload,

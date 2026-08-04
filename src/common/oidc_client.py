@@ -15,13 +15,13 @@ import os
 import socket
 import urllib.parse
 from dataclasses import dataclass
-from typing import cast
+from typing import ClassVar, cast
 
 import httpx
 
-from src.ai.oidc_types import OIDCClaimsDict
 from src.common.exception import ApplicationError, ExternalServiceError, ValidationError
 from src.common.json import JsonValue
+from src.common.oidc_types import OIDCClaimsDict
 
 # ── Result dataclasses ──────────────────────────────────────────────
 
@@ -455,25 +455,32 @@ class OidcClient:
 
     # ── Shared response handling ────────────────────────────────────
 
+    _ERROR_CODE_BY_LABEL: ClassVar[dict[str, str]] = {
+        "discovery": "oidc.discovery_failed",
+        "token exchange": "oidc.exchange_failed",
+        "userinfo": "oidc.userinfo_failed",
+    }
+
     async def _read_json(self, response: httpx.Response, *, label: str) -> OIDCClaimsDict:
         """Read + JSON-decode a 2xx response; raise ``ExternalServiceError`` otherwise."""
+        code = self._ERROR_CODE_BY_LABEL.get(label, "oidc.exchange_failed")
         if response.status_code < 200 or response.status_code >= 300:
             snippet = response.text[:2048].strip()
             raise ExternalServiceError(
                 f"OIDC {label} request failed: status={response.status_code} body={snippet}",
-                code="oidc.exchange_failed" if label != "discovery" else "oidc.discovery_failed",
+                code=code,
             )
         try:
             decoded = response.json()
         except json.JSONDecodeError as exc:
             raise ExternalServiceError(
                 f"failed to decode OIDC {label} JSON: {exc}",
-                code="oidc.exchange_failed" if label != "discovery" else "oidc.discovery_failed",
+                code=code,
             ) from exc
         if not isinstance(decoded, dict):
             raise ExternalServiceError(
                 f"OIDC {label} response is not a JSON object",
-                code="oidc.exchange_failed" if label != "discovery" else "oidc.discovery_failed",
+                code=code,
             )
         return decoded
 
@@ -490,9 +497,7 @@ def _as_str(value: object) -> str:
         return ""
     if isinstance(value, str):
         return value.strip()
-    raise TypeError(
-        f"expected str or None, got {type(value).__name__}: {value!r}"
-    )
+    raise TypeError(f"expected str or None, got {type(value).__name__}: {value!r}")
 
 
 __all__ = [

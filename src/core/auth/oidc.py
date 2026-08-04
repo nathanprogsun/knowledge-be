@@ -16,7 +16,6 @@ import time
 from dataclasses import dataclass
 from urllib.parse import urlencode
 
-from src.ai.oidc_client import OidcClient, OIDCUserInfoClaims
 from src.common.exception import (
     ExternalServiceError,
     NotFoundError,
@@ -24,6 +23,7 @@ from src.common.exception import (
     UnauthorizedError,
     ValidationError,
 )
+from src.common.oidc_client import OidcClient, OIDCUserInfoClaims
 from src.core.auth.service import LoginResult, mint_token_pair
 from src.core.auth.types import UserInfo
 from src.db.dao.auth_tokens_repository import AuthTokenRepository
