@@ -241,7 +241,13 @@ class LayerVisitor(ast.NodeVisitor):
                 f"(from-import indented at col {node.col_offset})"
             )
         if node.module:
-            _check_import_policy(self.layer, node.module, node.lineno, self.path, self.errors)
+            # First-party imports are rooted at ``src.``; the forbidden
+            # prefixes are layer-relative (``db``, ``core``...). Strip the
+            # package root or the policy never matches.
+            module = node.module
+            if module == "src" or module.startswith("src."):
+                module = module.removeprefix("src.").removesuffix("src")
+            _check_import_policy(self.layer, module, node.lineno, self.path, self.errors)
         self.generic_visit(node)
 
     # ── annotations ─────────────────────────────────────────────────

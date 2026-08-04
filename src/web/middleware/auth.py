@@ -22,15 +22,10 @@ from fastapi import Depends, Header, Request
 
 from src.app_context import request_context
 from src.common.exception import UnauthorizedError, ValidationError
+from src.core.auth.factory import build_auth_service
 from src.core.auth.permissions import APIKeyScopeType, TenantAPIKeyScope
-from src.core.auth.service import AuthService
 from src.core.auth.types import UserInfo
-from src.core.tenants.api_key_service import TenantAPIKeyService
-from src.core.tenants.member_service import TenantMemberService
-from src.db.dao.auth_tokens_repository import AuthTokenRepository
-from src.db.dao.tenant_api_keys_repository import TenantAPIKeyRepository
-from src.db.dao.tenant_members_repository import TenantMemberRepository
-from src.db.dao.users_repository import UserRepository
+from src.core.tenants.factory import build_tenant_api_key_service, build_tenant_member_service
 from src.web.deps.session import SessionDep
 from src.web.middleware.context import (
     set_api_key_scope,
@@ -94,9 +89,7 @@ async def _resolve_jwt(
 ) -> bool:
     """Attempt JWT authentication; return True on success."""
     try:
-        users_repo = UserRepository(session)
-        tokens_repo = AuthTokenRepository(session)
-        auth_service = AuthService(users_repo=users_repo, tokens_repo=tokens_repo)
+        auth_service = build_auth_service(session)
         info, tenant_id = await auth_service.get_me(token=token)
     except UnauthorizedError:
         return False
@@ -105,7 +98,7 @@ async def _resolve_jwt(
     role = ""
     if tenant_id is not None:
         try:
-            member_service = TenantMemberService(members_repo=TenantMemberRepository(session))
+            member_service = build_tenant_member_service(session)
             membership = await member_service.get_membership(
                 user_id=info.id,
                 tenant_id=tenant_id,
@@ -142,7 +135,7 @@ async def _resolve_api_key(
 ) -> bool:
     """Attempt X-API-Key authentication; return True on success."""
     try:
-        api_key_service = TenantAPIKeyService(api_keys_repo=TenantAPIKeyRepository(session))
+        api_key_service = build_tenant_api_key_service(session)
         key_info = await api_key_service.authenticate(api_key)
     except Exception:
         return False

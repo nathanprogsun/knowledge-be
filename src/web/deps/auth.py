@@ -1,9 +1,9 @@
 """Auth-domain FastAPI dependency factories.
 
-Builds a per-request ``AuthService`` from fresh ``UserRepository`` and
-``AuthTokenRepository`` instances sharing the request-scoped
-``AsyncSession``. The service is request-scoped and never shared
-across requests.
+One-line forwarders to the ``core`` builders: repositories are assembled
+in ``src.core.auth.factory`` on the request-scoped ``AsyncSession`` (the
+request's reads and writes form a single unit of work); APP-scope
+singletons come from the lifespan registry. ``web`` never imports ``db``.
 """
 
 from __future__ import annotations
@@ -13,19 +13,16 @@ from typing import Annotated
 from fastapi import Depends, Request
 
 from src.app_context.registry import get_oidc_client_from_lifespan
+from src.core.auth.factory import build_auth_service, build_oidc_service
 from src.core.auth.oidc import OidcService
 from src.core.auth.service import AuthService
-from src.db.dao.auth_tokens_repository import AuthTokenRepository
-from src.db.dao.users_repository import UserRepository
 from src.web.deps.session import SessionDep
 from src.web.middleware.auth import require_auth
 
 
 def get_auth_service(session: SessionDep) -> AuthService:
-    """Build a per-request ``AuthService`` with fresh repos sharing the session."""
-    users_repo = UserRepository(session)
-    tokens_repo = AuthTokenRepository(session)
-    return AuthService(users_repo=users_repo, tokens_repo=tokens_repo)
+    """Build a per-request ``AuthService`` on the shared session."""
+    return build_auth_service(session)
 
 
 def get_oidc_service(request: Request, session: SessionDep) -> OidcService:
@@ -35,13 +32,7 @@ def get_oidc_service(request: Request, session: SessionDep) -> OidcService:
     ``OidcClient`` is the APP-scope singleton from the lifespan registry
     so its pooled ``httpx.AsyncClient`` is shared across requests.
     """
-    users_repo = UserRepository(session)
-    tokens_repo = AuthTokenRepository(session)
-    return OidcService(
-        users_repo=users_repo,
-        tokens_repo=tokens_repo,
-        oidc_client=get_oidc_client_from_lifespan(request.app),
-    )
+    return build_oidc_service(session, oidc_client=get_oidc_client_from_lifespan(request.app))
 
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]

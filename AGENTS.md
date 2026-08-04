@@ -14,7 +14,12 @@ workers  → core, common, util
 ```
 
 Forbidden:
-- `web` calling `db` directly.
+- `web` importing `db` — anywhere, including `web/deps` and
+  `web/middleware`. Repositories are instantiated only inside
+  `core/<domain>/factory.py` `build_*_service(session, ...)` factories;
+  `web/deps` factories are one-line forwarders. Enforced by
+  `scripts/check_layer_violation.py` (`make check-layer`).
+- `db` is called only by repositories; repositories only by services.
 - `core` handling HTTP concerns (`Request`, `Response`, `HTTPException`).
 - `db` containing business logic.
 - `workers` calling `db` directly.
@@ -90,6 +95,8 @@ Pre-merge gates:
 - `make format` — ruff format --check
 - `make typecheck` — mypy --strict
 - `make test` — pytest
+- `make check` — anti-drift scripts (layer directionality, DI scope,
+  endpoint coverage, contract invariants, top-level imports)
 
 A change that fails any gate cannot merge.
 
