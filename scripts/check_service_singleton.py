@@ -1,25 +1,29 @@
 #!/usr/bin/env python3
-"""Verify every Service is registered in LifeSpanService.
+"""Verify DI scope discipline (AGENTS.md §3).
 
 Rules:
 
-1. For every top-level class whose name ends with ``Service`` defined under
-   ``src/core/**/service.py`` (or ``src/core/**/service/__init__.py`` /
-   ``src/core/**/service/<anything>.py``), there MUST be a corresponding field
-   on the ``LifeSpanService`` dataclass in
-   ``src/app_context/lifespan.py`` with the same type annotation.
+1. Every top-level class whose name ends with ``Service`` defined under
+   ``src/core/**/service.py`` (or ``src/core/**/service/<anything>.py``)
+   is **REQUEST-scoped** (it binds repositories holding the per-request
+   ``AsyncSession``). Such classes MUST NOT be registered as fields of
+   the ``LifeSpanService`` dataclass under ``src/app_context/`` — that
+   registry is reserved for APP-scope singletons: stateless objects that
+   are expensive to construct (``DatabaseEngine``, ``OidcClient``, ...).
 
 2. For every web router that injects a service via ``Depends(...)``, the
-   argument MUST be a ``get_<snake_case>_from_lifespan`` accessor from the
-   same ``lifespan.py`` module — not the service class directly.
+   argument MUST NOT be the service class directly — obtain the service
+   from a ``web.deps`` factory (which assembles repos + APP-scope
+   singletons), never by registering the class on the app.
 
 Usage::
 
     python check_service_singleton.py [--src-root PATH]
 
 Exit codes:
-    0 = all services registered and correctly injected
-    1 = missing registration or improper dependency injection
+    0 = scope discipline respected
+    1 = request-scoped service registered as app singleton, or improper
+        dependency injection
 """
 
 from __future__ import annotations
@@ -226,7 +230,7 @@ def main() -> int:
         return 0
 
     services = _collect_services(src)
-    registered, lifespan_file = _collect_lifespan(src)
+    registered, _lifespan_file = _collect_lifespan(src)
     errors: list[str] = []
 
     if not services:
@@ -237,21 +241,18 @@ def main() -> int:
             return 0
         for e in errors:
             print(f"[FAIL] {e}")
-        print(f"[FAIL] {len(errors)} service-registration violation(s)")
+        print(f"[FAIL] {len(errors)} service-scope violation(s)")
         return 1
 
-    # 1) every Service class must be registered
+    # 1) request-scoped Service classes MUST NOT be APP-scope singletons
     for name in sorted(services):
         path, lineno = services[name]
-        if name not in registered:
-            target = (
-                f"{lifespan_file.relative_to(src)} (LifeSpanService)"
-                if lifespan_file
-                else "src/app_context/lifespan.py (LifeSpanService)"
-            )
+        if name in registered:
             errors.append(
-                f"{path.relative_to(src)}:{lineno}: Service '{name}' is not "
-                f"registered as a field of LifeSpanService in {target}"
+                f"{path.relative_to(src)}:{lineno}: Service '{name}' is "
+                f"request-scoped (binds the per-request AsyncSession) and "
+                f"MUST NOT be registered as a field of LifeSpanService — "
+                f"that registry is for APP-scope stateless singletons only"
             )
 
     # 2) web Depends(SomeService) check
@@ -260,15 +261,13 @@ def main() -> int:
     if errors:
         for e in errors:
             print(f"[FAIL] {e}")
-        print(f"[FAIL] {len(errors)} service-registration violation(s)")
+        print(f"[FAIL] {len(errors)} service-scope violation(s)")
         return 1
 
-    location = (
-        str(lifespan_file.relative_to(src)) if lifespan_file else "src/app_context/lifespan.py"
-    )
     print(
-        f"[PASS] All {len(services)} Service classes are registered in "
-        f"{location} (LifeSpanService) and accessed via get_*_from_lifespan"
+        f"[PASS] All {len(services)} Service classes are request-scoped "
+        f"(absent from LifeSpanService) and no router injects a "
+        f"Service class directly"
     )
     return 0
 

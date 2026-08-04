@@ -461,7 +461,7 @@ class OidcClient:
         "userinfo": "oidc.userinfo_failed",
     }
 
-    async def _read_json(self, response: httpx.Response, *, label: str) -> OIDCClaimsDict:
+    async def _read_json(self, response: httpx.Response, *, label: str) -> dict[str, JsonValue]:
         """Read + JSON-decode a 2xx response; raise ``ExternalServiceError`` otherwise."""
         code = self._ERROR_CODE_BY_LABEL.get(label, "oidc.exchange_failed")
         if response.status_code < 200 or response.status_code >= 300:
@@ -482,10 +482,13 @@ class OidcClient:
                 f"OIDC {label} response is not a JSON object",
                 code=code,
             )
-        return decoded
+        # response.json() yields Any; the dict-isinstance check above plus
+        # the JSON grammar (object keys are strings, values are JSON
+        # values) justify the narrowing cast.
+        return cast(dict[str, JsonValue], decoded)
 
 
-def _as_str(value: object) -> str:
+def _as_str(value: JsonValue) -> str:
     """Coerce a claim value to a trimmed string.
 
     Accepts ``str`` or ``None``; rejects every other type with

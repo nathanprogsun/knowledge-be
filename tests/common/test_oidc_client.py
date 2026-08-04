@@ -18,6 +18,7 @@ import httpx
 import pytest
 
 from src.common.exception import ExternalServiceError, ValidationError
+from src.common.json import JsonValue
 from src.common.oidc_client import (
     OidcClient,
     OIDCDiscoveryDocument,
@@ -315,9 +316,12 @@ def test_as_str_returns_empty_for_none() -> None:
         ["a", "b"],
     ],
 )
-def test_as_str_rejects_non_string_non_none(value: object) -> None:
+def test_as_str_rejects_non_string_non_none(value: JsonValue) -> None:
     from src.common.oidc_client import _as_str
 
+    # All parametrized values are legal JsonValue members (number/bool/
+    # list/dict); _as_str must reject them because claim projection only
+    # accepts str or None.
     with pytest.raises(TypeError) as exc_info:
         _as_str(value)
     # Error message must mention the actual type so misconfiguration is debuggable.

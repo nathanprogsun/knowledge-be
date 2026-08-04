@@ -35,12 +35,25 @@ Forbidden:
 
 ## 3. Service registration (DI)
 
-- Every service is a singleton registered once in `LifeSpanService`
-  during FastAPI lifespan startup.
-- Web routers obtain services via
-  `Annotated[T, Depends(get_xxx_from_lifespan)]`.
-- Services receive their own deps via constructor injection at
-  registration time — never via runtime `Depends`.
+DI follows **scope layering**, not blanket singletons:
+
+- **APP scope** — stateless + expensive to construct (`DatabaseEngine`,
+  `OidcClient`/pooled `httpx.AsyncClient`, settings): created once in the
+  FastAPI lifespan, stored on `LifeSpanService`, obtained via
+  `get_xxx_from_lifespan(request.app)`. Long-lived resources must be
+  closed in the lifespan shutdown (e.g. `OidcClient.aclose()`).
+- **REQUEST scope** — anything holding the per-request `AsyncSession`
+  (repositories, and services binding repositories): constructed per
+  request in `web/deps/` factories. The factory composes fresh repos
+  with APP-scope singletons pulled from the lifespan registry.
+- Request-scoped services MUST NOT be registered on `LifeSpanService`
+  (enforced by `scripts/check_service_singleton.py`).
+- Never use class-level Singleton bases/metaclasses: they break test
+  transport injection, bind to the wrong event loop, and hide
+  dependencies. "One instance per app" is achieved by constructing once
+  in the lifespan — not by type-level tricks.
+- Services receive their own deps via constructor injection — never via
+  runtime `Depends` inside `core`.
 - Services MUST NOT hold request-scoped state; request data is read
   from `src.app_context.request_context`.
 

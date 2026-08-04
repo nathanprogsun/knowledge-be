@@ -26,6 +26,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.app_context.registry import LifeSpanService
 from src.app_logging import configure_logging, logger
+from src.common.oidc_client import OidcClient
 from src.db.base import DatabaseEngine
 from src.settings import get_settings
 from src.web.api.auth.router import router as auth_router
@@ -50,12 +51,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.db_conn_prewarm:
         await db_engine.prewarm()
 
-    app.state.lifespan_service = LifeSpanService(db_engine=db_engine)
+    # APP-scope singleton: pooled httpx.AsyncClient underneath; shared
+    # across requests so TCP/TLS connections to the IdP are reused.
+    oidc_client = OidcClient()
+
+    app.state.lifespan_service = LifeSpanService(db_engine=db_engine, oidc_client=oidc_client)
     logger.info("lifespan ready")
     try:
         yield
     finally:
         logger.info("shutting down {}", settings.app_name)
+        await oidc_client.aclose()
         await db_engine.close()
         app.state.lifespan_service = None
 
