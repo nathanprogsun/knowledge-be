@@ -92,7 +92,7 @@ async def require_role(
     *,
     min_role: str,
     request: Request,
-    audit_svc: AuditLogService,
+    audit_svc: AuditLogService | None,
 ) -> None:
     """Gate: caller's tenant role must be at least ``min_role``.
 
@@ -116,15 +116,16 @@ async def require_role(
     tenant_id = _tenant_id(request)
 
     # Fail-open during rollout (enforcement off).
-    await _emit_denied_audit(
-        audit_svc=audit_svc,
-        tenant_id=tenant_id,
-        actor_user_id=actor_id,
-        actor_role=role,
-        required_role=min_role,
-        request_path=request.url.path,
-        request_method=request.method,
-    )
+    if audit_svc is not None:
+        await _emit_denied_audit(
+            audit_svc=audit_svc,
+            tenant_id=tenant_id,
+            actor_user_id=actor_id,
+            actor_role=role,
+            required_role=min_role,
+            request_path=request.url.path,
+            request_method=request.method,
+        )
     raise PermissionDeniedError(
         code="rbac.insufficient_role",
         message=f"Forbidden: requires role '{min_role}' or higher",
@@ -134,7 +135,7 @@ async def require_role(
 async def require_system_admin(
     *,
     request: Request,
-    audit_svc: AuditLogService,
+    audit_svc: AuditLogService | None,
 ) -> None:
     """Gate: caller must be a system administrator.
 
@@ -156,15 +157,16 @@ async def require_system_admin(
 
     actor_id = _actor_user_id(request)
     tenant_id = _tenant_id(request)
-    await _emit_denied_audit(
-        audit_svc=audit_svc,
-        tenant_id=tenant_id,
-        actor_user_id=actor_id,
-        actor_role="user",
-        required_role="system_admin",
-        request_path=request.url.path,
-        request_method=request.method,
-    )
+    if audit_svc is not None:
+        await _emit_denied_audit(
+            audit_svc=audit_svc,
+            tenant_id=tenant_id,
+            actor_user_id=actor_id,
+            actor_role="user",
+            required_role="system_admin",
+            request_path=request.url.path,
+            request_method=request.method,
+        )
     raise PermissionDeniedError(
         code="rbac.system_admin_required",
         message="Forbidden: system administrator required",
@@ -176,7 +178,7 @@ async def require_ownership_or_role(
     min_role: str,
     lookup: CreatorLookup,
     request: Request,
-    audit_svc: AuditLogService,
+    audit_svc: AuditLogService | None,
 ) -> None:
     """Gate: role ≥ min_role **or** caller is the resource creator.
 
@@ -211,15 +213,16 @@ async def require_ownership_or_role(
         return
 
     tenant_id = _tenant_id(request)
-    await _emit_denied_audit(
-        audit_svc=audit_svc,
-        tenant_id=tenant_id,
-        actor_user_id=actor_id,
-        actor_role=role,
-        required_role=min_role,
-        request_path=request.url.path,
-        request_method=request.method,
-    )
+    if audit_svc is not None:
+        await _emit_denied_audit(
+            audit_svc=audit_svc,
+            tenant_id=tenant_id,
+            actor_user_id=actor_id,
+            actor_role=role,
+            required_role=min_role,
+            request_path=request.url.path,
+            request_method=request.method,
+        )
     raise PermissionDeniedError(
         code="rbac.ownership_or_role_required",
         message="Forbidden: must own the resource or have the required role",

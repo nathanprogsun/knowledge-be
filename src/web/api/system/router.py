@@ -38,6 +38,8 @@ from src.core.system.audit_service import AuditLogListResult
 from src.core.system.types import AuditLogInfo, SystemSettingInfo
 from src.web.deps import (
     AuditLogServiceDep,
+    AuthDep,
+    SystemAdminDep,
     SystemSettingServiceDep,
 )
 
@@ -175,6 +177,8 @@ def _audit_list_to_response(result: AuditLogListResult) -> AuditLogListResponse:
 
 @router.get("/settings", response_model=list[SystemSettingResponse])
 async def list_settings(
+    _auth: AuthDep,
+    _admin: SystemAdminDep,
     settings_svc: SystemSettingServiceDep,
 ) -> list[SystemSettingResponse]:
     """List every known system setting.
@@ -188,6 +192,8 @@ async def list_settings(
 
 @router.get("/settings/{key}", response_model=SystemSettingResponse)
 async def get_setting(
+    _auth: AuthDep,
+    _admin: SystemAdminDep,
     key: str,
     settings_svc: SystemSettingServiceDep,
 ) -> SystemSettingResponse:
@@ -198,6 +204,8 @@ async def get_setting(
 
 @router.put("/settings/{key}", response_model=SystemSettingResponse)
 async def update_setting(
+    _auth: AuthDep,
+    _admin: SystemAdminDep,
     key: str,
     body: UpdateSystemSettingRequest,
     settings_svc: SystemSettingServiceDep,
@@ -214,6 +222,8 @@ async def update_setting(
 
 @router.delete("/settings/{key}", response_model=ResetSystemSettingResponse)
 async def reset_setting(
+    _auth: AuthDep,
+    _admin: SystemAdminDep,
     key: str,
     settings_svc: SystemSettingServiceDep,
 ) -> ResetSystemSettingResponse:
@@ -228,6 +238,8 @@ async def reset_setting(
 
 @router.get("/audit-log", response_model=AuditLogListResponse)
 async def list_system_audit_log(
+    _auth: AuthDep,
+    _admin: SystemAdminDep,
     audit_svc: AuditLogServiceDep,
     after_id: int = Query(default=0, ge=0, description="游标：返回 id 小于此值的记录"),
     limit: int = Query(default=50, ge=1, le=100, description="页大小，1-100"),
