@@ -99,7 +99,7 @@ class GenericRepository(Generic[ModelType]):
         exclude_deleted_or_archived: bool,
         prefix: str = "and",
     ) -> str:
-        """Build ``and (deleted_at is null or deleted_at > now)`` fragment.
+        """Build ``and deleted_at is null`` fragment.
 
         Returns empty string when the model has no ``deleted_at`` column
         or when filtering is disabled. ``prefix`` controls the leading
@@ -110,7 +110,7 @@ class GenericRepository(Generic[ModelType]):
             return ""
         if "deleted_at" not in model.column_fields():
             return ""
-        return f"{prefix} (deleted_at is null or deleted_at > current_timestamp)"
+        return f"{prefix} deleted_at is null"
 
     @staticmethod
     def _archived_where_fragment(
@@ -119,12 +119,12 @@ class GenericRepository(Generic[ModelType]):
         exclude_deleted_or_archived: bool,
         prefix: str = "and",
     ) -> str:
-        """Build ``and (archived_at is null or archived_at > now)`` fragment."""
+        """Build ``and archived_at is null`` fragment."""
         if not exclude_deleted_or_archived:
             return ""
         if "archived_at" not in model.column_fields():
             return ""
-        return f"{prefix} (archived_at is null or archived_at > current_timestamp)"
+        return f"{prefix} archived_at is null"
 
     # ── Bind-param helpers ──────────────────────────────────────────
 
