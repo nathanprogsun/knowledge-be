@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from src.common.exception import NotFoundError
+from src.common.json import JsonObject
 from src.db.dao.tenants_repository import TenantRepository, escape_like_keyword
 from src.db.models.tenants.tenants import DEFAULT_STORAGE_QUOTA_BYTES, Tenant
 
@@ -80,7 +81,7 @@ def _sample_row(
     description: str | None = "acme workspace",
     business: str = "saas",
     created_at: datetime = _NOW,
-    retriever_engines: dict[str, object] | list[dict[str, object]] | None = None,
+    retriever_engines: JsonObject | list[JsonObject] | None = None,
 ) -> Tenant:
     return Tenant(
         name=name,
@@ -124,7 +125,7 @@ async def test_insert_ids_are_distinct_per_row(session: AsyncSession) -> None:
 
 async def test_insert_round_trips_retriever_engines_object(session: AsyncSession) -> None:
     repo = TenantRepository(session)
-    engines: dict[str, object] = {
+    engines: JsonObject = {
         "engines": [{"retriever_type": "keywords", "retriever_engine_type": "postgres"}]
     }
 
@@ -136,9 +137,7 @@ async def test_insert_round_trips_retriever_engines_object(session: AsyncSession
 
 async def test_insert_round_trips_legacy_retriever_engines_array(session: AsyncSession) -> None:
     repo = TenantRepository(session)
-    legacy: list[dict[str, object]] = [
-        {"retriever_type": "vector", "retriever_engine_type": "postgres"}
-    ]
+    legacy: list[JsonObject] = [{"retriever_type": "vector", "retriever_engine_type": "postgres"}]
 
     stored = await _insert(repo, session, _sample_row(retriever_engines=legacy))
 

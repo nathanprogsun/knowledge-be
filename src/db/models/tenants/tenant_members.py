@@ -13,9 +13,6 @@ from typing import ClassVar
 
 from src.common.table_model import TableModel
 
-# Columns the database assigns itself; excluded from INSERT.
-_DB_GENERATED_COLUMNS: frozenset[str] = frozenset({"id"})
-
 
 class TenantMember(TableModel):
     """One row of the `tenant_members` table."""
@@ -34,11 +31,6 @@ class TenantMember(TableModel):
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = None
-
-    @classmethod
-    def insert_sql_column_list(cls) -> tuple[str, ...]:
-        """Every column except the DB-generated `id`."""
-        return tuple(c for c in cls.column_fields() if c not in _DB_GENERATED_COLUMNS)
 
 
 __all__ = ["TenantMember"]

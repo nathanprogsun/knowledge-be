@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.common.json import JsonObject
+
 
 class Organization(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -72,7 +74,7 @@ class OrganizationList(BaseModel):
 
     items: list[Organization]
     total: int | None = Field(default=0)
-    resource_counts: dict[str, dict[str, object]] | None = Field(default=None)
+    resource_counts: dict[str, JsonObject] | None = Field(default=None)
 
 
 class SearchOrganizationsQuery(BaseModel):
@@ -252,7 +254,7 @@ class UpdateKnowledgeBaseShareRequest(BaseModel):
 class SharedKnowledgeBaseListItem(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    knowledge_base: dict[str, object]
+    knowledge_base: JsonObject
     share_id: str
     organization_id: str
     org_name: str | None = Field(default=None)
@@ -262,7 +264,7 @@ class SharedKnowledgeBaseListItem(BaseModel):
     shared_by_user_id: str | None = Field(default=None)
     shared_by_username: str | None = Field(default=None)
     is_mine: bool | None = Field(default=False)
-    source_from_agent: dict[str, object] | None = Field(default=None)
+    source_from_agent: JsonObject | None = Field(default=None)
 
 
 class SharedKnowledgeBaseListResponse(BaseModel):
@@ -311,7 +313,7 @@ class CreateAgentShareRequest(BaseModel):
 class SharedAgentListItem(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    agent: dict[str, object]
+    agent: JsonObject
     share_id: str
     organization_id: str
     org_name: str | None = Field(default=None)

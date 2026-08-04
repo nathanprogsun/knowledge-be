@@ -24,13 +24,11 @@ from typing import ClassVar
 
 from pydantic import Field
 
+from src.common.json import JsonObject
 from src.common.table_model import TableModel
 
 # Default storage quota: 10 GiB, in bytes.
 DEFAULT_STORAGE_QUOTA_BYTES: int = 10737418240
-
-# Columns the database assigns itself; excluded from INSERT.
-_DB_GENERATED_COLUMNS: frozenset[str] = frozenset({"id"})
 
 
 class Tenant(TableModel):
@@ -55,30 +53,25 @@ class Tenant(TableModel):
     id: int = 0
     name: str
     description: str | None = None
-    retriever_engines: dict[str, object] | list[dict[str, object]] = Field(default_factory=dict)
+    retriever_engines: JsonObject | list[JsonObject] = Field(default_factory=dict)
     status: str = "active"
     business: str = ""
     storage_quota: int = DEFAULT_STORAGE_QUOTA_BYTES
     storage_used: int = 0
-    agent_config: dict[str, object] | None = None
-    context_config: dict[str, object] | None = None
-    conversation_config: dict[str, object] | None = None
-    web_search_config: dict[str, object] | None = None
-    parser_engine_config: dict[str, object] | None = None
-    storage_engine_config: dict[str, object] | None = None
+    agent_config: JsonObject | None = None
+    context_config: JsonObject | None = None
+    conversation_config: JsonObject | None = None
+    web_search_config: JsonObject | None = None
+    parser_engine_config: JsonObject | None = None
+    storage_engine_config: JsonObject | None = None
     default_storage_backend_id: str | None = None
-    credentials: dict[str, object] | None = None
-    chat_history_config: dict[str, object] | None = None
-    retrieval_config: dict[str, object] | None = None
-    api_principal_config: dict[str, object] | None = None
+    credentials: JsonObject | None = None
+    chat_history_config: JsonObject | None = None
+    retrieval_config: JsonObject | None = None
+    api_principal_config: JsonObject | None = None
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = None
-
-    @classmethod
-    def insert_sql_column_list(cls) -> tuple[str, ...]:
-        """Every column except the DB-generated `id`."""
-        return tuple(c for c in cls.column_fields() if c not in _DB_GENERATED_COLUMNS)
 
 
 __all__ = ["DEFAULT_STORAGE_QUOTA_BYTES", "Tenant"]

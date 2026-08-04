@@ -8,7 +8,12 @@ from ``src.web.deps`` regardless of which module a dependency lives in.
 
 from __future__ import annotations
 
-from src.web.deps.auth import AuthServiceDep, get_auth_service
+from src.web.deps.auth import (
+    AuthServiceDep,
+    OidcServiceDep,
+    get_auth_service,
+    get_oidc_service,
+)
 from src.web.deps.session import SessionDep, get_async_session
 from src.web.deps.system import (
     AuditLogServiceDep,
@@ -16,17 +21,34 @@ from src.web.deps.system import (
     get_audit_log_service,
     get_system_setting_service,
 )
-from src.web.deps.tenants import TenantServiceDep, get_tenant_service
+from src.web.deps.tenants import (
+    TenantAPIKeyServiceDep,
+    TenantKVServiceDep,
+    TenantMemberServiceDep,
+    TenantServiceDep,
+    get_tenant_api_key_service,
+    get_tenant_kv_service,
+    get_tenant_member_service,
+    get_tenant_service,
+)
 
 __all__ = [
     "AuditLogServiceDep",
     "AuthServiceDep",
+    "OidcServiceDep",
     "SessionDep",
     "SystemSettingServiceDep",
+    "TenantAPIKeyServiceDep",
+    "TenantKVServiceDep",
+    "TenantMemberServiceDep",
     "TenantServiceDep",
     "get_async_session",
     "get_audit_log_service",
     "get_auth_service",
+    "get_oidc_service",
     "get_system_setting_service",
+    "get_tenant_api_key_service",
+    "get_tenant_kv_service",
+    "get_tenant_member_service",
     "get_tenant_service",
 ]

@@ -24,6 +24,7 @@ from typing import ClassVar
 
 from pydantic import Field
 
+from src.common.json import JsonObject
 from src.common.table_model import TableModel
 
 
@@ -47,13 +48,8 @@ class AuditLog(TableModel):
     request_path: str = ""
     request_method: str = ""
     outcome: str = "success"
-    details: dict[str, object] = Field(default_factory=dict)
+    details: JsonObject = Field(default_factory=dict)
     created_at: datetime
-
-    @classmethod
-    def insert_sql_column_list(cls) -> tuple[str, ...]:
-        """Exclude ``id`` from INSERT — Postgres BIGSERIAL fills it."""
-        return tuple(c for c in cls.column_fields() if c != "id")
 
 
 __all__ = ["AuditLog"]

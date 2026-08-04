@@ -8,20 +8,22 @@ collide with the Python builtin, so the standard hierarchy exposes
 
 from __future__ import annotations
 
+from src.common.json import JsonObject
+
 
 class ApplicationError(Exception):
     """Base for all domain-raised errors."""
 
     code: str = "internal_error"
     message: str = "Internal error"
-    details: dict[str, object] | None = None
+    details: JsonObject | None = None
 
     def __init__(
         self,
         message: str | None = None,
         *,
         code: str | None = None,
-        details: dict[str, object] | None = None,
+        details: JsonObject | None = None,
     ) -> None:
         if code is not None:
             self.code = code

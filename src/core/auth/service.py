@@ -6,18 +6,25 @@ import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from src.common.exception import NotFoundError, UnauthorizedError
+from src.common.exception import (
+    ConflictError,
+    NotFoundError,
+    UnauthorizedError,
+    ValidationError,
+)
 from src.core.auth.types import UserInfo
 from src.db.dao.auth_tokens_repository import (
     AuthTokenRepository,
 )
 from src.db.dao.users_repository import UserRepository
 from src.db.models.auth.auth_tokens import AuthToken
+from src.db.models.auth.users import User
 from src.util.security import (
     TokenError,
     create_access_token,
     create_refresh_token,
     decode_token,
+    hash_password,
     verify_password,
 )
 
@@ -206,6 +213,87 @@ class AuthService:
         except NotFoundError:
             return 0
         return await self._tokens_repo.revoke(record.id)
+
+    async def register(
+        self,
+        *,
+        username: str,
+        email: str,
+        password: str,
+    ) -> LoginResult:
+        """Create a user and mint an access/refresh pair.
+
+        Rejects empty / colliding usernames or emails with a
+        ``ConflictError`` (the ``users`` table enforces uniqueness on
+        both). The password is hashed at the configured cost.
+        """
+        clean_username = username.strip()
+        clean_email = email.strip().lower()
+        if not clean_username:
+            raise ValidationError(
+                code="auth.username_required",
+                message="Username cannot be empty",
+            )
+        if not clean_email:
+            raise ValidationError(
+                code="auth.email_required",
+                message="Email cannot be empty",
+            )
+        now = datetime.now(UTC)
+        user_row = User(
+            id=f"usr-{secrets.token_hex(8)}",
+            username=clean_username,
+            email=clean_email,
+            password_hash=hash_password(password),
+            is_active=True,
+            created_at=now,
+            updated_at=now,
+        )
+        try:
+            stored = await self._users_repo.insert(user_row)
+        except ConflictError as exc:
+            raise ConflictError(
+                code="user.exists",
+                message="Email or username already registered",
+            ) from exc
+        return await self._mint_pair(UserInfo.map_from_db(stored))
+
+    async def change_password(
+        self,
+        *,
+        user_id: str,
+        old_password: str,
+        new_password: str,
+    ) -> None:
+        """Verify ``old_password`` and replace it with ``new_password``."""
+        try:
+            user = await self._users_repo.find_by_id(user_id)
+        except NotFoundError as exc:
+            raise UnauthorizedError(
+                code="auth.invalid_credentials",
+                message="Email or password is incorrect",
+            ) from exc
+        if not verify_password(old_password, user.password_hash):
+            raise UnauthorizedError(
+                code="auth.invalid_credentials",
+                message="Current password is incorrect",
+            )
+        updated = await self._users_repo.update_by_primary_key(
+            {"id": user_id},
+            {
+                "password_hash": hash_password(new_password),
+                "updated_at": datetime.now(UTC),
+            },
+        )
+        if updated is None:
+            raise NotFoundError(
+                code="user.not_found",
+                message=f"User {user_id} not found",
+            )
+
+    async def get_me(self, *, token: str) -> tuple[UserInfo, int | None]:
+        """Resolve the authenticated user + active tenant from an access token."""
+        return await self._validate_token(token)
 
     # ── Internal helpers ────────────────────────────────────────────
 

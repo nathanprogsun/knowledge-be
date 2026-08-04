@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.common.json import JsonObject
+
 
 class SystemInfo(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -67,7 +69,7 @@ class StorageEngineCheckRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     provider: str
-    minio: dict[str, object] | None = Field(default=None)
+    minio: JsonObject | None = Field(default=None)
 
 
 class StorageEngineCheckResult(BaseModel):

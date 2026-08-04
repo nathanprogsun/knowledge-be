@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.common.json import JsonObject
+
 
 class EmbeddingParameters(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -152,7 +154,7 @@ class MCPTool(BaseModel):
 
     name: str
     description: str | None = Field(default=None)
-    input_schema: dict[str, object] | None = Field(default=None, alias="inputSchema")
+    input_schema: JsonObject | None = Field(default=None, alias="inputSchema")
 
 
 class MCPResource(BaseModel):
@@ -192,7 +194,7 @@ class MCPToolApprovalDecisionRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     decision: str
-    modified_args: dict[str, object] | None = Field(default=None)
+    modified_args: JsonObject | None = Field(default=None)
     reason: str | None = Field(default=None)
 
 
@@ -202,7 +204,7 @@ class VectorStoreConnectionField(BaseModel):
     name: str
     type: str
     required: bool | None = Field(default=False)
-    default: dict[str, object] | None = Field(default=None)
+    default: JsonObject | None = Field(default=None)
     description: str | None = Field(default=None)
     sensitive: bool | None = Field(default=False)
 
@@ -222,8 +224,8 @@ class VectorStore(BaseModel):
     id: str
     name: str
     engine_type: str
-    connection_config: dict[str, object] | None = Field(default=None)
-    index_config: dict[str, object] | None = Field(default=None)
+    connection_config: JsonObject | None = Field(default=None)
+    index_config: JsonObject | None = Field(default=None)
     source: str | None = Field(default="user")
     readonly: bool | None = Field(default=False)
     created_at: datetime | None = Field(default=None)
@@ -234,7 +236,7 @@ class TestVectorStoreRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     engine_type: str
-    connection_config: dict[str, object]
+    connection_config: JsonObject
 
 
 class CreateVectorStoreRequest(BaseModel):
@@ -242,8 +244,8 @@ class CreateVectorStoreRequest(BaseModel):
 
     name: str
     engine_type: str
-    connection_config: dict[str, object]
-    index_config: dict[str, object] | None = Field(default=None)
+    connection_config: JsonObject
+    index_config: JsonObject | None = Field(default=None)
 
 
 class UpdateVectorStoreRequest(BaseModel):
@@ -331,7 +333,7 @@ class WebSearchProviderTypeInfo(BaseModel):
     provider: str
     label: str
     description: str | None = Field(default=None)
-    parameter_schema: list[dict[str, object]] | None = Field(default=None)
+    parameter_schema: list[JsonObject] | None = Field(default=None)
 
 
 class WebSearchBuiltinProvider(BaseModel):
@@ -352,14 +354,14 @@ class WebSearchProvider(BaseModel):
     provider: str
     description: str | None = Field(default=None)
     is_default: bool | None = Field(default=False)
-    parameters: dict[str, object] | None = Field(default=None)
+    parameters: JsonObject | None = Field(default=None)
 
 
 class TestWebSearchProviderRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     provider: str
-    parameters: dict[str, object]
+    parameters: JsonObject
 
 
 class CreateWebSearchProviderRequest(BaseModel):
@@ -368,7 +370,7 @@ class CreateWebSearchProviderRequest(BaseModel):
     name: str
     provider: str
     description: str | None = Field(default=None)
-    parameters: dict[str, object] | None = Field(default=None)
+    parameters: JsonObject | None = Field(default=None)
     is_default: bool | None = Field(default=False)
 
 
@@ -377,7 +379,7 @@ class UpdateWebSearchProviderRequest(BaseModel):
 
     name: str | None = Field(default=None)
     description: str | None = Field(default=None)
-    parameters: dict[str, object] | None = Field(default=None)
+    parameters: JsonObject | None = Field(default=None)
     is_default: bool | None = Field(default=None)
 
 

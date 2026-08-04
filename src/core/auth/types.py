@@ -14,6 +14,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.common.json import JsonObject
 from src.db.models.auth.users import User
 
 # Columns present on the storage ``User`` row that must NOT cross the
@@ -31,7 +32,7 @@ class UserPreferences(BaseModel):
     last_active_tenant_id: int | None = None
 
     @classmethod
-    def from_json(cls, raw: dict[str, object] | str | None) -> UserPreferences:
+    def from_json(cls, raw: JsonObject | str | None) -> UserPreferences:
         """Build from the JSON-backed ``preferences`` column value.
 
         Accepts both a parsed ``dict`` and a raw JSON string.

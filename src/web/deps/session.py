@@ -13,7 +13,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.app_context.lifespan import get_db_engine_from_lifespan
+from src.app_context.registry import get_db_engine_from_lifespan
 
 
 async def get_async_session(request: Request) -> AsyncIterator[AsyncSession]:

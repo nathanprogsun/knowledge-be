@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import secrets
 from datetime import UTC, datetime, timedelta
-from typing import Any, Final
+from typing import Final
 
 import bcrypt
 from jose import JWTError, jwt
 
+from src.common.json import JsonObject
 from src.settings import get_settings
 
 # bcrypt cost factor.
@@ -70,7 +71,7 @@ def create_access_token(
     """Mint an HS256 access JWT. Returns ``(token, expires_at)``."""
     now = datetime.now(UTC)
     expires_at = now + ttl
-    claims: dict[str, Any] = {
+    claims: JsonObject = {
         "user_id": user_id,
         "email": email,
         "tenant_id": tenant_id,
@@ -91,7 +92,7 @@ def create_refresh_token(
     """Mint an HS256 refresh JWT. Returns ``(token, expires_at)``."""
     now = datetime.now(UTC)
     expires_at = now + ttl
-    claims: dict[str, Any] = {
+    claims: JsonObject = {
         "user_id": user_id,
         "iat": int(now.timestamp()),
         "exp": int(expires_at.timestamp()),
@@ -106,7 +107,7 @@ class TokenError(Exception):
     """Raised when a JWT cannot be decoded or has the wrong shape."""
 
 
-def decode_token(token: str) -> dict[str, Any]:
+def decode_token(token: str) -> JsonObject:
     """Decode and verify ``token``. Raises ``TokenError`` on any failure.
 
     Returns the claim dict so callers can inspect ``type``, ``user_id``,

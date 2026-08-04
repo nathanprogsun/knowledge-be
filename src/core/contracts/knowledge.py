@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.common.json import JsonObject
+
 
 class ChunkingParserEngineRule(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -184,7 +186,7 @@ class UpdateKnowledgeBaseRequest(BaseModel):
 
     name: str
     description: str | None = Field(default=None)
-    config: dict[str, object] | None = Field(default=None)
+    config: JsonObject | None = Field(default=None)
 
 
 class HybridSearchRequest(BaseModel):
@@ -226,7 +228,7 @@ class KnowledgeSearchHit(BaseModel):
     score: float
     chunk_type: str
     image_info: str | None = Field(default=None)
-    metadata: dict[str, object] | None = Field(default=None)
+    metadata: JsonObject | None = Field(default=None)
     knowledge_filename: str | None = Field(default=None)
     knowledge_source: str | None = Field(default=None)
 
@@ -295,7 +297,7 @@ class Knowledge(BaseModel):
     file_hash: str | None = Field(default=None)
     file_path: str | None = Field(default=None)
     storage_size: int | None = Field(default=None)
-    metadata: dict[str, object] | None = Field(default=None)
+    metadata: JsonObject | None = Field(default=None)
     created_at: datetime
     updated_at: datetime
     processed_at: datetime | None = Field(default=None)
@@ -357,7 +359,7 @@ class UpdateKnowledgeImageRequest(BaseModel):
 class BatchUpdateKnowledgeTagsRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    updates: dict[str, object]
+    updates: JsonObject
     kb_id: str | None = Field(default=None)
 
 
@@ -376,7 +378,7 @@ class KnowledgeBatchReparseRequest(BaseModel):
 
     kb_id: str
     ids: list[str]
-    process_config: dict[str, object] | None = Field(default=None)
+    process_config: JsonObject | None = Field(default=None)
 
 
 class KnowledgeBatchReparseResponse(BaseModel):
@@ -462,7 +464,7 @@ class Chunk(BaseModel):
     parent_chunk_id: str | None = Field(default=None)
     relation_chunks: list[str] | None = Field(default=None)
     indirect_relation_chunks: list[str] | None = Field(default=None)
-    metadata: dict[str, object] | None = Field(default=None)
+    metadata: JsonObject | None = Field(default=None)
     content_hash: str | None = Field(default=None)
     image_info: str | None = Field(default=None)
     created_at: datetime
@@ -670,9 +672,9 @@ class FAQImportTaskProgress(BaseModel):
     failed_count: int | None = Field(default=None)
     partial_failed_count: int | None = Field(default=None)
     skipped_count: int | None = Field(default=None)
-    failed_entries: list[dict[str, object]] | None = Field(default=None)
+    failed_entries: list[JsonObject] | None = Field(default=None)
     failed_entries_url: str | None = Field(default=None)
-    success_entries: list[dict[str, object]] | None = Field(default=None)
+    success_entries: list[JsonObject] | None = Field(default=None)
     message: str | None = Field(default=None)
     error: str | None = Field(default=None)
     created_at: int

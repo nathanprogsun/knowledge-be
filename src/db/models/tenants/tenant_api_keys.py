@@ -18,9 +18,6 @@ from pydantic import Field
 
 from src.common.table_model import TableModel
 
-# Columns the database assigns itself; excluded from INSERT.
-_DB_GENERATED_COLUMNS: frozenset[str] = frozenset({"id"})
-
 
 class TenantAPIKey(TableModel):
     """One row of the `tenant_api_keys` table."""
@@ -43,11 +40,6 @@ class TenantAPIKey(TableModel):
     revoked_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
-
-    @classmethod
-    def insert_sql_column_list(cls) -> tuple[str, ...]:
-        """Every column except the DB-generated `id`."""
-        return tuple(c for c in cls.column_fields() if c not in _DB_GENERATED_COLUMNS)
 
 
 __all__ = ["TenantAPIKey"]

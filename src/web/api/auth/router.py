@@ -1,19 +1,31 @@
-"""Auth HTTP endpoints - login, refresh, logout."""
+"""Auth HTTP endpoints - login, refresh, logout, register, me, OIDC."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Header
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Header, Query
 from pydantic import BaseModel, ConfigDict
 
+from src.common.exception import UnauthorizedError, ValidationError
 from src.core.auth.types import UserInfo
 from src.core.contracts.auth import (
     AuthUser,
+    ChangePasswordRequest,
     LoginRequest,
     LoginResponse,
+    MeResponse,
+    OIDCAuthorizeURLResponse,
+    OIDCCallbackResponse,
+    OIDCMetaConfig,
     RefreshTokenRequest,
     RefreshTokenResponse,
+    RegisterRequest,
+    RegisterResponse,
+    ValidateTokenResponse,
 )
-from src.web.deps import AuthServiceDep
+from src.settings import get_settings
+from src.web.deps import AuthServiceDep, OidcServiceDep
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -108,12 +120,165 @@ async def logout(
     return LogoutResponse(success=True, message="Logout successful")
 
 
+# ── Registration / profile / token validation ─────────────────────────
+
+
+@router.post("/register", response_model=RegisterResponse)
+async def register(
+    body: RegisterRequest,
+    auth_service: AuthServiceDep,
+) -> RegisterResponse:
+    """Create a user and establish a session."""
+    result = await auth_service.register(
+        username=body.username,
+        email=body.email,
+        password=body.password,
+    )
+    return RegisterResponse(
+        success=True,
+        message="Registration successful",
+        user=_user_info_to_auth_user(result.user),
+        active_tenant=None,
+        memberships=[],
+    )
+
+
+@router.get("/me", response_model=MeResponse)
+async def me(
+    auth_service: AuthServiceDep,
+    authorization: str | None = Header(default=None),
+) -> MeResponse:
+    """Return the authenticated user's profile and active tenant."""
+    token = _require_bearer(authorization)
+    info, _ = await auth_service.get_me(token=token)
+    return MeResponse(
+        success=True,
+        user=_user_info_to_auth_user(info),
+        active_tenant=None,
+        memberships=[],
+    )
+
+
+@router.post("/change-password", response_model=LogoutResponse)
+async def change_password(
+    body: ChangePasswordRequest,
+    auth_service: AuthServiceDep,
+    authorization: str | None = Header(default=None),
+) -> LogoutResponse:
+    """Verify the current password and replace it with a new one."""
+    token = _require_bearer(authorization)
+    info, _ = await auth_service.get_me(token=token)
+    await auth_service.change_password(
+        user_id=info.id,
+        old_password=body.old_password,
+        new_password=body.new_password,
+    )
+    return LogoutResponse(success=True, message="Password changed")
+
+
+@router.get("/validate", response_model=ValidateTokenResponse)
+async def validate_token(
+    auth_service: AuthServiceDep,
+    authorization: str | None = Header(default=None),
+) -> ValidateTokenResponse:
+    """Validate a Bearer access token."""
+    token = _require_bearer(authorization)
+    try:
+        info, tenant_id = await auth_service.validate_token(token=token)
+    except UnauthorizedError:
+        return ValidateTokenResponse(success=False, valid=False)
+    return ValidateTokenResponse(
+        success=True,
+        valid=True,
+        user_id=info.id,
+        tenant_id=tenant_id,
+    )
+
+
+# ── OIDC SSO ───────────────────────────────────────────────────────────
+
+
+@router.get("/oidc/config", response_model=OIDCMetaConfig)
+async def oidc_config() -> OIDCMetaConfig:
+    """Return OIDC provider metadata."""
+    settings = get_settings()
+    return OIDCMetaConfig(
+        success=True,
+        enabled=settings.oidc_enable,
+        provider_display_name=settings.oidc_provider_display_name,
+    )
+
+
+@router.get("/oidc/url", response_model=OIDCAuthorizeURLResponse)
+async def oidc_url(
+    oidc_service: OidcServiceDep,
+    redirect_uri: str = Query(...),
+) -> OIDCAuthorizeURLResponse:
+    """Build the provider authorize URL + signed state."""
+    result = await oidc_service.get_authorization_url(redirect_uri=redirect_uri)
+    return OIDCAuthorizeURLResponse(
+        success=True,
+        provider_display_name=result.provider_display_name,
+        authorization_url=result.authorization_url,
+        state=result.state,
+    )
+
+
+@router.get("/oidc/callback", response_model=OIDCCallbackResponse)
+async def oidc_callback(
+    oidc_service: OidcServiceDep,
+    code: str = Query(...),
+    redirect_uri: str = Query(...),
+) -> OIDCCallbackResponse:
+    """Exchange an OIDC authorization code for a session."""
+    result = await oidc_service.login_with_oidc(
+        code=code,
+        redirect_uri=redirect_uri,
+    )
+    if not result.success or result.user is None:
+        return OIDCCallbackResponse(
+            success=False,
+            message=result.message,
+            user=_empty_auth_user(),
+            token="",
+            refresh_token="",
+        )
+    return OIDCCallbackResponse(
+        success=True,
+        message=result.message,
+        user=_user_info_to_auth_user(result.user),
+        active_tenant=None,
+        memberships=[],
+        token=result.access_token,
+        refresh_token=result.refresh_token,
+    )
+
+
 # ── Local error helpers (avoid circular import with exception_handler) ──
 
 
-def _missing_auth_header() -> Exception:
-    from src.common.exception import ValidationError
+def _require_bearer(authorization: str | None) -> str:
+    """Return the Bearer token, or raise a 422-style validation error."""
+    if not authorization:
+        raise _missing_auth_header()
+    parts = authorization.split(" ", 1)
+    if len(parts) != 2 or parts[0] != "Bearer":
+        raise _invalid_auth_header()
+    return parts[1]
 
+
+def _empty_auth_user() -> AuthUser:
+    return AuthUser(
+        id="",
+        username="",
+        email="",
+        is_active=False,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+
+
+def _missing_auth_header() -> Exception:
     return ValidationError(
         code="auth.missing_authorization",
         message="Authorization header is required",
@@ -121,8 +286,6 @@ def _missing_auth_header() -> Exception:
 
 
 def _invalid_auth_header() -> Exception:
-    from src.common.exception import ValidationError
-
     return ValidationError(
         code="auth.invalid_authorization",
         message="Invalid Authorization header format",
