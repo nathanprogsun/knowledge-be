@@ -25,7 +25,7 @@ from src.core.contracts.auth import (
     ValidateTokenResponse,
 )
 from src.settings import get_settings
-from src.web.deps import AuthServiceDep, OidcServiceDep
+from src.web.deps import AuthDep, AuthServiceDep, OidcServiceDep
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -101,6 +101,7 @@ async def refresh_token(
 
 @router.post("/logout", response_model=LogoutResponse)
 async def logout(
+    _auth: AuthDep,
     auth_service: AuthServiceDep,
     authorization: str | None = Header(default=None),
 ) -> LogoutResponse:
@@ -145,6 +146,7 @@ async def register(
 
 @router.get("/me", response_model=MeResponse)
 async def me(
+    _auth: AuthDep,
     auth_service: AuthServiceDep,
     authorization: str | None = Header(default=None),
 ) -> MeResponse:
@@ -161,6 +163,7 @@ async def me(
 
 @router.post("/change-password", response_model=LogoutResponse)
 async def change_password(
+    _auth: AuthDep,
     body: ChangePasswordRequest,
     auth_service: AuthServiceDep,
     authorization: str | None = Header(default=None),
@@ -178,6 +181,7 @@ async def change_password(
 
 @router.get("/validate", response_model=ValidateTokenResponse)
 async def validate_token(
+    _auth: AuthDep,
     auth_service: AuthServiceDep,
     authorization: str | None = Header(default=None),
 ) -> ValidateTokenResponse:

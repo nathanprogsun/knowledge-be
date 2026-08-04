@@ -24,7 +24,13 @@ from src.web.api.tenants.views import (
     tenant_list_envelope,
 )
 from src.web.deps import (
+    AuthDep,
+    CrossTenantDep,
     CurrentUserContextDep,
+    PathTenantMatchDep,
+    RoleAdminDep,
+    RoleOwnerDep,
+    RoleViewerDep,
     TenantAPIKeyServiceDep,
     TenantKVServiceDep,
     TenantMemberServiceDep,
@@ -42,6 +48,7 @@ _MAX_PAGE_SIZE = 100
 
 @router.post("", response_model=TenantEnvelope, status_code=201)
 async def create_tenant(
+    _auth: AuthDep,
     body: CreateTenantRequest,
     tenant_service: TenantServiceDep,
 ) -> TenantEnvelope:
@@ -57,13 +64,19 @@ async def create_tenant(
 
 
 @router.get("/all", response_model=TenantListEnvelope)
-async def list_all_tenants(tenant_service: TenantServiceDep) -> TenantListEnvelope:
+async def list_all_tenants(
+    _auth: AuthDep,
+    _cross: CrossTenantDep,
+    tenant_service: TenantServiceDep,
+) -> TenantListEnvelope:
     """List every workspace, newest first."""
     return tenant_list_envelope(await tenant_service.list_tenants())
 
 
 @router.get("/search", response_model=TenantListEnvelope)
 async def search_tenants(
+    _auth: AuthDep,
+    _cross: CrossTenantDep,
     tenant_service: TenantServiceDep,
     keyword: str | None = Query(default=None),
     tenant_id: int | None = Query(default=None),
@@ -107,6 +120,9 @@ async def list_my_tenants(
 
 @router.get("/{tenant_id}/api-keys", response_model=list[TenantAPIKey])
 async def list_api_keys(
+    _auth: AuthDep,
+    _owner: RoleOwnerDep,
+    _match: PathTenantMatchDep,
     tenant_id: int,
     api_key_service: TenantAPIKeyServiceDep,
 ) -> list[TenantAPIKey]:
@@ -117,6 +133,9 @@ async def list_api_keys(
 
 @router.post("/{tenant_id}/api-keys", response_model=TenantAPIKey, status_code=201)
 async def create_api_key(
+    _auth: AuthDep,
+    _owner: RoleOwnerDep,
+    _match: PathTenantMatchDep,
     tenant_id: int,
     body: CreateAPIKeyRequest,
     api_key_service: TenantAPIKeyServiceDep,
@@ -134,6 +153,9 @@ async def create_api_key(
 
 @router.delete("/{tenant_id}/api-keys/{key_id}", response_model=DeleteTenantResponse)
 async def delete_api_key(
+    _auth: AuthDep,
+    _owner: RoleOwnerDep,
+    _match: PathTenantMatchDep,
     tenant_id: int,
     key_id: int,
     api_key_service: TenantAPIKeyServiceDep,
@@ -148,6 +170,9 @@ async def delete_api_key(
 
 @router.get("/{tenant_id}/api-principal-config", response_model=APIPrincipalConfig)
 async def get_api_principal_config(
+    _auth: AuthDep,
+    _owner: RoleOwnerDep,
+    _match: PathTenantMatchDep,
     tenant_id: int,
     tenant_service: TenantServiceDep,
 ) -> APIPrincipalConfig:
@@ -158,6 +183,9 @@ async def get_api_principal_config(
 
 @router.put("/{tenant_id}/api-principal-config", response_model=APIPrincipalConfig)
 async def update_api_principal_config(
+    _auth: AuthDep,
+    _owner: RoleOwnerDep,
+    _match: PathTenantMatchDep,
     tenant_id: int,
     body: UpdateAPIPrincipalConfigRequest,
     tenant_service: TenantServiceDep,
@@ -175,7 +203,8 @@ async def update_api_principal_config(
 
 @router.get("/kv/{key}", response_model=JsonObject)
 async def get_tenant_kv(
-    _ctx: CurrentUserContextDep,
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
     key: str,
     kv_service: TenantKVServiceDep,
 ) -> JsonObject:
@@ -197,7 +226,8 @@ async def get_tenant_kv(
 
 @router.put("/kv/{key}", response_model=JsonObject)
 async def put_tenant_kv(
-    _ctx: CurrentUserContextDep,
+    _auth: AuthDep,
+    _admin: RoleAdminDep,
     key: str,
     body: JsonObject,
     kv_service: TenantKVServiceDep,
@@ -214,13 +244,22 @@ async def put_tenant_kv(
 
 
 @router.get("/{tenant_id}", response_model=TenantEnvelope)
-async def get_tenant(tenant_id: int, tenant_service: TenantServiceDep) -> TenantEnvelope:
+async def get_tenant(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+    _match: PathTenantMatchDep,
+    tenant_id: int,
+    tenant_service: TenantServiceDep,
+) -> TenantEnvelope:
     """Return one workspace; an invalid id yields a path validation error."""
     return tenant_envelope(await tenant_service.get_tenant(tenant_id))
 
 
 @router.put("/{tenant_id}", response_model=TenantEnvelope)
 async def update_tenant(
+    _auth: AuthDep,
+    _owner: RoleOwnerDep,
+    _match: PathTenantMatchDep,
     tenant_id: int,
     body: UpdateTenantRequest,
     tenant_service: TenantServiceDep,
@@ -240,6 +279,9 @@ async def update_tenant(
 
 @router.delete("/{tenant_id}", response_model=DeleteTenantResponse)
 async def delete_tenant(
+    _auth: AuthDep,
+    _owner: RoleOwnerDep,
+    _match: PathTenantMatchDep,
     tenant_id: int,
     tenant_service: TenantServiceDep,
 ) -> DeleteTenantResponse:

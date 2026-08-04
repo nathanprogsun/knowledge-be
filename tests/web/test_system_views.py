@@ -24,6 +24,7 @@ from src.web.deps import (
     get_audit_log_service,
     get_system_setting_service,
 )
+from tests.fakes.auth_gates import override_auth_gates
 
 # ── In-memory fakes (reuse the service-test fakes' shape) ───────────
 
@@ -135,6 +136,7 @@ def app(
     fake_settings_repo: _FakeSystemSettingRepo,
 ) -> FastAPI:
     application = create_app()
+    override_auth_gates(application)
     application.dependency_overrides[get_system_setting_service] = lambda: SystemSettingService(
         settings_repo=fake_settings_repo,  # type: ignore[arg-type]
         audit_repo=fake_audit_repo,  # type: ignore[arg-type]

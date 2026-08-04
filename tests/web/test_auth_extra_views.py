@@ -20,6 +20,7 @@ from src.db.models.auth.auth_tokens import AuthToken
 from src.db.models.auth.users import User
 from src.util.security import hash_password, verify_password
 from src.web.deps import get_auth_service
+from tests.fakes.auth_gates import override_auth_gates
 
 
 class _FakeUserRepo:
@@ -110,6 +111,7 @@ def fake_tokens() -> _FakeTokenRepo:
 @pytest.fixture
 def app(fake_users: _FakeUserRepo, fake_tokens: _FakeTokenRepo) -> FastAPI:
     application = create_app()
+    override_auth_gates(application)
     application.dependency_overrides[get_auth_service] = lambda: AuthService(
         users_repo=fake_users,  # type: ignore[arg-type]
         tokens_repo=fake_tokens,  # type: ignore[arg-type]

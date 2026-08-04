@@ -19,6 +19,7 @@ from src.app_context.lifespan import create_app
 from src.core.tenants.service import TenantService
 from src.db.models.tenants.tenants import DEFAULT_STORAGE_QUOTA_BYTES, Tenant
 from src.web.deps import get_tenant_service
+from tests.fakes.auth_gates import override_auth_gates
 from tests.fakes.tenants import FakeTenantRepository
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
@@ -37,6 +38,7 @@ def app(repo: FakeTenantRepository) -> FastAPI:
         return TenantService(tenants_repo=repo)  # type: ignore[arg-type]
 
     application.dependency_overrides[get_tenant_service] = _override_service
+    override_auth_gates(application)
     return application
 
 
