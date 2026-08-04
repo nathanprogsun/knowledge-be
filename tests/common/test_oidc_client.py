@@ -357,5 +357,119 @@ async def test_validate_ssrf_whitelist_bypasses(monkeypatch: pytest.MonkeyPatch)
     await validate_ssrf_safe_url("https://idp.example.com/authorize")
 
 
-async def test_validate_ssrf_empty_url_is_noop() -> None:
-    await validate_ssrf_safe_url("")
+async def test_validate_ssrf_empty_url_rejects() -> None:
+    """Empty URL is rejected (fail-closed) — mirrors Go's isSSRFSafeURL."""
+    with pytest.raises(ValidationError) as exc_info:
+        await validate_ssrf_safe_url("")
+    assert exc_info.value.code == "oidc.ssrf_blocked"
+
+
+async def test_validate_ssrf_dns_failure_rejects(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unresolvable host MUST be rejected (fail-closed) — mirrors Go's net.LookupIP."""
+
+    def _raise(*_args: object) -> list[object]:
+        raise OSError("no DNS")
+
+    monkeypatch.setattr("socket.getaddrinfo", _raise)
+    with pytest.raises(ValidationError) as exc_info:
+        await validate_ssrf_safe_url("https://does-not-exist.invalid/")
+    assert exc_info.value.code == "oidc.ssrf_blocked"
+    assert "DNS resolution failed" in str(exc_info.value)
+
+
+def _build_redirect_transport(target: str) -> httpx.MockTransport:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(302, headers={"Location": target})
+
+    return httpx.MockTransport(handler)
+
+
+@pytest.mark.anyio
+async def test_redirect_revalidates_target() -> None:
+    """Redirect to a restricted host is blocked; mirrors Go's CheckRedirect."""
+    client = OidcClient(transport=_build_redirect_transport("http://127.0.0.1/x"))
+    try:
+        with pytest.raises(ValidationError) as exc_info:
+            await client._send("GET", "https://idp.example.com/start")
+        assert exc_info.value.code == "oidc.ssrf_blocked"
+    finally:
+        await client.aclose()
+
+
+@pytest.mark.anyio
+async def test_redirect_strips_credentials_on_cross_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cross-host redirects drop Authorization/Cookie/Api-Key headers."""
+    monkeypatch.setenv("SSRF_WHITELIST", "idp.example.com,other.example.com")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/start":
+            return httpx.Response(302, headers={"Location": "https://other.example.com/land"})
+        # Inspect the redirected request headers.
+        for header in ("authorization", "cookie", "x-api-key", "api-key", "x-auth-token"):
+            assert header not in {h.lower() for h in request.headers}, header
+        return httpx.Response(200, json={"ok": True})
+
+    client = OidcClient(transport=httpx.MockTransport(handler))
+    try:
+        await client._send(
+            "GET",
+            "https://idp.example.com/start",
+            headers={
+                "Authorization": "Bearer token",
+                "Cookie": "sess=1",
+                "X-API-Key": "key",
+                "Api-Key": "key",
+                "X-Auth-Token": "t",
+            },
+        )
+    finally:
+        await client.aclose()
+
+
+@pytest.mark.anyio
+async def test_redirect_preserves_headers_on_same_host() -> None:
+    """Same-host redirects keep Authorization (Go: sameHTTPOrigin allows it)."""
+    saw_authorization = False
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal saw_authorization
+        saw_authorization = "authorization" in {h.lower() for h in request.headers}
+        return httpx.Response(200, json={"ok": True})
+
+    def bounce(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(302, headers={"Location": "https://idp.example.com/next"})
+
+    async def dispatch(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/start":
+            return bounce(request)
+        return handler(request)
+
+    client = OidcClient(transport=httpx.MockTransport(dispatch))
+    try:
+        await client._send(
+            "GET",
+            "https://idp.example.com/start",
+            headers={"Authorization": "Bearer token"},
+        )
+        assert saw_authorization
+    finally:
+        await client.aclose()
+
+
+@pytest.mark.anyio
+async def test_redirect_caps_at_max() -> None:
+    """Beyond _MAX_REDIRECTS hops the request fails, mirroring Go's redirect cap."""
+    seen = 0
+
+    def bounce(request: httpx.Request) -> httpx.Response:
+        nonlocal seen
+        seen += 1
+        return httpx.Response(302, headers={"Location": "https://idp.example.com/loop"})
+
+    client = OidcClient(transport=httpx.MockTransport(bounce))
+    try:
+        with pytest.raises(ExternalServiceError) as exc_info:
+            await client._send("GET", "https://idp.example.com/start")
+        assert exc_info.value.code == "oidc.redirect_blocked"
+    finally:
+        await client.aclose()
