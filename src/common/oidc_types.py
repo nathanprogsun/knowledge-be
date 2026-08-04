@@ -1,6 +1,6 @@
 """OIDC domain types.
 
-Decoupled from ``src.ai.oidc_client`` so the type vocabulary can grow
+Decoupled from ``src.common.oidc_client`` so the type vocabulary can grow
 without inflating the runtime client module. All types here are pure
 data-shape carriers — no I/O, no side effects.
 

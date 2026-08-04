@@ -12,7 +12,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from src.ai.oidc_client import OidcClient
+from src.common.oidc_client import OidcClient
 from src.core.auth.oidc import OidcService
 from src.core.auth.service import AuthService
 from src.db.dao.auth_tokens_repository import AuthTokenRepository
