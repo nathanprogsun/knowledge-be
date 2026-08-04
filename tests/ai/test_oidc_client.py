@@ -285,6 +285,45 @@ def test_decode_jwt_claims_unverified_malformed_returns_empty() -> None:
     assert decode_jwt_claims_unverified("") == {}
 
 
+# ── _as_str hardening ────────────────────────────────────────────────
+
+
+def test_as_str_returns_trimmed_string() -> None:
+    from src.ai.oidc_client import _as_str
+
+    assert _as_str("hello") == "hello"
+    assert _as_str("  hello  ") == "hello"
+    assert _as_str("") == ""
+
+
+def test_as_str_returns_empty_for_none() -> None:
+    from src.ai.oidc_client import _as_str
+
+    assert _as_str(None) == ""
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        42,
+        3.14,
+        True,
+        False,
+        [],
+        {},
+        {"key": "val"},
+        ["a", "b"],
+    ],
+)
+def test_as_str_rejects_non_string_non_none(value: object) -> None:
+    from src.ai.oidc_client import _as_str
+
+    with pytest.raises(TypeError) as exc_info:
+        _as_str(value)
+    # Error message must mention the actual type so misconfiguration is debuggable.
+    assert type(value).__name__ in str(exc_info.value)
+
+
 # ── SSRF guard ───────────────────────────────────────────────────────
 
 
