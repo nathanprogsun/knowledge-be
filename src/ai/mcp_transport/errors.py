@@ -10,6 +10,8 @@ no-longer-connected) surface on the Python side.
 
 from __future__ import annotations
 
+from src.common.exception import UnauthorizedError
+
 
 class MCPError(Exception):
     """Base class for every MCP transport error."""
@@ -38,7 +40,7 @@ class MCPTransportError(MCPError):
         self.body = body
 
 
-class OAuthRequiredError(MCPError):
+class OAuthRequiredError(UnauthorizedError, MCPError):
     """The remote MCP server demands OAuth authorization.
 
     Mirrors Go's ``OAuthRequiredError``. Raised when the
@@ -46,12 +48,19 @@ class OAuthRequiredError(MCPError):
     ``resource_metadata`` URL the service was not configured to use;
     the UI surfaces this so the user can switch auth strategy rather
     than see a generic 401.
+
+    Inherits :class:`src.common.exception.UnauthorizedError` (which
+    maps to HTTP 401 via the standard exception handler) and
+    :class:`MCPError` so the existing ``except MCPError`` clauses in
+    the discovery + connectivity paths continue to match.
     """
 
     def __init__(self, *, metadata_url: str, message: str | None = None) -> None:
-        super().__init__(
-            message or f"MCP server requires OAuth (resource metadata: {metadata_url})",
-        )
+        text = message or f"MCP server requires OAuth (resource metadata: {metadata_url})"
+        # Initialize both bases so MRO walks see ``UnauthorizedError``
+        # code/message and ``MCPError`` is satisfied for isinstance.
+        UnauthorizedError.__init__(self, text)
+        MCPError.__init__(self, text)
         self.metadata_url = metadata_url
 
 

@@ -181,6 +181,10 @@ def _check_import_policy(
     - ``ai``                → must not import ``core`` / ``db`` / ``web``
     - ``workers``           → must not import ``web`` / ``db`` (must go via ``core``)
 
+    Exemptions:
+    - ``web/deps/**`` may import ``db.dao.*`` (per-domain forwarders
+      that construct repositories on the request-scoped session — PR-17.5c C4).
+
     ``common``, ``app_context``, ``util``, and ``unknown`` are not gated here.
     """
     forbidden_prefixes: set[str]
@@ -195,6 +199,17 @@ def _check_import_policy(
     elif layer == "workers":
         forbidden_prefixes = WORKERS_FORBIDDEN_PREFIXES
     else:
+        return
+    # Per-domain forwarders under ``web/deps/**`` are allowed to import
+    # ``db.dao.*`` so they can construct repositories on the request-
+    # scoped ``AsyncSession``. PR-17.5c C4.
+    if (
+        layer in {"web", "web_api"}
+        and file
+        and Path(file).as_posix().endswith(".py")
+        and "/web/deps/" in Path(file).as_posix()
+        and (module.startswith("db.dao") or module == "db.dao")
+    ):
         return
     prefixes = set(_prefixes_of(module))
 

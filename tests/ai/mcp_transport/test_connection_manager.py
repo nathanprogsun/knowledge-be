@@ -499,7 +499,7 @@ async def test_session_invalid_hint_evicts_session() -> None:
                 session,
                 method="tools/list",
                 params={},
-                retry=False,
+                evict_on_session_invalid=False,
             )
         assert "Invalid session ID" in excinfo.value.message_text
     finally:
@@ -529,7 +529,7 @@ async def test_no_active_connection_hint_also_evicts() -> None:
                 session,
                 method="tools/list",
                 params={},
-                retry=False,
+                evict_on_session_invalid=False,
             )
     finally:
         await manager.shutdown()
@@ -558,7 +558,7 @@ async def test_unrelated_transport_error_does_not_evict_session() -> None:
                 session,
                 method="tools/list",
                 params={},
-                retry=False,
+                evict_on_session_invalid=False,
             )
         assert "svc-keep" in manager.active_sessions()
     finally:
@@ -588,7 +588,7 @@ async def test_oauth_required_error_propagates_from_transport() -> None:
                 session,
                 method="tools/list",
                 params={},
-                retry=False,
+                evict_on_session_invalid=False,
             )
         assert "mcp.example.com" in excinfo.value.metadata_url
     finally:
@@ -614,6 +614,51 @@ async def test_list_tools_on_dead_session_raises_session_not_connected() -> None
         session.connected = False
         with pytest.raises(SessionNotConnectedError):
             await manager.list_tools(session=session)
+    finally:
+        await manager.shutdown()
+
+
+async def test_invoke_evict_on_session_invalid_returns_fresh_session() -> None:
+    """PR-17.5c H1: ``evict_on_session_invalid=True`` drops the stale
+    session on a session-invalid hint, and the next ``get_or_create``
+    rebuilds it.
+
+    The parameter is now self-documenting — it does not promise a
+    retry-once, only an eviction so the next caller rebuilds.
+    """
+    fake = _FakeTransportClient(
+        script=[
+            JSONRPCResponse(id="init", result={}),  # first init
+            MCPTransportError("Invalid session ID from server"),  # session-invalid hint
+            JSONRPCResponse(id="init", result={}),  # second init after rebuild
+        ],
+    )
+    manager = _build_manager(fake=fake)
+    try:
+        session = await manager.get_or_create(
+            service_id="svc-evict-on-invalid",
+            transport_type="sse",
+            url="https://mcp.example.com/sse",
+            headers=None,
+        )
+        first_session_id = id(session)
+        with pytest.raises(MCPTransportError):
+            await manager._invoke(
+                session,
+                method="tools/list",
+                params={},
+                evict_on_session_invalid=True,
+            )
+        # The session was evicted; the next ``get_or_create`` rebuilds.
+        assert "svc-evict-on-invalid" not in manager.active_sessions()
+        rebuilt = await manager.get_or_create(
+            service_id="svc-evict-on-invalid",
+            transport_type="sse",
+            url="https://mcp.example.com/sse",
+            headers=None,
+        )
+        assert id(rebuilt) != first_session_id
+        assert fake.connect_calls == 2
     finally:
         await manager.shutdown()
 

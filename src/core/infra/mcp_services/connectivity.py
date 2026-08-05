@@ -42,6 +42,7 @@ class ConnectivityProbe(Protocol):
     async def __call__(
         self,
         *,
+        tenant_id: int,
         service_id: str,
         transport_type: str,
         url: str | None,
@@ -50,14 +51,20 @@ class ConnectivityProbe(Protocol):
 
 
 class ConnectivityResolver(Protocol):
-    """Async ``service_id → MCPServiceInfo`` resolver for live probes.
+    """Async ``(tenant_id, service_id) → MCPServiceInfo`` resolver for live probes.
 
     The factory passes a callable that returns the live ``MCPServiceInfo``
     (or a pre-baked dict in tests) so this module does not import the
-    repository layer.
+    repository layer. PR-17.5c C2: the resolver takes the active
+    ``tenant_id`` so cross-tenant OAuth tokens / URLs do not leak
+    through a hard-coded ``tenant_id=0`` lookup.
     """
 
-    def __call__(self, service_id: str) -> Awaitable[MCPServiceInfo | JsonObject]: ...
+    def __call__(
+        self,
+        tenant_id: int,
+        service_id: str,
+    ) -> Awaitable[MCPServiceInfo | JsonObject]: ...
 
 
 @dataclass(frozen=True)
@@ -99,11 +106,13 @@ class StaticConnectivityProbe:
     async def __call__(
         self,
         *,
+        tenant_id: int,
         service_id: str,
         transport_type: str,
         url: str | None,
         oauth_required: bool,
     ) -> ConnectivityResult:
+        del tenant_id  # static probe does not consult the DB
         return self._result
 
 
@@ -153,12 +162,13 @@ class HTTPMCPConnectivityProbe:
     async def __call__(
         self,
         *,
+        tenant_id: int,
         service_id: str,
         transport_type: str,
         url: str | None,
         oauth_required: bool,
     ) -> ConnectivityResult:
-        info = await self._resolver(service_id)
+        info = await self._resolver(tenant_id, service_id)
         if isinstance(info, MCPServiceInfo):
             resolved_url = info.url
             resolved_transport = info.transport_type

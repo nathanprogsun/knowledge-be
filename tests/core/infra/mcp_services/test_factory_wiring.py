@@ -69,7 +69,8 @@ def test_build_mcp_service_returns_a_real_mcp_service_service() -> None:
 def test_build_mcp_service_forwards_discovery_provider() -> None:
     """A passed :class:`HTTPMCPDiscoveryProvider` reaches the service."""
 
-    async def _resolver(service_id: str) -> MCPServiceInfo | JsonObject:
+    async def _resolver(tenant_id: int, service_id: str) -> MCPServiceInfo | JsonObject:
+        del tenant_id, service_id
         return {}
 
     discovery = HTTPMCPDiscoveryProvider(
@@ -86,7 +87,8 @@ def test_build_mcp_service_forwards_discovery_provider() -> None:
 def test_build_mcp_service_forwards_connectivity_probe() -> None:
     """A passed :class:`HTTPMCPConnectivityProbe` reaches the service."""
 
-    async def _resolver(service_id: str) -> MCPServiceInfo | JsonObject:
+    async def _resolver(tenant_id: int, service_id: str) -> MCPServiceInfo | JsonObject:
+        del tenant_id, service_id
         return {}
 
     probe = HTTPMCPConnectivityProbe(
@@ -141,7 +143,8 @@ def test_build_mcp_service_succeeds_with_full_arg_set() -> None:
     """All four optional args together still produce a real service."""
     from src.core.infra.mcp_services.discovery import DiscoveryCache
 
-    async def _resolver(service_id: str) -> MCPServiceInfo | JsonObject:
+    async def _resolver(tenant_id: int, service_id: str) -> MCPServiceInfo | JsonObject:
+        del tenant_id, service_id
         return {}
 
     discovery = HTTPMCPDiscoveryProvider(

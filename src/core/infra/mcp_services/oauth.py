@@ -111,7 +111,6 @@ class StateEntry:
     code_verifier: str
     client_id: str
     redirect_uri: str
-    authorization_url: str
     created_at: float
 
 
@@ -187,6 +186,20 @@ class TokenStore(Protocol):
 
     async def delete(self, *, tenant_id: int, user_id: str, service_id: str) -> None: ...
 
+    async def find_by_access_token(
+        self,
+        *,
+        access_token: str,
+    ) -> tuple[int, str, str] | None:
+        """Return the (tenant_id, user_id, service_id) of the entry whose access_token matches.
+
+        Used by :meth:`OAuthManager.revoke_token` when the caller hands
+        in a :class:`TokenSet` rather than the principal triple.
+        Returns ``None`` when no entry matches. Default impl uses an
+        O(n) scan; concrete stores can replace with an indexed lookup
+        when persistence moves to Redis / DB.
+        """
+
 
 class InMemorySecretStore:
     """Default :class:`TokenStore` — process-internal dict.
@@ -221,6 +234,16 @@ class InMemorySecretStore:
 
     async def delete(self, *, tenant_id: int, user_id: str, service_id: str) -> None:
         self._store.pop((tenant_id, user_id, service_id), None)
+
+    async def find_by_access_token(
+        self,
+        *,
+        access_token: str,
+    ) -> tuple[int, str, str] | None:
+        for key, token in self._store.items():
+            if token.access_token == access_token:
+                return key
+        return None
 
 
 # ── Auth-config helpers ──────────────────────────────────────────────
@@ -334,10 +357,16 @@ class OAuthManager:
         # ``authorization_endpoint`` / ``token_endpoint`` via the
         # provided ``http_client``.
         self._transport = transport
-        self._http_client = http_client or (
-            httpx.AsyncClient(timeout=30.0) if _is_oauth(service.auth_config) else None
-        )
-        self._owns_http_client = http_client is None and self._http_client is not None
+        # PR-17.5c: do NOT auto-create an ``httpx.AsyncClient`` here.
+        # The legacy PR-17 path constructed one per request and
+        # never closed it, leaking one TCP/TLS connection per call.
+        # Callers that need the live lifecycle (the lifespan-wired
+        # factory and tests) MUST inject ``http_client`` explicitly;
+        # legacy-mode callers get ``http_client=None`` and the
+        # lifecycle methods raise a clear ``oauth_not_configured``
+        # if they try to use it.
+        self._http_client = http_client
+        self._owns_http_client = http_client is None
         self._secret_store: TokenStore = secret_store or InMemorySecretStore()
         self._state_store = state_store or OAuthStateStore()
 
@@ -503,7 +532,6 @@ class OAuthManager:
                 code_verifier=code_verifier,
                 client_id=client_id,
                 redirect_uri=redirect_uri,
-                authorization_url=authorization_url,
                 created_at=time.monotonic(),
             ),
         )
@@ -566,13 +594,24 @@ class OAuthManager:
         )
         return token
 
-    async def refresh(self, *, token: TokenSet) -> TokenSet:
+    async def refresh(
+        self,
+        *,
+        token: TokenSet,
+        tenant_id: int,
+        user_id: str,
+        service_id: str,
+    ) -> TokenSet:
         """Rotate ``token`` via refresh_token_grant and persist the result.
 
         Mirrors Go's ``oauthRuntime.refreshWithLease`` (without the
         distributed-lease layer; the Python side keeps refreshes
         single-flight within one process — concurrent refresh is
         coalesced in PR-17.7+ once we persist tokens in Redis).
+
+        The rotated pair is persisted to :attr:`_secret_store` before
+        being returned so the next refresh uses the new refresh token
+        and the next read sees the rotated access token.
         """
         if self._http_client is None:
             raise ValidationError(
@@ -599,11 +638,21 @@ class OAuthManager:
         scopes = _scopes(self._service.auth_config)
         if scopes:
             payload["scope"] = " ".join(scopes)
-        return await _post_token_request(
+        rotated = await _post_token_request(
             http_client=self._http_client,
             token_endpoint=token_endpoint,
             payload=payload,
         )
+        # Persist before returning so callers see the rotated pair on
+        # the next ``get`` and the next ``refresh`` uses the new
+        # ``refresh_token`` (PR-17.5c H2).
+        await self._secret_store.put(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            service_id=service_id,
+            token=rotated,
+        )
+        return rotated
 
     async def ensure_authorized(
         self,
@@ -619,7 +668,8 @@ class OAuthManager:
         opening a new session to make sure the OAuth bearer token is
         fresh. The refresh-on-the-fly path is a no-op when the stored
         token is still usable; when it has expired but has a refresh
-        token, the rotated pair is persisted before being returned.
+        token, :meth:`refresh` rotates and persists the pair before
+        returning.
         """
         del scope  # scope is passed to build_authorization_url on first use
         existing = await self._secret_store.get(
@@ -638,18 +688,24 @@ class OAuthManager:
         if not existing.is_expired():
             return existing
         if not existing.refresh_token:
+            # PR-17.5c H3: drop the unrecoverable token so the next
+            # caller sees a clean "unauthorized" state instead of a
+            # ghost token that can never be refreshed.
+            await self._secret_store.delete(
+                tenant_id=tenant_id,
+                user_id=user_id,
+                service_id=service_id,
+            )
             raise NotFoundError(
                 code="mcp_service.oauth_expired",
                 message="access token has expired and no refresh_token is available",
             )
-        rotated = await self.refresh(token=existing)
-        await self._secret_store.put(
+        return await self.refresh(
+            token=existing,
             tenant_id=tenant_id,
             user_id=user_id,
             service_id=service_id,
-            token=rotated,
         )
-        return rotated
 
     async def revoke_token(
         self,
@@ -663,9 +719,14 @@ class OAuthManager:
 
         Accepts either the exact ``(tenant_id, user_id, service_id)``
         triple (mirrors Go's ``OAuthManager.Revoke``), or a ``token``
-        whose ``access_token`` the manager finds in its secret store.
+        whose ``access_token`` the manager finds via the store's
+        ``find_by_access_token`` lookup.
+
         Passing ``None`` for both forms is a no-op so legacy callers do
-        not silently delete state.
+        not silently delete state. PR-17.5c C1: the ``token=`` form
+        now actually deletes the matching entry; the previous
+        implementation passed ``token.access_token`` as a user_id and
+        silently dropped nothing.
         """
         if tenant_id is not None and user_id is not None and service_id is not None:
             await self._secret_store.delete(
@@ -675,14 +736,26 @@ class OAuthManager:
             )
             return
         if token is not None:
+            key = await self._secret_store.find_by_access_token(
+                access_token=token.access_token,
+            )
+            if key is None:
+                return
+            resolved_tenant_id, resolved_user_id, resolved_service_id = key
             await self._secret_store.delete(
-                tenant_id=self._service.tenant_id,
-                user_id=token.access_token,
-                service_id=token.refresh_token or token.access_token,
+                tenant_id=resolved_tenant_id,
+                user_id=resolved_user_id,
+                service_id=resolved_service_id,
             )
 
     async def aclose(self) -> None:
-        """Close the underlying HTTP client when this manager owns it."""
+        """Close the underlying HTTP client when this manager owns it.
+
+        Idempotent: a second call after the client was already closed
+        is a no-op. When ``http_client`` was injected by the caller
+        (the lifespan-wired factory path), ``aclose`` deliberately does
+        NOT close it — the caller owns the lifetime.
+        """
         if self._owns_http_client and self._http_client is not None:
             await self._http_client.aclose()
             self._http_client = None

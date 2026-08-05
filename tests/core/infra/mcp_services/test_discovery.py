@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from src.ai.mcp_transport.errors import MCPTransportError
 from src.core.infra.mcp_services.connectivity import (
     ConnectivityResult,
     StaticConnectivityProbe,
@@ -52,8 +53,8 @@ async def _seed(mcp_repo: FakeMCPServiceRepository, *, id_: str = "svc-1") -> MC
 
 async def test_discovery_provider_returns_empty_when_unset() -> None:
     provider = StaticDiscoveryProvider()
-    assert await provider.list_tools(service_id="x") == []
-    assert await provider.list_resources(service_id="x") == []
+    assert await provider.list_tools(tenant_id=1, service_id="x") == []
+    assert await provider.list_resources(tenant_id=1, service_id="x") == []
 
 
 async def test_discovery_provider_returns_baked_lists() -> None:
@@ -64,8 +65,8 @@ async def test_discovery_provider_returns_baked_lists() -> None:
     resources = [DiscoveryResource(uri="file://docs", name="docs")]
     provider = StaticDiscoveryProvider(tools={"svc": tools}, resources={"svc": resources})
 
-    assert await provider.list_tools(service_id="svc") == tools
-    assert await provider.list_resources(service_id="svc") == resources
+    assert await provider.list_tools(tenant_id=1, service_id="svc") == tools
+    assert await provider.list_resources(tenant_id=1, service_id="svc") == resources
 
 
 # ── Cache ───────────────────────────────────────────────────────────
@@ -209,6 +210,7 @@ async def test_probe_receives_oauth_flag(
         async def __call__(
             self,
             *,
+            tenant_id: int,
             service_id: str,
             transport_type: str,
             url: str | None,
@@ -221,3 +223,62 @@ async def test_probe_receives_oauth_flag(
     service = _service(mcp_repo, approvals_repo, probe=_CapturingProbe())  # type: ignore[arg-type]
     await service.test_service(tenant_id=1, service_id="svc-1")
     assert captured["oauth"] is False  # no auth_config on the seeded row
+
+
+# ── PR-17.5c review follow-ups ─────────────────────────────────────
+
+
+class _FailingDiscoveryProvider:
+    """Provider that surfaces a transport failure as :class:`MCPError`.
+
+    Used by :func:`test_list_tools_returns_empty_when_discovery_fails_with_mcp_error`
+    to pin the PR-17.5a degrade-to-empty contract for the live path.
+    """
+
+    async def list_tools(self, *, tenant_id: int, service_id: str) -> list[DiscoveryTool]:
+        del tenant_id, service_id
+        raise MCPTransportError("upstream is down")
+
+    async def list_resources(
+        self,
+        *,
+        tenant_id: int,
+        service_id: str,
+    ) -> list[DiscoveryResource]:
+        del tenant_id, service_id
+        raise MCPTransportError("upstream is down")
+
+
+async def test_list_tools_returns_empty_when_discovery_fails_with_mcp_error(
+    mcp_repo: FakeMCPServiceRepository,
+    approvals_repo: FakeMCPToolApprovalRepository,
+) -> None:
+    """PR-17.5c C3: a live discovery failure surfaces as :class:`MCPError`,
+    which the service layer swallows to return an empty list (the
+    PR-17.5a degrade-to-empty contract).
+
+    The previous ``discovery._invoke`` raised ``RuntimeError``; the
+    ``except MCPError`` clause in the service layer did not catch
+    it, so the live path bubbled a 500 to the UI.
+    """
+    await _seed(mcp_repo)
+    service = _service(
+        mcp_repo,
+        approvals_repo,
+        provider=_FailingDiscoveryProvider(),  # type: ignore[arg-type]
+    )
+    assert await service.list_tools(tenant_id=1, service_id="svc-1") == []
+
+
+async def test_list_resources_returns_empty_when_discovery_fails_with_mcp_error(
+    mcp_repo: FakeMCPServiceRepository,
+    approvals_repo: FakeMCPToolApprovalRepository,
+) -> None:
+    """Same degradation as :func:`test_list_tools_returns_empty_when_discovery_fails_with_mcp_error`."""
+    await _seed(mcp_repo)
+    service = _service(
+        mcp_repo,
+        approvals_repo,
+        provider=_FailingDiscoveryProvider(),  # type: ignore[arg-type]
+    )
+    assert await service.list_resources(tenant_id=1, service_id="svc-1") == []

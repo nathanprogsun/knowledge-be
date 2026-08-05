@@ -27,7 +27,7 @@ from typing import Protocol, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.ai.mcp_transport.errors import MCPError
+from src.ai.mcp_transport.errors import MCPError, MCPTransportError
 from src.ai.mcp_transport.jsonrpc import JSONRPCResponse
 from src.common.json import JsonObject, JsonValue
 from src.core.infra.mcp_services.types import MCPServiceInfo
@@ -68,9 +68,14 @@ class DiscoveryProvider(Protocol):
     :class:`StaticDiscoveryProvider`.
     """
 
-    async def list_tools(self, *, service_id: str) -> list[DiscoveryTool]: ...
+    async def list_tools(self, *, tenant_id: int, service_id: str) -> list[DiscoveryTool]: ...
 
-    async def list_resources(self, *, service_id: str) -> list[DiscoveryResource]: ...
+    async def list_resources(
+        self,
+        *,
+        tenant_id: int,
+        service_id: str,
+    ) -> list[DiscoveryResource]: ...
 
 
 class StaticDiscoveryProvider:
@@ -90,22 +95,35 @@ class StaticDiscoveryProvider:
         self._tools = tools or {}
         self._resources = resources or {}
 
-    async def list_tools(self, *, service_id: str) -> list[DiscoveryTool]:
+    async def list_tools(self, *, tenant_id: int, service_id: str) -> list[DiscoveryTool]:
+        del tenant_id  # tenant scope is implicit in the pre-baked map
         return list(self._tools.get(service_id, []))
 
-    async def list_resources(self, *, service_id: str) -> list[DiscoveryResource]:
+    async def list_resources(
+        self,
+        *,
+        tenant_id: int,
+        service_id: str,
+    ) -> list[DiscoveryResource]:
+        del tenant_id  # tenant scope is implicit in the pre-baked map
         return list(self._resources.get(service_id, []))
 
 
 class ServiceResolver(Protocol):
-    """Async ``service_id → MCPServiceInfo`` resolver for live discovery.
+    """Async ``(tenant_id, service_id) → MCPServiceInfo`` resolver for live discovery.
 
     The factory passes a callable that returns the live ``MCPServiceInfo``
     (or a pre-baked dict in tests) so this module does not import the
-    repository layer.
+    repository layer. PR-17.5c C2: the resolver takes the active
+    ``tenant_id`` so cross-tenant OAuth tokens / URLs do not leak
+    through a hard-coded ``tenant_id=0`` lookup.
     """
 
-    def __call__(self, service_id: str) -> Awaitable[MCPServiceInfo | JsonObject]: ...
+    def __call__(
+        self,
+        tenant_id: int,
+        service_id: str,
+    ) -> Awaitable[MCPServiceInfo | JsonObject]: ...
 
 
 class _ConnectionManagerLike(Protocol):
@@ -153,16 +171,21 @@ class HTTPMCPDiscoveryProvider:
         self._manager = connection_manager
         self._resolver = service_resolver
 
-    async def list_tools(self, *, service_id: str) -> list[DiscoveryTool]:
-        response = await self._invoke(service_id, method="tools/list")
+    async def list_tools(self, *, tenant_id: int, service_id: str) -> list[DiscoveryTool]:
+        response = await self._invoke(tenant_id, service_id, method="tools/list")
         return _extract_tools(response)
 
-    async def list_resources(self, *, service_id: str) -> list[DiscoveryResource]:
-        response = await self._invoke(service_id, method="resources/list")
+    async def list_resources(
+        self,
+        *,
+        tenant_id: int,
+        service_id: str,
+    ) -> list[DiscoveryResource]:
+        response = await self._invoke(tenant_id, service_id, method="resources/list")
         return _extract_resources(response)
 
-    async def _invoke(self, service_id: str, *, method: str) -> object:
-        info = await self._resolve(service_id)
+    async def _invoke(self, tenant_id: int, service_id: str, *, method: str) -> object:
+        info = await self._resolve(tenant_id, service_id)
         try:
             session = await self._manager.get_or_create(
                 service_id=service_id,
@@ -176,28 +199,31 @@ class HTTPMCPDiscoveryProvider:
                 service_name=cast("str | None", info.get("name")),
             )
         except MCPError as exc:
+            # Re-raise as MCPTransportError so the service-layer
+            # ``except MCPError`` degrade-to-empty contract holds even
+            # for transport failures during session establishment.
             message = getattr(exc, "message_text", None) or str(exc)
-            raise RuntimeError(
-                f"manager could not establish a session for {service_id!r}: {message}"
+            raise MCPTransportError(
+                f"manager could not establish a session for {service_id!r}: {message}",
             ) from exc
         if method == "tools/list":
             response = await self._manager.list_tools(session=session)
         elif method == "resources/list":
             response = await self._manager.list_resources(session=session)
         else:
-            raise ValueError(f"unsupported discovery method {method!r}")
+            raise MCPTransportError(f"unsupported discovery method {method!r}")
         if not isinstance(response, JSONRPCResponse):
-            raise RuntimeError(
+            raise MCPTransportError(
                 f"unexpected response from manager for {method}: {type(response).__name__}",
             )
         if response.error is not None:
-            raise RuntimeError(
+            raise MCPTransportError(
                 f"MCP {method} returned error {response.error.code}: {response.error.message}",
             )
         return response
 
-    async def _resolve(self, service_id: str) -> JsonObject:
-        info = await self._resolver(service_id)
+    async def _resolve(self, tenant_id: int, service_id: str) -> JsonObject:
+        info = await self._resolver(tenant_id, service_id)
         if isinstance(info, MCPServiceInfo):
             return _info_to_resolver_payload(info)
         if isinstance(info, dict):
@@ -251,8 +277,11 @@ class DiscoveryCache:
         cached = self._store.get(key)
         if cached is not None and cached.expires_at > now:
             return list(cached.tools), list(cached.resources)
-        tools = await provider.list_tools(service_id=service_id)
-        resources = await provider.list_resources(service_id=service_id)
+        tools = await provider.list_tools(tenant_id=tenant_id, service_id=service_id)
+        resources = await provider.list_resources(
+            tenant_id=tenant_id,
+            service_id=service_id,
+        )
         self._store[key] = _CacheEntry(
             tools=tuple(tools),
             resources=tuple(resources),
