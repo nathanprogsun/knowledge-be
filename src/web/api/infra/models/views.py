@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from src.common.json import JsonValue
 from src.core.contracts.infra import (
     Model,
     ModelParameters,
@@ -67,7 +68,7 @@ class ModelDebugEnvelope(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     success: bool
-    data: dict[str, object]
+    data: dict[str, JsonValue]
 
 
 def _redact_credential(value: str | None) -> str:

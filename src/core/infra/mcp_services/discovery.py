@@ -27,6 +27,7 @@ from typing import Protocol, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.ai.mcp_transport.connection_manager import MCPSession
 from src.ai.mcp_transport.errors import MCPError, MCPTransportError
 from src.ai.mcp_transport.jsonrpc import JSONRPCResponse
 from src.common.json import JsonObject, JsonValue
@@ -145,9 +146,9 @@ class _ConnectionManagerLike(Protocol):
         service_name: str | None = None,
     ): ...
 
-    async def list_tools(self, *, session: object) -> object: ...
+    async def list_tools(self, *, session: MCPSession) -> JSONRPCResponse: ...
 
-    async def list_resources(self, *, session: object) -> object: ...
+    async def list_resources(self, *, session: MCPSession) -> JSONRPCResponse: ...
 
 
 class HTTPMCPDiscoveryProvider:
@@ -184,7 +185,7 @@ class HTTPMCPDiscoveryProvider:
         response = await self._invoke(tenant_id, service_id, method="resources/list")
         return _extract_resources(response)
 
-    async def _invoke(self, tenant_id: int, service_id: str, *, method: str) -> object:
+    async def _invoke(self, tenant_id: int, service_id: str, *, method: str) -> JSONRPCResponse:
         info = await self._resolve(tenant_id, service_id)
         try:
             session = await self._manager.get_or_create(
@@ -293,10 +294,8 @@ class DiscoveryCache:
 # ── Helpers ────────────────────────────────────────────────────────
 
 
-def _extract_tools(response: object) -> list[DiscoveryTool]:
+def _extract_tools(response: JSONRPCResponse) -> list[DiscoveryTool]:
     """Translate an MCP ``tools/list`` JSON-RPC response into ``DiscoveryTool`` rows."""
-    if not isinstance(response, JSONRPCResponse):
-        return []
     result = response.result or {}
     raw = result.get("tools")
     if not isinstance(raw, list):
@@ -323,10 +322,8 @@ def _extract_tools(response: object) -> list[DiscoveryTool]:
     return tools
 
 
-def _extract_resources(response: object) -> list[DiscoveryResource]:
+def _extract_resources(response: JSONRPCResponse) -> list[DiscoveryResource]:
     """Translate an MCP ``resources/list`` JSON-RPC response into ``DiscoveryResource`` rows."""
-    if not isinstance(response, JSONRPCResponse):
-        return []
     result = response.result or {}
     raw = result.get("resources")
     if not isinstance(raw, list):

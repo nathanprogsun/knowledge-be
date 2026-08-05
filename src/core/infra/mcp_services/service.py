@@ -19,7 +19,7 @@ from typing import cast
 
 from src.ai.mcp_transport.errors import MCPError
 from src.common.exception import ConflictError, NotFoundError, ValidationError
-from src.common.json import BindParams, JsonObject, JsonValue
+from src.common.json import JsonObject, JsonValue, SqlValue
 from src.core.infra.mcp_services.connectivity import (
     ConnectivityProbe,
     ConnectivityResult,
@@ -217,11 +217,7 @@ class MCPServiceService:
                     ),
                 )
         columns["updated_at"] = datetime.now(UTC)
-        updated = await self._mcp_repo.update(
-            tenant_id,
-            id,
-            columns=cast("BindParams", columns),
-        )
+        updated = await self._mcp_repo.update(tenant_id, id, columns=columns)
         if updated is None:
             raise NotFoundError(
                 code="mcp_service.not_found",
@@ -454,9 +450,9 @@ def _build_update_columns(
     advanced_config: JsonObject | None,
     stdio_config: JsonObject | None,
     env_vars: dict[str, str] | None,
-) -> dict[str, object]:
+) -> dict[str, SqlValue]:
     """Collect the supplied columns, dropping secret subfields."""
-    columns: dict[str, object] = {}
+    columns: dict[str, SqlValue] = {}
     if name is not None:
         clean_name = name.strip()
         if not clean_name:

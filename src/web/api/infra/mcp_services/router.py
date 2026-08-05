@@ -30,10 +30,11 @@ from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict
 
 from src.common.exception import NotFoundError, ValidationError
-from src.common.json import JsonObject
+from src.common.json import JsonObject, JsonValue
 from src.web.api.infra.mcp_services.views import (
     CreateMCPServiceRequest,
     DeleteMCPServiceResponse,
+    MCPOAuthAuthorizeURLResponse,
     MCPOAuthStatusEnvelope,
     MCPResourceEnvelope,
     MCPTestResultEnvelope,
@@ -84,7 +85,7 @@ async def create_mcp_service(
     body: CreateMCPServiceRequest,
     mcp_service: MCPServiceDep,
     tenant_id: RequireTenantIdDep,
-) -> object:
+) -> dict[str, JsonValue]:
     """Register a new MCP service in the active workspace."""
     info = await mcp_service.create_service(
         tenant_id=tenant_id,
@@ -108,7 +109,7 @@ async def list_mcp_services(
     _viewer: RoleViewerDep,
     mcp_service: MCPServiceDep,
     tenant_id: RequireTenantIdDep,
-) -> object:
+) -> dict[str, JsonValue]:
     """List the active workspace's MCP services, newest first."""
     return service_list_envelope(await mcp_service.list_services(tenant_id=tenant_id))
 
@@ -120,7 +121,7 @@ async def get_mcp_service(
     service_id: str,
     mcp_service: MCPServiceDep,
     tenant_id: RequireTenantIdDep,
-) -> object:
+) -> dict[str, JsonValue]:
     """Fetch one MCP service by id."""
     info = await mcp_service.get_service(tenant_id=tenant_id, id=service_id)
     return service_envelope(info)
@@ -134,7 +135,7 @@ async def update_mcp_service(
     body: UpdateMCPServiceRequest,
     mcp_service: MCPServiceDep,
     tenant_id: RequireTenantIdDep,
-) -> object:
+) -> dict[str, JsonValue]:
     """Patch the supplied columns of a configured service."""
     info = await mcp_service.update_service(
         tenant_id=tenant_id,
@@ -249,7 +250,7 @@ async def set_mcp_tool_approval(
     body: SetMCPToolApprovalRequest,
     mcp_service: MCPServiceDep,
     tenant_id: RequireTenantIdDep,
-) -> object:
+) -> dict[str, JsonValue]:
     """Upsert one tool's ``require_approval`` flag."""
     await mcp_service.set_tool_approval(
         tenant_id=tenant_id,
@@ -272,7 +273,7 @@ async def start_oauth_authorization(
     mcp_service: MCPServiceDep,
     tenant_id: RequireTenantIdDep,
     user_id: RequireUserIdDep,
-) -> object:
+) -> MCPOAuthAuthorizeURLResponse:
     """Begin OAuth authorisation; return the URL the browser must open."""
     if not body.redirect_uri:
         raise ValidationError(
@@ -336,7 +337,7 @@ async def revoke_oauth_token(
     mcp_service: MCPServiceDep,
     tenant_id: RequireTenantIdDep,
     user_id: RequireUserIdDep,
-) -> object:
+) -> None:
     """Revoke the per-user OAuth token."""
     manager = await mcp_service.fetch_oauth_manager(
         tenant_id=tenant_id,
@@ -345,13 +346,13 @@ async def revoke_oauth_token(
     manager.revoke(user_id=user_id)
     # FastAPI returns the empty body when ``response_model`` is None
     # and we return None — combine with status_code=204 above.
-    return None
+    return
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
 
 
-def _dict_or_none(model: object | None) -> JsonObject | None:
+def _dict_or_none(model: BaseModel | JsonObject | None) -> JsonObject | None:
     """Render a wire DTO (or ``None``) as a JSON-compatible dict.
 
     The frozen contract DTOs expose ``model_dump``; nested configs

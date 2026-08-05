@@ -45,17 +45,22 @@ clean:
 
 # ── Anti-drift checks (checkpoint) ──────────────────────────────────────
 
-check: check-layer check-singleton check-endpoint check-contract check-imports
+STAGE2_INFRA_DOMAINS := datasources,initialization,mcp_services,models,storage_backends,vector_stores,web_search
+
+check: check-layer check-singleton check-endpoint check-schema check-contract check-imports
 	@echo "All anti-drift checks passed"
 
+# Layer check covers every shipped domain. Endpoint coverage can only
+# verify domains whose upstream docs/api/*.md table is fully aligned;
+# the residual stage-2 gaps are tracked in the checkpoint-2 report.
 check-layer:
-	python scripts/check_layer_violation.py --src-root src/ --domains $(STAGE1_DOMAINS)
+	python scripts/check_layer_violation.py --src-root src/ --domains $(STAGE1_DOMAINS),$(STAGE2_INFRA_DOMAINS)
 
 check-singleton:
 	python scripts/check_service_singleton.py --src-root src/
 
 check-endpoint:
-	python scripts/check_endpoint_coverage.py --src-root src/ --domains auth,tenants
+	python scripts/check_endpoint_coverage.py --src-root src/ --domains auth,tenants,vector_stores,storage_backends,web_search
 
 check-schema:
 	python scripts/check_schema_compatibility.py --src-root src/

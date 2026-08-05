@@ -48,21 +48,13 @@ class _FakeService:
         self._next_call: int = 0
 
     async def list_stores(self, tenant_id: int) -> list[VectorStoreInfo]:
-        out = [
-            r
-            for r in self.rows.values()
-            if r.tenant_id == tenant_id and r.deleted_at is None
-        ]
+        out = [r for r in self.rows.values() if r.tenant_id == tenant_id and r.deleted_at is None]
         out.sort(key=lambda r: r.created_at, reverse=True)
         return [VectorStoreInfo.map_from_db(r) for r in out]
 
     async def get_store(self, tenant_id: int, store_id: str) -> VectorStoreInfo:
         for r in self.rows.values():
-            if (
-                r.id == store_id
-                and r.tenant_id == tenant_id
-                and r.deleted_at is None
-            ):
+            if r.id == store_id and r.tenant_id == tenant_id and r.deleted_at is None:
                 return VectorStoreInfo.map_from_db(r)
         from src.common.exception import ValidationError
 
@@ -103,9 +95,7 @@ class _FakeService:
     ) -> VectorStoreInfo:
         for r in self.rows.values():
             if r.id == store_id and r.tenant_id == tenant_id:
-                updated = r.model_copy(
-                    update={"name": body.name, "updated_at": datetime.now(UTC)}
-                )
+                updated = r.model_copy(update={"name": body.name, "updated_at": datetime.now(UTC)})
                 self.rows[store_id] = updated
                 return VectorStoreInfo.map_from_db(updated)
         from src.common.exception import ValidationError

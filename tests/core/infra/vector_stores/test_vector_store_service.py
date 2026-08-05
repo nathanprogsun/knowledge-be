@@ -70,11 +70,7 @@ class _FakeVectorStoreRepo:
         store_id: str,
     ) -> VectorStore | None:
         for row in self.rows.values():
-            if (
-                row.id == store_id
-                and row.tenant_id == tenant_id
-                and row.deleted_at is None
-            ):
+            if row.id == store_id and row.tenant_id == tenant_id and row.deleted_at is None:
                 return row
         return None
 
@@ -585,9 +581,12 @@ def test_registry_covers_seven_engines() -> None:
         "doris",
         "opensearch",
     }
-    assert frozenset(
-        {info.type for info in types},
-    ) == SUPPORTED_ENGINE_TYPES
+    assert (
+        frozenset(
+            {info.type for info in types},
+        )
+        == SUPPORTED_ENGINE_TYPES
+    )
 
 
 def test_vector_store_info_map_from_db_round_trip() -> None:
@@ -690,26 +689,16 @@ def test_validate_connection_config_required_fields() -> None:
 
 def test_validate_connection_config_passes_when_valid() -> None:
     """A fully populated config passes the engine-specific check."""
-    healthcheck_module.validate_connection_config(
-        "elasticsearch", {"addr": "http://es:9200"}
-    )
+    healthcheck_module.validate_connection_config("elasticsearch", {"addr": "http://es:9200"})
     healthcheck_module.validate_connection_config("qdrant", {"host": "localhost"})
-    healthcheck_module.validate_connection_config(
-        "milvus", {"addr": "localhost:19530"}
-    )
+    healthcheck_module.validate_connection_config("milvus", {"addr": "localhost:19530"})
     healthcheck_module.validate_connection_config(
         "tencent_vectordb",
         {"addr": "http://x", "username": "u", "api_key": "k"},
     )
-    healthcheck_module.validate_connection_config(
-        "weaviate", {"host": "weaviate:8080"}
-    )
-    healthcheck_module.validate_connection_config(
-        "doris", {"addr": "x", "database": "weknora"}
-    )
-    healthcheck_module.validate_connection_config(
-        "opensearch", {"addr": "https://os:9200"}
-    )
+    healthcheck_module.validate_connection_config("weaviate", {"host": "weaviate:8080"})
+    healthcheck_module.validate_connection_config("doris", {"addr": "x", "database": "weknora"})
+    healthcheck_module.validate_connection_config("opensearch", {"addr": "https://os:9200"})
 
 
 def test_test_connection_rejects_unknown_engine() -> None:

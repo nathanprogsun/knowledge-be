@@ -79,9 +79,10 @@ class VectorStoreRepository(GenericRepository[VectorStore]):
         result = await self._session.execute(stmt)
         for row in result.mappings().all():
             store = self._hydrate(row)
-            if _endpoint_of(store.connection_config) == endpoint and _index_name_of(
-                store.index_config, engine_type
-            ) == index_name:
+            if (
+                _endpoint_of(store.connection_config) == endpoint
+                and _index_name_of(store.index_config, engine_type) == index_name
+            ):
                 return True
         return False
 

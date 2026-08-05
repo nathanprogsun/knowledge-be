@@ -338,34 +338,73 @@ ALWAYS_INCLUDE_PREFIXES: tuple[tuple[str, ...], ...] = (
 )
 
 
+# Stage-2 infra domains keep the domain name in the second segment
+# (``core/infra/<domain>/``, ``web/api/infra/<domain>/``,
+# ``db/models/infra/<domain>/``), and their DAOs use a singular / shortened
+# stem (``mcp_service_repository`` for domain ``mcp_services``). Map domain
+# -> DAO prefix so both match.
+_DAO_PREFIX_BY_DOMAIN = {
+    "datasources": "datasource",
+    "mcp_services": "mcp_service",
+    "models": "model",
+    "storage_backends": "storage_backend",
+    "vector_stores": "vector_store",
+    "web_search": "web_search_provider",
+}
+
+
+def _infra_domain(parts: tuple[str, ...], base_index: int) -> str | None:
+    """Return the domain held in the second segment after ``infra``, if any.
+
+    ``base_index`` is the index of the ``infra`` segment within ``parts``.
+    """
+    if len(parts) > base_index + 1:
+        return parts[base_index + 1]
+    return None
+
+
 def _file_in_domains(parts: tuple[str, ...], domains: set[str]) -> bool:
     """True if the file belongs to any of the given domains.
 
     A file belongs to a domain when it lives under ``core/<domain>``,
-    ``web/api/<domain>``, ``db/models/<domain>``, or is a ``db/dao/<domain>*``
-    repository. Otherwise it is considered shared/bootstrap and scanned
+    ``core/infra/<domain>``, ``web/api/<domain>``,
+    ``web/api/infra/<domain>``, ``db/models/<domain>``,
+    ``db/models/infra/<domain>``, or is a ``db/dao/<domain>*`` repository.
+    Otherwise it is considered shared/bootstrap and scanned
     unconditionally.
     """
     for prefix in ALWAYS_INCLUDE_PREFIXES:
         if len(parts) >= len(prefix) and parts[: len(prefix)] == prefix:
             return True
-    if parts[0] in {"core", "web"}:
-        # core/<domain>/...  or  web/api/<domain>/...
-        domain_part = parts[1] if len(parts) >= 3 and parts[1] != "api" else None
-        if domain_part in domains:
+    if parts[0] == "core":
+        # core/<domain>/...  or  core/infra/<domain>/...
+        if parts[1] in domains:
             return True
-        if len(parts) >= 4 and parts[1] == "api" and parts[2] in domains:
+        if parts[1] == "infra" and _infra_domain(parts, 1) in domains:
             return True
+    if parts[0] == "web":
+        # web/api/<domain>/...  or  web/api/infra/<domain>/...
+        if len(parts) >= 3 and parts[1] == "api":
+            domain_part = (
+                parts[3] if len(parts) >= 4 and parts[2] == "infra" else parts[2]
+            )
+            if domain_part in domains:
+                return True
     if parts[0] == "db":
-        if len(parts) >= 3 and parts[1] == "models" and parts[2] in domains:
-            return True
+        if len(parts) >= 3 and parts[1] == "models":
+            domain_part = (
+                parts[3] if len(parts) >= 4 and parts[2] == "infra" else parts[2]
+            )
+            if domain_part in domains:
+                return True
         if len(parts) >= 3 and parts[1] == "dao":
             base = parts[2].removesuffix(".py")
+            dao_prefixes = {_DAO_PREFIX_BY_DOMAIN.get(d, d) for d in domains}
             # Domain-prefixed DAOs match their domain; unprefixed DAOs are
             # shared cross-domain repositories and always scanned.
-            if any(base.startswith(f"{d}_") for d in domains):
+            if any(base.startswith(f"{p}_") for p in dao_prefixes):
                 return True
-            return not any(base.startswith(f"{d}_") for d in domains)
+            return not any(base.startswith(f"{p}_") for p in dao_prefixes)
     return False
 
 

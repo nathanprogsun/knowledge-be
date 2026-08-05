@@ -29,9 +29,7 @@ _SSE_URL = "https://mcp.example.com/sse"
 
 def _sse_body(events: list[tuple[str, str]]) -> bytes:
     """Build a ``text/event-stream`` body from (event, data) pairs."""
-    return "".join(f"event: {event}\ndata: {data}\n\n" for event, data in events).encode(
-        "utf-8"
-    )
+    return "".join(f"event: {event}\ndata: {data}\n\n" for event, data in events).encode("utf-8")
 
 
 async def test_connect_discovers_post_endpoint_from_first_event() -> None:
@@ -125,9 +123,8 @@ async def test_request_sends_envelope_and_returns_matching_message_event() -> No
         # The handshake stream keeps the SSE connection open while the
         # request round-trip happens; we model the "endpoint first,
         # then matching message" sequence as a single streamed body.
-        sse_body = (
-            _sse_body([("endpoint", "/messages")])
-            + _sse_body([("message", json.dumps(response_payload))])
+        sse_body = _sse_body([("endpoint", "/messages")]) + _sse_body(
+            [("message", json.dumps(response_payload))]
         )
         router.get("/sse").respond(
             200,

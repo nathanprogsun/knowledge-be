@@ -116,9 +116,7 @@ async def test_create_service_duplicate_name_raises_conflict(
     """
     await service.create_service(tenant_id=1, name="dup", transport_type="sse")
     with pytest.raises(ConflictError) as excinfo:
-        await service.create_service(
-            tenant_id=1, name="dup", transport_type="sse"
-        )
+        await service.create_service(tenant_id=1, name="dup", transport_type="sse")
     assert excinfo.value.code == "mcp_service.duplicate_name"
 
 
@@ -128,9 +126,7 @@ async def test_create_service_same_name_different_tenant_is_allowed(
     """Name uniqueness is scoped to (tenant_id, name), not global."""
     await service.create_service(tenant_id=1, name="shared", transport_type="sse")
     # No conflict on a different tenant.
-    info = await service.create_service(
-        tenant_id=2, name="shared", transport_type="sse"
-    )
+    info = await service.create_service(tenant_id=2, name="shared", transport_type="sse")
     assert info.tenant_id == 2
 
 

@@ -45,6 +45,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.common.exception import NotFoundError, ValidationError
+from src.common.json import JsonObject, JsonValue
 from src.core.infra.mcp_services.types import MCPServiceInfo
 
 # Default TTL for in-flight OAuth state. Mirrors ``oauthStateTTL``
@@ -249,7 +250,7 @@ class InMemorySecretStore:
 # ── Auth-config helpers ──────────────────────────────────────────────
 
 
-def _auth_type(auth_config: object | None) -> str:
+def _auth_type(auth_config: JsonObject | None) -> str:
     """Return the normalised ``auth_type`` field of a persisted auth_config."""
     if not isinstance(auth_config, dict):
         return ""
@@ -257,7 +258,7 @@ def _auth_type(auth_config: object | None) -> str:
     return raw.strip().lower() if isinstance(raw, str) else ""
 
 
-def _is_oauth(auth_config: object | None) -> bool:
+def _is_oauth(auth_config: JsonObject | None) -> bool:
     """True when the persisted auth_config uses the OAuth strategy.
 
     Mirrors ``MCPAuthConfig.IsOAuth()`` in the Go codebase: an empty
@@ -266,7 +267,7 @@ def _is_oauth(auth_config: object | None) -> bool:
     return _auth_type(auth_config) == "oauth"
 
 
-def _authorization_endpoint(auth_config: object | None) -> str:
+def _authorization_endpoint(auth_config: JsonObject | None) -> str:
     """Return the override ``authorization_endpoint`` (empty when unset)."""
     if not isinstance(auth_config, dict):
         return ""
@@ -274,7 +275,7 @@ def _authorization_endpoint(auth_config: object | None) -> str:
     return raw.strip() if isinstance(raw, str) else ""
 
 
-def _token_endpoint(auth_config: object | None) -> str:
+def _token_endpoint(auth_config: JsonObject | None) -> str:
     """Return the override ``token_endpoint`` (empty when unset)."""
     if not isinstance(auth_config, dict):
         return ""
@@ -282,7 +283,7 @@ def _token_endpoint(auth_config: object | None) -> str:
     return raw.strip() if isinstance(raw, str) else ""
 
 
-def _client_id_override(auth_config: object | None) -> str:
+def _client_id_override(auth_config: JsonObject | None) -> str:
     """Return the override ``client_id`` (empty when unset)."""
     if not isinstance(auth_config, dict):
         return ""
@@ -290,7 +291,7 @@ def _client_id_override(auth_config: object | None) -> str:
     return raw.strip() if isinstance(raw, str) else ""
 
 
-def _scopes(auth_config: object | None) -> list[str]:
+def _scopes(auth_config: JsonObject | None) -> list[str]:
     """Return the configured OAuth scopes (empty list when unset)."""
     if not isinstance(auth_config, dict):
         return []
@@ -346,7 +347,7 @@ class OAuthManager:
         self,
         *,
         service: MCPServiceInfo,
-        transport: object | None = None,
+        transport: JsonValue | None = None,
         http_client: httpx.AsyncClient | None = None,
         secret_store: TokenStore | None = None,
         state_store: OAuthStateStore | None = None,
@@ -765,7 +766,7 @@ class OAuthManager:
 # ── Module helpers ───────────────────────────────────────────────────
 
 
-def _lifecycle_enabled(auth_config: object | None) -> bool:
+def _lifecycle_enabled(auth_config: JsonObject | None) -> bool:
     """True when the auth_config has enough fields to run the live lifecycle."""
     return _is_oauth(auth_config) and bool(
         _authorization_endpoint(auth_config) and _token_endpoint(auth_config)
@@ -814,7 +815,7 @@ async def _post_token_request(
             message=(f"token endpoint returned HTTP {response.status_code}: {response.text[:200]}"),
         )
     try:
-        decoded = response.json()
+        decoded: JsonObject = response.json()
     except Exception as exc:  # pragma: no cover - depends on server
         raise ValidationError(
             code="mcp_service.oauth_token_malformed",
@@ -828,7 +829,7 @@ async def _post_token_request(
     return _decode_token_payload(decoded)
 
 
-def _decode_token_payload(decoded: dict[str, object]) -> TokenSet:
+def _decode_token_payload(decoded: JsonObject) -> TokenSet:
     """Translate an OAuth 2.0 token response into a :class:`TokenSet`."""
     access_token = decoded.get("access_token")
     if not isinstance(access_token, str) or not access_token:

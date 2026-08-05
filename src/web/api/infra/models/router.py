@@ -9,12 +9,13 @@ subresource is not yet implemented.
 from __future__ import annotations
 
 import time
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, File, Form, Query, Request, UploadFile
 
 from src.app_context.request_context import get_tenant_id
 from src.common.exception import ValidationError
+from src.common.json import JsonValue
 from src.core.contracts.infra import (
     CreateModelRequest,
     ProviderTypeMeta,
@@ -216,7 +217,7 @@ async def debug_model(
     # behaviour) instead of an opaque debug probe failure.
     info = await model_service.get_model(tenant_id=tenant_id, model_id=model_id)
     started = time.monotonic()
-    data: dict[str, Any] = {
+    data: dict[str, JsonValue] = {
         "ok": False,
         "elapsed_ms": int((time.monotonic() - started) * 1000),
         "request": {
