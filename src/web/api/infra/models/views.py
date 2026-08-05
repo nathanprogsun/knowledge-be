@@ -1,0 +1,137 @@
+"""Wire-shape conversion for the model endpoints.
+
+``ModelInfo`` is the service-side projection of a ``models`` row; the
+wire shape is the frozen ``Model`` in
+``src/core/contracts/infra.py``. ``model_info_to_contract`` performs
+the boundary translation: it re-emits the storage row onto the wire
+contract, omitting the credential-bearing ``parameters`` fields.
+
+The wire ``Model`` carries the raw ``ModelParameters`` (which still
+includes ``api_key`` / ``app_secret`` in its field set). This module
+explicitly strips those two fields when projecting so a response can
+never carry plaintext credentials — mirrors
+``dto.NewModelResponse`` on the Go side.
+"""
+
+from __future__ import annotations
+
+from pydantic import BaseModel, ConfigDict
+
+from src.core.contracts.infra import (
+    Model,
+    ModelParameters,
+    ProviderTypeMeta,
+)
+from src.core.infra.models.types import ModelInfo
+
+
+class ModelEnvelope(BaseModel):
+    """``{"success": true, "data": {...}}`` - single-model responses."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: Model
+
+
+class ModelListEnvelope(BaseModel):
+    """``{"success": true, "data": [...]}`` - list responses."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: list[Model]
+
+
+class ProviderListEnvelope(BaseModel):
+    """``{"success": true, "data": [...]}`` - provider metadata responses."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: list[ProviderTypeMeta]
+
+
+class DeleteModelResponse(BaseModel):
+    """``{"success": true, "message": "..."}`` - simple ack response."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    message: str
+
+
+class ModelDebugEnvelope(BaseModel):
+    """``{"success": true, "data": {...}}`` - debug call responses."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: dict[str, object]
+
+
+def _parameters_for_wire(parameters: ModelParameters) -> ModelParameters:
+    """Strip ``api_key`` / ``app_secret`` for the wire response.
+
+    Mirrors Go's ``dto.ModelParametersDTO`` which drops both fields by
+    construction. We rebuild a fresh ``ModelParameters`` with the two
+    sensitive fields cleared.
+    """
+    return parameters.model_copy(
+        update={
+            "api_key": None,
+            "app_secret": None,
+        }
+    )
+
+
+def model_info_to_contract(info: ModelInfo) -> Model:
+    """Project the service DTO onto the frozen wire contract."""
+    return Model(
+        id=info.id,
+        tenant_id=info.tenant_id,
+        name=info.name,
+        display_name=info.display_name,
+        type=info.type,
+        source=info.source,
+        description=info.description,
+        parameters=_parameters_for_wire(info.parameters),
+        is_default=info.is_default,
+        is_builtin=info.is_builtin,
+        managed_by=info.managed_by,
+        status=info.status,
+        created_at=info.created_at,
+        updated_at=info.updated_at,
+        deleted_at=info.deleted_at,
+    )
+
+
+def model_envelope(info: ModelInfo) -> ModelEnvelope:
+    """Wrap one model in the success envelope."""
+    return ModelEnvelope(success=True, data=model_info_to_contract(info))
+
+
+def model_list_envelope(infos: list[ModelInfo]) -> ModelListEnvelope:
+    """Wrap a list of models in the success envelope."""
+    return ModelListEnvelope(
+        success=True,
+        data=[model_info_to_contract(info) for info in infos],
+    )
+
+
+def provider_list_envelope(providers: list[ProviderTypeMeta]) -> ProviderListEnvelope:
+    """Wrap a list of provider metadata in the success envelope."""
+    return ProviderListEnvelope(success=True, data=providers)
+
+
+__all__ = [
+    "DeleteModelResponse",
+    "ModelDebugEnvelope",
+    "ModelEnvelope",
+    "ModelListEnvelope",
+    "ProviderListEnvelope",
+    "model_envelope",
+    "model_info_to_contract",
+    "model_list_envelope",
+    "provider_list_envelope",
+]
