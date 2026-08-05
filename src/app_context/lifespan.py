@@ -30,6 +30,16 @@ from src.common.oidc_client import OidcClient
 from src.db.base import DatabaseEngine
 from src.settings import get_settings
 from src.web.api.auth.router import router as auth_router
+from src.web.api.infra.datasources.router import router as datasources_router
+from src.web.api.infra.initialization.router import router as initialization_router
+from src.web.api.infra.mcp_services.router import router as mcp_services_router
+from src.web.api.infra.models.router import router as models_router
+from src.web.api.infra.storage_backends.router import router as storage_backends_router
+from src.web.api.infra.vector_stores.router import router as vector_stores_router
+from src.web.api.infra.web_search.catalog_router import (
+    router as web_search_catalog_router,
+)
+from src.web.api.infra.web_search.router import router as web_search_router
 from src.web.api.system.router import router as system_router
 from src.web.api.tenants.router import router as tenants_router
 from src.web.exception_handler import register_exception_handlers
@@ -84,8 +94,16 @@ def create_app() -> FastAPI:
     register_exception_handlers(application)
 
     application.include_router(auth_router)
+    application.include_router(datasources_router)
+    application.include_router(initialization_router)
+    application.include_router(mcp_services_router)
+    application.include_router(models_router)
+    application.include_router(storage_backends_router)
     application.include_router(system_router)
     application.include_router(tenants_router)
+    application.include_router(vector_stores_router)
+    application.include_router(web_search_catalog_router)
+    application.include_router(web_search_router)
 
     @application.get("/health", tags=["meta"])
     async def health() -> dict[str, str]:

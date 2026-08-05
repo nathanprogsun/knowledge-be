@@ -28,8 +28,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "web_search_providers"
-down_revision: str | None | None = "0008_tenant_kv"
+revision: str = "0012_web_search_providers"
+down_revision: str | None = "0011_vector_stores"
 branch_labels: tuple[str, ...] | None = None
 depends_on: tuple[str, ...] | None = None
 
