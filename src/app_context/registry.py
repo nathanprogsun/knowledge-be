@@ -9,10 +9,16 @@ populated during FastAPI lifespan startup and attached to
 Scope rule (see AGENTS.md §3):
 
 - APP scope (this registry): stateless + expensive — ``DatabaseEngine``,
-  ``OidcClient``/``httpx.AsyncClient``, settings.
+  ``OidcClient``/``httpx.AsyncClient``, the MCP connection pool.
 - REQUEST scope (``web.deps`` per-request construction): anything holding
   an ``AsyncSession`` — repositories and the services binding them.
   Request-scoped services MUST NOT be registered here.
+
+PR-17.5b adds the live MCP singletons that the lifespan wires during
+startup: the connection pool, the OAuth state + secret stores, and a
+factory that produces per-service :class:`OAuthManager` instances on
+demand. All new fields default to ``None`` so legacy callers and tests
+keep working.
 
 It lives in its own module (rather than ``lifespan.py``) so ``web.deps``
 can import the accessors without creating an import cycle with the app
@@ -21,12 +27,21 @@ factory (which mounts routers that import ``web.deps``).
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import cast
 
+import httpx
 from fastapi import FastAPI
 
+from src.ai.mcp_transport import MCPConnectionManager
 from src.common.oidc_client import OidcClient
+from src.core.infra.mcp_services.oauth import (
+    InMemorySecretStore,
+    OAuthManager,
+    OAuthStateStore,
+)
+from src.core.infra.mcp_services.types import MCPServiceInfo
 from src.db.base import DatabaseEngine
 
 
@@ -40,6 +55,13 @@ class LifeSpanService:
 
     db_engine: DatabaseEngine | None = None
     oidc_client: OidcClient | None = None
+    # PR-17.5b: live MCP singletons. Each entry is optional so a slim
+    # deployment can ship without the live MCP transport layer.
+    mcp_connection_manager: MCPConnectionManager | None = None
+    mcp_oauth_state_store: OAuthStateStore | None = None
+    mcp_oauth_secret_store: InMemorySecretStore | None = None
+    mcp_oauth_http_client: httpx.AsyncClient | None = None
+    mcp_oauth_manager_factory: Callable[[MCPServiceInfo], Awaitable[OAuthManager]] | None = None
 
 
 def get_lifespan_service(app: FastAPI) -> LifeSpanService:

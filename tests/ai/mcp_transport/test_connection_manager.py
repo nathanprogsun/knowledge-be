@@ -207,18 +207,24 @@ async def test_get_or_create_rejects_unsupported_transport() -> None:
         await manager.shutdown()
 
 
-async def test_get_or_create_rejects_http_streamable_until_pr_17_5b() -> None:
-    """The default factory rejects ``http-streamable`` until PR-17.5b lands."""
+async def test_get_or_create_returns_http_streamable_client_for_http_streamable() -> None:
+    """PR-17.5b: ``http-streamable`` now builds an :class:`HTTPStreamableClient`.
+
+    The factory no longer rejects the transport type — it builds the
+    client and the network call is what surfaces a transport error.
+    We assert that the failure is the network-level :class:`MCPTransportError`,
+    not a config rejection.
+    """
     manager = MCPConnectionManager()
     try:
         with pytest.raises(MCPTransportError) as excinfo:
             await manager.get_or_create(
                 service_id="svc-streamable",
                 transport_type="http-streamable",
-                url="https://mcp.example.com",
+                url="https://no-such-host.invalid",
                 headers=None,
             )
-        assert "PR-17.5b" in excinfo.value.message_text
+        assert "PR-17.5b" not in excinfo.value.message_text
     finally:
         await manager.shutdown()
 
@@ -639,10 +645,7 @@ async def test_cleanup_loop_drops_dead_sessions() -> None:
         manager.start_cleanup()
         # Wait for the sweep to pop the session AND call disconnect.
         for _ in range(200):
-            if (
-                "svc-ghost" not in manager.active_sessions()
-                and fake.disconnect_calls >= 1
-            ):
+            if "svc-ghost" not in manager.active_sessions() and fake.disconnect_calls >= 1:
                 break
             await asyncio.sleep(0.01)
         assert "svc-ghost" not in manager.active_sessions()
@@ -678,17 +681,18 @@ def test_default_transport_factory_builds_sse_client() -> None:
     assert isinstance(client, SSEClient)
 
 
-def test_default_transport_factory_rejects_http_streamable() -> None:
-    """``_default_transport_factory`` rejects ``http-streamable`` (PR-17.5b)."""
-    with pytest.raises(MCPTransportError) as excinfo:
-        _default_transport_factory(
-            service_id="x",
-            transport_type="http-streamable",
-            url="https://mcp.example.com",
-            headers=None,
-            timeout_seconds=10.0,
-        )
-    assert "PR-17.5b" in excinfo.value.message_text
+def test_default_transport_factory_returns_http_streamable_client() -> None:
+    """PR-17.5b: the default factory now returns an :class:`HTTPStreamableClient`."""
+    from src.ai.mcp_transport.http_streamable_client import HTTPStreamableClient
+
+    client = _default_transport_factory(
+        service_id="x",
+        transport_type="http-streamable",
+        url="https://mcp.example.com",
+        headers=None,
+        timeout_seconds=10.0,
+    )
+    assert isinstance(client, HTTPStreamableClient)
 
 
 def test_default_transport_factory_rejects_stdio() -> None:

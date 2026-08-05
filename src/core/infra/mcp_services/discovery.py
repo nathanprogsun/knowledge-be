@@ -29,7 +29,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.ai.mcp_transport.errors import MCPError
 from src.ai.mcp_transport.jsonrpc import JSONRPCResponse
-from src.common.json import JsonObject
+from src.common.json import JsonObject, JsonValue
 from src.core.infra.mcp_services.types import MCPServiceInfo
 
 # Default cache TTL for tool/resource lists. Short so admin edits are
@@ -105,7 +105,7 @@ class ServiceResolver(Protocol):
     repository layer.
     """
 
-    def __call__(self, service_id: str) -> Awaitable[MCPServiceInfo | dict[str, object]]: ...
+    def __call__(self, service_id: str) -> Awaitable[MCPServiceInfo | JsonObject]: ...
 
 
 class _ConnectionManagerLike(Protocol):
@@ -196,12 +196,12 @@ class HTTPMCPDiscoveryProvider:
             )
         return response
 
-    async def _resolve(self, service_id: str) -> dict[str, object]:
+    async def _resolve(self, service_id: str) -> JsonObject:
         info = await self._resolver(service_id)
         if isinstance(info, MCPServiceInfo):
             return _info_to_resolver_payload(info)
         if isinstance(info, dict):
-            payload = dict(info)
+            payload: JsonObject = dict(info)
             payload.setdefault("transport_type", "sse")
             payload.setdefault("url", "")
             payload.setdefault("headers", {})
@@ -323,17 +323,18 @@ def _extract_resources(response: object) -> list[DiscoveryResource]:
     return resources
 
 
-def _info_to_resolver_payload(info: MCPServiceInfo) -> dict[str, object]:
+def _info_to_resolver_payload(info: MCPServiceInfo) -> JsonObject:
     """Render an :class:`MCPServiceInfo` as the resolver payload the manager consumes."""
     advanced_timeout: int | None = None
     if isinstance(info.advanced_config, dict):
         raw_timeout = info.advanced_config.get("timeout")
         if isinstance(raw_timeout, (int, float)) and raw_timeout > 0:
             advanced_timeout = int(raw_timeout)
+    headers: dict[str, str] = dict(info.headers or {})
     return {
         "transport_type": info.transport_type,
         "url": info.url or "",
-        "headers": info.headers or {},
+        "headers": cast(dict[str, JsonValue], headers),
         "advanced_timeout_seconds": advanced_timeout,
         "name": info.name,
     }

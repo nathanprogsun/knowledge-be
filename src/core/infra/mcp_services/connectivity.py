@@ -57,7 +57,7 @@ class ConnectivityResolver(Protocol):
     repository layer.
     """
 
-    def __call__(self, service_id: str) -> Awaitable[MCPServiceInfo | dict[str, object]]: ...
+    def __call__(self, service_id: str) -> Awaitable[MCPServiceInfo | JsonObject]: ...
 
 
 @dataclass(frozen=True)
