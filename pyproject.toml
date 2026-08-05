@@ -11,6 +11,9 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "gunicorn>=22.0",
+    # Required by FastAPI to parse multipart/form-data bodies (the
+    # initialization multimodal probe uploads an image file).
+    "python-multipart>=0.0.9",
     "pydantic>=2.7",
     "pydantic-settings>=2.0",
     "sqlalchemy[asyncio]>=2.0",
@@ -37,6 +40,9 @@ dev = [
     "testcontainers[postgresql]>=4.0",
     "aiosqlite>=0.20",
     "anyio>=4.0",
+    # Async SQLite driver: service tests bind an in-memory SQLAlchemy engine
+    # instead of spinning up a container.
+    "aiosqlite>=0.20",
     "pre-commit>=3.5",
     "types-passlib>=1.7",
     "types-python-jose>=3.3",
