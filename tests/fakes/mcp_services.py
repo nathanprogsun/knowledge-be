@@ -75,9 +75,7 @@ class FakeMCPServiceRepository:
         used by the 409 pre-check path.
         """
         return any(
-            row.tenant_id == tenant_id
-            and row.name == name
-            and row.deleted_at is None
+            row.tenant_id == tenant_id and row.name == name and row.deleted_at is None
             for row in self.rows.values()
         )
 

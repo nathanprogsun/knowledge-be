@@ -95,9 +95,17 @@ def parse_docs_endpoints(
             continue
         if domains:
             stem = md.stem.lower()
-            # docs file names may be singular (``tenant.md``) while the
-            # route domain is plural (``tenants``).
-            alias = {"tenant": "tenants"}
+            # Docs file names may be singular (``tenant.md``) or hyphenated
+            # (``mcp-service.md``) while the route domain is plural or
+            # underscored (``tenants`` / ``mcp_services``).
+            alias = {
+                "model": "models",
+                "tenant": "tenants",
+                "mcp-service": "mcp_services",
+                "vector-store": "vector_stores",
+                "storage-backend": "storage_backends",
+                "web-search": "web_search",
+            }
             if stem not in domains and alias.get(stem) not in domains:
                 continue
         try:
@@ -217,7 +225,9 @@ def parse_fastapi_routes(
 
     The path includes any prefix declared via ``APIRouter(prefix="...")`` on
     the same module. When ``domains`` is given, only routes under
-    ``web/api/<domain>/`` are returned.
+    ``web/api/<domain>/`` are returned. Stage-2 infra routes live one level
+    deeper (``web/api/infra/<domain>/``) and are matched on that second
+    segment.
     """
     out: list[tuple[str, str, Path, int]] = []
     web_api_root = src_root / "web" / "api"
@@ -225,8 +235,11 @@ def parse_fastapi_routes(
         return out
     for file in sorted(web_api_root.rglob("*.py")):
         rel = file.relative_to(web_api_root)
-        if domains and rel.parts and rel.parts[0] not in domains:
-            continue
+        if domains and rel.parts:
+            head = rel.parts[0]
+            domain = rel.parts[1] if head == "infra" and len(rel.parts) > 1 else head
+            if domain not in domains:
+                continue
         try:
             tree = ast.parse(file.read_text(encoding="utf-8"), filename=str(file))
         except (OSError, SyntaxError):

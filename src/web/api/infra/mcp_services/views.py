@@ -8,6 +8,8 @@ the standard success / list envelopes.
 
 from __future__ import annotations
 
+from typing import cast
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.common.json import JsonObject, JsonValue
@@ -153,7 +155,7 @@ def service_info_to_contract(info: MCPServiceInfo) -> MCPService:
     )
 
 
-def service_envelope(info: MCPServiceInfo) -> object:
+def service_envelope(info: MCPServiceInfo) -> dict[str, JsonValue]:
     """Wrap one service in the success envelope.
 
     The auth_config is serialized with secret fields stripped so the
@@ -167,7 +169,7 @@ def service_envelope(info: MCPServiceInfo) -> object:
     return {"success": True, "data": body}
 
 
-def service_list_envelope(infos: list[MCPServiceInfo]) -> object:
+def service_list_envelope(infos: list[MCPServiceInfo]) -> dict[str, JsonValue]:
     """Wrap the list in the standard envelope."""
     data: list[dict[str, JsonValue]] = []
     for info in infos:
@@ -176,7 +178,7 @@ def service_list_envelope(infos: list[MCPServiceInfo]) -> object:
         if wire.auth_config is not None:
             payload["auth_config"] = _auth_config_to_wire_dict(wire.auth_config)
         data.append(payload)
-    return {"success": True, "data": data}
+    return {"success": True, "data": cast("JsonValue", data)}
 
 
 def tool_envelope(tools: list[DiscoveryTool]) -> MCPToolEnvelope:

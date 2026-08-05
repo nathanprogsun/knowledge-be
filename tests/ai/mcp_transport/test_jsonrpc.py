@@ -98,7 +98,11 @@ def test_notification_serialises_without_id() -> None:
     """Notifications do not carry an id per JSON-RPC 2.0 §4.1."""
     note = JSONRPCNotification(method="notifications/cancelled", params={"requestId": "x"})
     raw = json.loads(note.model_dump_json())
-    assert raw == {"jsonrpc": "2.0", "method": "notifications/cancelled", "params": {"requestId": "x"}}
+    assert raw == {
+        "jsonrpc": "2.0",
+        "method": "notifications/cancelled",
+        "params": {"requestId": "x"},
+    }
 
 
 def test_response_accepts_result_only() -> None:

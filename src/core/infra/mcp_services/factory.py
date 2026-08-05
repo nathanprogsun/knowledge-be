@@ -24,6 +24,8 @@ from collections.abc import Awaitable, Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.infra.mcp_services.connectivity import ConnectivityProbe
+from src.core.infra.mcp_services.discovery import DiscoveryCache, DiscoveryProvider
 from src.core.infra.mcp_services.oauth import OAuthManager
 from src.core.infra.mcp_services.service import MCPServiceService
 from src.core.infra.mcp_services.types import MCPServiceInfo
@@ -38,18 +40,18 @@ OAuthManagerFactoryLike = Callable[[MCPServiceInfo], Awaitable[OAuthManager]]
 def build_mcp_service(
     session: AsyncSession,
     *,
-    discovery_provider: object | None = None,
-    discovery_cache: object | None = None,
-    connectivity_probe: object | None = None,
+    discovery_provider: DiscoveryProvider | None = None,
+    discovery_cache: DiscoveryCache | None = None,
+    connectivity_probe: ConnectivityProbe | None = None,
     oauth_manager_factory: OAuthManagerFactoryLike | None = None,
 ) -> MCPServiceService:
     """Per-request ``MCPServiceService`` with fresh repositories + APP-scope deps."""
     return MCPServiceService(
         mcp_repo=MCPServiceRepository(session),
         tool_approvals_repo=MCPToolApprovalRepository(session),
-        discovery_provider=discovery_provider,  # type: ignore[arg-type]
-        discovery_cache=discovery_cache,  # type: ignore[arg-type]
-        connectivity_probe=connectivity_probe,  # type: ignore[arg-type]
+        discovery_provider=discovery_provider,
+        discovery_cache=discovery_cache,
+        connectivity_probe=connectivity_probe,
         oauth_manager_factory=oauth_manager_factory,
     )
 

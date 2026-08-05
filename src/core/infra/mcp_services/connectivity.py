@@ -26,6 +26,7 @@ from typing import Protocol, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.ai.mcp_transport.connection_manager import MCPSession
 from src.ai.mcp_transport.errors import MCPError, OAuthRequiredError
 from src.ai.mcp_transport.jsonrpc import JSONRPCResponse
 from src.common.json import JsonObject
@@ -135,9 +136,9 @@ class _ConnectionManagerLike(Protocol):
         service_name: str | None = None,
     ): ...
 
-    async def list_tools(self, *, session: object) -> object: ...
+    async def list_tools(self, *, session: MCPSession) -> JSONRPCResponse: ...
 
-    async def list_resources(self, *, session: object) -> object: ...
+    async def list_resources(self, *, session: MCPSession) -> JSONRPCResponse: ...
 
 
 class HTTPMCPConnectivityProbe:
@@ -253,9 +254,7 @@ def _extract_timeout(info: MCPServiceInfo) -> int | None:
     return None
 
 
-def _as_tools(response: object) -> tuple[DiscoveryTool, ...]:
-    if not isinstance(response, JSONRPCResponse):
-        return ()
+def _as_tools(response: JSONRPCResponse) -> tuple[DiscoveryTool, ...]:
     result = response.result or {}
     raw = result.get("tools")
     if not isinstance(raw, list):
@@ -282,9 +281,7 @@ def _as_tools(response: object) -> tuple[DiscoveryTool, ...]:
     return tuple(tools)
 
 
-def _as_resources(response: object) -> tuple[DiscoveryResource, ...]:
-    if not isinstance(response, JSONRPCResponse):
-        return ()
+def _as_resources(response: JSONRPCResponse) -> tuple[DiscoveryResource, ...]:
     result = response.result or {}
     raw = result.get("resources")
     if not isinstance(raw, list):
