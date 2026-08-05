@@ -16,7 +16,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import cast
 
-from src.common.exception import NotFoundError, ValidationError
+from src.common.exception import ConflictError, NotFoundError, ValidationError
 from src.common.json import BindParams, JsonObject, JsonValue
 from src.core.infra.mcp_services.connectivity import (
     ConnectivityProbe,
@@ -103,6 +103,21 @@ class MCPServiceService:
         if advanced_config is None:
             advanced_config = dict(_DEFAULT_ADVANCED_CONFIG)
 
+        # Pre-check duplicate name within the tenant. Mirrors Go's
+        # `MCPServiceRepository.FindByName` + service-level 409 path.
+        # The DB-level unique constraint is the second line of defence
+        # against concurrent inserts.
+        if await self._mcp_repo.exists_by_tenant_and_name(
+            tenant_id=tenant_id, name=clean_name
+        ):
+            raise ConflictError(
+                code="mcp_service.duplicate_name",
+                message=(
+                    f"an MCP service named {clean_name!r} already exists "
+                    "in this workspace"
+                ),
+            )
+
         now = datetime.now(UTC)
         new_id = uuid.uuid4().hex
         row = MCPService(
@@ -122,7 +137,22 @@ class MCPServiceService:
             created_at=now,
             updated_at=now,
         )
-        stored = await self._mcp_repo.insert(row)
+        try:
+            stored = await self._mcp_repo.insert(row)
+        except Exception as exc:  # pragma: no cover - rare race path
+            # Catch the DB unique-violation race window between the
+            # pre-check and the actual insert. Translate to the same
+            # 409 the pre-check raises so callers see one error shape.
+            name = exc.__class__.__name__
+            if "UniqueViolation" in name and "tenant_name" in str(exc):
+                raise ConflictError(
+                    code="mcp_service.duplicate_name",
+                    message=(
+                        f"an MCP service named {clean_name!r} already exists "
+                        "in this workspace"
+                    ),
+                ) from exc
+            raise
         return MCPServiceInfo.map_from_db(stored)
 
     # ── Read ────────────────────────────────────────────────────────

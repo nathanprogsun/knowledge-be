@@ -1,10 +1,17 @@
 """Static provider catalog for ``GET /models/providers``.
 
-Mirrors ``internal/types/model.go::GetModelTypes`` on the Go side. Each
-entry exposes the ``ProviderTypeMeta`` contract fields the UI uses to
-render the create-model form: a value identifier, a human-readable
-label, a one-line description, the default per-model-type endpoint
-URLs, and the set of model types the provider supports.
+Mirrors ``internal/models/provider/provider.go::AllProviders`` and the
+per-provider ``Info()`` methods on the Go side. Each entry exposes the
+``ProviderTypeMeta`` contract fields the UI uses to render the
+create-model form: a value identifier, a human-readable label, a
+one-line description, the default per-model-type endpoint URLs, the
+set of model types the provider supports, whether it requires an
+``api_key``, and any per-provider extra config fields.
+
+The 26 providers mirror Go's ``AllProviders()`` order. Provider type
+identifiers use the ``value`` strings from
+``internal/models/provider/provider.go::ProviderName`` so a UI may
+switch between languages unchanged.
 
 The model types in this catalog use the **frontend alias** form
 (``chat`` / ``embedding`` / ``rerank`` / ``vllm`` / ``asr``) — the
@@ -17,7 +24,7 @@ from __future__ import annotations
 
 from src.core.contracts.infra import ProviderTypeMeta
 
-# Type aliases (frontend-facing, as documented in docs/api/model.md).
+# Frontend aliases, as documented in docs/api/model.md.
 _CHAT = "chat"
 _EMBEDDING = "embedding"
 _RERANK = "rerank"
@@ -36,17 +43,20 @@ PROVIDER_CATALOG: tuple[ProviderTypeMeta, ...] = (
             _RERANK: "",
         },
         modelTypes=[_CHAT, _EMBEDDING, _RERANK, _VLLM],
+        requiresAuth=False,
     ),
     ProviderTypeMeta(
-        value="openai",
-        label="OpenAI",
-        description="GPT, text-embedding-3, etc.",
+        value="weknoracloud",
+        label="WeKnoraCloud",
+        description="WeKnora 云服务 (chat, embedding, rerank, vlm)",
         defaultUrls={
-            _CHAT: "https://api.openai.com/v1",
-            _EMBEDDING: "https://api.openai.com/v1",
-            _RERANK: "",
+            _CHAT: "https://weknora.weixin.qq.com",
+            _EMBEDDING: "https://weknora.weixin.qq.com",
+            _RERANK: "https://weknora.weixin.qq.com",
+            _VLLM: "https://weknora.weixin.qq.com",
         },
         modelTypes=[_CHAT, _EMBEDDING, _RERANK, _VLLM],
+        requiresAuth=True,
     ),
     ProviderTypeMeta(
         value="aliyun",
@@ -58,6 +68,7 @@ PROVIDER_CATALOG: tuple[ProviderTypeMeta, ...] = (
             _RERANK: "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank",
         },
         modelTypes=[_CHAT, _EMBEDDING, _RERANK, _VLLM],
+        requiresAuth=True,
     ),
     ProviderTypeMeta(
         value="zhipu",
@@ -69,6 +80,7 @@ PROVIDER_CATALOG: tuple[ProviderTypeMeta, ...] = (
             _RERANK: "https://open.bigmodel.cn/api/paas/v4/rerank",
         },
         modelTypes=[_CHAT, _EMBEDDING, _RERANK, _VLLM],
+        requiresAuth=True,
     ),
     ProviderTypeMeta(
         value="volcengine",
@@ -80,6 +92,7 @@ PROVIDER_CATALOG: tuple[ProviderTypeMeta, ...] = (
             _RERANK: "https://api-knowledgebase.mlp.cn-beijing.volces.com",
         },
         modelTypes=[_CHAT, _EMBEDDING, _RERANK, _VLLM],
+        requiresAuth=True,
     ),
     ProviderTypeMeta(
         value="hunyuan",
@@ -90,33 +103,7 @@ PROVIDER_CATALOG: tuple[ProviderTypeMeta, ...] = (
             _EMBEDDING: "https://api.hunyuan.tencent.com/v1",
         },
         modelTypes=[_CHAT, _EMBEDDING],
-    ),
-    ProviderTypeMeta(
-        value="deepseek",
-        label="DeepSeek",
-        description="deepseek-chat, deepseek-reasoner",
-        defaultUrls={
-            _CHAT: "https://api.deepseek.com/v1",
-        },
-        modelTypes=[_CHAT],
-    ),
-    ProviderTypeMeta(
-        value="minimax",
-        label="MiniMax",
-        description="abab series",
-        defaultUrls={
-            _CHAT: "https://api.minimax.chat/v1",
-        },
-        modelTypes=[_CHAT],
-    ),
-    ProviderTypeMeta(
-        value="mimo",
-        label="小米 MiMo",
-        description="Xiaomi MiMo chat models",
-        defaultUrls={
-            _CHAT: "https://api.xiaomimimo.com/v1",
-        },
-        modelTypes=[_CHAT],
+        requiresAuth=True,
     ),
     ProviderTypeMeta(
         value="siliconflow",
@@ -128,44 +115,47 @@ PROVIDER_CATALOG: tuple[ProviderTypeMeta, ...] = (
             _RERANK: "https://api.siliconflow.cn/v1/rerank",
         },
         modelTypes=[_CHAT, _EMBEDDING, _RERANK, _VLLM],
+        requiresAuth=True,
     ),
     ProviderTypeMeta(
-        value="jina",
-        label="Jina",
-        description="jina-embeddings-v3, jina-reranker-v2",
+        value="deepseek",
+        label="DeepSeek",
+        description="deepseek-chat, deepseek-reasoner",
         defaultUrls={
-            _EMBEDDING: "https://api.jina.ai/v1",
-            _RERANK: "https://api.jina.ai/v1",
-        },
-        modelTypes=[_EMBEDDING, _RERANK],
-    ),
-    ProviderTypeMeta(
-        value="openrouter",
-        label="OpenRouter",
-        description="Aggregated multi-provider routing",
-        defaultUrls={
-            _CHAT: "https://openrouter.ai/api/v1",
-        },
-        modelTypes=[_CHAT, _VLLM],
-    ),
-    ProviderTypeMeta(
-        value="requesty",
-        label="Requesty",
-        description="Aggregated multi-provider routing",
-        defaultUrls={
-            _CHAT: "https://router.requesty.ai/v1",
-            _EMBEDDING: "https://router.requesty.ai/v1",
-        },
-        modelTypes=[_CHAT, _EMBEDDING, _VLLM],
-    ),
-    ProviderTypeMeta(
-        value="gemini",
-        label="Google Gemini",
-        description="gemini-2.0-flash, gemini-1.5-pro",
-        defaultUrls={
-            _CHAT: "https://generativelanguage.googleapis.com/v1beta",
+            _CHAT: "https://api.deepseek.com/v1",
         },
         modelTypes=[_CHAT],
+        requiresAuth=True,
+    ),
+    ProviderTypeMeta(
+        value="minimax",
+        label="MiniMax",
+        description="abab series",
+        defaultUrls={
+            _CHAT: "https://api.minimax.chat/v1",
+        },
+        modelTypes=[_CHAT],
+        requiresAuth=True,
+    ),
+    ProviderTypeMeta(
+        value="mimo",
+        label="小米 MiMo",
+        description="mimo-v2-flash",
+        defaultUrls={
+            _CHAT: "https://api.xiaomimimo.com/v1",
+        },
+        modelTypes=[_CHAT],
+        requiresAuth=True,
+    ),
+    ProviderTypeMeta(
+        value="moonshot",
+        label="月之暗面 Moonshot",
+        description="moonshot-v1-8k, moonshot-v1-128k",
+        defaultUrls={
+            _CHAT: "https://api.moonshot.cn/v1",
+        },
+        modelTypes=[_CHAT, _VLLM],
+        requiresAuth=True,
     ),
     ProviderTypeMeta(
         value="modelscope",
@@ -176,15 +166,7 @@ PROVIDER_CATALOG: tuple[ProviderTypeMeta, ...] = (
             _EMBEDDING: "https://api-inference.modelscope.cn/v1",
         },
         modelTypes=[_CHAT, _EMBEDDING, _VLLM],
-    ),
-    ProviderTypeMeta(
-        value="moonshot",
-        label="月之暗面 Moonshot",
-        description="moonshot-v1-8k, moonshot-v1-128k",
-        defaultUrls={
-            _CHAT: "https://api.moonshot.cn/v1",
-        },
-        modelTypes=[_CHAT, _VLLM],
+        requiresAuth=True,
     ),
     ProviderTypeMeta(
         value="qianfan",
@@ -196,6 +178,7 @@ PROVIDER_CATALOG: tuple[ProviderTypeMeta, ...] = (
             _RERANK: "https://qianfan.baidubce.com/v2",
         },
         modelTypes=[_CHAT, _EMBEDDING, _RERANK, _VLLM],
+        requiresAuth=True,
     ),
     ProviderTypeMeta(
         value="qiniu",
@@ -205,6 +188,71 @@ PROVIDER_CATALOG: tuple[ProviderTypeMeta, ...] = (
             _CHAT: "https://api.qnaigc.com/v1",
         },
         modelTypes=[_CHAT],
+        requiresAuth=True,
+    ),
+    ProviderTypeMeta(
+        value="openai",
+        label="OpenAI",
+        description="GPT, text-embedding-3, etc.",
+        defaultUrls={
+            _CHAT: "https://api.openai.com/v1",
+            _EMBEDDING: "https://api.openai.com/v1",
+            _RERANK: "",
+        },
+        modelTypes=[_CHAT, _EMBEDDING, _RERANK, _VLLM],
+        requiresAuth=True,
+    ),
+    ProviderTypeMeta(
+        value="anthropic",
+        label="Anthropic",
+        description="Claude models via native Anthropic Messages API",
+        defaultUrls={
+            _CHAT: "https://api.anthropic.com/v1",
+        },
+        modelTypes=[_CHAT],
+        requiresAuth=True,
+    ),
+    ProviderTypeMeta(
+        value="gemini",
+        label="Google Gemini",
+        description="gemini-2.0-flash, gemini-1.5-pro",
+        defaultUrls={
+            _CHAT: "https://generativelanguage.googleapis.com/v1beta",
+        },
+        modelTypes=[_CHAT],
+        requiresAuth=True,
+    ),
+    ProviderTypeMeta(
+        value="openrouter",
+        label="OpenRouter",
+        description="Aggregated multi-provider routing",
+        defaultUrls={
+            _CHAT: "https://openrouter.ai/api/v1",
+        },
+        modelTypes=[_CHAT, _VLLM],
+        requiresAuth=True,
+    ),
+    ProviderTypeMeta(
+        value="requesty",
+        label="Requesty",
+        description="Aggregated multi-provider routing",
+        defaultUrls={
+            _CHAT: "https://router.requesty.ai/v1",
+            _EMBEDDING: "https://router.requesty.ai/v1",
+        },
+        modelTypes=[_CHAT, _EMBEDDING, _VLLM],
+        requiresAuth=True,
+    ),
+    ProviderTypeMeta(
+        value="jina",
+        label="Jina",
+        description="jina-embeddings-v3, jina-reranker-v2",
+        defaultUrls={
+            _EMBEDDING: "https://api.jina.ai/v1",
+            _RERANK: "https://api.jina.ai/v1",
+        },
+        modelTypes=[_EMBEDDING, _RERANK],
+        requiresAuth=True,
     ),
     ProviderTypeMeta(
         value="longcat",
@@ -214,6 +262,18 @@ PROVIDER_CATALOG: tuple[ProviderTypeMeta, ...] = (
             _CHAT: "https://api.longcat.chat/v1",
         },
         modelTypes=[_CHAT],
+        requiresAuth=True,
+    ),
+    ProviderTypeMeta(
+        value="lkeap",
+        label="腾讯云 LKEAP",
+        description="DeepSeek-R1, DeepSeek-V3, lke-reranker-base 等",
+        defaultUrls={
+            _CHAT: "https://api.lkeap.cloud.tencent.com/v1",
+            _RERANK: "https://lkeap.tencentcloudapi.com",
+        },
+        modelTypes=[_CHAT, _RERANK],
+        requiresAuth=True,
     ),
     ProviderTypeMeta(
         value="gpustack",
@@ -225,15 +285,48 @@ PROVIDER_CATALOG: tuple[ProviderTypeMeta, ...] = (
             _RERANK: "",
         },
         modelTypes=[_CHAT, _EMBEDDING, _RERANK, _VLLM],
+        requiresAuth=True,
     ),
     ProviderTypeMeta(
-        value="xunfei",
-        label="科大讯飞 (ASR)",
-        description="iFlyTek Spark ASR models",
+        value="nvidia",
+        label="NVIDIA",
+        description="deepseek-ai-deepseek-v3_1, nv-embed-v1, rerank-qa-mistral-4b, etc.",
         defaultUrls={
-            _ASR: "wss://iat-api.xfyun.cn/v2/iat",
+            _CHAT: "https://integrate.api.nvidia.com/v1",
+            _EMBEDDING: "https://integrate.api.nvidia.com/v1",
+            _RERANK: "https://ai.api.nvidia.com/v1/retrieval/nvidia/reranking",
+            _VLLM: "https://integrate.api.nvidia.com/v1",
         },
-        modelTypes=[_ASR],
+        modelTypes=[_CHAT, _EMBEDDING, _RERANK, _VLLM],
+        requiresAuth=True,
+    ),
+    ProviderTypeMeta(
+        value="novita",
+        label="Novita AI",
+        description=(
+            "moonshotai/kimi-k2.5, zai-org/glm-5, "
+            "minimax/minimax-m2.7, qwen/qwen3-embedding-0.6b, etc."
+        ),
+        defaultUrls={
+            _CHAT: "https://api.novita.ai/openai/v1",
+            _EMBEDDING: "https://api.novita.ai/openai/v1",
+            _VLLM: "https://api.novita.ai/openai/v1",
+        },
+        modelTypes=[_CHAT, _EMBEDDING, _VLLM],
+        requiresAuth=True,
+    ),
+    ProviderTypeMeta(
+        value="azure_openai",
+        label="Azure OpenAI",
+        description="gpt-4o, gpt-4, text-embedding-ada-002, etc.",
+        defaultUrls={
+            _CHAT: "https://{resource}.openai.azure.com",
+            _EMBEDDING: "https://{resource}.openai.azure.com",
+            _VLLM: "https://{resource}.openai.azure.com",
+            _ASR: "https://{resource}.openai.azure.com",
+        },
+        modelTypes=[_CHAT, _EMBEDDING, _VLLM, _ASR],
+        requiresAuth=True,
     ),
 )
 

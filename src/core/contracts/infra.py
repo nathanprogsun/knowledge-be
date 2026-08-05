@@ -73,6 +73,14 @@ class UpdateModelRequest(BaseModel):
 
 
 class ProviderTypeMeta(BaseModel):
+    """Catalog metadata for one model provider.
+
+    Mirrors ``internal/models/provider/provider.go::ProviderInfo`` on
+    the Go side; the wire JSON keeps camelCase (``defaultUrls``,
+    ``modelTypes``, ``requiresAuth``, ``extraFields``) so a Go UI
+    consumer can drop in unchanged.
+    """
+
     model_config = ConfigDict(frozen=True, populate_by_name=True)
 
     value: str
@@ -80,6 +88,8 @@ class ProviderTypeMeta(BaseModel):
     description: str | None = Field(default=None)
     default_urls: dict[str, str] | None = Field(default=None, alias="defaultUrls")
     model_types: list[str] | None = Field(default=None, alias="modelTypes")
+    requires_auth: bool | None = Field(default=None, alias="requiresAuth")
+    extra_fields: list[JsonObject] | None = Field(default=None, alias="extraFields")
 
 
 class MCPMcpServiceAuthConfig(BaseModel):

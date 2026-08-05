@@ -73,6 +73,24 @@ class MCPServiceRepository(GenericRepository[MCPService]):
             {"is_builtin": True, "id": id},
         )
 
+    async def exists_by_tenant_and_name(
+        self,
+        tenant_id: int,
+        name: str,
+    ) -> bool:
+        """Return whether a live row with ``(tenant_id, name)`` exists.
+
+        Mirrors Go's ``MCPServiceRepository.FindByName`` used by the
+        service-layer 409 path. The DB-level unique constraint on
+        ``(tenant_id, name)`` is the authoritative race-condition guard;
+        this method is a fast pre-check that surfaces the conflict
+        without paying the insert cost.
+        """
+        row = await self.find_unique_by_column_values(
+            {"tenant_id": tenant_id, "name": name},
+        )
+        return row is not None
+
     async def soft_delete(
         self,
         tenant_id: int,

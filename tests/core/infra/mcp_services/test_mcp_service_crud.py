@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from src.common.exception import NotFoundError, ValidationError
+from src.common.exception import ConflictError, NotFoundError, ValidationError
 from src.core.infra.mcp_services.service import MCPServiceService
 from src.db.models.infra.mcp_services import MCPService
 from tests.fakes.mcp_services import (
@@ -101,6 +101,37 @@ async def test_create_service_rejects_stdio(service: MCPServiceService) -> None:
             transport_type="stdio",
         )
     assert excinfo.value.code == "mcp_service.stdio_disabled"
+
+
+async def test_create_service_duplicate_name_raises_conflict(
+    service: MCPServiceService,
+    mcp_repo: FakeMCPServiceRepository,
+) -> None:
+    """Creating two services with the same (tenant, name) raises 409.
+
+    Mirrors Go's ``MCPServiceService.CreateMCPService`` → 1005
+    ``ErrConflict`` path; the Python side uses the explicit
+    ``mcp_service.duplicate_name`` code so the web layer can render a
+    targeted error message.
+    """
+    await service.create_service(tenant_id=1, name="dup", transport_type="sse")
+    with pytest.raises(ConflictError) as excinfo:
+        await service.create_service(
+            tenant_id=1, name="dup", transport_type="sse"
+        )
+    assert excinfo.value.code == "mcp_service.duplicate_name"
+
+
+async def test_create_service_same_name_different_tenant_is_allowed(
+    service: MCPServiceService,
+) -> None:
+    """Name uniqueness is scoped to (tenant_id, name), not global."""
+    await service.create_service(tenant_id=1, name="shared", transport_type="sse")
+    # No conflict on a different tenant.
+    info = await service.create_service(
+        tenant_id=2, name="shared", transport_type="sse"
+    )
+    assert info.tenant_id == 2
 
 
 async def test_create_service_preserves_auth_config(

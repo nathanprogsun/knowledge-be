@@ -64,6 +64,23 @@ class FakeMCPServiceRepository:
             return None
         return row
 
+    async def exists_by_tenant_and_name(
+        self,
+        tenant_id: int,
+        name: str,
+    ) -> bool:
+        """Return whether a live row with ``(tenant_id, name)`` exists.
+
+        Mirrors the real ``MCPServiceRepository.exists_by_tenant_and_name``
+        used by the 409 pre-check path.
+        """
+        return any(
+            row.tenant_id == tenant_id
+            and row.name == name
+            and row.deleted_at is None
+            for row in self.rows.values()
+        )
+
     # ── Mutations ───────────────────────────────────────────────────
 
     async def insert(self, row: MCPService) -> MCPService:

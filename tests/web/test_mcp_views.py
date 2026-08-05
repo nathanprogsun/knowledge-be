@@ -121,6 +121,24 @@ async def test_create_service_returns_201_envelope(client: AsyncClient) -> None:
     assert body["data"]["id"]
 
 
+async def test_create_service_duplicate_name_returns_409(client: AsyncClient) -> None:
+    """Two creates with the same (tenant, name) → second returns 409.
+
+    Mirrors Go's ErrConflict (code 1005); the Python wire code is
+    ``mcp_service.duplicate_name`` so the UI can render a targeted
+    message.
+    """
+    payload = {"name": "alpha", "transport_type": "sse"}
+    first = await client.post("/mcp-services", json=payload)
+    assert first.status_code == 201
+
+    second = await client.post("/mcp-services", json=payload)
+    assert second.status_code == 409
+    body = second.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "mcp_service.duplicate_name"
+
+
 async def test_create_service_rejects_blank_name(client: AsyncClient) -> None:
     resp = await client.post("/mcp-services", json={"name": "  ", "transport_type": "sse"})
     assert resp.status_code == 422
