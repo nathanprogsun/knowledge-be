@@ -8,8 +8,8 @@ Operations:
 - ``log_denied`` — record a middleware-level reject decision, subject
   to 1-minute sliding-window dedup keyed by
   ``(tenant_id, actor_user_id, action, request_path)`` so a probing
-  client cannot flood the table. PR-11 ships the dedup; the
-  middleware caller lands in PR-12.
+  client cannot flood the table. The dedup is implemented here; the
+  middleware caller is not yet wired.
 - ``list`` — cursor-paginated newest-first read.
 - ``purge`` — retention sweep driven by ``retention_days``.
 

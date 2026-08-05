@@ -10,14 +10,14 @@ and ``internal/handler/audit_log.go``:
 - ``GET    /system/admin/audit-log``        — system-scope audit feed
 
 Tenant-scoped audit-log endpoints (``GET /tenants/{id}/audit-log``) and
-KB activity (``GET /knowledge-bases/{id}/activity``) land in later PRs
-— they require RBAC middleware (PR-12) and the KB domain (stage 4)
+KB activity (``GET /knowledge-bases/{id}/activity``) are not yet
+implemented — they require RBAC middleware and the KB domain
 respectively.
 
 Wire-shape conversion (``SystemSettingInfo`` → response model) lives in
 this module so the router stays declarative. The ``SystemAdmin`` guard
-itself lands in PR-12 (middleware); for now the endpoints are
-unauthenticated so the contract tests can exercise them.
+is not yet wired; the endpoints are currently unauthenticated so the
+contract tests can exercise them.
 
 Query-parameter ``description`` strings are intentionally Chinese
 (mirrors the upstream Go swagger annotations). RUF001 flags the

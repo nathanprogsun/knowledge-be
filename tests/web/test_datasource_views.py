@@ -1,4 +1,4 @@
-"""Web-layer tests for the data-source router (PR-26).
+"""Web-layer tests for the data-source router.
 
 Per AGENTS.md §9, web routers are tested via ``httpx.AsyncClient``
 against the app: the full HTTP path (routing, serialization, exception

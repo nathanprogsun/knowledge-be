@@ -12,9 +12,9 @@ that must not be rebuilt per call:
   request that started the pull.
 - ``httpx.AsyncClient`` / ``OllamaClient``: pooled connections. These are
   APP-scope by nature; registering them on ``LifeSpanService`` is
-  checkpoint-2 work (the DI registry is off-limits to this PR), so they
-  are memoized here with the same ``lru_cache`` pattern
-  ``get_settings()`` uses — no module-level mutable globals.
+  deferred (the DI registry is off-limits here), so they are memoized
+  with the same ``lru_cache`` pattern ``get_settings()`` uses — no
+  module-level mutable globals.
 """
 
 from __future__ import annotations

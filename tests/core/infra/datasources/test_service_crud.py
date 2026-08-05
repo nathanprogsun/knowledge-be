@@ -1,4 +1,4 @@
-"""Unit tests for ``DataSourceService`` CRUD (PR-24).
+"""Unit tests for ``DataSourceService`` CRUD.
 
 Core services are tested with Protocol-based fakes (AGENTS.md §9): the
 fakes mirror the repository contracts, the service projects storage rows

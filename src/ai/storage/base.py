@@ -4,8 +4,8 @@ The ``ai`` layer holds the provider SDK/HTTP wiring; it never imports
 ``core``, ``db`` or ``web``. Each adapter exposes one coroutine —
 ``check_connectivity`` — mirroring the Go ``FileService.CheckConnectivity``
 probe used by ``storageBackendService.Test``. The upload/download half of
-the Go ``FileService`` interface lands with the file domain in a later PR;
-this module deliberately stops at the read-only probe.
+the Go ``FileService`` interface lands with the file domain; this
+module deliberately stops at the read-only probe.
 
 Failures are raised as ``StorageBackendError`` so the service can turn
 them into a ``success=false`` response without inspecting HTTP internals.

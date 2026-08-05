@@ -1,4 +1,4 @@
-"""Tests for the SSE MCP transport client (PR-17.5a).
+"""Tests for the SSE MCP transport client.
 
 The tests use ``respx`` to mock the ``httpx`` transport layer so the
 SSE handshake (``GET /sse`` + first ``endpoint`` event) and the

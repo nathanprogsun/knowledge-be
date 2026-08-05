@@ -78,7 +78,7 @@ def _mask_parameters(
     """Return a copy of ``params`` with ``api_key`` redacted.
 
     The wire contract forbids leaking ``api_key`` through this endpoint —
-    credentials live behind a dedicated subresource (PR-19+ followup).
+    credentials live behind a dedicated subresource.
     ``api_key=None`` keeps the field present in the JSON so clients can
     tell that the slot exists.
     """

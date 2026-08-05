@@ -4,7 +4,7 @@ The MCP spec rides on JSON-RPC 2.0 — every request, response and
 notification follows that envelope shape. This module is the single
 source of truth for the request id, the request / response / error
 naming, the error code namespace, and the helpers used by the SSE
-client (PR-17.5a) and the HTTP-streamable client (PR-17.5b).
+client and the HTTP-streamable client.
 
 The Go side uses the ``github.com/mark3labs/mcp-go/mcp`` package for
 the same purpose; here we keep it minimal — frozen Pydantic models

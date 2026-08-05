@@ -37,6 +37,9 @@ Forbidden:
 - Use `T | None` over `Optional[T]`.
 - Files: 200–400 lines typical, 800 max.
 - Functions: < 50 lines.
+- Comments carry **business rationale only** — never restate the
+  code, and never reference internal PR numbers or migration-plan
+  stages (this repo is public-facing).
 
 ## 3. Service registration (DI)
 

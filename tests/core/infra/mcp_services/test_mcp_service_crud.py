@@ -1,4 +1,4 @@
-"""Unit tests for the MCP service CRUD layer (PR-15)."""
+"""Unit tests for the MCP service CRUD layer."""
 
 from __future__ import annotations
 

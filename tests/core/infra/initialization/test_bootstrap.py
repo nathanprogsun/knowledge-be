@@ -1,4 +1,4 @@
-"""Core tests for the initialization bootstrap (PR-27).
+"""Core tests for the initialization bootstrap.
 
 Ollama is spoken to over its REST API, so every probe is driven through
 an ``httpx.MockTransport`` — no network, no Ollama install. The remote

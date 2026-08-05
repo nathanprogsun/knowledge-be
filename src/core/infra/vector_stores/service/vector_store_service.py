@@ -21,7 +21,7 @@ Behaviour parity notes:
 - ``delete_store`` rejects unknown ids with :class:`NotFoundError` so
   the web layer renders a 404. The KB-binding guard lives on the Go
   service (``s.kbRepo.CountByVectorStoreID``) and will be wired in via
-  the knowledge-base domain in a later PR.
+  the knowledge-base domain.
 - ``test_by_id`` runs the connectivity probe against the stored
   config; ``test_raw`` validates user-supplied raw config before
   delegating to the probe (matches the Go

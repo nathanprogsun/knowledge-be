@@ -1,7 +1,7 @@
 """Web-search dispatch service.
 
 Maps ``internal/application/service/web_search.go::WebSearchService::Search``
-(narrow surface — CompressWithRAG lands in a separate PR).
+(narrow surface — CompressWithRAG is deferred).
 
 Resolves a provider by id (or, for backward compat, by deprecated
 ``config.provider`` field), constructs a client via the registry, runs

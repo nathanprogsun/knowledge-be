@@ -14,9 +14,9 @@ Operations:
 - ``reset`` — delete the DB override so the resolver falls back to
   ENV / built-in default.
 
-PR-11 scope: the Redis pubsub cache invalidation, the SSRF whitelist
-side-effect bridge, and the model-concurrency limiter push are stubbed
-— they land in later PRs alongside the services they configure.
+The Redis pubsub cache invalidation, the SSRF whitelist side-effect
+bridge, and the model-concurrency limiter push are stubbed; they land
+alongside the services they configure.
 """
 
 from __future__ import annotations

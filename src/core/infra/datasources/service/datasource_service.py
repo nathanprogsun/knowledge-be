@@ -17,13 +17,13 @@ Deliberate scope deviations from Go, in order of visibility:
 
 1. **Knowledge-base ownership checks.** Go's ``CreateDataSource``
    resolves the KB through ``kbService`` and rejects a cross-tenant KB.
-   The KB domain is a later stage, so this service validates
+   The KB domain is not migrated yet, so this service validates
    ``tenant_id`` consistency on its own rows and leaves the KB existence
    check to the caller. Tenant isolation itself is enforced here.
 2. **Cron scheduler.** Go registers/removes an entry on a
    ``datasource.Scheduler`` for every mutation. There is no scheduler
    process yet; ``sync_schedule`` is persisted verbatim so the scheduler
-   PR can pick the rows up.
+   can pick the rows up.
 3. **Credential encryption.** Go AES-GCM encrypts each credential string
    in ``DataSourceConfig.ToJSON``. The shared crypto helper is not
    migrated yet, so the blob is stored as given. The *redaction* boundary

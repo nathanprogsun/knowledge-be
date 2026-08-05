@@ -14,7 +14,7 @@ the non-HTTP parts of those handlers so the web layer stays declarative:
 
 Everything the KB-scoped handlers do (``UpdateKBConfig``,
 ``InitializeByKB``, ``GetCurrentConfigByKB``) belongs to the knowledge
-domain (stage 4) and is deliberately absent.
+domain and is deliberately absent.
 
 Operator-facing ``message`` strings are Chinese so they match the Go
 strings the frontend renders verbatim; RUF001 is suppressed file-wide.
@@ -257,7 +257,7 @@ class InitializationService:
         available, message = await check_chat_model_connection(request, client=self._http)
         return ModelProbeResult(available=available, message=message)
 
-    # ── Model probes (PR-28) ─────────────────────────────────────────
+    # ── Model probes ──────────────────────────────────────────────────
     #
     # Thin delegations to ``model_test``: the probe logic is a pure
     # function of (request, client), and routing it through the service

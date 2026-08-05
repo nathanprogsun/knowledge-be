@@ -12,9 +12,8 @@ Column notes
 - ``tenant_id`` is non-nullable; ``is_builtin=true`` rows live in
   tenant 10000 (the Go constant ``DefaultBuiltinModelTenantID``),
   visible to every tenant via the repository's ``(tenant_id = X OR
-  is_builtin = true)`` predicate (PR-13 ships the per-tenant
-  variant; the cross-tenant visibility helper arrives with the
-  built-in loader).
+  is_builtin = true)`` predicate; the cross-tenant visibility helper
+  arrives with the built-in loader.
 - ``parameters`` is JSONB and carries a free-form ``ModelParameters``
   blob; on the wire it is a structured Pydantic model, but the row
   stores the JSON dump.

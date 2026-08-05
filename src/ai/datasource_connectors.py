@@ -9,7 +9,7 @@ registry that resolves them by type lives in
 Migration state, stated plainly: the upstream connectors are ~10k lines of
 per-vendor HTTP clients (Feishu wiki traversal, Notion block trees,
 Confluence CQL, OAuth refresh flows, IMAP, sitemap crawling). Porting them
-is one PR per vendor. What ships here is the layer they all share:
+is per-vendor work. What ships here is the layer they all share:
 
 ``CredentialSpec`` / ``HttpConnector``
     Declarative credential requirements plus the validation flow every
@@ -148,7 +148,7 @@ class HttpConnector(Connector):
 
         The base implementation is a no-op: with the credential shape
         verified, a source is accepted and a real failure surfaces on the
-        first sync. Each vendor PR overrides this with its cheapest
+        first sync. Each vendor connector overrides this with its cheapest
         authenticated call (Feishu ``tenant_access_token``, Notion
         ``/users/me``, ...).
         """

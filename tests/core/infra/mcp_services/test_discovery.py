@@ -1,4 +1,4 @@
-"""Unit tests for MCP service discovery (PR-16) + connectivity test (PR-17)."""
+"""Unit tests for MCP service discovery + connectivity test."""
 
 from __future__ import annotations
 
@@ -92,7 +92,7 @@ async def test_cache_get_or_refresh_caches_until_invalidated() -> None:
     # which is idempotent with a static provider.
 
 
-# ── Service integration (PR-16 + PR-17) ─────────────────────────────
+# ── Service integration ─────────────────────────────────────────────
 
 
 def _service(

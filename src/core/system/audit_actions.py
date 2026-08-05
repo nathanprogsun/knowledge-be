@@ -3,13 +3,13 @@
 Mirrors ``internal/types/audit_log.go::AuditAction``. Actions are
 grouped by area (``rbac.*``, ``vector_store.*``, ``system.*``,
 ``kb.*``, ``knowledge.*``, ``tag.*``, ``datasource.*``, ``kb.share_*``,
-``wiki.*``, ``faq.*``, ``opensearch.*``) so future PRs can plug in
-their own areas without colliding with the events PR-11 ships.
+``wiki.*``, ``faq.*``, ``opensearch.*``) so each area can be extended
+without colliding with existing events.
 
-PR-11 only emits ``system.setting_changed`` (via
-``SystemSettingService.Update``); the full constant set is defined here
-so downstream PRs reference ``AuditAction.KB_CREATED`` etc. without
-redefining the enum.
+Only ``system.setting_changed`` is emitted today (via
+``SystemSettingService.Update``); the full set is defined here so
+consumers reference ``AuditAction.KB_CREATED`` etc. without redefining
+the enum.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from typing import Final
 class AuditAction:
     """Dot-namespaced audit action constants (no enum — plain ``str``)."""
 
-    # ── RBAC (PR-12 middleware emits these) ───────────────────────────
+    # ── RBAC ───────────────────────────────────────────────────────────
     MEMBER_ADDED: Final[str] = "rbac.member_added"
     MEMBER_REMOVED: Final[str] = "rbac.member_removed"
     MEMBER_ROLE_CHANGED: Final[str] = "rbac.member_role_changed"
@@ -32,17 +32,17 @@ class AuditAction:
     INVITATION_REVOKED: Final[str] = "rbac.invitation_revoked"
     INVITATION_EXPIRED: Final[str] = "rbac.invitation_expired"
 
-    # ── VectorStore (later stage 2 PRs) ───────────────────────────────
+    # ── VectorStore ────────────────────────────────────────────────────
     VECTOR_STORE_CREATED: Final[str] = "vector_store.created"
     VECTOR_STORE_UPDATED: Final[str] = "vector_store.updated"
     VECTOR_STORE_DELETED: Final[str] = "vector_store.deleted"
 
-    # ── OpenSearch (later stage 2 PRs) ────────────────────────────────
+    # ── OpenSearch ─────────────────────────────────────────────────────
     OPENSEARCH_INDEX_CREATED: Final[str] = "opensearch.index_created"
     OPENSEARCH_INDEX_DELETED: Final[str] = "opensearch.index_deleted"
     OPENSEARCH_REINDEX_EXECUTED: Final[str] = "opensearch.reindex_executed"
 
-    # ── System (PR-11 emits setting_changed) ──────────────────────────
+    # ── System ─────────────────────────────────────────────────────────
     SYSTEM_SETTING_CHANGED: Final[str] = "system.setting_changed"
     SYSTEM_ADMIN_PROMOTED: Final[str] = "system.admin_promoted"
     SYSTEM_ADMIN_REVOKED: Final[str] = "system.admin_revoked"
@@ -55,7 +55,7 @@ class AuditAction:
     SYSTEM_QUEUE_TASK_CANCELLED: Final[str] = "system.queue_task_cancelled"
     SYSTEM_QUEUE_ARCHIVED_PURGED: Final[str] = "system.queue_archived_purged"
 
-    # ── Knowledge base (later stage 4 PRs) ────────────────────────────
+    # ── Knowledge base ─────────────────────────────────────────────────
     KB_CREATED: Final[str] = "kb.created"
     KB_UPDATED: Final[str] = "kb.updated"
     KB_DELETED: Final[str] = "kb.deleted"
@@ -67,7 +67,7 @@ class AuditAction:
     KB_SHARE_PERMISSION_CHANGED: Final[str] = "kb.share_permission_changed"
     KB_SHARE_REMOVED: Final[str] = "kb.share_removed"
 
-    # ── Knowledge item (later stage 4 PRs) ────────────────────────────
+    # ── Knowledge item ─────────────────────────────────────────────────
     KNOWLEDGE_CREATED: Final[str] = "knowledge.created"
     KNOWLEDGE_UPDATED: Final[str] = "knowledge.updated"
     KNOWLEDGE_DELETED: Final[str] = "knowledge.deleted"
@@ -78,12 +78,12 @@ class AuditAction:
     KNOWLEDGE_MOVE_COMPLETED: Final[str] = "knowledge.move_completed"
     KNOWLEDGE_MOVE_FAILED: Final[str] = "knowledge.move_failed"
 
-    # ── Tag (later stage 4 PRs) ───────────────────────────────────────
+    # ── Tag ────────────────────────────────────────────────────────────
     TAG_CREATED: Final[str] = "tag.created"
     TAG_UPDATED: Final[str] = "tag.updated"
     TAG_DELETED: Final[str] = "tag.deleted"
 
-    # ── DataSource (later stage 2 PRs) ────────────────────────────────
+    # ── DataSource ─────────────────────────────────────────────────────
     DATASOURCE_CREATED: Final[str] = "datasource.created"
     DATASOURCE_UPDATED: Final[str] = "datasource.updated"
     DATASOURCE_DELETED: Final[str] = "datasource.deleted"
@@ -93,7 +93,7 @@ class AuditAction:
     DATASOURCE_PAUSED: Final[str] = "datasource.paused"
     DATASOURCE_RESUMED: Final[str] = "datasource.resumed"
 
-    # ── Wiki / FAQ (later stage 4 PRs) ────────────────────────────────
+    # ── Wiki / FAQ ─────────────────────────────────────────────────────
     WIKI_CONTENT_CHANGED: Final[str] = "wiki.content_changed"
     FAQ_IMPORT_STARTED: Final[str] = "faq.import_started"
     FAQ_IMPORT_COMPLETED: Final[str] = "faq.import_completed"

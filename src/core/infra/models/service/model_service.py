@@ -1,10 +1,10 @@
 """ModelService — CRUD for tenant-scoped AI model configurations.
 
 Mirrors ``internal/application/service/model.go`` on the Go side for
-the basic CRUD surface (PR-13). Inference / debug paths (the
+the basic CRUD surface. Inference / debug paths (the
 ``GetEmbeddingModel`` / ``GetChatModel`` / ``DebugModel`` family)
-arrive with PR-14 / PR-15 once the inference providers land; PR-13
-keeps the service focused on persistence + tenant scoping.
+are deferred until the inference providers land; the service stays
+focused on persistence + tenant scoping.
 
 Constructed per request; the repository owns the per-request session.
 """
@@ -88,7 +88,7 @@ class ModelService:
         to keep a stable id); otherwise a UUID is generated. ``status``
         defaults to ``active`` — both local and remote models are
         immediately queryable; the local Ollama download path lives on
-        the Go side and is out of scope for PR-13.
+        the Go side and is out of scope here.
         """
         if tenant_id <= 0:
             raise ValidationError(

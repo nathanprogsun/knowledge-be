@@ -7,10 +7,10 @@ underlying transport is no longer connected, and exposes the
 high-level JSON-RPC operations (``initialize``, ``tools/list``,
 ``resources/list``, ``tools/call``, ``resources/read``).
 
-PR-17.5a scope: SSE transport only. The HTTP-streamable client (PR-17.5b)
-plugs in through :data:`_default_transport_factory` when its module
-ships; for now the factory rejects ``"http-streamable"`` with a clear
-error so callers do not silently fall back.
+SSE transport only. The HTTP-streamable client plugs in through
+:data:`_default_transport_factory` once its module ships; until then
+the factory rejects ``"http-streamable"`` with a clear error so
+callers do not silently fall back.
 
 Wire-level errors
 -----------------
@@ -71,7 +71,7 @@ class MCPSession:
 
     service_id: str
     transport_type: str
-    client: Any  # ``SSEClient`` (and ``HTTPStreamableClient`` in PR-17.5b)
+    client: Any  # ``SSEClient`` (``HTTPStreamableClient`` once implemented)
     session_id: str = ""
     connected: bool = False
     initialized: bool = False
@@ -122,9 +122,8 @@ def _default_transport_factory(
 
     Mirrors the Go switch in ``NewMCPClient`` — SSE gets an
     :class:`src.ai.mcp_transport.sse_client.SSEClient`. The
-    HTTP-streamable branch raises (PR-17.5b will register it once the
-    module lands); ``stdio`` is intentionally rejected (disabled for
-    security, same as the Go side).
+    HTTP-streamable branch raises until its module lands; ``stdio`` is
+    intentionally rejected (disabled for security, same as the Go side).
     """
     if transport_type == "sse":
         return SSEClient(
@@ -134,8 +133,7 @@ def _default_transport_factory(
         )
     if transport_type == "http-streamable":
         raise MCPTransportError(
-            "transport_type='http-streamable' is not implemented in this build "
-            "(ships in PR-17.5b)",
+            "transport_type='http-streamable' is not implemented in this build",
         )
     raise MCPTransportError(
         f"unsupported transport_type: {transport_type!r}; "

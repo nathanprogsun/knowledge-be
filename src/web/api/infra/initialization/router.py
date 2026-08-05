@@ -17,7 +17,7 @@ Maps the non-KB initialization endpoints from
 
 The KB-scoped routes (``/initialization/config/{kbId}``,
 ``/initialization/initialize/{kbId}``) belong to the knowledge domain
-(stage 4) and are intentionally absent, as are the three
+and are intentionally absent, as are the three
 ``/initialization/extract/*`` routes (they need the chat/LLM layer).
 
 Every route carries ``AuthDep`` plus its role gate, matching the

@@ -12,8 +12,8 @@ Rules:
    ``raise NotImplementedError``. Dunders are exempt; everything else is
    checked.
 
-3. Field-signature immutability after PR-1. A baseline JSON file
-   (``docs/migration/baselines/contracts_pr1.json``) records the PR-1
+3. Field-signature immutability. A baseline JSON file
+   (``docs/migration/baselines/contracts_pr1.json``) records the
    snapshot as::
 
        {
@@ -249,7 +249,7 @@ def main() -> int:
     parser.add_argument(
         "--baseline",
         default=None,
-        help="Path to PR-1 baseline JSON (defaults to "
+        help="Path to baseline JSON (defaults to "
         "docs/migration/baselines/contracts_pr1.json).",
     )
     args = parser.parse_args()
@@ -285,7 +285,7 @@ def main() -> int:
 
     if not baseline and classes and not baseline_loaded:
         print(
-            f"[WARN] No PR-1 baseline at {baseline_path} — skipping field-drift "
+            f"[WARN] No baseline at {baseline_path} — skipping field-drift "
             f"check (frozen + no-logic rules still enforced)"
         )
 
@@ -318,13 +318,13 @@ def main() -> int:
                 if fname not in live_fields:
                     errors.append(
                         f"{rel}: contract model '{cname}' is missing baseline "
-                        f"field '{fname}: {ftype}' (PR-1 snapshot)"
+                        f"field '{fname}: {ftype}' (baseline snapshot)"
                     )
             for fname in sorted(set(live_fields) - set(base_fields)):
                 errors.append(
                     f"{rel}: contract model '{cname}' has new field '{fname}: "
-                    f"{live_fields[fname]}' not present in the PR-1 baseline "
-                    f"(field additions are forbidden after PR-1)"
+                    f"{live_fields[fname]}' not present in the baseline "
+                    f"(field additions are forbidden after the baseline)"
                 )
             for fname in sorted(set(live_fields) & set(base_fields)):
                 if live_fields[fname] != base_fields[fname]:

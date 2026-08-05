@@ -471,7 +471,7 @@ def main() -> int:
     parser.add_argument(
         "--baseline",
         default=None,
-        help="Optional JSON file pinning PR-1 field types (defaults to "
+        help="Optional JSON file pinning baseline field types (defaults to "
         "docs/migration/baselines/db_models_pr1.json).",
     )
     args = parser.parse_args()

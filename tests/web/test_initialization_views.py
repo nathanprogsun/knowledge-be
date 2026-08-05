@@ -1,4 +1,4 @@
-"""Web-layer tests for the initialization router (PR-28).
+"""Web-layer tests for the initialization router.
 
 Per AGENTS.md §9 the router is exercised over ``httpx.AsyncClient``
 against the real app, with the service dependency overridden by a real
@@ -96,8 +96,8 @@ def _build_app(
     """App with the initialization router mounted and gates neutralised.
 
     The router is not yet wired into ``create_app`` — mounting it is
-    checkpoint-2 work (``lifespan.py`` is off-limits to this PR) — so the
-    test mounts it explicitly.
+    deferred (``lifespan.py`` is off-limits) — so the test mounts it
+    explicitly.
     """
     application = create_app()
     application.include_router(initialization_router)

@@ -22,7 +22,7 @@ dependencies = [
     "redis>=5.0",
     "arq>=0.26",
     "httpx>=0.27",
-    # PR-17.5a: SSE transport client (httpx + httpx-sse) for MCP-over-SSE.
+    # SSE transport for MCP-over-SSE (httpx-sse).
     "httpx-sse>=0.4",
     "orjson>=3.9",
     "loguru>=0.7",
@@ -44,8 +44,7 @@ dev = [
     # instead of spinning up a container.
     "aiosqlite>=0.20",
     "anyio>=4.0",
-    # PR-17.5a: respx mocks the httpx transport so the SSE client and
-    # connection-manager tests run without a real MCP server.
+    # respx mocks the httpx transport so the SSE tests run without a live MCP server.
     "respx>=0.21",
     "pre-commit>=3.5",
     "types-passlib>=1.7",

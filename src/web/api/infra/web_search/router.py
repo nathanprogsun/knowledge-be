@@ -208,8 +208,8 @@ def _require_context_tenant() -> int:
 class _NoopClientRegistry(WebSearchClientRegistry):
     """Stub registry for the test endpoints.
 
-    PR-19 wires the real HTTP client registry (the dispatcher module)
-    into these endpoints; until then a successful connectivity test
+    The real HTTP client registry (the dispatcher module) is not yet
+    wired into these endpoints, so a successful connectivity test
     cannot be observed here. The endpoints still exercise full
     validation + lookup so the route surface is complete.
     """
@@ -221,10 +221,7 @@ class _NoopClientRegistry(WebSearchClientRegistry):
     ) -> WebSearchClient:
         raise ValidationError(
             code="web_search_provider.test_unavailable",
-            message=(
-                "Connectivity test requires the upstream HTTP client registry; "
-                "landed in PR-19+ followup"
-            ),
+            message="Connectivity test requires the upstream HTTP client registry; not yet wired",
         )
 
 

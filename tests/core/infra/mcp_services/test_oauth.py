@@ -1,4 +1,4 @@
-"""Unit tests for the MCP service OAuth flow (PR-17)."""
+"""Unit tests for the MCP service OAuth flow."""
 
 from __future__ import annotations
 

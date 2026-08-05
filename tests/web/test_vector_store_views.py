@@ -160,7 +160,7 @@ def app(fake_service: _FakeService) -> FastAPI:
     application.dependency_overrides[get_vector_store_service] = lambda: fake_service
     # Mount the vector-store router in this isolated app instance so the
     # test exercises the full HTTP path without registering it in the
-    # global lifespan (which checkpoint-2 owns).
+    # global lifespan.
     from src.web.api.infra.vector_stores.router import router as vs_router
 
     application.include_router(vs_router)

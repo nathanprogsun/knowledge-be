@@ -1,4 +1,4 @@
-"""Tests for the MCP connection manager (PR-17.5a).
+"""Tests for the MCP connection manager.
 
 The manager owns the cache and the cleanup loop; the SSE wire
 plumbing is covered in ``test_sse_client.py``. Here we focus on:
@@ -208,7 +208,7 @@ async def test_get_or_create_rejects_unsupported_transport() -> None:
 
 
 async def test_get_or_create_rejects_http_streamable_until_pr_17_5b() -> None:
-    """The default factory rejects ``http-streamable`` until PR-17.5b lands."""
+    """The default factory rejects ``http-streamable`` until it is implemented."""
     manager = MCPConnectionManager()
     try:
         with pytest.raises(MCPTransportError) as excinfo:
@@ -218,7 +218,7 @@ async def test_get_or_create_rejects_http_streamable_until_pr_17_5b() -> None:
                 url="https://mcp.example.com",
                 headers=None,
             )
-        assert "PR-17.5b" in excinfo.value.message_text
+        assert "not implemented in this build" in excinfo.value.message_text
     finally:
         await manager.shutdown()
 
@@ -679,7 +679,7 @@ def test_default_transport_factory_builds_sse_client() -> None:
 
 
 def test_default_transport_factory_rejects_http_streamable() -> None:
-    """``_default_transport_factory`` rejects ``http-streamable`` (PR-17.5b)."""
+    """``_default_transport_factory`` rejects ``http-streamable``."""
     with pytest.raises(MCPTransportError) as excinfo:
         _default_transport_factory(
             service_id="x",
@@ -688,7 +688,7 @@ def test_default_transport_factory_rejects_http_streamable() -> None:
             headers=None,
             timeout_seconds=10.0,
         )
-    assert "PR-17.5b" in excinfo.value.message_text
+    assert "not implemented in this build" in excinfo.value.message_text
 
 
 def test_default_transport_factory_rejects_stdio() -> None:

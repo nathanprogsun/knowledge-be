@@ -8,7 +8,7 @@ the same protocol seam:
 - :class:`DiscoveryProvider` — the protocol the service layer depends on.
 - :class:`StaticDiscoveryProvider` — kept for tests that do not want a
   live transport wired in.
-- :class:`HTTPMCPDiscoveryProvider` — PR-17.5a live implementation that
+- :class:`HTTPMCPDiscoveryProvider` — live implementation that
   speaks MCP-over-SSE through
   :class:`src.ai.mcp_transport.MCPConnectionManager`.
 - :class:`DiscoveryCache` — in-memory TTL cache for one

@@ -19,9 +19,9 @@ Maps the 13 endpoints from WeKnora ``routes_infra.go``:
     DELETE /mcp-services/{id}/oauth/token      Viewer+  revoke token
 
 The credentials subresource (``PUT/DELETE /mcp-services/{id}/credentials``
-and ``DELETE /mcp-services/{id}/credentials/{field}``) lands in a later
-PR — it is intentionally NOT here so the secret write surface has its
-own service module + tests.
+and ``DELETE /mcp-services/{id}/credentials/{field}``) is
+intentionally NOT here so the secret write surface has its own
+service module + tests.
 """
 
 from __future__ import annotations

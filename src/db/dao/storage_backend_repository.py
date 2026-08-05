@@ -148,7 +148,7 @@ class StorageBackendRepository(GenericRepository[StorageBackend]):
     async def count_knowledge_base_references(self, *, tenant_id: int, id: str) -> int:
         """Count knowledge bases bound to this backend.
 
-        The ``knowledge_bases`` table lands in a later PR; until then a
+        The ``knowledge_bases`` table is not created yet; until then a
         missing relation means zero bindings rather than a hard failure,
         so the guard degrades safely instead of blocking every delete.
         """
@@ -176,7 +176,7 @@ class StorageBackendRepository(GenericRepository[StorageBackend]):
         async with self._session.begin_nested():
             try:
                 result = await self._session.execute(text(sql).bindparams(**params))
-            except Exception:  # relation absent until a later PR adds it
+            except Exception:  # relation absent until the table exists
                 return 0
             row = result.mappings().first()
             return int(row["n"]) if row is not None else 0

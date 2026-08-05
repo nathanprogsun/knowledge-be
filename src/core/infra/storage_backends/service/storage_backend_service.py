@@ -16,8 +16,8 @@ The Go methods map one-for-one:
   fallback, then the workspace default.
 
 ``resolve_file_service`` from Go is deliberately absent: it returns a
-``FileService`` (upload/download), which arrives with the file domain in a
-later PR. ``resolve_backend`` — the half that selects the instance — is
+``FileService`` (upload/download), which arrives with the file domain.
+``resolve_backend`` — the half that selects the instance — is
 implemented here because the registry owns that decision.
 """
 

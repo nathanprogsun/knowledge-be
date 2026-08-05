@@ -298,7 +298,7 @@ class MCPServiceService:
         stored = await self._tool_approvals_repo.upsert(row=row)
         return MCPToolApprovalInfo.map_from_db(stored)
 
-    # ── Discovery (PR-16) ──────────────────────────────────────────
+    # ── Discovery ───────────────────────────────────────────────────
 
     async def list_tools(
         self,
@@ -308,7 +308,7 @@ class MCPServiceService:
     ) -> list[DiscoveryTool]:
         """Discover the upstream MCP service's tools (with cache).
 
-        PR-17.5a: when the live transport raises :class:`MCPError`
+        When the live transport raises :class:`MCPError`
         (network failure, server-side session invalidation) the call
         degrades to an empty list so the UI keeps working when the
         upstream MCP server is unreachable.
@@ -338,7 +338,7 @@ class MCPServiceService:
     ) -> list[DiscoveryResource]:
         """Discover the upstream MCP service's resources (with cache).
 
-        PR-17.5a: same degradation as :meth:`list_tools`.
+        Same degradation as :meth:`list_tools`.
         """
         await self._mcp_repo.get_by_id(tenant_id, service_id)
         if self._discovery_provider is None:
@@ -367,7 +367,7 @@ class MCPServiceService:
                 service_id=service_id,
             )
 
-    # ── Connectivity test (PR-17) ─────────────────────────────────
+    # ── Connectivity test ──────────────────────────────────────────
 
     async def test_service(
         self,
@@ -394,7 +394,7 @@ class MCPServiceService:
             oauth_required=_is_oauth(service.auth_config),
         )
 
-    # ── OAuth (PR-17) ──────────────────────────────────────────────
+    # ── OAuth ───────────────────────────────────────────────────────
 
     async def fetch_oauth_manager(
         self,
@@ -471,9 +471,8 @@ def _build_update_columns(
         # Pass-through; mirrors Go's
         # ``service.UpdateMCPService`` which round-trips
         # ``auth_config`` on user services verbatim. The dedicated
-        # credentials subresource (post-PR-17 followup) is the only
-        # writer of ``api_key`` / ``token``; the standard update path
-        # just preserves them.
+        # credentials subresource is the only writer of ``api_key`` /
+        # ``token``; the standard update path just preserves them.
         columns["auth_config"] = cast("JsonValue", auth_config)
     if advanced_config is not None:
         columns["advanced_config"] = advanced_config

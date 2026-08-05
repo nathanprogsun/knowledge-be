@@ -6,10 +6,10 @@ Mixed into ``DataSourceService``. Two halves of one flow:
     The request-time half. Opens a ``running`` sync log and hands back its
     id so the caller can poll. Go additionally enqueues an asynq task
     here; there is no task queue in this codebase yet, so the log is
-    opened and the worker PR will pick up ``running`` logs. The failure
+    opened and the async worker will pick up ``running`` logs. The failure
     bookkeeping Go performs when the enqueue itself fails (log →
     ``failed``, source → ``error``) is implemented in
-    :meth:`SyncMixin.fail_sync` so the worker PR can call it unchanged.
+    :meth:`SyncMixin.fail_sync` so the worker can call it unchanged.
 
 ``process_sync``
     The worker half. Resolves the connector, walks the source

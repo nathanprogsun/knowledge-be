@@ -15,10 +15,9 @@ default is. Adding a new tunable is a matter of:
 so the UI cannot inject arbitrary keys into the DB, even with an
 attacker-controlled body.
 
-PR-11 scope: the registry is defined but the **side-effect bridges**
-(SSRF whitelist application, model-concurrency limiter push, Redis
-pubsub invalidation) are stubbed — they land in later PRs alongside
-the services they configure.
+The **side-effect bridges** (SSRF whitelist application,
+model-concurrency limiter push, Redis pubsub invalidation) are
+stubbed; they land alongside the services they configure.
 
 The ``description`` strings are intentionally Chinese (mirrors the
 upstream Go registry verbatim) so the management UI renders the same

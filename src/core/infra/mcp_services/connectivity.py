@@ -13,7 +13,7 @@ path without a live server.
 Two implementations ship in this module:
 
 - :class:`StaticConnectivityProbe` — pre-baked result, used by tests.
-- :class:`HTTPMCPConnectivityProbe` — PR-17.5a drives the live MCP
+- :class:`HTTPMCPConnectivityProbe` — drives the live MCP
   transport via :class:`src.ai.mcp_transport.MCPConnectionManager`
   and reports the actual probe outcome.
 """

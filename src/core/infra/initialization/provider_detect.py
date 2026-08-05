@@ -182,7 +182,7 @@ def get_download_task_store() -> DownloadTaskStore:
     Download progress must outlive the request that started the pull, so
     the store cannot be request-scoped. It is not registered on
     ``LifeSpanService`` yet — promoting it to an explicit APP-scope
-    singleton is checkpoint-2 work (the DI registry is off-limits here).
+    singleton is deferred (the DI registry is off-limits here).
     """
     return DownloadTaskStore()
 

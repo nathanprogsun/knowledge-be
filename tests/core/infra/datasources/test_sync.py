@@ -1,4 +1,4 @@
-"""Unit tests for the data-source sync engine + connectivity (PR-25).
+"""Unit tests for the data-source sync engine + connectivity.
 
 Covers the three modules mixed into ``DataSourceService``:
 

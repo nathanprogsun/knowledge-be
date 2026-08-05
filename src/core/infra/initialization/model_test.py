@@ -10,7 +10,7 @@ Mirrors the model-test handlers in
 
 Go assembles a throwaway ``*types.Model`` and runs it through the same
 ``ConfigFromModel`` → provider-client path as production. The provider
-client layer does not exist in Python yet (stage 3), so these probes call
+client layer does not exist in Python yet, so these probes call
 the OpenAI-compatible endpoints every provider in WeKnora ultimately
 speaks (``POST {baseUrl}/embeddings``, ``POST {baseUrl}/rerank``,
 ``POST {baseUrl}/audio/transcriptions``, ``POST {baseUrl}/chat/completions``)

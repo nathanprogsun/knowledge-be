@@ -1,4 +1,4 @@
-"""Tests for the JSON-RPC 2.0 envelope types (PR-17.5a).
+"""Tests for the JSON-RPC 2.0 envelope types.
 
 Covers the wire-shape contract every MCP message must conform to
 before the SSE / HTTP-streamable clients serialise or parse it.

@@ -3,7 +3,7 @@
 Mirrors ``internal/router/routes_infra.go`` (``RegisterModelRoutes``)
 on the Go side. The seven endpoints here cover the basic CRUD +
 provider-list + debug-probe surface; the per-field credentials
-subresource arrives with a later PR.
+subresource is not yet implemented.
 """
 
 from __future__ import annotations
@@ -80,9 +80,9 @@ async def list_model_providers(
     """Return the provider catalog filtered by model type.
 
     The Go handler returns a list of provider descriptors built from
-    ``provider.List`` / ``provider.ListByModelType``. PR-14 ships a
-    static catalog (no inference-provider land yet) and the same
-    wire shape so a later PR can swap the implementation without
+    ``provider.List`` / ``provider.ListByModelType``. This build ships
+    a static catalog (no inference-provider land yet) behind the same
+    wire shape so the implementation can be swapped later without
     breaking callers.
     """
     providers = _static_providers(model_type)
@@ -94,8 +94,9 @@ def _static_providers(model_type: str | None) -> list[ProviderTypeMeta]:
 
     Returns the full ``PROVIDER_CATALOG`` (or the subset whose
     ``model_types`` includes the requested frontend alias) so the wire
-    shape mirrors ``docs/api/model.md``. A later PR can swap in
-    inference-provider metadata without changing the response model.
+    shape mirrors ``docs/api/model.md``. The implementation can later
+    swap in inference-provider metadata without changing the response
+    model.
     """
     return filter_providers(PROVIDER_CATALOG, model_type=model_type)
 
@@ -201,7 +202,7 @@ async def debug_model(
     Mirrors ``handler/model.go`` ``DebugModel`` on the Go side. The
     real implementation dispatches by ``model.type`` to the right
     inference client (chat / embedding / rerank / vllm / asr); the
-    inference providers land in a later PR. For now this endpoint
+    inference providers are not implemented yet. For now this endpoint
     returns a static response describing the request envelope so
     callers can wire their UI against the same shape.
     """
@@ -232,7 +233,7 @@ async def debug_model(
         "observations": {
             "probe": "stub",
             "reason": (
-                "debug probe is wired but the inference-provider dispatch arrives in a later PR"
+                "debug probe is wired but the inference-provider dispatch is not yet implemented"
             ),
         },
         "error": "debug probe is a no-op until inference providers land",
