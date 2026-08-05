@@ -11,6 +11,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 from src.core.contracts.infra import (
+    CredentialFieldMetadata,
     WebSearchBuiltinProvider,
     WebSearchProvider,
     WebSearchProviderParameters,
@@ -95,6 +96,10 @@ def _mask_parameters(
 
 def info_to_wire(info: WebSearchProviderInfo) -> WebSearchProvider:
     """Project the service DTO onto the wire contract."""
+    parameters = info.parameters
+    api_key_configured = bool(
+        parameters.api_key if isinstance(parameters, WebSearchProviderParameters) else None
+    )
     return WebSearchProvider(
         id=info.id,
         tenant_id=info.tenant_id,
@@ -102,10 +107,12 @@ def info_to_wire(info: WebSearchProviderInfo) -> WebSearchProvider:
         provider=info.provider,
         description=info.description,
         is_default=info.is_default,
-        parameters=_mask_parameters(info.parameters).model_dump(exclude_none=True),
+        parameters=_mask_parameters(parameters).model_dump(exclude_none=True),
         created_at=info.created_at,
         updated_at=info.updated_at,
-        deleted_at=info.deleted_at,
+        # Go emits the per-field "configured?" map so the UI can render
+        # credential presence without seeing the value.
+        credentials={"api_key": CredentialFieldMetadata(configured=api_key_configured)},
     )
 
 

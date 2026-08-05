@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict
 
 from src.common.json import JsonValue
 from src.core.contracts.infra import (
+    CredentialFieldMetadata,
     Model,
     ModelParameters,
     ProviderTypeMeta,
@@ -101,6 +102,7 @@ def _parameters_for_wire(parameters: ModelParameters) -> ModelParameters:
 
 def model_info_to_contract(info: ModelInfo) -> Model:
     """Project the service DTO onto the frozen wire contract."""
+    parameters = info.parameters
     return Model(
         id=info.id,
         tenant_id=info.tenant_id,
@@ -109,14 +111,18 @@ def model_info_to_contract(info: ModelInfo) -> Model:
         type=info.type,
         source=info.source,
         description=info.description,
-        parameters=_parameters_for_wire(info.parameters),
+        parameters=_parameters_for_wire(parameters),
         is_default=info.is_default,
         is_builtin=info.is_builtin,
-        managed_by=info.managed_by,
         status=info.status,
         created_at=info.created_at,
         updated_at=info.updated_at,
-        deleted_at=info.deleted_at,
+        # Go emits the per-field "configured?" map on the response so the
+        # UI can render credential presence without ever seeing values.
+        credentials={
+            "api_key": CredentialFieldMetadata(configured=bool(parameters.api_key)),
+            "app_secret": CredentialFieldMetadata(configured=bool(parameters.app_secret)),
+        },
     )
 
 
