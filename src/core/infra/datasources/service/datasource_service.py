@@ -52,6 +52,7 @@ from src.core.infra.datasources.types import (
     SYNC_MODE_INCREMENTAL,
     DataSourceInfo,
     SyncLogInfo,
+    encrypt_config_credentials,
     parse_config,
 )
 from src.core.system.audit_actions import AuditAction, AuditOutcome
@@ -122,6 +123,11 @@ class DataSourceService(ConnectivityMixin, ResourceListingMixin, SyncMixin):
                 code="datasource.knowledge_base_id_required",
                 message="knowledge_base_id is required",
             )
+        # TODO(kb-domain): Go's ``getOwnedKnowledgeBase`` verifies the KB
+        # exists AND belongs to the tenant (404 "knowledge base not found"
+        # / 403 "access denied"). The knowledge-base domain is not
+        # migrated yet (no table/service), so ownership cannot be
+        # enforced here; wire it in with the KB PR.
         # Raises when the connector type is unknown.
         self._connector_registry.get(type)
 
@@ -417,11 +423,17 @@ class DataSourceService(ConnectivityMixin, ResourceListingMixin, SyncMixin):
 
     @staticmethod
     def _normalize_config(config: JsonObject | None, connector_type: str) -> JsonObject | None:
-        """Strip non-secret values out of the incoming credential map."""
+        """Strip non-secret values out of the incoming credential map.
+
+        Credential strings are AES-GCM encrypted before the blob is
+        persisted (Go ``DataSourceConfig.ToJSON``).
+        """
         parsed = parse_config(config)
         if parsed is None:
             return None
-        return parsed.strip_non_secret_credentials(connector_type).model_dump()
+        return encrypt_config_credentials(
+            parsed.strip_non_secret_credentials(connector_type).model_dump()
+        )
 
     @staticmethod
     def _merge_config_preserving_credentials(
@@ -446,7 +458,9 @@ class DataSourceService(ConnectivityMixin, ResourceListingMixin, SyncMixin):
                 "credentials": existing_cfg.credentials if existing_cfg is not None else {},
             }
         )
-        return merged.strip_non_secret_credentials(connector_type).model_dump()
+        return encrypt_config_credentials(
+            merged.strip_non_secret_credentials(connector_type).model_dump()
+        )
 
     async def _audit(
         self,

@@ -39,14 +39,14 @@ class StorageBackendRepository(GenericRepository[StorageBackend]):
         )
 
     async def list_for_tenant(self, tenant_id: int) -> list[StorageBackend]:
-        """Return every live backend of the workspace, oldest first.
+        """Return every live backend of the workspace, newest first.
 
-        Go's ``List`` orders by ``created_at`` so the UI keeps a stable
-        ordering across reloads.
+        Go's ``List`` orders by ``created_at DESC`` so the UI keeps a
+        stable ordering across reloads.
         """
         stmt = text(
             f"select * from {self._table} where tenant_id = :tenant_id and {_LIVE} "
-            "order by created_at asc, id asc"
+            "order by created_at desc, id desc"
         ).bindparams(tenant_id=tenant_id)
         result = await self._session.execute(stmt)
         return [self._hydrate(m) for m in result.mappings().all()]

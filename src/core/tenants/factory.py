@@ -20,7 +20,10 @@ from src.db.dao.tenants_repository import TenantRepository
 
 def build_tenant_service(session: AsyncSession) -> TenantService:
     """Per-request ``TenantService`` with a fresh repository."""
-    return TenantService(tenants_repo=TenantRepository(session))
+    return TenantService(
+        tenants_repo=TenantRepository(session),
+        members_repo=TenantMemberRepository(session),
+    )
 
 
 def build_tenant_api_key_service(session: AsyncSession) -> TenantAPIKeyService:

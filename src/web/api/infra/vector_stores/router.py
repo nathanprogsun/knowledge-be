@@ -29,7 +29,7 @@ from typing import cast
 
 from fastapi import APIRouter, Path, Request
 
-from src.common.exception import ValidationError
+from src.common.exception import NotFoundError, ValidationError
 from src.common.json import JsonObject
 from src.core.contracts.infra import (
     CreateVectorStoreRequest,
@@ -344,11 +344,19 @@ async def test_vector_store_raw(
     body: TestVectorStoreRawRequest,
     service: VectorStoreServiceDep,
 ) -> TestVectorStoreResponse:
-    """Test a raw user-supplied connection config (no persistence)."""
-    return await service.test_raw(
-        engine_type=body.engine_type,
-        connection_config=body.connection_config,
-    )
+    """Test a raw user-supplied connection config (no persistence).
+
+    A validation failure (SSRF block, missing field) answers 200 with
+    ``success=false`` — Go's ``TestRawConnection`` keeps the HTTP
+    status at 200 and reports the error in the body.
+    """
+    try:
+        return await service.test_raw(
+            engine_type=body.engine_type,
+            connection_config=body.connection_config,
+        )
+    except ValidationError as exc:
+        return TestVectorStoreResponse(success=False, version=None, error=exc.message)
 
 
 @router.post("", response_model=VectorStoreEnvelope, status_code=201)
@@ -411,7 +419,7 @@ async def get_vector_store(
         for entry in env_entries:
             if entry.id == store_id:
                 return vector_store_envelope(entry)
-        raise ValidationError(
+        raise NotFoundError(
             code="vector_store.not_found",
             message=f"vector store {store_id} not found",
         )
@@ -454,14 +462,23 @@ async def delete_vector_store(
     request: Request,
     store_id: str = Path(...),
 ) -> DeleteVectorStoreResponse:
-    """Soft-delete a vector store. Env-store entries are rejected."""
+    """Soft-delete a vector store. Env-store entries are rejected.
+
+    An unknown id answers 404 — Go's handler checks ownership first
+    (``vectorstore.go`` ``DeleteVectorStore``).
+    """
     tenant_id = _require_tenant_id(request)
     if _is_env_store_id(store_id):
         raise ValidationError(
             code="vector_store.env_store_readonly",
             message="environment-configured vector stores cannot be modified via API",
         )
-    await service.delete_store(tenant_id, store_id)
+    deleted = await service.delete_store(tenant_id, store_id)
+    if not deleted:
+        raise NotFoundError(
+            code="vector_store.not_found",
+            message=f"vector store {store_id} not found",
+        )
     return DeleteVectorStoreResponse(success=True)
 
 
@@ -479,19 +496,23 @@ async def test_vector_store_by_id(
     by the Go handler). The DB-row path uses the stored config.
     """
     tenant_id = _require_tenant_id(request)
-    if _is_env_store_id(store_id):
-        env_entries = _build_env_store_entries(os.environ.get("RETRIEVE_DRIVER", ""))
-        for entry in env_entries:
-            if entry.id == store_id:
-                return await service.test_raw(
-                    engine_type=entry.engine_type,
-                    connection_config=cast("JsonObject", entry.connection_config or {}),
-                )
-        raise ValidationError(
-            code="vector_store.not_found",
-            message=f"vector store {store_id} not found",
-        )
-    return await service.test_by_id(tenant_id, store_id)
+    try:
+        if _is_env_store_id(store_id):
+            env_entries = _build_env_store_entries(os.environ.get("RETRIEVE_DRIVER", ""))
+            for entry in env_entries:
+                if entry.id == store_id:
+                    return await service.test_raw(
+                        engine_type=entry.engine_type,
+                        connection_config=cast("JsonObject", entry.connection_config or {}),
+                    )
+            raise ValidationError(
+                code="vector_store.not_found",
+                message=f"vector store {store_id} not found",
+            )
+        return await service.test_by_id(tenant_id, store_id)
+    except ValidationError as exc:
+        # Go's ``TestStoreByID`` answers 200 with the error in the body.
+        return TestVectorStoreResponse(success=False, version=None, error=exc.message)
 
 
 # Re-export the wire-shape VectorStore so the router module stays

@@ -289,10 +289,9 @@ async def get_tenant_kv(
     tenant_id = _require_context_tenant()
     value = await kv_service.get(tenant_id=tenant_id, key=key)
     if value is None:
-        raise NotFoundError(
-            code="tenant_kv.not_found",
-            message=f"KV key '{key}' is not set",
-        )
+        # Go returns the typed zero config (``&RetrievalConfig{}`` etc.)
+        # when the key is unset — an empty object, not a 404.
+        return {}
     if not isinstance(value, dict):
         raise ValidationError(
             code="tenant_kv.bad_shape",
@@ -403,24 +402,32 @@ def _principal_to_contract(config: JsonObject | None) -> APIPrincipalConfig:
     direct = config.get("direct_header_name")
     signed = config.get("signed_token_header_name")
     require_direct = config.get("require_direct_header", False)
-    has_secret = config.get("has_hmac_secret", False)
+    # The stored secret is never disclosed; only its presence is
+    # reported (Go GET semantics).
+    raw_secret = config.get("hmac_secret")
+    has_secret = isinstance(raw_secret, str) and bool(raw_secret)
     return APIPrincipalConfig(
         mode=mode,
         direct_header_name=direct if isinstance(direct, str) else None,
         signed_token_header_name=signed if isinstance(signed, str) else None,
         require_direct_header=require_direct if isinstance(require_direct, bool) else False,
-        has_hmac_secret=has_secret if isinstance(has_secret, bool) else False,
+        has_hmac_secret=has_secret,
     )
 
 
 def _principal_update_payload(body: UpdateAPIPrincipalConfigRequest) -> JsonObject:
-    """Build the stored principal config object from an update request."""
+    """Build the stored principal config object from an update request.
+
+    ``hmac_secret`` is carried through verbatim; the service resolves
+    the ``"***"`` redaction placeholder against the stored secret (Go
+    ``apiPrincipalSecretRedacted`` semantics).
+    """
     return {
         "mode": body.mode,
         "direct_header_name": body.direct_header_name,
         "signed_token_header_name": body.signed_token_header_name,
         "require_direct_header": body.require_direct_header,
-        "has_hmac_secret": body.hmac_secret is not None,
+        "hmac_secret": body.hmac_secret,
     }
 
 

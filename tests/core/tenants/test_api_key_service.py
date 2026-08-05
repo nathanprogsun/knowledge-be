@@ -76,7 +76,7 @@ async def test_create_api_key_returns_token_once_and_stores_only_its_hash(
     service: TenantAPIKeyService,
     repo: FakeTenantAPIKeyRepository,
 ) -> None:
-    result = await service.create_api_key(name="ci", tenant_id=_TENANT_ID)
+    result = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
 
     stored = repo.rows[result.key.id]
     assert result.token.startswith("sk-")
@@ -85,14 +85,14 @@ async def test_create_api_key_returns_token_once_and_stores_only_its_hash(
 
 
 async def test_create_api_key_trims_name(service: TenantAPIKeyService) -> None:
-    result = await service.create_api_key(name="  ci  ", tenant_id=_TENANT_ID)
+    result = await service.create_api_key(name="  ci  ", tenant_id=_TENANT_ID, full_access=True)
 
     assert result.key.name == "ci"
 
 
 async def test_create_api_key_rejects_blank_name(service: TenantAPIKeyService) -> None:
     with pytest.raises(ValidationError) as excinfo:
-        await service.create_api_key(name="   ", tenant_id=_TENANT_ID)
+        await service.create_api_key(name="   ", tenant_id=_TENANT_ID, full_access=True)
 
     assert excinfo.value.code == "tenant_api_key.name_required"
 
@@ -168,6 +168,7 @@ async def test_create_api_key_normalizes_expiry_to_utc(service: TenantAPIKeyServ
     result = await service.create_api_key(
         name="ci",
         tenant_id=_TENANT_ID,
+        full_access=True,
         expires_at=expires,
     )
 
@@ -181,7 +182,7 @@ async def test_create_api_key_normalizes_expiry_to_utc(service: TenantAPIKeyServ
 async def test_authenticate_resolves_a_live_key(
     service: TenantAPIKeyService,
 ) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID)
+    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
 
     found = await service.authenticate(created.token)
 
@@ -190,7 +191,7 @@ async def test_authenticate_resolves_a_live_key(
 
 
 async def test_authenticate_trims_the_token(service: TenantAPIKeyService) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID)
+    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
 
     found = await service.authenticate(f"  {created.token}  ")
 
@@ -214,7 +215,7 @@ async def test_authenticate_rejects_unknown_token(service: TenantAPIKeyService) 
 
 
 async def test_authenticate_rejects_revoked_key(service: TenantAPIKeyService) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID)
+    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
     await service.revoke_api_key(created.key.id, tenant_id=_TENANT_ID)
 
     with pytest.raises(NotFoundError):
@@ -227,6 +228,7 @@ async def test_authenticate_rejects_expired_key(
     created = await service.create_api_key(
         name="ci",
         tenant_id=_TENANT_ID,
+        full_access=True,
         expires_at=datetime.now(UTC) - timedelta(seconds=1),
     )
 
@@ -238,7 +240,7 @@ async def test_authenticate_stamps_last_used_on_first_use(
     service: TenantAPIKeyService,
     repo: FakeTenantAPIKeyRepository,
 ) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID)
+    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
 
     await service.authenticate(created.token)
 
@@ -249,7 +251,7 @@ async def test_authenticate_throttles_repeated_last_used_writes(
     service: TenantAPIKeyService,
     repo: FakeTenantAPIKeyRepository,
 ) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID)
+    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
     await service.authenticate(created.token)
     first_touch = repo.rows[created.key.id].last_used_at
 
@@ -262,7 +264,7 @@ async def test_authenticate_refreshes_last_used_after_the_interval(
     service: TenantAPIKeyService,
     repo: FakeTenantAPIKeyRepository,
 ) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID)
+    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
     stale = datetime.now(UTC) - timedelta(minutes=5)
     repo.rows[created.key.id] = repo.rows[created.key.id].model_copy(update={"last_used_at": stale})
 
@@ -279,9 +281,9 @@ async def test_authenticate_refreshes_last_used_after_the_interval(
 async def test_list_api_keys_returns_only_that_tenants_live_keys(
     service: TenantAPIKeyService,
 ) -> None:
-    mine = await service.create_api_key(name="mine", tenant_id=_TENANT_ID)
-    await service.create_api_key(name="theirs", tenant_id=_TENANT_ID + 1)
-    revoked = await service.create_api_key(name="revoked", tenant_id=_TENANT_ID)
+    mine = await service.create_api_key(name="mine", tenant_id=_TENANT_ID, full_access=True)
+    await service.create_api_key(name="theirs", tenant_id=_TENANT_ID + 1, full_access=True)
+    revoked = await service.create_api_key(name="revoked", tenant_id=_TENANT_ID, full_access=True)
     await service.revoke_api_key(revoked.key.id, tenant_id=_TENANT_ID)
 
     keys = await service.list_api_keys(_TENANT_ID)
@@ -297,7 +299,7 @@ async def test_list_platform_api_keys_filters_by_scope(
         scope_type=SCOPE_PLATFORM,
         capabilities=["system_tenants_read"],
     )
-    await service.create_api_key(name="tenant-scoped", tenant_id=_TENANT_ID)
+    await service.create_api_key(name="tenant-scoped", tenant_id=_TENANT_ID, full_access=True)
 
     keys = await service.list_platform_api_keys()
 
@@ -311,7 +313,7 @@ async def test_revoke_api_key_stamps_revoked_at(
     service: TenantAPIKeyService,
     repo: FakeTenantAPIKeyRepository,
 ) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID)
+    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
 
     await service.revoke_api_key(created.key.id, tenant_id=_TENANT_ID)
 
@@ -321,14 +323,14 @@ async def test_revoke_api_key_stamps_revoked_at(
 async def test_revoke_api_key_rejects_another_tenants_key(
     service: TenantAPIKeyService,
 ) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID)
+    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
 
     with pytest.raises(NotFoundError):
         await service.revoke_api_key(created.key.id, tenant_id=_TENANT_ID + 1)
 
 
 async def test_revoke_api_key_twice_raises_not_found(service: TenantAPIKeyService) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID)
+    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
     await service.revoke_api_key(created.key.id, tenant_id=_TENANT_ID)
 
     with pytest.raises(NotFoundError):
@@ -338,7 +340,7 @@ async def test_revoke_api_key_twice_raises_not_found(service: TenantAPIKeyServic
 async def test_revoke_platform_api_key_rejects_a_tenant_key(
     service: TenantAPIKeyService,
 ) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID)
+    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
 
     with pytest.raises(NotFoundError):
         await service.revoke_platform_api_key(created.key.id)
@@ -401,6 +403,6 @@ async def test_backfill_skips_rows_without_a_stored_token(
 async def test_backfill_is_a_noop_without_placeholders(
     service: TenantAPIKeyService,
 ) -> None:
-    await service.create_api_key(name="ci", tenant_id=_TENANT_ID)
+    await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
 
     assert await service.backfill_missing_key_hashes() == 0

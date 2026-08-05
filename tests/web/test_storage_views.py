@@ -440,15 +440,20 @@ async def test_test_raw_config_reports_a_probe_failure_as_200(
     assert body["error"] == "bucket unavailable"
 
 
-async def test_test_raw_config_rejects_an_invalid_body_with_422(
+async def test_test_raw_config_reports_an_invalid_body_with_200(
     client: AsyncClient,
 ) -> None:
+    """A validation failure answers 200 with ``success=false`` (Go keeps
+    the HTTP status at 200 and reports the error in the body)."""
     resp = await client.post(
         "/storage-backends/test",
         json={"name": "Probe", "provider": "minio", "config": {"mode": "remote"}},
     )
 
-    assert resp.status_code == 422
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]
 
 
 # ── POST /storage-backends/{id}/test ────────────────────────────────

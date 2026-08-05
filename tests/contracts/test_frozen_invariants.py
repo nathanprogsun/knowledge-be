@@ -80,7 +80,9 @@ def _dummy_for(annotation: Any) -> Any:
         if args:
             return args[0]
     if annotation is str:
-        return "x"
+        # Long enough to satisfy any ``min_length`` constraint on the
+        # contract fields (e.g. password ``min_length=6``).
+        return "x" * 6
     if annotation is int:
         return 0
     if annotation is float:

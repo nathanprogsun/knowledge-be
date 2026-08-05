@@ -16,7 +16,8 @@ class RegisterRequest(BaseModel):
 
     username: str
     email: str
-    password: str
+    # Go ``types/user.go``: ``binding:"required,min=6"``.
+    password: str = Field(min_length=6)
 
 
 class LoginRequest(BaseModel):
@@ -36,7 +37,8 @@ class ChangePasswordRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     old_password: str
-    new_password: str
+    # Go ``handler/auth.go``: ``binding:"required,min=6"``.
+    new_password: str = Field(min_length=6)
 
 
 class AuthUser(BaseModel):

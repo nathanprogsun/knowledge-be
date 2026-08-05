@@ -306,6 +306,16 @@ def _parse_pull_progress(line: str) -> tuple[float, str]:
         return 0.0, ""
     if not isinstance(frame, dict):
         return 0.0, ""
+    # An error frame (``{"error": "..."}``) aborts the pull — surface it
+    # as a failure so the task lands in ``failed`` instead of being
+    # reported as completed when the stream ends (Go
+    # ``pullModelWithProgress`` propagates the error).
+    error = frame.get("error")
+    if isinstance(error, str) and error:
+        raise ExternalServiceError(
+            f"ollama pull failed: {error}",
+            code="ollama.pull_failed",
+        )
     status = frame.get("status")
     status_text = status if isinstance(status, str) else ""
     total = frame.get("total")

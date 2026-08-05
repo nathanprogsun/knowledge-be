@@ -18,8 +18,14 @@ from datetime import UTC, datetime
 from typing import cast
 
 from src.ai.mcp_transport.errors import MCPError
-from src.common.exception import ConflictError, NotFoundError, ValidationError
+from src.common.exception import (
+    ApplicationError,
+    ConflictError,
+    NotFoundError,
+    ValidationError,
+)
 from src.common.json import JsonObject, JsonValue, SqlValue
+from src.common.oidc_client import validate_ssrf_safe_url
 from src.core.infra.mcp_services.connectivity import (
     ConnectivityProbe,
     ConnectivityResult,
@@ -114,6 +120,10 @@ class MCPServiceService:
                 code="mcp_service.url_required",
                 message=(f"url is required when transport_type is {transport_type!r}"),
             )
+        # SSRF validation for the service URL — mirrors Go
+        # mcp_service.go ``ValidateURLForSSRF`` on create.
+        if url and url.strip():
+            await _validate_url_ssrf(url)
         if advanced_config is None:
             advanced_config = dict(_DEFAULT_ADVANCED_CONFIG)
 
@@ -216,6 +226,10 @@ class MCPServiceService:
             stdio_config=stdio_config,
             env_vars=env_vars,
         )
+        # SSRF validation for a supplied URL — mirrors Go
+        # mcp_service.go ``ValidateURLForSSRF`` on update.
+        if "url" in columns and columns["url"]:
+            await _validate_url_ssrf(str(columns["url"]))
         if "transport_type" in columns:
             self._validate_transport(str(columns["transport_type"]))
             if columns["transport_type"] == _TRANSPORT_STDIO:
@@ -434,6 +448,22 @@ class MCPServiceService:
                 code="mcp_service.invalid_transport",
                 message=f"transport_type must be one of {sorted(_KNOWN_TRANSPORT_TYPES)}",
             )
+
+
+async def _validate_url_ssrf(url: str) -> None:
+    """Reject a service URL that is not SSRF-safe.
+
+    Mirrors Go mcp_service.go: ``if service.URL != nil && *service.URL
+    != ""`` then ``ValidateURLForSSRF``.
+    """
+    try:
+        await validate_ssrf_safe_url(url)
+    except ApplicationError as exc:
+        raise ValidationError(
+            code="mcp_service.url_ssrf_blocked",
+            message="MCP service URL failed SSRF validation",
+            details={"reason": exc.message},
+        ) from exc
 
 
 def _is_oauth(auth_config: JsonValue) -> bool:

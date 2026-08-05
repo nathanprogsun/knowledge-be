@@ -23,7 +23,7 @@ Field and JSON names match ``internal/types/datasource.go`` exactly.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Self
+from typing import Self, cast
 
 from pydantic import BaseModel, ConfigDict
 
@@ -54,6 +54,7 @@ from src.common.datasource_protocol import (
 )
 from src.common.json import JsonObject
 from src.db.models.datasource import DataSource, SyncLog
+from src.util.crypto import decrypt_stored_secret_lenient, encrypt_aesgcm, get_aes_key
 
 # ── Sync modes ───────────────────────────────────────────────────────
 
@@ -203,11 +204,49 @@ def parse_config(raw: JsonObject | None) -> DataSourceConfig | None:
     rather than rejected: the column is written by other revisions too,
     and a strict decode would make a whole data source unreadable over
     one stray key.
+
+    Credential strings are decrypted in place (Go ``ParseConfig``):
+    legacy plaintext passes through, ``enc:v1:`` blobs are decrypted
+    with ``SYSTEM_AES_KEY``, and a decrypt failure blanks the field so
+    the row stays visible.
     """
     if not raw:
         return None
     known = set(DataSourceConfig.model_fields)
-    return DataSourceConfig.model_validate({k: v for k, v in raw.items() if k in known})
+    parsed = DataSourceConfig.model_validate({k: v for k, v in raw.items() if k in known})
+    if parsed.credentials:
+        decrypted: JsonObject = {}
+        for key, value in parsed.credentials.items():
+            if isinstance(value, str) and value:
+                plain, ok = decrypt_stored_secret_lenient(value)
+                decrypted[key] = plain if ok else ""
+            else:
+                decrypted[key] = value
+        parsed = parsed.model_copy(update={"credentials": decrypted})
+    return parsed
+
+
+def encrypt_config_credentials(config: JsonObject) -> JsonObject:
+    """Encrypt every credential string in a config blob before storage.
+
+    Mirrors Go ``DataSourceConfig.ToJSON``: only string values inside
+    ``credentials`` are encrypted (non-strings pass through), and only
+    when ``SYSTEM_AES_KEY`` is configured. Operates on a copy — the
+    caller's dict is never mutated.
+    """
+    if not config or not isinstance(config.get(CREDENTIALS_FIELD), dict):
+        return config
+    key = get_aes_key()
+    if key is None:
+        return config
+    credentials = cast("JsonObject", config[CREDENTIALS_FIELD])
+    encrypted: JsonObject = {}
+    for k, v in credentials.items():
+        if isinstance(v, str) and v:
+            encrypted[k] = encrypt_aesgcm(v, key)
+        else:
+            encrypted[k] = v
+    return {**config, CREDENTIALS_FIELD: encrypted}
 
 
 def _enrich_rss_feed_urls(connector_type: str, parsed: DataSourceConfig) -> JsonObject:

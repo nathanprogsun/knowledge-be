@@ -197,6 +197,14 @@ class TenantAPIKeyService:
                 code="tenant_api_key.tenant_required",
                 message="tenant_id is required",
             )
+        if scope == SCOPE_TENANT and not full_access and not capabilities:
+            # Go ``tenant.go``: "capabilities are required for scoped API
+            # keys" — a scoped key with no capabilities can never pass
+            # the api-key gate, so reject it at create time.
+            raise ValidationError(
+                code="tenant_api_key.capabilities_required",
+                message="capabilities are required for scoped API keys",
+            )
         if scope != SCOPE_PLATFORM:
             return
         if full_access:

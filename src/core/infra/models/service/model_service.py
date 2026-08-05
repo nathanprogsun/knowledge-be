@@ -15,8 +15,9 @@ import uuid
 from datetime import UTC, datetime
 from typing import cast
 
-from src.common.exception import NotFoundError, ValidationError
+from src.common.exception import ApplicationError, NotFoundError, ValidationError
 from src.common.json import BindParams, JsonObject
+from src.common.oidc_client import validate_ssrf_safe_url
 from src.core.contracts.infra import (
     CreateModelRequest,
     ModelParameters,
@@ -38,6 +39,25 @@ def _now() -> datetime:
 def _new_id() -> str:
     """Generate a UUID for a freshly created model row."""
     return str(uuid.uuid4())
+
+
+async def _validate_parameters_ssrf(parameters: JsonObject) -> None:
+    """Reject a model ``base_url`` that is not SSRF-safe.
+
+    Mirrors Go model.go: ``if req.Parameters.BaseURL != ""`` then
+    ``ValidateURLForSSRF`` — empty base_url is allowed (local models).
+    """
+    base_url = parameters.get("base_url")
+    if not isinstance(base_url, str) or not base_url.strip():
+        return
+    try:
+        await validate_ssrf_safe_url(base_url)
+    except ApplicationError as exc:
+        raise ValidationError(
+            code="model.base_url_ssrf_blocked",
+            message="model base_url failed SSRF validation",
+            details={"reason": exc.message},
+        ) from exc
 
 
 def _coerce_parameters(raw: JsonObject | ModelParameters | None) -> JsonObject:
@@ -103,11 +123,14 @@ class ModelService:
             )
         now = _now()
         parameters = _coerce_parameters(body.parameters)
+        # SSRF validation for model BaseURL — mirrors Go model.go
+        # ``ValidateURLForSSRF`` on create.
+        await _validate_parameters_ssrf(parameters)
         row = Model(
             id=model_id or _new_id(),
             tenant_id=tenant_id,
             name=clean_name,
-            display_name=body.name,
+            display_name=body.display_name or body.name,
             type=body.type,
             source=body.source,
             description=body.description,
@@ -184,7 +207,7 @@ class ModelService:
                 code="model.builtin_protected",
                 message="Only system administrators can update builtin models",
             )
-        updates = self._build_update_columns(
+        updates = await self._build_update_columns(
             existing=existing,
             body=body,
         )
@@ -210,7 +233,7 @@ class ModelService:
         return ModelInfo.map_from_db(row)
 
     @staticmethod
-    def _build_update_columns(
+    async def _build_update_columns(
         *,
         existing: Model,
         body: UpdateModelRequest,
@@ -231,6 +254,8 @@ class ModelService:
                     message="Model name cannot be empty",
                 )
             columns["name"] = clean_name
+        if body.display_name is not None:
+            columns["display_name"] = body.display_name
         if body.description is not None:
             columns["description"] = body.description
         if body.type is not None:
@@ -251,6 +276,9 @@ class ModelService:
             for key, value in existing_params.items():
                 if key not in new_params:
                     new_params[key] = value
+            # SSRF validation for the merged BaseURL — mirrors Go
+            # model.go ``ValidateURLForSSRF`` on update.
+            await _validate_parameters_ssrf(new_params)
             columns["parameters"] = new_params
         return columns
 

@@ -30,7 +30,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.common.json import JsonObject, JsonValue
@@ -41,6 +41,7 @@ from src.web.deps import (
     AuthDep,
     SystemAdminDep,
     SystemSettingServiceDep,
+    get_request_user_id,
 )
 
 router = APIRouter(prefix="/system/admin", tags=["system-admin"])
@@ -206,6 +207,7 @@ async def get_setting(
 async def update_setting(
     _auth: AuthDep,
     _admin: SystemAdminDep,
+    request: Request,
     key: str,
     body: UpdateSystemSettingRequest,
     settings_svc: SystemSettingServiceDep,
@@ -214,9 +216,14 @@ async def update_setting(
 
     The service validates the value against the registry's declared
     ``value_type`` and rejects mismatches with 400. Emits an audit row
-    (``system.setting_changed``) on success.
+    (``system.setting_changed``) on success, stamped with the acting
+    user (Go reads ``actorID`` from the request context).
     """
-    info = await settings_svc.update(key=key, raw_value=body.value)
+    info = await settings_svc.update(
+        key=key,
+        raw_value=body.value,
+        actor_user_id=get_request_user_id(request),
+    )
     return _setting_to_response(info)
 
 

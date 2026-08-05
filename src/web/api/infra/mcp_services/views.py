@@ -8,7 +8,7 @@ the standard success / list envelopes.
 
 from __future__ import annotations
 
-from typing import cast
+from typing import Final, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -111,17 +111,31 @@ def _to_auth_config(info: MCPServiceInfo) -> MCPMcpServiceAuthConfig | None:
     return MCPMcpServiceAuthConfig.model_validate(raw)
 
 
-def _auth_config_to_wire_dict(model: MCPMcpServiceAuthConfig) -> dict[str, JsonValue]:
-    """Serialise the auth DTO verbatim.
+# Go's ``dto.MCPAuthConfigResponse`` intentionally has no APIKey/Token
+# fields — presence is signalled via ``MCPServiceResponse.Credentials``.
+# These are the only fields safe to echo back.
+_AUTH_CONFIG_WIRE_FIELDS: Final = frozenset(
+    {
+        "auth_type",
+        "api_key_header",
+        "custom_headers",
+        "scopes",
+        "auth_server_metadata_url",
+    }
+)
 
-    The frozen contract requires ``api_key`` and ``token`` as nullable
-    fields. User-created rows carry them through unchanged so the wire
-    shape matches ``docs/api/mcp-service.md``.
+
+def _auth_config_to_wire_dict(model: MCPMcpServiceAuthConfig) -> dict[str, JsonValue]:
+    """Serialise the auth DTO with secret fields stripped.
+
+    Mirrors Go's ``MCPAuthConfigResponse``: ``api_key`` and ``token`` are
+    never emitted — their presence is reported via the ``credentials``
+    metadata map on the envelope.
     """
     dumped = model.model_dump(mode="json", exclude_none=True)
     if not isinstance(dumped, dict):
         return {}
-    return dict(dumped)
+    return {k: v for k, v in dumped.items() if k in _AUTH_CONFIG_WIRE_FIELDS}
 
 
 def _to_advanced_config(

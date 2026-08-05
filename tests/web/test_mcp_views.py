@@ -151,12 +151,12 @@ async def test_create_service_rejects_stdio(client: AsyncClient) -> None:
     assert resp.json()["error"]["code"] == "mcp_service.stdio_disabled"
 
 
-async def test_create_service_preserves_secrets(client: AsyncClient) -> None:
-    """``api_key`` / ``token`` are kept verbatim on user services.
+async def test_create_service_never_echoes_secrets(client: AsyncClient) -> None:
+    """``api_key`` / ``token`` are never echoed on the wire.
 
-    Mirrors Go's ``dto.NewMCPServiceResponse`` — credentials are not
-    stripped on user-created rows; only built-in services (not exposed
-    via the public API) are masked.
+    Mirrors Go's ``dto.MCPAuthConfigResponse`` — the response DTO has no
+    APIKey/Token fields; presence is signalled via the ``credentials``
+    metadata map.
     """
     resp = await client.post(
         "/mcp-services",
@@ -173,11 +173,14 @@ async def test_create_service_preserves_secrets(client: AsyncClient) -> None:
         },
     )
     assert resp.status_code == 201
-    auth = resp.json()["data"]["auth_config"]
+    data = resp.json()["data"]
+    auth = data["auth_config"]
     assert auth["auth_type"] == "api_key"
-    assert auth["api_key"] == "should-be-preserved"
-    assert auth["token"] == "should-be-preserved"
+    assert "api_key" not in auth
+    assert "token" not in auth
     assert auth["scopes"] == ["read"]
+    assert data["credentials"]["api_key"]["configured"] is True
+    assert data["credentials"]["token"]["configured"] is True
 
 
 # ── GET /mcp-services ───────────────────────────────────────────────
@@ -238,9 +241,11 @@ async def test_update_service_preserves_secret_auth(
         },
     )
     assert resp.status_code == 200
-    auth = resp.json()["data"]["auth_config"]
+    data = resp.json()["data"]
+    auth = data["auth_config"]
     assert auth.get("auth_type") == "oauth"
-    assert auth.get("api_key") == "should-be-preserved"
+    assert "api_key" not in auth
+    assert data["credentials"]["api_key"]["configured"] is True
 
 
 # ── DELETE /mcp-services/{id} ────────────────────────────────────────

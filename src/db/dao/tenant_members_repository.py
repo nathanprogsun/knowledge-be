@@ -186,6 +186,24 @@ class TenantMemberRepository(GenericRepository[TenantMember]):
             {"user_id": user_id, "tenant_id": tenant_id, "deleted_at": deleted_at},
         )
 
+    async def soft_delete_by_tenant(
+        self,
+        *,
+        tenant_id: int,
+        deleted_at: datetime,
+    ) -> int:
+        """Soft-delete every live membership of a workspace.
+
+        Called when the workspace itself is deleted (Go deletes
+        ``TenantMember`` rows in the same transaction) so the deleted
+        workspace never surfaces in ``/auth/me``.
+        """
+        return await self._update_live(
+            "deleted_at = :deleted_at, updated_at = :deleted_at",
+            {"tenant_id": tenant_id, "deleted_at": deleted_at},
+            where="tenant_id = :tenant_id",
+        )
+
     # ── Query builders ──────────────────────────────────────────────
 
     async def _select_members(
@@ -199,10 +217,15 @@ class TenantMemberRepository(GenericRepository[TenantMember]):
         result = await self._session.execute(stmt)
         return [self._hydrate(m) for m in result.mappings().all()]
 
-    async def _update_live(self, set_clause: str, params: BindParams) -> int:
+    async def _update_live(
+        self,
+        set_clause: str,
+        params: BindParams,
+        *,
+        where: str = "user_id = :user_id and tenant_id = :tenant_id",
+    ) -> int:
         stmt = text(
-            f"update {self._table} set {set_clause} "
-            f"where user_id = :user_id and tenant_id = :tenant_id and {_LIVE}"
+            f"update {self._table} set {set_clause} where {where} and {_LIVE}"
         ).bindparams(**params)
         result = await self._session.execute(stmt)
         return cast("CursorResult[SqlValue]", result).rowcount

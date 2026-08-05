@@ -37,6 +37,7 @@ from src.core.infra.web_search.types import (
 )
 from src.db.dao.web_search_provider_repository import WebSearchProviderRepository
 from src.db.models.infra.web_search_provider import WebSearchProvider
+from src.util.crypto import decrypt_stored_secret_lenient, encrypt_aesgcm, get_aes_key
 
 _NOT_FOUND_CODE = "web_search_provider.not_found"
 
@@ -302,6 +303,12 @@ def _parameters_from_json(raw: JsonObject | None) -> WebSearchProviderParameters
             str(k): str(v) for k, v in extra.items() if isinstance(v, (str, int, float, bool))
         }
     api_key = raw.get("api_key")
+    if isinstance(api_key, str) and api_key:
+        # Decrypt an ``enc:v1:`` blob; legacy plaintext passes through.
+        # A decrypt failure (rotated key) blanks the field so the row
+        # stays visible — Go ``WebSearchProviderParameters.Scan``.
+        plain, ok = decrypt_stored_secret_lenient(api_key)
+        api_key = plain if ok else ""
     cx_raw = raw.get("cx") or raw.get("engine_id") or raw.get("engineId")
     base_url = raw.get("base_url")
     proxy_url = raw.get("proxy_url")
@@ -315,10 +322,15 @@ def _parameters_from_json(raw: JsonObject | None) -> WebSearchProviderParameters
 
 
 def _parameters_to_json(params: WebSearchProviderParameters) -> JsonObject:
-    """Render the typed DTO as the JSONB blob the row carries."""
+    """Render the typed DTO as the JSONB blob the row carries.
+
+    The api_key is AES-GCM encrypted before persistence (Go
+    ``WebSearchProviderParameters.Value``); other fields pass through.
+    """
     raw: JsonObject = {}
     if params.api_key is not None:
-        raw["api_key"] = params.api_key
+        key = get_aes_key()
+        raw["api_key"] = encrypt_aesgcm(params.api_key, key) if key is not None else params.api_key
     if params.cx is not None:
         raw["cx"] = params.cx
     if params.base_url is not None:

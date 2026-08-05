@@ -76,14 +76,19 @@ async def test_storage_backend_config(
     """Probe a configuration without persisting it.
 
     A connectivity failure answers 200 with ``success=false`` and a
-    sanitized message; only an invalid request body is a 4xx.
+    sanitized message; a validation failure (SSRF block, missing field)
+    answers the same way — Go's ``TestRaw`` keeps the HTTP status at
+    200 and reports the error in the body.
     """
-    result = await service.test_config(
-        tenant_id=_require_tenant(request),
-        name=body.name,
-        provider=body.provider,
-        config=config_from_contract(body.config),
-    )
+    try:
+        result = await service.test_config(
+            tenant_id=_require_tenant(request),
+            name=body.name,
+            provider=body.provider,
+            config=config_from_contract(body.config),
+        )
+    except ValidationError as exc:
+        return StorageConnectivityEnvelope(success=False, error=exc.message)
     return connectivity_envelope(result)
 
 
@@ -183,8 +188,15 @@ async def test_storage_backend_by_id(
     id: str,
     service: StorageBackendServiceDep,
 ) -> StorageConnectivityEnvelope:
-    """Probe a saved backend using its stored credentials."""
-    result = await service.test_backend(tenant_id=_require_tenant(request), id=id)
+    """Probe a saved backend using its stored credentials.
+
+    A validation failure answers 200 with ``success=false`` (Go
+    ``TestByID`` keeps the HTTP status at 200).
+    """
+    try:
+        result = await service.test_backend(tenant_id=_require_tenant(request), id=id)
+    except ValidationError as exc:
+        return StorageConnectivityEnvelope(success=False, error=exc.message)
     return connectivity_envelope(result)
 
 

@@ -98,6 +98,29 @@ def _require_name(name: str) -> str:
     return clean
 
 
+async def _validate_endpoint_ssrf(connection_config: JsonObject | None) -> None:
+    """Reject user-supplied endpoints that are not SSRF-safe.
+
+    Mirrors Go ``validateConnectionAddrSSRF``: applied ONLY at
+    user-input boundaries (create / raw test); stored configs are
+    trusted and skip it. ``addr`` (elasticsearch/milvus/...) or
+    ``host`` (qdrant) carries the endpoint.
+    """
+    if not connection_config:
+        return
+    endpoint = connection_config.get("addr") or connection_config.get("host")
+    if not isinstance(endpoint, str) or not endpoint.strip():
+        return
+    try:
+        await validate_ssrf_safe_url(endpoint)
+    except ApplicationError as exc:
+        raise ValidationError(
+            code="vector_store.endpoint_ssrf_blocked",
+            message="vector store endpoint failed SSRF validation",
+            details={"reason": exc.message},
+        ) from exc
+
+
 class VectorStoreService:
     """Stateless vector-store service, constructed per request."""
 
@@ -167,6 +190,9 @@ class VectorStoreService:
         _require_engine_type(body.engine_type)
         clean_name = _require_name(body.name)
         self._validate_connection_config(body.engine_type, body.connection_config)
+        # SSRF policy on user-supplied addresses, before any network I/O —
+        # mirrors Go ``validateConnectionAddrSSRF`` at CreateStore.
+        await _validate_endpoint_ssrf(cast("JsonObject | None", body.connection_config))
         endpoint = _endpoint_of(cast("JsonObject | None", body.connection_config))
         index_name = _index_name_of(body.index_config, body.engine_type)
         if await self._vector_store_repo.exists_by_engine_type_endpoint_index(
@@ -286,12 +312,18 @@ class VectorStoreService:
         tenant_id: int,
         store_id: str,
     ) -> TestVectorStoreResponse:
-        """Run the connectivity probe against the stored config."""
+        """Run the connectivity probe against the stored config.
+
+        Stored configs are trusted (Go ``TestStoreByID`` skips the SSRF
+        policy — it was already enforced at create time), so the probe
+        runs without a re-check.
+        """
         info = await self.require_store(tenant_id, store_id)
         return await self._run_test(
             engine_type=info.engine_type,
             connection_config=info.connection_config or {},
             allowlist_only=False,
+            ssrf_check=False,
         )
 
     async def test_raw(
@@ -320,6 +352,7 @@ class VectorStoreService:
         engine_type: str,
         connection_config: Mapping[str, JsonValue],
         allowlist_only: bool,
+        ssrf_check: bool = True,
     ) -> TestVectorStoreResponse:
         if allowlist_only and not is_valid_engine_type(engine_type):
             raise ValidationError(
@@ -327,20 +360,8 @@ class VectorStoreService:
                 message=f"connection test is not supported for engine type: {engine_type}",
             )
         self._validate_connection_config(engine_type, connection_config)
-        # SSRF guard on the probe target, mirroring the storage-backend
-        # test endpoints: the probe must not be usable as an internal
-        # port scanner. ``addr`` (elasticsearch/milvus/...) or ``host``
-        # (qdrant) carries the endpoint.
-        endpoint = connection_config.get("addr") or connection_config.get("host")
-        if isinstance(endpoint, str) and endpoint.strip():
-            try:
-                await validate_ssrf_safe_url(endpoint)
-            except ApplicationError as exc:
-                raise ValidationError(
-                    code="vector_store.endpoint_ssrf_blocked",
-                    message="vector store endpoint failed SSRF validation",
-                    details={"reason": exc.message},
-                ) from exc
+        if ssrf_check:
+            await _validate_endpoint_ssrf(cast("JsonObject | None", dict(connection_config)))
         version, error = await test_connection_async(engine_type, connection_config)
         if error is not None:
             return TestVectorStoreResponse(

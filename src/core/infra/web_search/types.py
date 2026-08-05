@@ -28,6 +28,7 @@ from src.core.contracts.infra import (
     WebSearchProviderTypeInfo,
 )
 from src.db.models.infra.web_search_provider import WebSearchProvider
+from src.util.crypto import decrypt_stored_secret_lenient
 
 # ── Provider-type metadata (registry) ───────────────────────────────
 
@@ -208,6 +209,12 @@ def _parameters_from_raw(raw: JsonObject | None) -> WebSearchProviderParameters 
         typed_extra = {
             str(k): str(v) for k, v in extra_dict.items() if isinstance(v, (str, int, float, bool))
         }
+    api_key = raw.get("api_key")
+    if isinstance(api_key, str) and api_key:
+        # Decrypt an ``enc:v1:`` blob; legacy plaintext passes through.
+        # A decrypt failure blanks the field (Go ``Scan`` semantics).
+        plain, ok = decrypt_stored_secret_lenient(api_key)
+        api_key = plain if ok else ""
     api_key = raw.get("api_key")
     # ``cx`` is the Go-spec field name; ``engine_id`` / ``engineId`` are
     # accepted as legacy aliases.

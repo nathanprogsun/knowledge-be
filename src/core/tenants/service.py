@@ -13,6 +13,7 @@ from typing import cast
 from src.common.exception import NotFoundError, ValidationError
 from src.common.json import BindParams, JsonObject, JsonValue
 from src.core.tenants.types import TenantInfo
+from src.db.dao.tenant_members_repository import TenantMemberRepository
 from src.db.dao.tenants_repository import TenantRepository
 from src.db.models.tenants.tenants import DEFAULT_STORAGE_QUOTA_BYTES, Tenant
 
@@ -22,6 +23,10 @@ _INITIAL_STATUS = "active"
 # API-principal authentication strategies (Go ``UpdateAPIPrincipalConfig``).
 _PRINCIPAL_MODES: frozenset[str] = frozenset({"tenant", "direct_header", "signed_token"})
 
+# Redaction placeholder an update request may re-submit to mean "keep
+# the existing secret" (Go ``apiPrincipalSecretRedacted``).
+_PRINCIPAL_SECRET_REDACTED = "***"
+
 # Default page size for the search endpoint.
 _DEFAULT_PAGE_SIZE = 20
 
@@ -29,8 +34,14 @@ _DEFAULT_PAGE_SIZE = 20
 class TenantService:
     """Stateless tenant service, constructed per request."""
 
-    def __init__(self, *, tenants_repo: TenantRepository) -> None:
+    def __init__(
+        self,
+        *,
+        tenants_repo: TenantRepository,
+        members_repo: TenantMemberRepository | None = None,
+    ) -> None:
         self._tenants_repo = tenants_repo
+        self._members_repo = members_repo
 
     # ── Create ──────────────────────────────────────────────────────
 
@@ -185,7 +196,10 @@ class TenantService:
         """Soft-delete a workspace; return whether a row was deleted.
 
         Idempotent: deleting an unknown or already-deleted workspace is
-        not an error, it just reports ``False``.
+        not an error, it just reports ``False``. Memberships are
+        soft-deleted in the same pass — Go's repository deletes
+        ``TenantMember`` rows in the same transaction, and leaving them
+        would surface the deleted workspace in ``/auth/me``.
         """
         self._require_valid_id(tenant_id)
         now = datetime.now(UTC)
@@ -193,6 +207,8 @@ class TenantService:
             {"id": tenant_id},
             {"deleted_at": now, "updated_at": now},
         )
+        if row is not None and self._members_repo is not None:
+            await self._members_repo.soft_delete_by_tenant(tenant_id=tenant_id, deleted_at=now)
         return row is not None
 
     # ── Storage counters ────────────────────────────────────────────
@@ -220,15 +236,29 @@ class TenantService:
                 code="tenant.principal_mode_invalid",
                 message="mode must be tenant, direct_header, or signed_token",
             )
-        if mode == "signed_token" and not config.get("hmac_secret"):
+        # Resolve the HMAC secret: an omitted value or the ``"***"``
+        # redaction placeholder keeps the stored secret (Go
+        # ``apiPrincipalSecretRedacted``); anything else replaces it.
+        existing = await self._tenants_repo.find_by_id(tenant_id)
+        existing_secret = ""
+        if existing is not None and existing.api_principal_config:
+            raw = existing.api_principal_config.get("hmac_secret")
+            if isinstance(raw, str):
+                existing_secret = raw
+        provided = config.get("hmac_secret")
+        hmac_secret = existing_secret
+        if isinstance(provided, str) and provided.strip() and provided.strip() != _PRINCIPAL_SECRET_REDACTED:
+            hmac_secret = provided.strip()
+        if mode == "signed_token" and not hmac_secret:
             raise ValidationError(
                 code="tenant.principal_hmac_required",
                 message="hmac_secret is required for signed_token mode",
             )
+        persisted_config = {**config, "hmac_secret": hmac_secret}
         updated = await self._tenants_repo.update_by_primary_key(
             {"id": tenant_id},
             {
-                "api_principal_config": config,
+                "api_principal_config": persisted_config,
                 "updated_at": datetime.now(UTC),
             },
         )

@@ -14,6 +14,7 @@ hit a real network in unit tests).
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterator
 from datetime import UTC, datetime
 
@@ -128,6 +129,13 @@ class _FakeVectorStoreRepo:
         updated = row.model_copy(update=column_to_update)
         self.rows[sid] = updated
         return updated
+
+
+@pytest.fixture(autouse=True)
+def _ssrf_whitelist(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Allow the fake ``es``/``es-b``/``es-c`` probe hosts through the
+    SSRF policy (the whitelist is re-read on every call)."""
+    monkeypatch.setenv("SSRF_WHITELIST", "es,es-b,es-c")
 
 
 # ── Probe monkeypatch ────────────────────────────────────────────────
