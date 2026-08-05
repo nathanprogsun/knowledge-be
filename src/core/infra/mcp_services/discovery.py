@@ -1,32 +1,36 @@
 """Discovery helpers for MCP service tools and resources.
 
-The Go ``mcp_service.go`` ``GetMCPServiceTools`` / ``GetMCPServiceResources``
-methods go through an ``mcpManager`` that maintains a pool of live
-MCP client connections. Real client construction and protocol
-serialization lives behind the ``mcp`` package there; here we model the
-equivalent surface without a live MCP runtime so the service layer
-keeps testable.
+The Go ``mcp_service.go`` ``GetMCPServiceTools`` /
+``GetMCPServiceResources`` methods go through an ``mcpManager`` that
+maintains a pool of live MCP client connections. This module exposes
+the same protocol seam:
 
-``DiscoveryProvider`` is the seam: a callable the service stack
-constructs per request. The default provider returns empty result
-lists (the repository-rows-but-no-live-connection shape) so the
-endpoints are reachable and testable before a real implementation is
-introduced in a later checkpoint.
+- :class:`DiscoveryProvider` — the protocol the service layer depends on.
+- :class:`StaticDiscoveryProvider` — kept for tests that do not want a
+  live transport wired in.
+- :class:`HTTPMCPDiscoveryProvider` — PR-17.5a live implementation that
+  speaks MCP-over-SSE through
+  :class:`src.ai.mcp_transport.MCPConnectionManager`.
+- :class:`DiscoveryCache` — in-memory TTL cache for one
+  ``(tenant_id, service_id)``.
 
-Discovery results are cached per (tenant_id, service_id) for a short
-TTL via ``DiscoveryCache`` to avoid hammering the upstream MCP server
-when the UI polls.
+Discovery results are cached for a short TTL via :class:`DiscoveryCache`
+to avoid hammering the upstream MCP server when the UI polls.
 """
 
 from __future__ import annotations
 
+from collections.abc import Awaitable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Protocol
+from typing import Protocol, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.ai.mcp_transport.errors import MCPError
+from src.ai.mcp_transport.jsonrpc import JSONRPCResponse
 from src.common.json import JsonObject
+from src.core.infra.mcp_services.types import MCPServiceInfo
 
 # Default cache TTL for tool/resource lists. Short so admin edits are
 # picked up promptly without restart; the cache is invalidated
@@ -59,9 +63,9 @@ class DiscoveryResource(BaseModel):
 class DiscoveryProvider(Protocol):
     """Protocol implemented by the live MCP transport client.
 
-    Real implementations (wired in a later checkpoint) speak the
-    MCP-over-HTTP protocol; the default provider used by tests just
-    returns empty results.
+    The service layer depends only on this protocol; production code
+    wires :class:`HTTPMCPDiscoveryProvider` and tests fall back to
+    :class:`StaticDiscoveryProvider`.
     """
 
     async def list_tools(self, *, service_id: str) -> list[DiscoveryTool]: ...
@@ -72,8 +76,9 @@ class DiscoveryProvider(Protocol):
 class StaticDiscoveryProvider:
     """Default provider: returns whatever was pre-baked at construction.
 
-    Keeps the API reachable when no live MCP transport is wired in.
-    A real provider will be installed via DI in a later PR.
+    Used by tests that don't want a live transport wired in. The
+    production wiring in :func:`src.core.infra.mcp_services.factory.build_mcp_service`
+    installs :class:`HTTPMCPDiscoveryProvider` instead.
     """
 
     def __init__(
@@ -92,6 +97,122 @@ class StaticDiscoveryProvider:
         return list(self._resources.get(service_id, []))
 
 
+class ServiceResolver(Protocol):
+    """Async ``service_id → MCPServiceInfo`` resolver for live discovery.
+
+    The factory passes a callable that returns the live ``MCPServiceInfo``
+    (or a pre-baked dict in tests) so this module does not import the
+    repository layer.
+    """
+
+    def __call__(self, service_id: str) -> Awaitable[MCPServiceInfo | dict[str, object]]: ...
+
+
+class _ConnectionManagerLike(Protocol):
+    """Minimal surface the discovery provider needs from the connection manager.
+
+    Declared as a Protocol so callers can pass any object that exposes
+    ``get_or_create`` / ``list_tools`` / ``list_resources`` without
+    forcing this module to import the AI layer.
+    """
+
+    async def get_or_create(  # type: ignore[no-untyped-def]
+        self,
+        *,
+        service_id: str,
+        transport_type: str,
+        url: str,
+        headers: dict[str, str] | None,
+        advanced_timeout_seconds: int | None = None,
+        service_name: str | None = None,
+    ): ...
+
+    async def list_tools(self, *, session: object) -> object: ...
+
+    async def list_resources(self, *, session: object) -> object: ...
+
+
+class HTTPMCPDiscoveryProvider:
+    """Live discovery through the MCP connection manager.
+
+    The provider is constructed once per request; it borrows the
+    APP-scope :class:`src.ai.mcp_transport.MCPConnectionManager` from
+    the runtime and looks the service up via the supplied resolver.
+    The resolver returns either an :class:`MCPServiceInfo` or a
+    ``(transport_type, url, headers, advanced_timeout)`` mapping —
+    kept as a callable so this module never imports the service
+    repository directly.
+    """
+
+    def __init__(
+        self,
+        *,
+        connection_manager: _ConnectionManagerLike,
+        service_resolver: ServiceResolver,
+    ) -> None:
+        self._manager = connection_manager
+        self._resolver = service_resolver
+
+    async def list_tools(self, *, service_id: str) -> list[DiscoveryTool]:
+        response = await self._invoke(service_id, method="tools/list")
+        return _extract_tools(response)
+
+    async def list_resources(self, *, service_id: str) -> list[DiscoveryResource]:
+        response = await self._invoke(service_id, method="resources/list")
+        return _extract_resources(response)
+
+    async def _invoke(self, service_id: str, *, method: str) -> object:
+        info = await self._resolve(service_id)
+        try:
+            session = await self._manager.get_or_create(
+                service_id=service_id,
+                transport_type=str(info["transport_type"]),
+                url=str(info["url"]),
+                headers=cast("dict[str, str]", info.get("headers") or {}),
+                advanced_timeout_seconds=cast(
+                    "int | None",
+                    info.get("advanced_timeout_seconds"),
+                ),
+                service_name=cast("str | None", info.get("name")),
+            )
+        except MCPError as exc:
+            message = getattr(exc, "message_text", None) or str(exc)
+            raise RuntimeError(
+                f"manager could not establish a session for {service_id!r}: {message}"
+            ) from exc
+        if method == "tools/list":
+            response = await self._manager.list_tools(session=session)
+        elif method == "resources/list":
+            response = await self._manager.list_resources(session=session)
+        else:
+            raise ValueError(f"unsupported discovery method {method!r}")
+        if not isinstance(response, JSONRPCResponse):
+            raise RuntimeError(
+                f"unexpected response from manager for {method}: {type(response).__name__}",
+            )
+        if response.error is not None:
+            raise RuntimeError(
+                f"MCP {method} returned error {response.error.code}: {response.error.message}",
+            )
+        return response
+
+    async def _resolve(self, service_id: str) -> dict[str, object]:
+        info = await self._resolver(service_id)
+        if isinstance(info, MCPServiceInfo):
+            return _info_to_resolver_payload(info)
+        if isinstance(info, dict):
+            payload = dict(info)
+            payload.setdefault("transport_type", "sse")
+            payload.setdefault("url", "")
+            payload.setdefault("headers", {})
+            payload.setdefault("advanced_timeout_seconds", None)
+            payload.setdefault("name", service_id)
+            return payload
+        raise TypeError(
+            "service_resolver must return an MCPServiceInfo or a resolver dict",
+        )
+
+
 @dataclass(frozen=True)
 class _CacheEntry:
     tools: tuple[DiscoveryTool, ...]
@@ -103,8 +224,8 @@ class DiscoveryCache:
     """In-memory TTL cache for one (tenant_id, service_id).
 
     Used as a request-scoped helper: a service is created once per
-    request, populated by the first discovery call, and expires at
-    the end of the TTL.
+    request, populated by the first discovery call, and expires at the
+    end of the TTL.
     """
 
     def __init__(self, *, ttl: timedelta = _DISCOVERY_TTL) -> None:
@@ -140,10 +261,90 @@ class DiscoveryCache:
         return list(tools), list(resources)
 
 
+# ── Helpers ────────────────────────────────────────────────────────
+
+
+def _extract_tools(response: object) -> list[DiscoveryTool]:
+    """Translate an MCP ``tools/list`` JSON-RPC response into ``DiscoveryTool`` rows."""
+    if not isinstance(response, JSONRPCResponse):
+        return []
+    result = response.result or {}
+    raw = result.get("tools")
+    if not isinstance(raw, list):
+        return []
+    tools: list[DiscoveryTool] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name")
+        if not isinstance(name, str) or not name:
+            continue
+        description = entry.get("description")
+        input_schema = entry.get("inputSchema")
+        if input_schema is not None and not isinstance(input_schema, dict):
+            input_schema = None
+        tools.append(
+            DiscoveryTool(
+                name=name,
+                description=description if isinstance(description, str) else None,
+                input_schema=cast("JsonObject | None", input_schema),
+                require_approval=False,
+            ),
+        )
+    return tools
+
+
+def _extract_resources(response: object) -> list[DiscoveryResource]:
+    """Translate an MCP ``resources/list`` JSON-RPC response into ``DiscoveryResource`` rows."""
+    if not isinstance(response, JSONRPCResponse):
+        return []
+    result = response.result or {}
+    raw = result.get("resources")
+    if not isinstance(raw, list):
+        return []
+    resources: list[DiscoveryResource] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        uri = entry.get("uri")
+        name = entry.get("name")
+        if not isinstance(uri, str) or not isinstance(name, str):
+            continue
+        description = entry.get("description")
+        mime_type = entry.get("mimeType")
+        resources.append(
+            DiscoveryResource(
+                uri=uri,
+                name=name,
+                description=description if isinstance(description, str) else None,
+                mime_type=mime_type if isinstance(mime_type, str) else None,
+            ),
+        )
+    return resources
+
+
+def _info_to_resolver_payload(info: MCPServiceInfo) -> dict[str, object]:
+    """Render an :class:`MCPServiceInfo` as the resolver payload the manager consumes."""
+    advanced_timeout: int | None = None
+    if isinstance(info.advanced_config, dict):
+        raw_timeout = info.advanced_config.get("timeout")
+        if isinstance(raw_timeout, (int, float)) and raw_timeout > 0:
+            advanced_timeout = int(raw_timeout)
+    return {
+        "transport_type": info.transport_type,
+        "url": info.url or "",
+        "headers": info.headers or {},
+        "advanced_timeout_seconds": advanced_timeout,
+        "name": info.name,
+    }
+
+
 __all__ = [
     "DiscoveryCache",
     "DiscoveryProvider",
     "DiscoveryResource",
     "DiscoveryTool",
+    "HTTPMCPDiscoveryProvider",
+    "ServiceResolver",
     "StaticDiscoveryProvider",
 ]

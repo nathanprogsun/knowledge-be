@@ -16,6 +16,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import cast
 
+from src.ai.mcp_transport.errors import MCPError
 from src.common.exception import ConflictError, NotFoundError, ValidationError
 from src.common.json import BindParams, JsonObject, JsonValue
 from src.core.infra.mcp_services.connectivity import (
@@ -305,20 +306,29 @@ class MCPServiceService:
         tenant_id: int,
         service_id: str,
     ) -> list[DiscoveryTool]:
-        """Discover the upstream MCP service's tools (with cache)."""
+        """Discover the upstream MCP service's tools (with cache).
+
+        PR-17.5a: when the live transport raises :class:`MCPError`
+        (network failure, server-side session invalidation) the call
+        degrades to an empty list so the UI keeps working when the
+        upstream MCP server is unreachable.
+        """
         await self._mcp_repo.get_by_id(tenant_id, service_id)
         if self._discovery_provider is None:
             return []
-        if self._discovery_cache is None:
-            return list(
-                await self._discovery_provider.list_tools(service_id=service_id),
+        try:
+            if self._discovery_cache is None:
+                return list(
+                    await self._discovery_provider.list_tools(service_id=service_id),
+                )
+            tools, _ = await self._discovery_cache.get_or_refresh(
+                tenant_id=tenant_id,
+                service_id=service_id,
+                provider=self._discovery_provider,
             )
-        tools, _ = await self._discovery_cache.get_or_refresh(
-            tenant_id=tenant_id,
-            service_id=service_id,
-            provider=self._discovery_provider,
-        )
-        return tools
+            return tools
+        except MCPError:
+            return []
 
     async def list_resources(
         self,
@@ -326,20 +336,28 @@ class MCPServiceService:
         tenant_id: int,
         service_id: str,
     ) -> list[DiscoveryResource]:
-        """Discover the upstream MCP service's resources (with cache)."""
+        """Discover the upstream MCP service's resources (with cache).
+
+        PR-17.5a: same degradation as :meth:`list_tools`.
+        """
         await self._mcp_repo.get_by_id(tenant_id, service_id)
         if self._discovery_provider is None:
             return []
-        if self._discovery_cache is None:
-            return list(
-                await self._discovery_provider.list_resources(service_id=service_id),
+        try:
+            if self._discovery_cache is None:
+                return list(
+                    await self._discovery_provider.list_resources(
+                        service_id=service_id,
+                    ),
+                )
+            _, resources = await self._discovery_cache.get_or_refresh(
+                tenant_id=tenant_id,
+                service_id=service_id,
+                provider=self._discovery_provider,
             )
-        _, resources = await self._discovery_cache.get_or_refresh(
-            tenant_id=tenant_id,
-            service_id=service_id,
-            provider=self._discovery_provider,
-        )
-        return resources
+            return resources
+        except MCPError:
+            return []
 
     def invalidate_discovery_cache(self, *, tenant_id: int, service_id: str) -> None:
         """Drop the cached tool/resource lists for one service."""
