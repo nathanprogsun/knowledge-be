@@ -356,14 +356,14 @@ def test_error_classification_matches_go_hints() -> None:
 async def test_remote_check_requires_model_and_base_url() -> None:
     service = _service()
     with pytest.raises(ValidationError):
-        await service.check_remote_model(ModelTestRequest(model="m", baseUrl=None))
+        await service.check_remote_model(ModelTestRequest(modelName="m", baseUrl=None))
 
 
 async def test_remote_check_rejects_ssrf_target() -> None:
     service = _service()
     with pytest.raises(ValidationError):
         await service.check_remote_model(
-            ModelTestRequest(model="m", baseUrl="http://localhost:8080/v1")
+            ModelTestRequest(modelName="m", baseUrl="http://localhost:8080/v1")
         )
 
 
@@ -377,7 +377,7 @@ async def test_remote_check_succeeds_on_200() -> None:
     service = _service(remote_handler=httpx.MockTransport(handler))
     result = await service.check_remote_model(
         ModelTestRequest(
-            model="gpt-4o-mini",
+            modelName="gpt-4o-mini",
             baseUrl=_REMOTE_BASE,
             apiKey="sk-test",
             customHeaders={"X-Trace": "1"},
@@ -398,7 +398,7 @@ async def test_remote_check_treats_400_as_reachable() -> None:
         return httpx.Response(400, json={"error": "max_tokens unsupported"})
 
     service = _service(remote_handler=httpx.MockTransport(handler))
-    result = await service.check_remote_model(ModelTestRequest(model="m", baseUrl=_REMOTE_BASE))
+    result = await service.check_remote_model(ModelTestRequest(modelName="m", baseUrl=_REMOTE_BASE))
     assert result.available is True
     assert result.message == "连接正常，模型可用"
 
@@ -408,7 +408,7 @@ async def test_remote_check_surfaces_hint_and_raw_error() -> None:
         return httpx.Response(401, text="invalid api key")
 
     service = _service(remote_handler=httpx.MockTransport(handler))
-    result = await service.check_remote_model(ModelTestRequest(model="m", baseUrl=_REMOTE_BASE))
+    result = await service.check_remote_model(ModelTestRequest(modelName="m", baseUrl=_REMOTE_BASE))
     assert result.available is False
     # Format is "<hint>：<raw error>" so operators keep the upstream detail.
     assert result.message.startswith("认证失败，请检查API Key：")

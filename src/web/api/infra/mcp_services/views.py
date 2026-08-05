@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.common.json import JsonObject, JsonValue
 from src.core.contracts.infra import (
     CreateMCPServiceRequest,
+    CredentialFieldMetadata,
     MCPMcpServiceAuthConfig,
     MCPResource,
     MCPService,
@@ -136,6 +137,9 @@ def _to_advanced_config(
 def service_info_to_contract(info: MCPServiceInfo) -> MCPService:
     """Render a service DTO onto the frozen wire contract."""
     auth = _to_auth_config(info)
+    auth_config = auth.model_dump(exclude_none=True) if auth is not None else None
+    api_key = auth_config.get("api_key") if isinstance(auth_config, dict) else None
+    token = auth_config.get("token") if isinstance(auth_config, dict) else None
     return MCPService(
         id=info.id,
         tenant_id=info.tenant_id,
@@ -152,6 +156,12 @@ def service_info_to_contract(info: MCPServiceInfo) -> MCPService:
         is_builtin=info.is_builtin,
         created_at=info.created_at,
         updated_at=info.updated_at,
+        # Go emits the per-field "configured?" map on the response so the
+        # UI can render credential presence without seeing the values.
+        credentials={
+            "api_key": CredentialFieldMetadata(configured=bool(api_key)),
+            "token": CredentialFieldMetadata(configured=bool(token)),
+        },
     )
 
 

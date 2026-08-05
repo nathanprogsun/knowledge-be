@@ -45,11 +45,13 @@ class Model(BaseModel):
     parameters: ModelParameters
     is_default: bool | None = Field(default=False)
     is_builtin: bool | None = Field(default=False)
-    managed_by: str | None = Field(default=None)
     status: str | None = Field(default="active")
     created_at: datetime
     updated_at: datetime
-    deleted_at: datetime | None = Field(default=None)
+    # Per-field "configured?" map mirroring Go's
+    # ``dto.ModelResponse.Credentials``; the values never carry the
+    # secret itself.
+    credentials: dict[str, CredentialFieldMetadata] | None = Field(default=None)
 
 
 class CreateModelRequest(BaseModel):
@@ -59,6 +61,7 @@ class CreateModelRequest(BaseModel):
     type: str
     source: str
     description: str | None = Field(default=None)
+    display_name: str | None = Field(default=None)
     parameters: ModelParameters
 
 
@@ -69,6 +72,7 @@ class UpdateModelRequest(BaseModel):
     description: str | None = Field(default=None)
     type: str | None = Field(default=None)
     source: str | None = Field(default=None)
+    display_name: str | None = Field(default=None)
     parameters: ModelParameters | None = Field(default=None)
 
 
@@ -137,6 +141,9 @@ class MCPService(BaseModel):
     is_builtin: bool | None = Field(default=False)
     created_at: datetime
     updated_at: datetime
+    # Per-field "configured?" map mirroring Go's
+    # ``dto.MCPServiceResponse.Credentials``.
+    credentials: dict[str, CredentialFieldMetadata] | None = Field(default=None)
 
 
 class CreateMCPServiceRequest(BaseModel):
@@ -390,7 +397,9 @@ class WebSearchProvider(BaseModel):
     parameters: JsonObject | None = Field(default=None)
     created_at: datetime | None = Field(default=None)
     updated_at: datetime | None = Field(default=None)
-    deleted_at: datetime | None = Field(default=None)
+    # Per-field "configured?" map mirroring Go's
+    # ``dto.WebSearchProviderResponse.Credentials``.
+    credentials: dict[str, CredentialFieldMetadata] | None = Field(default=None)
 
 
 class TestWebSearchProviderRequest(BaseModel):
@@ -619,15 +628,15 @@ class DownloadOllamaModelRequest(BaseModel):
 class ModelTestRequest(BaseModel):
     """Wire shape for ``/initialization/*/test|check`` model probes.
 
-    Go uses ``model`` (not ``modelName``) on the
-    ``/initialization/{remote,embedding,rerank,multimodal}/{check,test}``
-    endpoints. ``modelName`` is kept as an alias for legacy callers.
+    Go's ``ModelTestRequest`` binds ``json:"modelName"`` (see
+    ``internal/handler/initialization.go``); ``model`` is kept as an
+    alias for legacy callers.
     """
 
     model_config = ConfigDict(frozen=True, populate_by_name=True)
 
     source: str | None = Field(default=None)
-    model: str = Field(default="")
+    model: str = Field(default="", alias="modelName")
     base_url: str | None = Field(default=None, alias="baseUrl")
     api_key: str | None = Field(default=None, alias="apiKey")
     provider: str | None = Field(default=None)
