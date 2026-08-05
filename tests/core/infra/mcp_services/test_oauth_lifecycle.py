@@ -119,7 +119,6 @@ def test_state_store_records_returns_and_consumes_entries() -> None:
         code_verifier="verifier",
         client_id="client",
         redirect_uri="https://example.com/cb",
-        authorization_url="https://example.com/auth",
         created_at=time.monotonic(),
     )
     store.put(state="abc", entry=entry)
@@ -150,7 +149,6 @@ def test_state_store_purges_expired_entries_on_access() -> None:
         code_verifier="v",
         client_id="c",
         redirect_uri="https://example.com/cb",
-        authorization_url="u",
         created_at=time.monotonic() - 100,
     )
     store.put(state="stale", entry=entry)
@@ -161,6 +159,42 @@ def test_state_store_purges_expired_entries_on_access() -> None:
 def test_state_store_default_ttl_matches_go_layout_constant() -> None:
     """The default TTL mirrors the Go ``oauthStateTTL`` (10 minutes)."""
     assert DEFAULT_STATE_TTL_SECONDS == 600
+
+
+def test_state_store_purge_expired_keeps_fresh_drops_stale() -> None:
+    """PR-17.5c coverage: ``_purge_expired`` removes only stale entries.
+
+    With ``ttl=1.0`` we can construct a mixed-bag scenario:
+    one entry recorded ``now`` (still fresh), one recorded well in
+    the past (stale). A subsequent ``peek`` round-trip must drop
+    only the stale entry; the fresh one must survive.
+    """
+    import time
+
+    store = OAuthStateStore(ttl_seconds=1)
+    now = time.monotonic()
+    fresh = StateEntry(
+        tenant_id=1,
+        user_id="alice",
+        service_id="svc-1",
+        code_verifier="v-fresh",
+        client_id="c",
+        redirect_uri="https://example.com/cb",
+        created_at=now,
+    )
+    stale = StateEntry(
+        tenant_id=1,
+        user_id="alice",
+        service_id="svc-1",
+        code_verifier="v-stale",
+        client_id="c",
+        redirect_uri="https://example.com/cb",
+        created_at=now - 5.0,  # older than ttl
+    )
+    store.put(state="fresh", entry=fresh)
+    store.put(state="stale", entry=stale)
+    assert store.peek(state="fresh") is not None
+    assert store.peek(state="stale") is None  # purged on access
 
 
 # ── InMemorySecretStore ────────────────────────────────────────────
@@ -392,7 +426,12 @@ async def test_refresh_rotates_via_refresh_token_grant_and_returns_new_pair() ->
         refresh_route = router.post("/token").respond(200, json=rotated_payload)
         async with httpx.AsyncClient() as http_client:
             manager._http_client = http_client
-            rotated = await manager.refresh(token=expired)
+            rotated = await manager.refresh(
+                token=expired,
+                tenant_id=42,
+                user_id="alice",
+                service_id="svc-1",
+            )
 
     assert rotated.access_token == "new-access"
     assert rotated.refresh_token == "new-refresh"
@@ -413,7 +452,12 @@ async def test_refresh_rejects_token_without_refresh_token() -> None:
         manager._http_client = http_client
         token = TokenSet(access_token="only-access")
         with pytest.raises(ValidationError) as excinfo:
-            await manager.refresh(token=token)
+            await manager.refresh(
+                token=token,
+                tenant_id=42,
+                user_id="alice",
+                service_id="svc-1",
+            )
     assert excinfo.value.code == "mcp_service.oauth_no_refresh_token"
 
 
@@ -566,6 +610,261 @@ async def test_revoke_token_drops_token_from_store() -> None:
         )
         is None
     )
+
+
+# ── PR-17.5c review follow-ups ─────────────────────────────────────
+
+
+async def test_revoke_token_with_token_kwarg_drops_entry() -> None:
+    """``revoke_token(token=...)`` actually removes the matching entry.
+
+    PR-17.5c C1: the previous implementation passed
+    ``token.access_token`` as a user_id and silently dropped nothing.
+    """
+    secret_store = InMemorySecretStore()
+    token = TokenSet(access_token="doomed", refresh_token="rt")
+    await secret_store.put(
+        tenant_id=42,
+        user_id="alice",
+        service_id="svc-1",
+        token=token,
+    )
+    manager = OAuthManager(
+        service=_info(auth_config=_live_auth_config()),
+        secret_store=secret_store,
+    )
+    await manager.revoke_token(token=token)
+    assert (
+        await secret_store.get(
+            tenant_id=42,
+            user_id="alice",
+            service_id="svc-1",
+        )
+        is None
+    )
+
+
+async def test_revoke_token_with_token_kwarg_is_noop_when_no_match() -> None:
+    """``revoke_token(token=...)`` for an unknown access_token is a no-op."""
+    secret_store = InMemorySecretStore()
+    manager = OAuthManager(
+        service=_info(auth_config=_live_auth_config()),
+        secret_store=secret_store,
+    )
+    # No entry was ever stored; revoke must not raise.
+    await manager.revoke_token(token=TokenSet(access_token="ghost"))
+
+
+async def test_refresh_persists_rotated_pair_so_next_refresh_uses_new_refresh_token() -> None:
+    """PR-17.5c H2: ``refresh`` persists the rotated pair.
+
+    The first refresh returns and persists a new access+refresh pair.
+    A second refresh must use the NEW refresh token, not the old one
+    (the previous code returned the rotated token but never wrote it
+    back, so the next refresh would replay the old refresh token and
+    the IdP would reject it as already-used).
+    """
+    secret_store = InMemorySecretStore()
+    manager = OAuthManager(
+        service=_info(auth_config=_live_auth_config()),
+        secret_store=secret_store,
+    )
+    await secret_store.put(
+        tenant_id=42,
+        user_id="alice",
+        service_id="svc-1",
+        token=TokenSet(
+            access_token="old-access",
+            refresh_token="first-refresh",
+            expires_at=datetime.now(UTC) - timedelta(minutes=5),
+        ),
+    )
+
+    seen_refresh_tokens: list[str] = []
+
+    def _record_refresh(req: httpx.Request) -> httpx.Response:
+        body = req.content.decode("utf-8")
+        # ``body`` is ``refresh_token=...&grant_type=...``; pull the
+        # ``refresh_token`` field out for the assertion below.
+        from urllib.parse import parse_qs
+
+        parsed = parse_qs(body)
+        seen_refresh_tokens.append(parsed["refresh_token"][0])
+        rotation = "second-access" if len(seen_refresh_tokens) == 1 else "third-access"
+        new_refresh = "second-refresh" if len(seen_refresh_tokens) == 1 else "third-refresh"
+        return httpx.Response(
+            200,
+            json={
+                "access_token": rotation,
+                "refresh_token": new_refresh,
+                "token_type": "Bearer",
+                "expires_in": 3600,
+            },
+        )
+
+    with respx.mock(base_url="https://idp.example.com") as router:
+        route = router.post("/token").mock(side_effect=_record_refresh)
+        async with httpx.AsyncClient() as http_client:
+            manager._http_client = http_client
+            first = await manager.refresh(
+                token=TokenSet(
+                    access_token="old-access",
+                    refresh_token="first-refresh",
+                ),
+                tenant_id=42,
+                user_id="alice",
+                service_id="svc-1",
+            )
+            # Read the rotated pair back from the store before the
+            # second refresh; the new refresh_token must be present.
+            stored_after_first = await secret_store.get(
+                tenant_id=42,
+                user_id="alice",
+                service_id="svc-1",
+            )
+            second = await manager.refresh(
+                token=first, tenant_id=42, user_id="alice", service_id="svc-1"
+            )
+
+    assert seen_refresh_tokens == ["first-refresh", "second-refresh"]
+    assert stored_after_first is not None
+    assert stored_after_first.refresh_token == "second-refresh"
+    assert second.access_token == "third-access"
+    assert route.call_count == 2
+
+
+async def test_ensure_authorized_deletes_stale_token_on_permanent_refresh_failure() -> None:
+    """PR-17.5c H3: stale tokens are dropped on unrecoverable refresh failure.
+
+    An expired token with no ``refresh_token`` cannot be rotated, so
+    the entry must be deleted (otherwise the next caller would see a
+    ghost token that can never be refreshed).
+    """
+    secret_store = InMemorySecretStore()
+    expired_no_refresh = TokenSet(
+        access_token="expired",
+        refresh_token="",
+        expires_at=datetime.now(UTC) - timedelta(minutes=10),
+    )
+    await secret_store.put(
+        tenant_id=42,
+        user_id="alice",
+        service_id="svc-1",
+        token=expired_no_refresh,
+    )
+    manager = OAuthManager(
+        service=_info(auth_config=_live_auth_config()),
+        secret_store=secret_store,
+    )
+    with pytest.raises(NotFoundError) as excinfo:
+        await manager.ensure_authorized(
+            tenant_id=42,
+            user_id="alice",
+            service_id="svc-1",
+        )
+    assert excinfo.value.code == "mcp_service.oauth_expired"
+    assert (
+        await secret_store.get(
+            tenant_id=42,
+            user_id="alice",
+            service_id="svc-1",
+        )
+        is None
+    )
+
+
+async def test_pkce_verifier_round_trip_to_token_endpoint() -> None:
+    """The PKCE ``code_verifier`` recorded in the state store is the one
+    sent to ``token_endpoint`` during code exchange.
+
+    This pins the verifier round-trip so a future refactor cannot
+    accidentally regenerate it (which would yield an
+    ``invalid_grant`` from the IdP).
+    """
+    secret_store = InMemorySecretStore()
+    state_store = OAuthStateStore()
+    manager = OAuthManager(
+        service=_info(auth_config=_live_auth_config()),
+        secret_store=secret_store,
+        state_store=state_store,
+    )
+    _url, state = manager.build_authorization_url(
+        user_id="alice",
+        redirect_uri="https://app.example.com/cb",
+    )
+    recorded_verifier = state_store.peek(state=state)
+    assert recorded_verifier is not None
+
+    seen_code_verifier: list[str] = []
+
+    def _capture(req: httpx.Request) -> httpx.Response:
+        from urllib.parse import parse_qs
+
+        parsed = parse_qs(req.content.decode("utf-8"))
+        seen_code_verifier.append(parsed["code_verifier"][0])
+        return httpx.Response(
+            200,
+            json={
+                "access_token": "new-access",
+                "refresh_token": "new-refresh",
+                "token_type": "Bearer",
+                "expires_in": 3600,
+            },
+        )
+
+    with respx.mock(base_url="https://idp.example.com") as router:
+        router.post("/token").mock(side_effect=_capture)
+        async with httpx.AsyncClient() as http_client:
+            manager._http_client = http_client
+            await manager.exchange_code(
+                user_id="alice",
+                code="auth-code",
+                state=state,
+            )
+
+    assert seen_code_verifier == [recorded_verifier.code_verifier]
+
+
+async def test_aclose_closes_owned_http_client() -> None:
+    """When the manager owns its http_client, ``aclose`` closes it."""
+    client = httpx.AsyncClient(timeout=10.0)
+    manager = OAuthManager(
+        service=_info(auth_config=_live_auth_config()),
+    )
+    # Replace the internally-created client so we can observe ``aclose``.
+    manager._http_client = client
+    manager._owns_http_client = True
+    assert client.is_closed is False
+    await manager.aclose()
+    assert client.is_closed is True
+    assert manager._http_client is None
+
+
+async def test_aclose_does_not_close_injected_client() -> None:
+    """When the http_client was injected (lifespan path), ``aclose``
+    must NOT close it — the caller owns the lifetime."""
+    client = httpx.AsyncClient(timeout=10.0)
+    manager = OAuthManager(
+        service=_info(auth_config=_live_auth_config()),
+        http_client=client,
+    )
+    assert manager._owns_http_client is False
+    await manager.aclose()
+    assert client.is_closed is False
+    await client.aclose()
+
+
+async def test_aclose_is_idempotent() -> None:
+    """A second ``aclose`` is a no-op (no error, no double-close)."""
+    client = httpx.AsyncClient(timeout=10.0)
+    manager = OAuthManager(
+        service=_info(auth_config=_live_auth_config()),
+    )
+    manager._http_client = client
+    manager._owns_http_client = True
+    await manager.aclose()
+    # Second call is a no-op.
+    await manager.aclose()
 
 
 # ── Skew constant parity with Go ───────────────────────────────────

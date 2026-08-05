@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime
+from typing import Any
 from typing import cast as _cast
 
 import httpx
@@ -123,23 +124,32 @@ def app(
     )
     application.state.lifespan_service = lifespan_service
 
-    async def _resolver(service_id: str) -> MCPServiceInfo | JsonObject:
+    async def _resolver(
+        resolved_tenant_id: int,
+        service_id: str,
+    ) -> MCPServiceInfo | JsonObject:
         # The fake repo stores rows in-memory; look them up directly
         # via the public ``rows`` dict to bypass the SQLAlchemy
         # session the production resolver would use.
+        del resolved_tenant_id  # tenant filter is the resolver's responsibility
         for row in mcp_repo.rows.values():
             if row.id == service_id and row.deleted_at is None:
                 return MCPServiceInfo.map_from_db(row)
-        return {}
+        return _cast(JsonObject, {})
 
-    def _override_service() -> MCPServiceService:
+    def _override_service(
+        request: object = None,
+        session: object = None,
+        tenant_id: int = 1,
+    ) -> MCPServiceService:
+        del request, session  # overridden deps — see PR-17.5c C2
         discovery = HTTPMCPDiscoveryProvider(
             connection_manager=_cast("_ConnDiscLike", connection_manager),
-            service_resolver=_resolver,
+            service_resolver=_cast("Any", _resolver),
         )
         probe = HTTPMCPConnectivityProbe(
             connection_manager=_cast("_ConnProbeLike", connection_manager),
-            resolver=_resolver,
+            resolver=_cast("Any", _resolver),
         )
         # Build the service directly so the fake DB repos are wired
         # through without a real SQLAlchemy session: the production
@@ -235,28 +245,24 @@ async def test_list_tools_does_not_silently_succeed_when_upstream_fails(
     client: AsyncClient,
     mcp_repo: FakeMCPServiceRepository,
 ) -> None:
-    """An upstream failure is surfaced (the live path was actually taken).
+    """An upstream failure degrades to an empty list (PR-17.5a contract).
 
-    The :class:`HTTPMCPDiscoveryProvider` wraps :class:`MCPError` as
-    ``RuntimeError``; the route does not catch the runtime error, so
-    the framework surfaces a 500. We only assert the live path was
-    reached (respx saw the call) so a future PR can tighten the
-    degradation without breaking the test.
+    PR-17.5c C3: the discovery provider now wraps transport errors as
+    :class:`MCPError` instead of ``RuntimeError`` so the service
+    layer's ``except MCPError`` clause can degrade to an empty list.
+    The route returns ``200`` with ``data=[]`` rather than a 500;
+    the live path is reached (respx saw the call) so the UI keeps
+    working when the upstream MCP server is unreachable.
     """
     await _seed(mcp_repo, service_id="svc-broken", name="broken")
 
     with respx.mock(assert_all_called=False) as router:
         route = router.post("/mcp").respond(502, text="bad gateway")
-        try:
-            resp = await client.get("/mcp-services/svc-broken/tools")
-        except Exception:
-            # Starlette raises through the unhandled RuntimeError;
-            # the route hit upstream so the live path was taken.
-            assert route.call_count >= 1
-            return
+        resp = await client.get("/mcp-services/svc-broken/tools")
 
     assert route.call_count >= 1
-    assert resp.status_code != 200
+    assert resp.status_code == 200
+    assert resp.json()["data"] == []
 
 
 async def test_list_tools_uses_sse_transport_when_configured(
@@ -323,3 +329,79 @@ async def test_oauth_authorize_url_still_returns_legacy_shape(
     # global exception handler; the existing ``test_mcp_views.py``
     # test only checks the status code, so we mirror that contract.
     assert resp.status_code == 422
+
+
+# ── PR-17.5c review follow-ups ─────────────────────────────────────
+
+
+async def test_resolver_uses_request_tenant_id_not_zero() -> None:
+    """PR-17.5c C2: ``build_live_resolvers`` passes the active tenant_id
+    into the lookup, not a hard-coded ``0``.
+
+    Pins the cross-tenant leak fix: a row that lives in tenant=2 must
+    not be returned to a tenant=1 caller just because the resolver
+    fallback used to look up ``find_for_tenant(0, id)``.
+    """
+    import src.web.deps.infra_mcp as _infra_mcp
+    from src.db.dao.mcp_service_repository import MCPServiceRepository
+    from src.web.deps.infra_mcp import build_live_resolvers
+
+    seen_tenant_id: list[int] = []
+    seen_service_id: list[str] = []
+
+    ours = MCPService(
+        id="svc-shared",
+        tenant_id=1,
+        name="ours",
+        transport_type="sse",
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+    other = MCPService(
+        id="svc-shared",
+        tenant_id=2,
+        name="other",
+        transport_type="sse",
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+
+    class _SpyRepo:
+        def __init__(self, _session: object) -> None:
+            self._rows = [ours, other]
+
+        async def find_for_tenant(
+            self,
+            tenant_id: int,
+            id: str,
+        ) -> MCPService | None:
+            seen_tenant_id.append(tenant_id)
+            seen_service_id.append(id)
+            for row in self._rows:
+                if row.id == id and row.tenant_id == tenant_id:
+                    return row
+            return None
+
+    class _StubSession:
+        pass
+
+    real_repo = MCPServiceRepository
+    # Patch the MCPServiceRepository symbol in the web/deps/infra_mcp
+    # module so ``build_live_resolvers`` sees our spy. ``setattr``
+    # routes through the module ``__dict__`` directly — mypy cannot
+    # see cross-module rebinds otherwise.
+    setattr(_infra_mcp, "MCPServiceRepository", _SpyRepo)  # noqa: B010, SIM
+    try:
+        discovery_resolver, _ = build_live_resolvers(
+            session=_cast(Any, _StubSession()),
+            tenant_id=1,
+        )
+        result = await discovery_resolver(1, "svc-shared")
+    finally:
+        setattr(_infra_mcp, "MCPServiceRepository", real_repo)  # noqa: B010, SIM
+
+    assert seen_tenant_id == [1], "resolver must use the active tenant_id, not 0"
+    assert seen_service_id == ["svc-shared"]
+    assert isinstance(result, MCPServiceInfo)
+    assert result.tenant_id == 1
+    assert result.name == "ours"

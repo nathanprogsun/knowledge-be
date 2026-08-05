@@ -316,7 +316,10 @@ class MCPServiceService:
         try:
             if self._discovery_cache is None:
                 return list(
-                    await self._discovery_provider.list_tools(service_id=service_id),
+                    await self._discovery_provider.list_tools(
+                        tenant_id=tenant_id,
+                        service_id=service_id,
+                    ),
                 )
             tools, _ = await self._discovery_cache.get_or_refresh(
                 tenant_id=tenant_id,
@@ -344,6 +347,7 @@ class MCPServiceService:
             if self._discovery_cache is None:
                 return list(
                     await self._discovery_provider.list_resources(
+                        tenant_id=tenant_id,
                         service_id=service_id,
                     ),
                 )
@@ -385,6 +389,7 @@ class MCPServiceService:
                 message="MCP connectivity probe is not configured",
             )
         return await self._connectivity_probe(
+            tenant_id=tenant_id,
             service_id=service.id,
             transport_type=service.transport_type,
             url=service.url,

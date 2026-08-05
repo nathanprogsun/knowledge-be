@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import httpx
 import pytest
 
 from src.common.exception import NotFoundError, ValidationError
@@ -97,3 +98,31 @@ def test_manager_revoke_is_a_noop_for_valid_user() -> None:
         service=_info(auth_config={"auth_type": "oauth"}),
     )
     manager.revoke(user_id="alice")  # returns None implicitly
+
+
+def test_legacy_oauth_manager_uses_injected_http_client_not_creates_new_one() -> None:
+    """PR-17.5c C5: when ``http_client`` is injected the manager does NOT
+    create a fresh ``httpx.AsyncClient`` (one per request leak).
+
+    The legacy router path used to construct ``OAuthManager(service=info)``
+    which auto-created a new client when ``auth_config`` was OAuth — that
+    leaked one TCP/TLS connection per request and was never closed.
+    Lifespan-wired factories now inject the shared http_client; this
+    test pins both the "no auto-creation" path and the "owns=False"
+    flag the ``aclose`` semantics depend on.
+    """
+    auth_config: JsonObject = {
+        "auth_type": "oauth",
+        "authorization_endpoint": "https://idp.example.com/authorize",
+        "token_endpoint": "https://idp.example.com/token",
+        "client_id": "client-abc",
+    }
+    injected = httpx.AsyncClient(timeout=10.0)
+    manager = OAuthManager(
+        service=_info(auth_config=auth_config),
+        http_client=injected,
+    )
+    # The injected client is the one wired in; the manager does not
+    # own it (so ``aclose`` will leave it alone).
+    assert manager._http_client is injected
+    assert manager._owns_http_client is False

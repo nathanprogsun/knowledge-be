@@ -250,7 +250,7 @@ class MCPConnectionManager:
             session,
             method="ping",
             params={},
-            retry=False,
+            evict_on_session_invalid=False,
         )
 
     async def list_tools(
@@ -263,7 +263,7 @@ class MCPConnectionManager:
             session,
             method=METHOD_TOOLS_LIST,
             params={},
-            retry=True,
+            evict_on_session_invalid=True,
         )
 
     async def list_resources(
@@ -276,7 +276,7 @@ class MCPConnectionManager:
             session,
             method=METHOD_RESOURCES_LIST,
             params={},
-            retry=True,
+            evict_on_session_invalid=True,
         )
 
     async def call_tool(
@@ -291,7 +291,7 @@ class MCPConnectionManager:
             session,
             method=METHOD_TOOLS_CALL,
             params={"name": tool_name, "arguments": arguments or {}},
-            retry=True,
+            evict_on_session_invalid=True,
         )
 
     async def read_resource(
@@ -305,7 +305,7 @@ class MCPConnectionManager:
             session,
             method=METHOD_RESOURCES_READ,
             params={"uri": uri},
-            retry=True,
+            evict_on_session_invalid=True,
         )
 
     async def _invoke(
@@ -314,14 +314,16 @@ class MCPConnectionManager:
         *,
         method: str,
         params: dict[str, object],
-        retry: bool,
+        evict_on_session_invalid: bool,
     ) -> JSONRPCResponse:
         """Send one JSON-RPC request and surface the response.
 
         On a session-invalid error (server says ``Invalid session ID``
-        or ``No active connection``) the session is evicted and, if
-        ``retry`` is True, the call is replayed once on a fresh
-        session. Other transport errors bubble up unchanged.
+        or ``No active connection``) the session is evicted so the next
+        caller rebuilds it. The call itself is not retried here —
+        callers that want a retry-once-on-fresh-session flow re-invoke
+        ``_invoke`` themselves. Other transport errors bubble up
+        unchanged.
         """
         if not session.is_alive():
             raise SessionNotConnectedError(
@@ -331,7 +333,7 @@ class MCPConnectionManager:
             response = await session.client.request(method=method, params=params)
             return cast("JSONRPCResponse", response)
         except MCPTransportError as exc:
-            if retry and _looks_like_session_invalid(exc):
+            if evict_on_session_invalid and _looks_like_session_invalid(exc):
                 await self._evict(session.service_id)
                 raise
             raise

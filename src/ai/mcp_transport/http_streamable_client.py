@@ -169,6 +169,7 @@ class HTTPStreamableClient:
         """Compose the request headers (user headers + Accept + session id)."""
         merged = dict(self._headers)
         merged.setdefault("Accept", _ACCEPT_HEADER)
+        merged.setdefault("Content-Type", _CONTENT_TYPE_JSON)
         if self._session_id:
             merged[_SESSION_HEADER] = self._session_id
         return merged

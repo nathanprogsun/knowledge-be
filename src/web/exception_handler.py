@@ -10,6 +10,7 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from src.ai.mcp_transport.errors import OAuthRequiredError
 from src.common.exception import (
     ApplicationError,
     ConflictError,
@@ -28,6 +29,7 @@ _STATUS_BY_TYPE: dict[type[ApplicationError], int] = {
     ValidationError: 422,
     PermissionDeniedError: 403,
     UnauthorizedError: 401,
+    OAuthRequiredError: 401,
     ExternalServiceError: 502,
     DataError: 500,
     ApplicationError: 500,

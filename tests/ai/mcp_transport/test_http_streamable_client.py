@@ -277,3 +277,77 @@ async def test_request_accepts_injected_httpx_client() -> None:
             assert route.called
     finally:
         await injected.aclose()
+
+
+async def test_post_sends_content_type_application_json() -> None:
+    """PR-17.5c H4: the POST carries ``Content-Type: application/json``.
+
+    Without this header some MCP servers reject the request with a
+    415 because ``httpx.post(content=...)`` does not set the type
+    automatically.
+    """
+    with respx.mock(base_url="https://mcp.example.com") as router:
+        route = router.post("/mcp").respond(
+            200,
+            headers={"content-type": "application/json"},
+            json={"jsonrpc": "2.0", "id": "1", "result": {}},
+        )
+        client = HTTPStreamableClient(url=_STREAMABLE_URL, timeout_seconds=5.0)
+        await client.connect()
+        await client.request(method="initialize", params={}, request_id="1")
+
+    headers = route.calls.last.request.headers
+    assert headers.get("Content-Type") == "application/json"
+
+
+async def test_request_wraps_httpx_connect_error_as_transport_error() -> None:
+    """PR-17.5c: an ``httpx.ConnectError`` becomes ``MCPTransportError``."""
+    import httpx as _httpx
+
+    with respx.mock(base_url="https://mcp.example.com") as router:
+        router.post("/mcp").mock(
+            side_effect=_httpx.ConnectError("connection refused"),
+        )
+        client = HTTPStreamableClient(url=_STREAMABLE_URL, timeout_seconds=5.0)
+        await client.connect()
+        with pytest.raises(MCPTransportError) as excinfo:
+            await client.request(method="tools/list", params={})
+
+    assert "ConnectError" in excinfo.value.message_text
+
+
+async def test_request_wraps_httpx_timeout_exception_as_transport_error() -> None:
+    """PR-17.5c: an ``httpx.TimeoutException`` becomes ``MCPTransportError``."""
+    import httpx as _httpx
+
+    with respx.mock(base_url="https://mcp.example.com") as router:
+        router.post("/mcp").mock(
+            side_effect=_httpx.TimeoutException("read timed out"),
+        )
+        client = HTTPStreamableClient(url=_STREAMABLE_URL, timeout_seconds=5.0)
+        await client.connect()
+        with pytest.raises(MCPTransportError) as excinfo:
+            await client.request(method="tools/list", params={})
+
+    assert "TimeoutException" in excinfo.value.message_text
+
+
+async def test_403_with_resource_metadata_becomes_oauth_required() -> None:
+    """PR-17.5c: a 403 carrying ``WWW-Authenticate: resource_metadata``
+    becomes :class:`OAuthRequiredError` (same path as 401)."""
+    with respx.mock(base_url="https://mcp.example.com") as router:
+        router.post("/mcp").respond(
+            403,
+            headers={
+                "WWW-Authenticate": (
+                    'Bearer resource_metadata="https://mcp.example.com/'
+                    '.well-known/oauth-protected-resource"'
+                ),
+            },
+        )
+        client = HTTPStreamableClient(url=_STREAMABLE_URL, timeout_seconds=5.0)
+        await client.connect()
+        with pytest.raises(OAuthRequiredError) as excinfo:
+            await client.request(method="tools/list", params={})
+
+    assert "mcp.example.com" in excinfo.value.metadata_url
