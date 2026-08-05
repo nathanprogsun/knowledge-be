@@ -14,6 +14,12 @@ the anti-drift layer check can verify web -> core -> db directionality
 without function-level imports. The routers themselves only reference
 `web.deps`, which imports the DI accessors from `registry` — breaking the
 former `lifespan` <-> `web.deps` cycle.
+
+PR-17.5b also wires the live MCP transport layer (connection pool,
+discovery + connectivity probes, OAuth state + secret stores) into
+``app.state.lifespan_service`` during startup; the matching teardown
+in the ``finally`` block releases the connection pool's cleanup loop
+and closes the OAuth HTTP client.
 """
 
 from __future__ import annotations
@@ -21,12 +27,20 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.ai.mcp_transport import MCPConnectionManager
 from src.app_context.registry import LifeSpanService
 from src.app_logging import configure_logging, logger
 from src.common.oidc_client import OidcClient
+from src.core.infra.mcp_services.oauth import (
+    InMemorySecretStore,
+    OAuthManager,
+    OAuthStateStore,
+)
+from src.core.infra.mcp_services.types import MCPServiceInfo
 from src.db.base import DatabaseEngine
 from src.settings import get_settings
 from src.web.api.auth.router import router as auth_router
@@ -65,12 +79,46 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # across requests so TCP/TLS connections to the IdP are reused.
     oidc_client = OidcClient()
 
-    app.state.lifespan_service = LifeSpanService(db_engine=db_engine, oidc_client=oidc_client)
+    # PR-17.5b: live MCP singletons. The connection pool runs the
+    # background sweep; the discovery + connectivity probes borrow it
+    # per-request via ``infra_mcp`` (their DB-session-bound resolver
+    # is request-scoped); the OAuth state + secret stores back the
+    # per-service OAuthManager that ``infra_mcp`` constructs on demand.
+    mcp_connection_manager = MCPConnectionManager()
+    mcp_connection_manager.start_cleanup()
+
+    oauth_state_store = OAuthStateStore()
+    oauth_secret_store = InMemorySecretStore()
+    oauth_http_client = httpx.AsyncClient(timeout=30.0)
+
+    # Bind the per-request ``OAuthManager`` to APP-scope state. The
+    # signature matches the ``OAuthManagerFactoryLike`` callable type
+    # advertised by ``core.infra.mcp_services.factory``.
+    async def _oauth_manager_factory(info: MCPServiceInfo) -> OAuthManager:
+        return OAuthManager(
+            service=info,
+            http_client=oauth_http_client,
+            secret_store=oauth_secret_store,
+            state_store=oauth_state_store,
+        )
+
+    lifespan_service = LifeSpanService(
+        db_engine=db_engine,
+        oidc_client=oidc_client,
+        mcp_connection_manager=mcp_connection_manager,
+        mcp_oauth_state_store=oauth_state_store,
+        mcp_oauth_secret_store=oauth_secret_store,
+        mcp_oauth_http_client=oauth_http_client,
+        mcp_oauth_manager_factory=_oauth_manager_factory,
+    )
+    app.state.lifespan_service = lifespan_service
     logger.info("lifespan ready")
     try:
         yield
     finally:
         logger.info("shutting down {}", settings.app_name)
+        await mcp_connection_manager.shutdown()
+        await oauth_http_client.aclose()
         await oidc_client.aclose()
         await db_engine.close()
         app.state.lifespan_service = None

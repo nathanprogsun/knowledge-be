@@ -1,17 +1,21 @@
-"""MCP live transport layer — JSON-RPC 2.0 over SSE.
+"""MCP live transport layer — JSON-RPC 2.0 over SSE / HTTP-streamable.
+
+PR-17.5 scope (17.5a + 17.5b):
 
 - :mod:`src.ai.mcp_transport.jsonrpc` — JSON-RPC 2.0 envelope types
   (``JSONRPCRequest`` / ``JSONRPCResponse`` / ``JSONRPCError`` /
   ``JSONRPCNotification``) + reserved error code constants.
 - :mod:`src.ai.mcp_transport.sse_client` — long-lived ``GET /sse`` +
   ``POST /messages`` transport on top of ``httpx`` + ``httpx_sse``.
+- :mod:`src.ai.mcp_transport.http_streamable_client` — single ``POST``
+  endpoint transport that answers either a JSON body or an SSE
+  stream.
 - :mod:`src.ai.mcp_transport.connection_manager` — pooled sessions
   per remote service, background sweep, session-invalidation
   detection.
-
-The HTTP-streamable transport and the OAuth lifecycle are not yet
-implemented; the manager's default factory raises for
-``http-streamable`` so callers do not silently fall back.
+- :mod:`src.core.infra.mcp_services.oauth` — full OAuth 2.0 lifecycle:
+  authorize URL, code exchange, refresh, revoke, in-memory secret
+  store + CSRF state store.
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ from src.ai.mcp_transport.errors import (
     OAuthRequiredError,
     SessionNotConnectedError,
 )
+from src.ai.mcp_transport.http_streamable_client import HTTPStreamableClient
 from src.ai.mcp_transport.jsonrpc import (
     JSONRPCError,
     JSONRPCNotification,
@@ -38,6 +43,7 @@ from src.ai.mcp_transport.jsonrpc import (
 from src.ai.mcp_transport.sse_client import SSEClient
 
 __all__ = [
+    "HTTPStreamableClient",
     "JSONRPCError",
     "JSONRPCNotification",
     "JSONRPCRequest",

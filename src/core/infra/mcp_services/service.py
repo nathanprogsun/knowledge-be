@@ -13,6 +13,7 @@ mirroring Go's ``MCPCredentialsHandler``.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import cast
 
@@ -59,12 +60,14 @@ class MCPServiceService:
         discovery_provider: DiscoveryProvider | None = None,
         discovery_cache: DiscoveryCache | None = None,
         connectivity_probe: ConnectivityProbe | None = None,
+        oauth_manager_factory: (Callable[[MCPServiceInfo], Awaitable[OAuthManager]] | None) = None,
     ) -> None:
         self._mcp_repo = mcp_repo
         self._tool_approvals_repo = tool_approvals_repo
         self._discovery_provider = discovery_provider
         self._discovery_cache = discovery_cache
         self._connectivity_probe = connectivity_probe
+        self._oauth_manager_factory = oauth_manager_factory
 
     # ── Create ──────────────────────────────────────────────────────
 
@@ -108,15 +111,10 @@ class MCPServiceService:
         # `MCPServiceRepository.FindByName` + service-level 409 path.
         # The DB-level unique constraint is the second line of defence
         # against concurrent inserts.
-        if await self._mcp_repo.exists_by_tenant_and_name(
-            tenant_id=tenant_id, name=clean_name
-        ):
+        if await self._mcp_repo.exists_by_tenant_and_name(tenant_id=tenant_id, name=clean_name):
             raise ConflictError(
                 code="mcp_service.duplicate_name",
-                message=(
-                    f"an MCP service named {clean_name!r} already exists "
-                    "in this workspace"
-                ),
+                message=(f"an MCP service named {clean_name!r} already exists in this workspace"),
             )
 
         now = datetime.now(UTC)
@@ -149,8 +147,7 @@ class MCPServiceService:
                 raise ConflictError(
                     code="mcp_service.duplicate_name",
                     message=(
-                        f"an MCP service named {clean_name!r} already exists "
-                        "in this workspace"
+                        f"an MCP service named {clean_name!r} already exists in this workspace"
                     ),
                 ) from exc
             raise
@@ -406,9 +403,15 @@ class MCPServiceService:
 
         Fetches the live row eagerly so the standard
         ``mcp_service.not_found`` 404 fires before any OAuth work is
-        done.
+        done. PR-17.5b: when the lifespan registered an
+        ``oauth_manager_factory``, that factory binds the per-request
+        manager to the APP-scope state (HTTP client, CSRF store, token
+        store) and is preferred over the legacy
+        :class:`OAuthManager(service=info)` constructor.
         """
         info = await self.get_service(tenant_id=tenant_id, id=service_id)
+        if self._oauth_manager_factory is not None:
+            return await self._oauth_manager_factory(info)
         return OAuthManager(service=info)
 
     # ── Validation helpers ─────────────────────────────────────────

@@ -5,6 +5,13 @@ repositories are built in ``core`` on the request-scoped
 ``AsyncSession`` so the request's reads and writes share one
 transactional unit of work. ``web`` never imports ``db``.
 
+PR-17.5b also reads the live MCP singletons the lifespan registered
+(connection pool, OAuth state + secret stores, OAuth factory) and
+forwards them to :func:`src.core.infra.mcp_services.factory.build_mcp_service`
+so the per-request service can drive the live transport layer when
+the lifespan was started, while keeping the dependency-overrides path
+green for tests that bypass lifespan.
+
 Adds two FastAPI dependency factories for ``tenant_id`` and ``user_id``
 so the router can read them from the per-request auth state without
 reaching into the context layer directly.
@@ -12,22 +19,69 @@ reaching into the context layer directly.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import Depends, Request
 
 from src.app_context import request_context
+from src.app_context.registry import LifeSpanService
 from src.common.exception import ValidationError
-from src.core.infra.mcp_services.factory import build_mcp_service
+from src.core.infra.mcp_services.factory import (
+    build_live_connectivity_probe,
+    build_live_discovery_provider,
+    build_mcp_service,
+)
 from src.core.infra.mcp_services.service import MCPServiceService
 from src.web.deps.session import SessionDep
 from src.web.middleware.context import get_tenant_id as _gtid
 from src.web.middleware.context import get_user_info as _gui
 
 
-def get_mcp_service(session: SessionDep) -> MCPServiceService:
-    """Build a per-request ``MCPServiceService`` on the shared session."""
-    return build_mcp_service(session)
+def _resolve_lifespan_service(request: Request) -> LifeSpanService | None:
+    """Return the lifespan service if the lifespan was started, else ``None``."""
+    return cast("LifeSpanService | None", getattr(request.app.state, "lifespan_service", None))
+
+
+def get_mcp_service(
+    request: Request,
+    session: SessionDep,
+) -> MCPServiceService:
+    """Build a per-request ``MCPServiceService`` on the shared session.
+
+    PR-17.5b: when the lifespan registered a live MCP connection pool
+    we forward it (plus the OAuth factory the lifespan owns) to the
+    factory so the service can drive live discovery, connectivity, and
+    OAuth flows. When the lifespan was bypassed (the test-app path)
+    we hand the factory ``None`` so the static fakes take over.
+    """
+    lifespan_service = _resolve_lifespan_service(request)
+    discovery_provider = (
+        build_live_discovery_provider(
+            session=session,
+            connection_manager=lifespan_service.mcp_connection_manager,
+        )
+        if lifespan_service is not None and lifespan_service.mcp_connection_manager is not None
+        else None
+    )
+    connectivity_probe = (
+        build_live_connectivity_probe(
+            session=session,
+            connection_manager=lifespan_service.mcp_connection_manager,
+        )
+        if lifespan_service is not None and lifespan_service.mcp_connection_manager is not None
+        else None
+    )
+    oauth_factory = (
+        getattr(lifespan_service, "mcp_oauth_manager_factory", None)
+        if lifespan_service is not None
+        else None
+    )
+    return build_mcp_service(
+        session,
+        discovery_provider=discovery_provider,
+        connectivity_probe=connectivity_probe,
+        oauth_manager_factory=oauth_factory,
+    )
 
 
 def get_request_tenant_id(request: Request) -> int:

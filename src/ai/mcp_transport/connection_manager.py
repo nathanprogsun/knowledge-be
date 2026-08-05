@@ -41,6 +41,7 @@ from src.ai.mcp_transport.errors import (
     MCPTransportError,
     SessionNotConnectedError,
 )
+from src.ai.mcp_transport.http_streamable_client import HTTPStreamableClient
 from src.ai.mcp_transport.jsonrpc import (
     METHOD_INITIALIZE,
     METHOD_RESOURCES_LIST,
@@ -120,10 +121,12 @@ def _default_transport_factory(
 ) -> Any:
     """Build a transport client by inspecting ``transport_type``.
 
-    Mirrors the Go switch in ``NewMCPClient`` — SSE gets an
-    :class:`src.ai.mcp_transport.sse_client.SSEClient`. The
-    HTTP-streamable branch raises until its module lands; ``stdio`` is
-    intentionally rejected (disabled for security, same as the Go side).
+    Mirrors the Go switch in ``NewMCPClient`` — ``sse`` gets an
+    :class:`src.ai.mcp_transport.sse_client.SSEClient`,
+    ``http-streamable`` (PR-17.5b) gets an
+    :class:`src.ai.mcp_transport.http_streamable_client.HTTPStreamableClient`;
+    ``stdio`` is intentionally rejected (disabled for security, same as
+    the Go side).
     """
     if transport_type == "sse":
         return SSEClient(
@@ -132,12 +135,14 @@ def _default_transport_factory(
             timeout_seconds=timeout_seconds,
         )
     if transport_type == "http-streamable":
-        raise MCPTransportError(
-            "transport_type='http-streamable' is not implemented in this build",
+        return HTTPStreamableClient(
+            url=url,
+            headers=headers or {},
+            timeout_seconds=timeout_seconds,
         )
     raise MCPTransportError(
         f"unsupported transport_type: {transport_type!r}; "
-        "only 'sse' (and 'http-streamable' in a later build) are accepted",
+        "only 'sse' and 'http-streamable' are accepted",
     )
 
 
@@ -344,8 +349,7 @@ class MCPConnectionManager:
         )
         if response.error is not None:
             raise MCPTransportError(
-                f"initialize failed: {response.error.message} "
-                f"(code={response.error.code})",
+                f"initialize failed: {response.error.message} (code={response.error.code})",
             )
 
     # ── Cache management ────────────────────────────────────────────
