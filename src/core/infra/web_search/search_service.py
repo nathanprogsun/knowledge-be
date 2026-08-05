@@ -193,8 +193,8 @@ def _row_parameters(info: WebSearchProviderInfo) -> JsonObject:
     raw: JsonObject = {}
     if info.parameters.api_key is not None:
         raw["api_key"] = info.parameters.api_key
-    if info.parameters.engine_id is not None:
-        raw["engine_id"] = info.parameters.engine_id
+    if info.parameters.cx is not None:
+        raw["cx"] = info.parameters.cx
     if info.parameters.base_url is not None:
         raw["base_url"] = info.parameters.base_url
     if info.parameters.proxy_url is not None:

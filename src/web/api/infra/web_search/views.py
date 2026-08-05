@@ -86,7 +86,7 @@ def _mask_parameters(
         return WebSearchProviderParameters()
     return WebSearchProviderParameters(
         api_key=None,
-        engine_id=params.engine_id,
+        cx=params.cx,
         base_url=params.base_url,
         proxy_url=params.proxy_url,
         extra_config=params.extra_config,

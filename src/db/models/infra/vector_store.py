@@ -35,6 +35,7 @@ class VectorStore(TableModel):
     table: ClassVar[str] = "vector_stores"
     primary_keys: ClassVar[tuple[str, ...]] = ("id",)
     json_columns: ClassVar[tuple[str, ...]] = ("connection_config", "index_config")
+    db_generated_columns: ClassVar[tuple[str, ...]] = ()  # id is caller-assigned (UUID).
 
     id: str
     tenant_id: int

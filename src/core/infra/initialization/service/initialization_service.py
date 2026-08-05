@@ -248,7 +248,7 @@ class InitializationService:
         ``modelName`` and ``baseUrl`` are both mandatory and the URL is
         SSRF-validated before any request leaves the process.
         """
-        if not request.model_name or not request.base_url:
+        if not request.model or not request.base_url:
             raise ValidationError(
                 "模型名称和Base URL不能为空",
                 code="initialization.model_and_base_url_required",

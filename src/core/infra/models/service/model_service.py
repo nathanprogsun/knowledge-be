@@ -114,7 +114,7 @@ class ModelService:
             parameters=parameters,
             is_default=False,
             is_builtin=False,
-            managed_by=None,
+            managed_by="",
             status=_STATUS_ACTIVE,
             created_at=now,
             updated_at=now,
@@ -244,6 +244,13 @@ class ModelService:
             for key in ("api_key", "app_secret"):
                 if key in existing_params:
                     new_params[key] = existing_params[key]
+            # Preserve any stored parameter key the caller did not send
+            # — Go's `omitempty` contract drops *empty* fields, not
+            # caller-omitted ones, so the merged blob keeps
+            # ``base_url`` / ``embedding_parameters`` / etc.
+            for key, value in existing_params.items():
+                if key not in new_params:
+                    new_params[key] = value
             columns["parameters"] = new_params
         return columns
 

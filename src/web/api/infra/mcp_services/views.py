@@ -97,31 +97,28 @@ class MCPOAuthStatusEnvelope(BaseModel):
 def _to_auth_config(info: MCPServiceInfo) -> MCPMcpServiceAuthConfig | None:
     """Project the service's auth_config to the wire DTO.
 
-    The info DTO has already dropped the secret fields; we still
-    re-strip here as defence-in-depth.
+    Credentials are kept verbatim on user-created services, mirroring
+    Go's ``dto.NewMCPServiceResponse`` (which round-trips the
+    ``api_key`` / ``token`` fields on user rows; built-in rows are not
+    exposed via the public API).
     """
     raw = info.auth_config
     if not isinstance(raw, dict):
         return None
-    cleaned = {k: v for k, v in raw.items() if k not in {"api_key", "token"}}
-    return MCPMcpServiceAuthConfig.model_validate(cleaned)
+    return MCPMcpServiceAuthConfig.model_validate(raw)
 
 
 def _auth_config_to_wire_dict(model: MCPMcpServiceAuthConfig) -> dict[str, JsonValue]:
-    """Serialise the auth DTO with secret fields omitted.
+    """Serialise the auth DTO verbatim.
 
     The frozen contract requires ``api_key`` and ``token`` as nullable
-    fields. Stripping them in the response body keeps the wire-shape
-    "no secret in responses" invariant the Go side enforces via the
-    ``dto.NewMCPServiceResponse`` projector.
+    fields. User-created rows carry them through unchanged so the wire
+    shape matches ``docs/api/mcp-service.md``.
     """
     dumped = model.model_dump(mode="json", exclude_none=True)
     if not isinstance(dumped, dict):
         return {}
-    cleaned: dict[str, JsonValue] = {
-        k: v for k, v in dumped.items() if k not in {"api_key", "token"}
-    }
-    return cleaned
+    return dict(dumped)
 
 
 def _to_advanced_config(

@@ -466,16 +466,24 @@ async def test_delete_model_rejects_non_positive_tenant_id(
 # ── ModelInfo DTO ────────────────────────────────────────────────────
 
 
-async def test_model_info_redacts_credential_fields(
+async def test_model_info_keeps_credential_fields_in_service_dto(
     service: ModelService,
 ) -> None:
+    """Service DTO preserves credentials; the wire view masks them.
+
+    Mirrors Go: the row stores the raw value; the wire DTO
+    (``dto.ModelParametersDTO``) emits ``"sk-***"`` placeholders. We
+    keep the same split — credentials live in ``ModelInfo`` and are
+    replaced with the wire placeholder at the ``ModelEnvelope``
+    boundary.
+    """
     body = _make_create_request(
         parameters=_make_parameters(api_key="sk-secret", app_secret="app-secret"),
     )
     info = await service.create_model(tenant_id=1, body=body)
 
-    assert info.parameters.api_key is None
-    assert info.parameters.app_secret is None
+    assert info.parameters.api_key == "sk-secret"
+    assert info.parameters.app_secret == "app-secret"
 
 
 async def test_model_info_preserves_other_parameter_fields(

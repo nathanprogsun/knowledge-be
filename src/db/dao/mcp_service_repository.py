@@ -60,7 +60,7 @@ class MCPServiceRepository(GenericRepository[MCPService]):
         """Live tenant-scoped rows (excludes builtin), newest first."""
         stmt = text(
             f"select * from {self._table} "
-            "where tenant_id = :tenant_id and is_builtin = 0 "
+            "where tenant_id = :tenant_id and is_builtin = false "
             "and deleted_at is null "
             "order by created_at desc"
         ).bindparams(tenant_id=tenant_id)
@@ -70,7 +70,7 @@ class MCPServiceRepository(GenericRepository[MCPService]):
     async def find_builtin(self, id: str) -> MCPService | None:
         """Return the live builtin row for an id (cross-tenant)."""
         return await self.find_unique_by_column_values(
-            {"is_builtin": 1, "id": id},
+            {"is_builtin": True, "id": id},
         )
 
     async def soft_delete(

@@ -13,16 +13,6 @@ Three surfaces live here:
 - ``SUPPORTED_ENGINE_TYPES`` — frozenset of valid engine ids, used by
   the service to validate the ``engine_type`` field on create and
   during the raw connection probe.
-
-Note on the ``default`` field
------------------------------
-
-The frozen contract types ``VectorStoreConnectionField.default`` as
-``JsonObject | None`` (a dict), but the Go wire format ships scalar
-defaults (``"http://localhost:9200"``, ``4``, ``false``). The contract
-is the source of truth for the column type; we wrap every scalar in a
-single-entry ``{"value": ...}`` object so the contract validates.
-A drift note is queued for the next contract reconciliation.
 """
 
 from __future__ import annotations
@@ -40,12 +30,14 @@ from src.core.contracts.infra import (
 from src.db.models.infra.vector_store import VectorStore
 
 
-def _scalar_default(value: str | int | bool) -> JsonObject:
-    """Wrap a scalar default as a single-entry JsonObject.
+def _scalar(value: str | int | bool) -> JsonValue:
+    """Coerce a literal default to ``JsonValue``.
 
-    See the module docstring for the contract-vs-wire drift context.
+    ``VectorStoreConnectionField.default`` is typed as
+    ``JsonValue | None`` (the Go wire format ships scalar defaults:
+    ``"http://localhost:9200"``, ``4``, ``false``).
     """
-    return cast("JsonObject", {"value": cast("JsonValue", value)})
+    return cast("JsonValue", value)
 
 
 # ── Vector-store type metadata (registry) ────────────────────────────
@@ -67,14 +59,14 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="addr",
                 type="string",
                 required=True,
-                default=_scalar_default("http://localhost:9200"),
+                default=_scalar("http://localhost:9200"),
                 description="URL",
             ),
             VectorStoreConnectionField(
                 name="username",
                 type="string",
                 required=False,
-                default=_scalar_default("elastic"),
+                default=_scalar("elastic"),
                 description="Username",
             ),
             VectorStoreConnectionField(
@@ -90,21 +82,21 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="index_name",
                 type="string",
                 required=False,
-                default=_scalar_default("weknora"),
+                default=_scalar("weknora"),
                 description="Index Name",
             ),
             VectorStoreConnectionField(
                 name="number_of_shards",
                 type="number",
                 required=False,
-                default=_scalar_default(4),
+                default=_scalar(4),
                 description="Shards",
             ),
             VectorStoreConnectionField(
                 name="number_of_replicas",
                 type="number",
                 required=False,
-                default=_scalar_default(1),
+                default=_scalar(1),
                 description="Replicas",
             ),
         ],
@@ -117,14 +109,14 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="host",
                 type="string",
                 required=True,
-                default=_scalar_default("localhost"),
+                default=_scalar("localhost"),
                 description="Host",
             ),
             VectorStoreConnectionField(
                 name="port",
                 type="number",
                 required=False,
-                default=_scalar_default(6334),
+                default=_scalar(6334),
                 description="Port",
             ),
             VectorStoreConnectionField(
@@ -138,7 +130,7 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="use_tls",
                 type="boolean",
                 required=False,
-                default=_scalar_default(False),
+                default=_scalar(False),
                 description="Use TLS",
             ),
         ],
@@ -147,21 +139,21 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="collection_prefix",
                 type="string",
                 required=False,
-                default=_scalar_default("weknora_embeddings"),
+                default=_scalar("weknora_embeddings"),
                 description="Collection Prefix",
             ),
             VectorStoreConnectionField(
                 name="shard_number",
                 type="number",
                 required=False,
-                default=_scalar_default(1),
+                default=_scalar(1),
                 description="Shard Number",
             ),
             VectorStoreConnectionField(
                 name="replication_factor",
                 type="number",
                 required=False,
-                default=_scalar_default(1),
+                default=_scalar(1),
                 description="Replication Factor",
             ),
         ],
@@ -174,7 +166,7 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="addr",
                 type="string",
                 required=True,
-                default=_scalar_default("localhost:19530"),
+                default=_scalar("localhost:19530"),
                 description="Address",
             ),
             VectorStoreConnectionField(
@@ -187,7 +179,7 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="username",
                 type="string",
                 required=False,
-                default=_scalar_default("root"),
+                default=_scalar("root"),
                 description="Username",
             ),
             VectorStoreConnectionField(
@@ -203,21 +195,21 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="collection_name",
                 type="string",
                 required=False,
-                default=_scalar_default("weknora_embeddings"),
+                default=_scalar("weknora_embeddings"),
                 description="Collection Name",
             ),
             VectorStoreConnectionField(
                 name="shards_num",
                 type="number",
                 required=False,
-                default=_scalar_default(1),
+                default=_scalar(1),
                 description="Shards (write parallelism)",
             ),
             VectorStoreConnectionField(
                 name="replica_number",
                 type="number",
                 required=False,
-                default=_scalar_default(1),
+                default=_scalar(1),
                 description="In-memory Replicas (read HA)",
             ),
         ],
@@ -230,7 +222,7 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="addr",
                 type="string",
                 required=True,
-                default=_scalar_default("http://localhost:8080"),
+                default=_scalar("http://localhost:8080"),
                 description="Address",
             ),
             VectorStoreConnectionField(
@@ -250,7 +242,7 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="database",
                 type="string",
                 required=False,
-                default=_scalar_default("weknora"),
+                default=_scalar("weknora"),
                 description="Database",
             ),
         ],
@@ -259,21 +251,21 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="collection_name",
                 type="string",
                 required=False,
-                default=_scalar_default("weknora_embeddings"),
+                default=_scalar("weknora_embeddings"),
                 description="Collection Name",
             ),
             VectorStoreConnectionField(
                 name="shards_num",
                 type="number",
                 required=False,
-                default=_scalar_default(1),
+                default=_scalar(1),
                 description="Shards",
             ),
             VectorStoreConnectionField(
                 name="replica_number",
                 type="number",
                 required=False,
-                default=_scalar_default(1),
+                default=_scalar(1),
                 description="Replicas",
             ),
         ],
@@ -286,21 +278,21 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="host",
                 type="string",
                 required=True,
-                default=_scalar_default("weaviate:8080"),
+                default=_scalar("weaviate:8080"),
                 description="Host",
             ),
             VectorStoreConnectionField(
                 name="grpc_address",
                 type="string",
                 required=False,
-                default=_scalar_default("weaviate:50051"),
+                default=_scalar("weaviate:50051"),
                 description="gRPC Address",
             ),
             VectorStoreConnectionField(
                 name="scheme",
                 type="string",
                 required=False,
-                default=_scalar_default("http"),
+                default=_scalar("http"),
                 description="Scheme",
             ),
             VectorStoreConnectionField(
@@ -316,21 +308,21 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="collection_prefix",
                 type="string",
                 required=False,
-                default=_scalar_default("Weknora_embeddings"),
+                default=_scalar("Weknora_embeddings"),
                 description="Collection Prefix",
             ),
             VectorStoreConnectionField(
                 name="desired_shard_count",
                 type="number",
                 required=False,
-                default=_scalar_default(1),
+                default=_scalar(1),
                 description="Shard Count",
             ),
             VectorStoreConnectionField(
                 name="replication_factor",
                 type="number",
                 required=False,
-                default=_scalar_default(1),
+                default=_scalar(1),
                 description="Replication Factor",
             ),
         ],
@@ -343,28 +335,28 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="addr",
                 type="string",
                 required=True,
-                default=_scalar_default("doris-fe:9030"),
+                default=_scalar("doris-fe:9030"),
                 description="FE MySQL Address (host:port)",
             ),
             VectorStoreConnectionField(
                 name="http_port",
                 type="number",
                 required=False,
-                default=_scalar_default(8030),
+                default=_scalar(8030),
                 description="FE HTTP Port (Stream Load)",
             ),
             VectorStoreConnectionField(
                 name="database",
                 type="string",
                 required=True,
-                default=_scalar_default("weknora"),
+                default=_scalar("weknora"),
                 description="Database",
             ),
             VectorStoreConnectionField(
                 name="username",
                 type="string",
                 required=False,
-                default=_scalar_default("root"),
+                default=_scalar("root"),
                 description="Username",
             ),
             VectorStoreConnectionField(
@@ -380,21 +372,21 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="collection_prefix",
                 type="string",
                 required=False,
-                default=_scalar_default("weknora_embeddings"),
+                default=_scalar("weknora_embeddings"),
                 description="Table Prefix",
             ),
             VectorStoreConnectionField(
                 name="buckets_num",
                 type="number",
                 required=False,
-                default=_scalar_default(10),
+                default=_scalar(10),
                 description="Buckets per table",
             ),
             VectorStoreConnectionField(
                 name="replication_num",
                 type="number",
                 required=False,
-                default=_scalar_default(1),
+                default=_scalar(1),
                 description="Replication Num",
             ),
         ],
@@ -407,14 +399,14 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="addr",
                 type="string",
                 required=True,
-                default=_scalar_default("https://localhost:9200"),
+                default=_scalar("https://localhost:9200"),
                 description="URL",
             ),
             VectorStoreConnectionField(
                 name="username",
                 type="string",
                 required=False,
-                default=_scalar_default("admin"),
+                default=_scalar("admin"),
                 description="Username",
             ),
             VectorStoreConnectionField(
@@ -428,7 +420,7 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="insecure_skip_verify",
                 type="boolean",
                 required=False,
-                default=_scalar_default(False),
+                default=_scalar(False),
                 description=(
                     "Skip TLS certificate verification. For self-signed "
                     "dev clusters only — never enable in production."
@@ -440,21 +432,21 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="index_name",
                 type="string",
                 required=False,
-                default=_scalar_default("weknora"),
+                default=_scalar("weknora"),
                 description="Index Name",
             ),
             VectorStoreConnectionField(
                 name="number_of_shards",
                 type="number",
                 required=False,
-                default=_scalar_default(4),
+                default=_scalar(4),
                 description="Shards",
             ),
             VectorStoreConnectionField(
                 name="number_of_replicas",
                 type="number",
                 required=False,
-                default=_scalar_default(1),
+                default=_scalar(1),
                 description="Replicas",
             ),
         ],

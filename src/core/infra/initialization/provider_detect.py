@@ -384,7 +384,7 @@ async def check_chat_model_connection(
     """
     base_url = (request.base_url or "").rstrip("/")
     payload = {
-        "model": request.model_name,
+        "model": request.model,
         "messages": [{"role": "user", "content": "test"}],
         "max_tokens": 1,
     }

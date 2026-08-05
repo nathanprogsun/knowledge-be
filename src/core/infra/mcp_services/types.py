@@ -17,11 +17,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.common.json import JsonObject, JsonValue
 from src.db.models.infra.mcp_services import MCPService, MCPToolApproval
 
-# Storage-only or secret-bearing columns of an ``mcp_services`` row.
-# ``auth_config.api_key`` / ``auth_config.token`` are NOT a row column
-# — they live inside the JSON blob — so the wire DTO strips them at
-# the contract layer instead.
-_AUTH_SECRET_KEYS: tuple[str, ...] = ("api_key", "token")
+# ``auth_config.api_key`` / ``auth_config.token`` are NOT a row column —
+# they live inside the JSON blob — and the wire contract carries them
+# verbatim on user-created services (mirrors Go's
+# ``dto.NewMCPServiceResponse``). Built-in services are not exposed via
+# the API, so credential stripping is intentionally not done at this
+# layer.
 
 
 class MCPServiceInfo(BaseModel):
@@ -47,15 +48,10 @@ class MCPServiceInfo(BaseModel):
 
     @classmethod
     def map_from_db(cls, db: MCPService) -> Self:
-        """Project the storage row, parsing JSON columns and stripping secrets."""
+        """Project the storage row, parsing JSON columns; keep auth_config verbatim."""
         record = db.model_dump()
         for column in ("headers", "auth_config", "advanced_config", "stdio_config", "env_vars"):
             record[column] = _parse_json_blob(record.get(column), column)
-        if isinstance(record.get("auth_config"), dict):
-            auth = dict(record["auth_config"])
-            for secret_key in _AUTH_SECRET_KEYS:
-                auth.pop(secret_key, None)
-            record["auth_config"] = auth
         return cls.model_validate(record)
 
 

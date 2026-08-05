@@ -70,17 +70,30 @@ class ModelDebugEnvelope(BaseModel):
     data: dict[str, object]
 
 
+def _redact_credential(value: str | None) -> str:
+    """Return the wire placeholder for a stored credential.
+
+    Go's ``dto.NewModelResponse`` emits ``"sk-***"`` when an
+    ``api_key`` is set and ``""`` when it is empty — the ``sk-`` prefix
+    is preserved so the UI can tell at a glance whether a key is
+    configured without revealing its value.
+    """
+    if not value:
+        return ""
+    return "sk-***"
+
+
 def _parameters_for_wire(parameters: ModelParameters) -> ModelParameters:
     """Strip ``api_key`` / ``app_secret`` for the wire response.
 
-    Mirrors Go's ``dto.ModelParametersDTO`` which drops both fields by
+    Mirrors Go's ``dto.ModelParametersDTO`` which masks both fields by
     construction. We rebuild a fresh ``ModelParameters`` with the two
-    sensitive fields cleared.
+    sensitive fields replaced by the wire placeholder.
     """
     return parameters.model_copy(
         update={
-            "api_key": None,
-            "app_secret": None,
+            "api_key": _redact_credential(parameters.api_key),
+            "app_secret": _redact_credential(parameters.app_secret),
         }
     )
 

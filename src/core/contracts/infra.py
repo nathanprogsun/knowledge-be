@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.common.json import JsonObject
+from src.common.json import JsonObject, JsonValue
 
 
 class EmbeddingParameters(BaseModel):
@@ -216,7 +216,7 @@ class VectorStoreConnectionField(BaseModel):
     name: str
     type: str
     required: bool | None = Field(default=False)
-    default: JsonObject | None = Field(default=None)
+    default: JsonValue | None = Field(default=None)
     description: str | None = Field(default=None)
     sensitive: bool | None = Field(default=False)
 
@@ -410,10 +410,12 @@ class UpdateWebSearchProviderRequest(BaseModel):
 
 
 class WebSearchProviderParameters(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, populate_by_name=True)
 
     api_key: str | None = Field(default=None)
-    engine_id: str | None = Field(default=None)
+    # Google CSE uses ``cx`` (custom-search engine id) per Go docs/api/web-search.md.
+    # Accept ``engine_id`` / ``engineId`` as alias for legacy callers.
+    cx: str | None = Field(default=None, alias="cx")
     base_url: str | None = Field(default=None)
     proxy_url: str | None = Field(default=None)
     extra_config: dict[str, str] | None = Field(default=None)
@@ -605,12 +607,17 @@ class DownloadOllamaModelRequest(BaseModel):
 
 
 class ModelTestRequest(BaseModel):
-    """Wire shape for ``/initialization/*/test|check`` model probes."""
+    """Wire shape for ``/initialization/*/test|check`` model probes.
+
+    Go uses ``model`` (not ``modelName``) on the
+    ``/initialization/{remote,embedding,rerank,multimodal}/{check,test}``
+    endpoints. ``modelName`` is kept as an alias for legacy callers.
+    """
 
     model_config = ConfigDict(frozen=True, populate_by_name=True)
 
     source: str | None = Field(default=None)
-    model_name: str = Field(alias="modelName")
+    model: str = Field(default="")
     base_url: str | None = Field(default=None, alias="baseUrl")
     api_key: str | None = Field(default=None, alias="apiKey")
     provider: str | None = Field(default=None)

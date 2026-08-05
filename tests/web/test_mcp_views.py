@@ -133,7 +133,13 @@ async def test_create_service_rejects_stdio(client: AsyncClient) -> None:
     assert resp.json()["error"]["code"] == "mcp_service.stdio_disabled"
 
 
-async def test_create_service_strips_secrets(client: AsyncClient) -> None:
+async def test_create_service_preserves_secrets(client: AsyncClient) -> None:
+    """``api_key`` / ``token`` are kept verbatim on user services.
+
+    Mirrors Go's ``dto.NewMCPServiceResponse`` — credentials are not
+    stripped on user-created rows; only built-in services (not exposed
+    via the public API) are masked.
+    """
     resp = await client.post(
         "/mcp-services",
         json={
@@ -141,8 +147,8 @@ async def test_create_service_strips_secrets(client: AsyncClient) -> None:
             "transport_type": "sse",
             "auth_config": {
                 "auth_type": "api_key",
-                "api_key": "should-be-dropped",
-                "token": "should-be-dropped",
+                "api_key": "should-be-preserved",
+                "token": "should-be-preserved",
                 "scopes": ["read"],
             },
         },
@@ -150,11 +156,9 @@ async def test_create_service_strips_secrets(client: AsyncClient) -> None:
     assert resp.status_code == 201
     auth = resp.json()["data"]["auth_config"]
     assert auth["auth_type"] == "api_key"
-    # The info DTO strips secret values before projecting; the wire
-    # contract re-hydrates them as nullable fields, so the assertion is
-    # "value is None", not "key is absent".
-    assert auth.get("api_key") is None
-    assert auth.get("token") is None
+    assert auth["api_key"] == "should-be-preserved"
+    assert auth["token"] == "should-be-preserved"
+    assert auth["scopes"] == ["read"]
 
 
 # ── GET /mcp-services ───────────────────────────────────────────────
@@ -201,7 +205,7 @@ async def test_update_service_patches_columns(
     assert resp.json()["data"]["description"] == "new"
 
 
-async def test_update_service_strips_secret_auth(
+async def test_update_service_preserves_secret_auth(
     client: AsyncClient, mcp_repo: FakeMCPServiceRepository
 ) -> None:
     await _seed(mcp_repo, name="alpha")
@@ -210,14 +214,14 @@ async def test_update_service_strips_secret_auth(
         json={
             "auth_config": {
                 "auth_type": "oauth",
-                "api_key": "should-be-dropped",
+                "api_key": "should-be-preserved",
             },
         },
     )
     assert resp.status_code == 200
     auth = resp.json()["data"]["auth_config"]
     assert auth.get("auth_type") == "oauth"
-    assert auth.get("api_key") is None
+    assert auth.get("api_key") == "should-be-preserved"
 
 
 # ── DELETE /mcp-services/{id} ────────────────────────────────────────

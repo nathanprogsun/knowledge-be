@@ -209,12 +209,14 @@ def _parameters_from_raw(raw: JsonObject | None) -> WebSearchProviderParameters 
             str(k): str(v) for k, v in extra_dict.items() if isinstance(v, (str, int, float, bool))
         }
     api_key = raw.get("api_key")
-    engine_id = raw.get("engine_id")
+    # ``cx`` is the Go-spec field name; ``engine_id`` / ``engineId`` are
+    # accepted as legacy aliases.
+    cx_raw = raw.get("cx") or raw.get("engine_id") or raw.get("engineId")
     base_url = raw.get("base_url")
     proxy_url = raw.get("proxy_url")
     return WebSearchProviderParameters(
         api_key=str(api_key) if isinstance(api_key, (str, int, float, bool)) else None,
-        engine_id=str(engine_id) if isinstance(engine_id, (str, int, float, bool)) else None,
+        cx=str(cx_raw) if isinstance(cx_raw, (str, int, float, bool)) else None,
         base_url=str(base_url) if isinstance(base_url, (str, int, float, bool)) else None,
         proxy_url=str(proxy_url) if isinstance(proxy_url, (str, int, float, bool)) else None,
         extra_config=typed_extra,

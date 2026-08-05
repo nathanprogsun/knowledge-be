@@ -19,7 +19,6 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.common.json import JsonObject
 from src.core.contracts.infra import ModelParameters
 from src.db.models.infra.model import Model
 
@@ -28,21 +27,11 @@ from src.db.models.infra.model import Model
 # secret-bearing parameter fields instead.
 #
 # ``parameters`` carries ``api_key`` / ``app_secret`` (encrypted at
-# rest, decrypted by the ``ModelParameters.Scan`` Go hook on the Go
-# side). We strip both fields at the service boundary so the wire
-# never sees plaintext secrets even on the create response.
-_REDACTED_FIELDS: frozenset[str] = frozenset({"api_key", "app_secret"})
-
-
-def _redact_parameters(raw: JsonObject) -> JsonObject:
-    """Strip ``api_key`` / ``app_secret`` from a stored parameters blob.
-
-    Keeps every other field (including empty-string values) so the
-    downstream UI rendering matches what the row actually carries.
-    """
-    if not raw:
-        return {}
-    return {k: v for k, v in raw.items() if k not in _REDACTED_FIELDS}
+# rest on the Go side, plain on the Python scaffold). The service
+# DTO keeps the values verbatim so the wire layer can emit the
+# documented ``"sk-***"`` redaction placeholder on the response.
+# Built-in / cross-tenant masking for builtins lives at the wire
+# boundary (not in this module).
 
 
 class ModelInfo(BaseModel):
@@ -74,7 +63,6 @@ class ModelInfo(BaseModel):
         ``api_key`` / ``app_secret`` so they never cross the service
         boundary in plaintext.
         """
-        redacted = _redact_parameters(db.parameters)
         return cls.model_validate(
             {
                 "id": db.id,
@@ -84,7 +72,7 @@ class ModelInfo(BaseModel):
                 "type": db.type,
                 "source": db.source,
                 "description": db.description,
-                "parameters": redacted,
+                "parameters": dict(db.parameters),
                 "is_default": db.is_default,
                 "is_builtin": db.is_builtin,
                 "managed_by": db.managed_by,

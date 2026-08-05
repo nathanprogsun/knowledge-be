@@ -103,7 +103,7 @@ async def test_create_service_rejects_stdio(service: MCPServiceService) -> None:
     assert excinfo.value.code == "mcp_service.stdio_disabled"
 
 
-async def test_create_service_strips_secret_auth_fields(
+async def test_create_service_preserves_auth_config(
     service: MCPServiceService,
 ) -> None:
     info = await service.create_service(
@@ -112,15 +112,17 @@ async def test_create_service_strips_secret_auth_fields(
         transport_type="sse",
         auth_config={
             "auth_type": "api_key",
-            "api_key": "should-not-persist",
-            "token": "should-not-persist",
+            "api_key": "should-be-preserved",
+            "token": "should-be-preserved",
             "scopes": ["read"],
         },
     )
     assert info.auth_config is not None
-    assert "api_key" not in info.auth_config
-    assert "token" not in info.auth_config
+    # Mirrors Go: credentials are kept on user services verbatim.
     assert info.auth_config["auth_type"] == "api_key"
+    assert info.auth_config["api_key"] == "should-be-preserved"
+    assert info.auth_config["token"] == "should-be-preserved"
+    assert info.auth_config["scopes"] == ["read"]
 
 
 # ── Read ────────────────────────────────────────────────────────────
@@ -205,7 +207,7 @@ async def test_update_service_rejects_builtin(
     assert excinfo.value.code == "mcp_service.builtin_immutable"
 
 
-async def test_update_service_strips_secret_auth_fields(
+async def test_update_service_preserves_auth_config(
     service: MCPServiceService,
     mcp_repo: FakeMCPServiceRepository,
 ) -> None:
@@ -215,14 +217,14 @@ async def test_update_service_strips_secret_auth_fields(
         id="seed-alpha",
         auth_config={
             "auth_type": "oauth",
-            "api_key": "should-be-dropped",
+            "api_key": "should-be-preserved",
             "scopes": ["read"],
         },
     )
     assert info.auth_config is not None
     assert info.auth_config.get("auth_type") == "oauth"
     assert info.auth_config.get("scopes") == ["read"]
-    assert "api_key" not in info.auth_config
+    assert info.auth_config.get("api_key") == "should-be-preserved"
 
 
 async def test_update_service_rejects_stdio_transition(

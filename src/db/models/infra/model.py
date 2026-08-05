@@ -49,7 +49,7 @@ class Model(TableModel):
     parameters: JsonObject
     is_default: bool = False
     is_builtin: bool = False
-    managed_by: str | None = None
+    managed_by: str = ""
     status: str | None = "active"
     created_at: datetime
     updated_at: datetime

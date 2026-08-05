@@ -420,9 +420,13 @@ def _build_update_columns(
     if headers is not None:
         columns["headers"] = cast("JsonValue", headers)
     if auth_config is not None:
-        # Credentials flow through the dedicated subresource only.
-        sanitised = {k: v for k, v in auth_config.items() if k not in ("api_key", "token")}
-        columns["auth_config"] = sanitised
+        # Pass-through; mirrors Go's
+        # ``service.UpdateMCPService`` which round-trips
+        # ``auth_config`` on user services verbatim. The dedicated
+        # credentials subresource (post-PR-17 followup) is the only
+        # writer of ``api_key`` / ``token``; the standard update path
+        # just preserves them.
+        columns["auth_config"] = cast("JsonValue", auth_config)
     if advanced_config is not None:
         columns["advanced_config"] = advanced_config
     if stdio_config is not None:

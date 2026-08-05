@@ -57,10 +57,10 @@ class WebSearchClientRegistry(Protocol):
     """Minimal interface ``TestProvider`` needs from the provider registry.
 
     ``params`` is the JSON-shaped parameter blob (``api_key``,
-    ``engine_id``, ``base_url``, ``proxy_url``, ``extra_config``) so the
-    Protocol does not depend on the typed ``WebSearchProviderParameters``
-    contract — that keeps the boundary clean for implementations living
-    in a lower layer (e.g. ``src/ai``).
+    ``cx`` (Google CSE engine id), ``base_url``, ``proxy_url``,
+    ``extra_config``) so the Protocol does not depend on the typed
+    ``WebSearchProviderParameters`` contract — that keeps the boundary
+    clean for implementations living in a lower layer (e.g. ``src/ai``).
     """
 
     def create_provider(
@@ -264,7 +264,7 @@ def _validate_provider_parameters(
     """Validate the parameters blob against the provider type's requirements.
 
     Mirrors the Go validator: Bing/Google/Tavily/Ollama/Baidu/Zhipu
-    require an api_key; Google additionally requires engine_id;
+    require an api_key; Google additionally requires cx;
     SearXNG requires a non-empty base_url; the rest are optional.
     """
     params = _parameters_from_json(raw)
@@ -279,10 +279,10 @@ def _validate_provider_parameters(
                 code="web_search_provider.api_key_required",
                 message="API key is required for Google provider",
             )
-        if not params.engine_id:
+        if not params.cx:
             raise ValidationError(
-                code="web_search_provider.engine_id_required",
-                message="engine ID is required for Google provider",
+                code="web_search_provider.cx_required",
+                message="cx (Google Custom Search engine ID) is required for Google provider",
             )
     if provider == "searxng" and not (params.base_url and params.base_url.strip()):
         raise ValidationError(
@@ -302,12 +302,12 @@ def _parameters_from_json(raw: JsonObject | None) -> WebSearchProviderParameters
             str(k): str(v) for k, v in extra.items() if isinstance(v, (str, int, float, bool))
         }
     api_key = raw.get("api_key")
-    engine_id = raw.get("engine_id")
+    cx_raw = raw.get("cx") or raw.get("engine_id") or raw.get("engineId")
     base_url = raw.get("base_url")
     proxy_url = raw.get("proxy_url")
     return WebSearchProviderParameters(
         api_key=str(api_key) if isinstance(api_key, (str, int, float, bool)) else None,
-        engine_id=str(engine_id) if isinstance(engine_id, (str, int, float, bool)) else None,
+        cx=str(cx_raw) if isinstance(cx_raw, (str, int, float, bool)) else None,
         base_url=str(base_url) if isinstance(base_url, (str, int, float, bool)) else None,
         proxy_url=str(proxy_url) if isinstance(proxy_url, (str, int, float, bool)) else None,
         extra_config=extra_dict,
@@ -319,8 +319,8 @@ def _parameters_to_json(params: WebSearchProviderParameters) -> JsonObject:
     raw: JsonObject = {}
     if params.api_key is not None:
         raw["api_key"] = params.api_key
-    if params.engine_id is not None:
-        raw["engine_id"] = params.engine_id
+    if params.cx is not None:
+        raw["cx"] = params.cx
     if params.base_url is not None:
         raw["base_url"] = params.base_url
     if params.proxy_url is not None:

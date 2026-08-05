@@ -102,9 +102,13 @@ async def test_create_model_strips_credential_fields(
 
     assert resp.status_code == 201
     params = resp.json()["data"]["parameters"]
-    assert params["api_key"] is None
-    assert params["app_secret"] is None
-    # Non-credential fields survive the projection.
+    # Sensitive fields are redacted with the wire placeholder
+    # ``sk-***`` (mirrors Go's ``dto.NewModelResponse``); non-credential
+    # fields survive the projection verbatim. ``app_secret`` was not
+    # supplied in the fixture so it round-trips as ``""`` (no
+    # placeholder — Go's same convention).
+    assert params["api_key"] == "sk-***"
+    assert params["app_secret"] == ""
     assert params["provider"] == "openai"
     assert params["base_url"] == "https://api.openai.com/v1"
 
@@ -212,13 +216,22 @@ async def test_delete_model_removes_row(
 # ── GET /models/providers ───────────────────────────────────────────
 
 
-async def test_list_providers_returns_empty_catalog(client: AsyncClient) -> None:
+async def test_list_providers_returns_catalog(client: AsyncClient) -> None:
     resp = await client.get("/models/providers")
 
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["success"] is True
-    assert payload["data"] == []
+    # The static catalog mirrors ``docs/api/model.md``'s supported
+    # providers list; assert only that the wire shape (value / label /
+    # defaultUrls / modelTypes) is intact, not exact provider counts.
+    providers = payload["data"]
+    assert isinstance(providers, list) and providers
+    sample = providers[0]
+    assert {"value", "label", "defaultUrls", "modelTypes"} <= set(sample.keys())
+    # Ali­yun / DashScope is the canonical first example from the Go docs.
+    values = {p["value"] for p in providers}
+    assert "aliyun" in values
 
 
 # ── POST /models/{id}/debug ─────────────────────────────────────────

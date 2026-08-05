@@ -33,6 +33,7 @@ class WebSearchProvider(TableModel):
     table: ClassVar[str] = "web_search_providers"
     primary_keys: ClassVar[tuple[str, ...]] = ("id",)
     json_columns: ClassVar[tuple[str, ...]] = ("parameters",)
+    db_generated_columns: ClassVar[tuple[str, ...]] = ()  # id is caller-assigned (UUID).
 
     id: str
     tenant_id: int

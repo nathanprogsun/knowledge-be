@@ -291,7 +291,7 @@ async def test_create_provider_requires_api_key(provider: str) -> None:
     assert exc.value.code == "web_search_provider.api_key_required"
 
 
-async def test_create_google_requires_api_key_and_engine_id() -> None:
+async def test_create_google_requires_api_key_and_cx() -> None:
     svc, _ = _make_svc()
     with pytest.raises(ValidationError) as exc:
         await svc.create_provider(
@@ -303,7 +303,7 @@ async def test_create_google_requires_api_key_and_engine_id() -> None:
             is_default=False,
             provider_id="wsp-google-noengine",
         )
-    assert exc.value.code == "web_search_provider.engine_id_required"
+    assert exc.value.code == "web_search_provider.cx_required"
     with pytest.raises(ValidationError) as exc:
         await svc.create_provider(
             tenant_id=1,
@@ -349,7 +349,7 @@ async def test_create_default_promotion_clears_prior() -> None:
         name="Second",
         provider="google",
         description=None,
-        parameters={"api_key": "k2", "engine_id": "e2"},
+        parameters={"api_key": "k2", "cx": "e2"},
         is_default=True,
         provider_id="wsp-second",
     )
@@ -437,11 +437,11 @@ async def test_update_provider_revalidates_parameters() -> None:
         name="g",
         provider="google",
         description=None,
-        parameters={"api_key": "k", "engine_id": "e"},
+        parameters={"api_key": "k", "cx": "e"},
         is_default=False,
         provider_id="wsp-google",
     )
-    # Drop engine_id — must fail with the same code as on create.
+    # Drop cx — must fail with the same code as on create.
     with pytest.raises(ValidationError) as exc:
         await svc.update_provider(
             tenant_id=1,
@@ -451,7 +451,7 @@ async def test_update_provider_revalidates_parameters() -> None:
             parameters={"api_key": "k"},
             is_default=None,
         )
-    assert exc.value.code == "web_search_provider.engine_id_required"
+    assert exc.value.code == "web_search_provider.cx_required"
 
 
 # ── delete ─────────────────────────────────────────────────────────

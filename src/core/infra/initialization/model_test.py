@@ -108,13 +108,13 @@ def _is_aliyun_multimodal_embedding(request: ModelTestRequest) -> bool:
     """Go rejects Aliyun vision/multimodal embedding models up front."""
     if (request.provider or "").lower() != _ALIYUN_PROVIDER:
         return False
-    lowered = request.model_name.lower()
+    lowered = request.model.lower()
     return any(marker in lowered for marker in _ALIYUN_MULTIMODAL_MARKERS)
 
 
 def _require_model_and_base_url(request: ModelTestRequest, *, code: str) -> str:
     """Validate the two mandatory fields and return the normalized base URL."""
-    if not request.model_name or not request.base_url:
+    if not request.model or not request.base_url:
         raise ValidationError(_MODEL_AND_BASE_URL_REQUIRED, code=code)
     return request.base_url.rstrip("/")
 
@@ -122,7 +122,7 @@ def _require_model_and_base_url(request: ModelTestRequest, *, code: str) -> str:
 def _embedding_payload(request: ModelTestRequest) -> JsonObject:
     """Go ``OpenAIEmbedder``: ``dimensions`` only when override is supported."""
     payload: JsonObject = {
-        "model": request.model_name,
+        "model": request.model,
         "input": _EMBEDDING_PROBE_TEXT,
     }
     if request.supports_dimension_override and request.dimension:
@@ -221,7 +221,7 @@ async def check_rerank_model(
     await validate_ssrf_safe_url(request.base_url or "")
 
     payload: JsonObject = {
-        "model": request.model_name,
+        "model": request.model,
         "query": _RERANK_PROBE_QUERY,
         "documents": [_RERANK_PROBE_DOCUMENT],
     }
@@ -294,7 +294,7 @@ async def check_asr_model(
         response = await client.post(
             f"{base_url}/audio/transcriptions",
             files={"file": (_ASR_TEST_FILENAME, ASR_TEST_WAV, "audio/wav")},
-            data={"model": request.model_name},
+            data={"model": request.model},
             headers=headers,
         )
     except httpx.HTTPError as exc:

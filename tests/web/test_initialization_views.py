@@ -162,7 +162,7 @@ async def test_ollama_status_reports_unavailable_as_200(
 async def test_list_ollama_models(client: AsyncClient) -> None:
     resp = await client.get("/initialization/ollama/models")
     assert resp.status_code == 200
-    models = resp.json()["data"]["models"]
+    models = resp.json()["data"]
     assert models[0]["name"] == "qwen3:8b"
     assert models[0]["size"] == 5200000000
 
@@ -190,7 +190,7 @@ async def test_check_ollama_models_returns_per_name_map(client: AsyncClient) -> 
         json={"models": ["qwen3:8b", "absent"]},
     )
     assert resp.status_code == 200
-    assert resp.json()["data"]["models"] == {"qwen3:8b": True, "absent": False}
+    assert resp.json()["data"] == {"qwen3:8b": True, "absent": False}
 
 
 # ── POST /initialization/ollama/models/download ──────────────────────
@@ -273,21 +273,21 @@ async def test_list_download_tasks(
 async def test_remote_check_available(client: AsyncClient) -> None:
     resp = await client.post(
         "/initialization/remote/check",
-        json={"modelName": "gpt-4o-mini", "baseUrl": _REMOTE_BASE, "apiKey": "sk-x"},
+        json={"model": "gpt-4o-mini", "baseUrl": _REMOTE_BASE, "apiKey": "sk-x"},
     )
     assert resp.status_code == 200
     assert resp.json()["data"] == {"available": True, "message": "连接正常，模型可用"}
 
 
 async def test_remote_check_missing_base_url_is_422(client: AsyncClient) -> None:
-    resp = await client.post("/initialization/remote/check", json={"modelName": "m"})
+    resp = await client.post("/initialization/remote/check", json={"model": "m"})
     assert resp.status_code == 422
 
 
 async def test_remote_check_blocks_ssrf_target(client: AsyncClient) -> None:
     resp = await client.post(
         "/initialization/remote/check",
-        json={"modelName": "m", "baseUrl": "http://127.0.0.1:8080/v1"},
+        json={"model": "m", "baseUrl": "http://127.0.0.1:8080/v1"},
     )
     assert resp.status_code == 422
 
@@ -298,7 +298,7 @@ async def test_remote_check_blocks_ssrf_target(client: AsyncClient) -> None:
 async def test_embedding_test_returns_dimension(client: AsyncClient) -> None:
     resp = await client.post(
         "/initialization/embedding/test",
-        json={"modelName": "text-embedding-3-small", "baseUrl": _REMOTE_BASE},
+        json={"model": "text-embedding-3-small", "baseUrl": _REMOTE_BASE},
     )
     assert resp.status_code == 200
     data = resp.json()["data"]
@@ -311,7 +311,7 @@ async def test_embedding_test_rejects_aliyun_multimodal(client: AsyncClient) -> 
     resp = await client.post(
         "/initialization/embedding/test",
         json={
-            "modelName": "multimodal-embedding-v1",
+            "model": "multimodal-embedding-v1",
             "baseUrl": _REMOTE_BASE,
             "provider": "aliyun",
         },
@@ -334,7 +334,7 @@ async def test_embedding_test_failure_is_200_with_zero_dimension(
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         resp = await c.post(
             "/initialization/embedding/test",
-            json={"modelName": "m", "baseUrl": _REMOTE_BASE},
+            json={"model": "m", "baseUrl": _REMOTE_BASE},
         )
     assert resp.status_code == 200
     data = resp.json()["data"]
@@ -356,12 +356,12 @@ async def test_embedding_test_sends_dimensions_only_when_override_supported(
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         await c.post(
             "/initialization/embedding/test",
-            json={"modelName": "m", "baseUrl": _REMOTE_BASE, "dimension": 8},
+            json={"model": "m", "baseUrl": _REMOTE_BASE, "dimension": 8},
         )
         await c.post(
             "/initialization/embedding/test",
             json={
-                "modelName": "m",
+                "model": "m",
                 "baseUrl": _REMOTE_BASE,
                 "dimension": 8,
                 "supportsDimensionOverride": True,
@@ -377,7 +377,7 @@ async def test_embedding_test_sends_dimensions_only_when_override_supported(
 async def test_rerank_check_counts_results(client: AsyncClient) -> None:
     resp = await client.post(
         "/initialization/rerank/check",
-        json={"modelName": "bge-reranker", "baseUrl": _REMOTE_BASE},
+        json={"model": "bge-reranker", "baseUrl": _REMOTE_BASE},
     )
     assert resp.status_code == 200
     data = resp.json()["data"]
@@ -396,7 +396,7 @@ async def test_rerank_check_empty_results_is_unavailable(
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         resp = await c.post(
             "/initialization/rerank/check",
-            json={"modelName": "m", "baseUrl": _REMOTE_BASE},
+            json={"model": "m", "baseUrl": _REMOTE_BASE},
         )
     data = resp.json()["data"]
     assert data["available"] is False
@@ -404,7 +404,7 @@ async def test_rerank_check_empty_results_is_unavailable(
 
 
 async def test_rerank_check_requires_base_url(client: AsyncClient) -> None:
-    resp = await client.post("/initialization/rerank/check", json={"modelName": "m"})
+    resp = await client.post("/initialization/rerank/check", json={"model": "m"})
     assert resp.status_code == 422
 
 
@@ -414,7 +414,7 @@ async def test_rerank_check_requires_base_url(client: AsyncClient) -> None:
 async def test_asr_check_reports_transcript(client: AsyncClient) -> None:
     resp = await client.post(
         "/initialization/asr/check",
-        json={"modelName": "whisper-1", "baseUrl": _REMOTE_BASE},
+        json={"model": "whisper-1", "baseUrl": _REMOTE_BASE},
     )
     assert resp.status_code == 200
     data = resp.json()["data"]
@@ -433,7 +433,7 @@ async def test_asr_check_auth_failure_is_unavailable(
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         resp = await c.post(
             "/initialization/asr/check",
-            json={"modelName": "m", "baseUrl": _REMOTE_BASE},
+            json={"model": "m", "baseUrl": _REMOTE_BASE},
         )
     data = resp.json()["data"]
     assert data["available"] is False
@@ -452,7 +452,7 @@ async def test_asr_check_non_fatal_error_still_reachable(
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         resp = await c.post(
             "/initialization/asr/check",
-            json={"modelName": "m", "baseUrl": _REMOTE_BASE},
+            json={"model": "m", "baseUrl": _REMOTE_BASE},
         )
     data = resp.json()["data"]
     assert data["available"] is True

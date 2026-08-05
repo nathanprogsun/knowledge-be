@@ -33,38 +33,28 @@ class OllamaStatusEnvelope(BaseModel):
     data: OllamaStatusData
 
 
-class OllamaModelsDataView(BaseModel):
-    """``data`` of ``GET /initialization/ollama/models``."""
-
-    model_config = ConfigDict(frozen=True)
-
-    models: list[OllamaModelInfo] = Field(default_factory=list)
-
-
 class OllamaModelsEnvelope(BaseModel):
-    """``{"success": true, "data": {"models": [...]}}``."""
+    """``{"success": true, "data": [...]}`` — flat list of models.
+
+    Mirrors ``docs/api/initialization.md`` for ``GET
+    /initialization/ollama/models``. The flat ``list[OllamaModelInfo]``
+    payload is the wire shape; the wrapped ``{models: [...]}`` view
+    was used in an earlier scaffold.
+    """
 
     model_config = ConfigDict(frozen=True)
 
     success: bool
-    data: OllamaModelsDataView
-
-
-class OllamaModelsCheckDataView(BaseModel):
-    """``data`` of the models-check probe: name → installed."""
-
-    model_config = ConfigDict(frozen=True)
-
-    models: dict[str, bool] = Field(default_factory=dict)
+    data: list[OllamaModelInfo] = Field(default_factory=list)
 
 
 class OllamaModelsCheckEnvelope(BaseModel):
-    """``{"success": true, "data": {"models": {"<name>": bool}}}``."""
+    """``{"success": true, "data": {"<name>": bool, ...}}``."""
 
     model_config = ConfigDict(frozen=True)
 
     success: bool
-    data: OllamaModelsCheckDataView
+    data: dict[str, bool] = Field(default_factory=dict)
 
 
 class DownloadStartEnvelope(BaseModel):
@@ -181,14 +171,11 @@ def ollama_status_envelope(data: OllamaStatusData) -> OllamaStatusEnvelope:
 
 
 def ollama_models_envelope(models: list[OllamaModelInfo]) -> OllamaModelsEnvelope:
-    return OllamaModelsEnvelope(success=True, data=OllamaModelsDataView(models=models))
+    return OllamaModelsEnvelope(success=True, data=models)
 
 
 def ollama_models_check_envelope(statuses: dict[str, bool]) -> OllamaModelsCheckEnvelope:
-    return OllamaModelsCheckEnvelope(
-        success=True,
-        data=OllamaModelsCheckDataView(models=statuses),
-    )
+    return OllamaModelsCheckEnvelope(success=True, data=statuses)
 
 
 def download_start_envelope(result: DownloadStartResult) -> DownloadStartEnvelope:

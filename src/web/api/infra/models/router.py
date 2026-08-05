@@ -20,6 +20,7 @@ from src.core.contracts.infra import (
     ProviderTypeMeta,
     UpdateModelRequest,
 )
+from src.core.infra.models.catalog import PROVIDER_CATALOG, filter_providers
 from src.web.api.infra.models.views import (
     DeleteModelResponse,
     ModelDebugEnvelope,
@@ -91,10 +92,12 @@ async def list_model_providers(
 def _static_providers(model_type: str | None) -> list[ProviderTypeMeta]:
     """Build the static provider catalog used by ``GET /models/providers``.
 
-    Returns an empty list until the inference providers land — the
-    wire shape is in place so a later PR can fill it in.
+    Returns the full ``PROVIDER_CATALOG`` (or the subset whose
+    ``model_types`` includes the requested frontend alias) so the wire
+    shape mirrors ``docs/api/model.md``. A later PR can swap in
+    inference-provider metadata without changing the response model.
     """
-    return []
+    return filter_providers(PROVIDER_CATALOG, model_type=model_type)
 
 
 # ── CRUD ─────────────────────────────────────────────────────────────
