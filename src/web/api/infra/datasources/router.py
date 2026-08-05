@@ -7,25 +7,25 @@ Data sources hold external-service credentials and trigger syncs that
 mutate knowledge-base content workspace-wide, so the permission split
 follows upstream exactly: reads are Viewer+, everything else Admin+.
 
-============================================  ========
-Route                                          Role
-============================================  ========
-``GET    /datasources/types``                  Viewer
-``POST   /datasources/validate-credentials``   Admin
-``POST   /datasources``                        Admin
-``GET    /datasources``                        Viewer
-``GET    /datasources/{id}``                   Viewer
-``PUT    /datasources/{id}``                   Admin
-``DELETE /datasources/{id}``                   Admin
-``POST   /datasources/{id}/validate``          Admin
-``GET    /datasources/{id}/resources``         Admin
-``POST   /datasources/{id}/resource-ancestors``Admin
-``POST   /datasources/{id}/sync``              Admin
-``POST   /datasources/{id}/pause``             Admin
-``POST   /datasources/{id}/resume``            Admin
-``GET    /datasources/{id}/logs``              Viewer
-``GET    /datasources/logs/{log_id}``          Viewer
-============================================  ========
+===========================================  ========
+Route                                         Role
+===========================================  ========
+``GET    /datasource/types``                  Viewer
+``POST   /datasource/validate-credentials``   Admin
+``POST   /datasource``                        Admin
+``GET    /datasource``                        Viewer
+``GET    /datasource/{id}``                   Viewer
+``PUT    /datasource/{id}``                   Admin
+``DELETE /datasource/{id}``                   Admin
+``POST   /datasource/{id}/validate``          Admin
+``GET    /datasource/{id}/resources``         Admin
+``POST   /datasource/{id}/resource-ancestors``Admin
+``POST   /datasource/{id}/sync``              Admin
+``POST   /datasource/{id}/pause``             Admin
+``POST   /datasource/{id}/resume``            Admin
+``GET    /datasource/{id}/logs``              Viewer
+``GET    /datasource/logs/{log_id}``          Viewer
+===========================================  ========
 
 Route order matters: ``/logs/{log_id}`` and the two static paths
 (``/types``, ``/validate-credentials``) are declared before
@@ -74,7 +74,7 @@ from src.web.deps import AuthDep, RoleAdminDep, RoleViewerDep
 from src.web.deps.infra_datasources import DataSourceServiceDep
 from src.web.middleware.context import get_tenant_id, get_user_info
 
-router = APIRouter(prefix="/datasources", tags=["datasources"])
+router = APIRouter(prefix="/datasource", tags=["datasources"])
 
 # Go answers validate / pause / resume with a bare status string.
 _STATUS_CONNECTED = "connected"
