@@ -111,7 +111,7 @@ async def _seed(mcp_repo: FakeMCPServiceRepository, *, name: str = "alpha") -> s
 async def test_create_service_returns_201_envelope(client: AsyncClient) -> None:
     resp = await client.post(
         "/mcp-services",
-        json={"name": "alpha", "transport_type": "sse"},
+        json={"name": "alpha", "transport_type": "sse", "url": "https://example.com/mcp"},
     )
     assert resp.status_code == 201
     body = resp.json()
@@ -128,7 +128,7 @@ async def test_create_service_duplicate_name_returns_409(client: AsyncClient) ->
     ``mcp_service.duplicate_name`` so the UI can render a targeted
     message.
     """
-    payload = {"name": "alpha", "transport_type": "sse"}
+    payload = {"name": "alpha", "transport_type": "sse", "url": "https://example.com/mcp"}
     first = await client.post("/mcp-services", json=payload)
     assert first.status_code == 201
 
@@ -163,6 +163,7 @@ async def test_create_service_preserves_secrets(client: AsyncClient) -> None:
         json={
             "name": "alpha",
             "transport_type": "sse",
+            "url": "https://example.com/mcp",
             "auth_config": {
                 "auth_type": "api_key",
                 "api_key": "should-be-preserved",

@@ -104,6 +104,16 @@ class MCPServiceService:
                     "please use SSE or HTTP Streamable transport instead"
                 ),
             )
+        if transport_type in (_TRANSPORT_SSE, _TRANSPORT_HTTP_STREAMABLE) and not (
+            url and url.strip()
+        ):
+            # docs/api/mcp-service.md: url is conditionally required for
+            # the network transports; a service without one can never
+            # pass a connectivity test.
+            raise ValidationError(
+                code="mcp_service.url_required",
+                message=(f"url is required when transport_type is {transport_type!r}"),
+            )
         if advanced_config is None:
             advanced_config = dict(_DEFAULT_ADVANCED_CONFIG)
 

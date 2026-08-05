@@ -137,8 +137,11 @@ async def test_create_api_key(client: AsyncClient) -> None:
     )
     assert resp.status_code == 201
     body = resp.json()
-    assert body["name"] == "ci"
-    assert body["scope_type"] == "tenant"
+    assert body["success"] is True
+    assert body["data"]["name"] == "ci"
+    assert body["data"]["scope_type"] == "tenant"
+    # The plaintext token is embedded once, on create only.
+    assert body["data"]["api_key"]
 
 
 # ── DELETE /tenants/{id}/api-keys/{key_id} ───────────────────────────
@@ -167,10 +170,10 @@ async def test_put_and_get_kv(client: AsyncClient, kv_repo: _FakeKVRepo) -> None
     assert get.json() == {"max_results": 20}
 
 
-async def test_get_kv_missing(client: AsyncClient) -> None:
+async def test_get_kv_unsupported_key(client: AsyncClient) -> None:
     resp = await client.get("/tenants/kv/nonexistent")
-    assert resp.status_code == 404
-    assert resp.json()["error"]["code"] == "tenant_kv.not_found"
+    assert resp.status_code == 422
+    assert resp.json()["error"]["code"] == "tenant_kv.unsupported_key"
 
 
 __all__ = []

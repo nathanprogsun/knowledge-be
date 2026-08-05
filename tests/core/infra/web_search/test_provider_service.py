@@ -12,7 +12,7 @@ from typing import cast
 
 import pytest
 
-from src.common.exception import ValidationError
+from src.common.exception import NotFoundError, ValidationError
 from src.common.json import JsonObject
 from src.core.infra.web_search.provider_service import (
     WebSearchClient,
@@ -93,17 +93,17 @@ class FakeWebSearchProviderRepository:
         *,
         exclude_deleted_or_archived: bool = True,
     ) -> WebSearchProvider | None:
-        key = self._key(
-            cast(int, primary_key_to_value["tenant_id"]),
-            cast(str, primary_key_to_value["id"]),
+        provider_id = str(primary_key_to_value["id"])
+        row = next(
+            (r for r in self.rows.values() if r.id == provider_id),
+            None,
         )
-        row = self.rows.get(key)
         if row is None:
             return None
         if exclude_deleted_or_archived and row.deleted_at is not None:
             return None
         persisted = row.model_copy(update=dict(column_to_update))
-        self.rows[key] = persisted
+        self.rows[self._key(persisted.tenant_id, persisted.id)] = persisted
         return persisted
 
     async def clear_default(
@@ -214,7 +214,7 @@ async def test_list_providers_returns_empty_initially() -> None:
 
 async def test_get_provider_missing_raises() -> None:
     svc, _ = _make_svc()
-    with pytest.raises(ValidationError) as exc:
+    with pytest.raises(NotFoundError) as exc:
         await svc.get_provider(tenant_id=1, provider_id="missing")
     assert exc.value.code == _NOT_FOUND_CODE
 
@@ -419,7 +419,7 @@ async def test_update_provider_applies_changes() -> None:
 
 async def test_update_provider_missing_raises() -> None:
     svc, _ = _make_svc()
-    with pytest.raises(ValidationError):
+    with pytest.raises(NotFoundError):
         await svc.update_provider(
             tenant_id=1,
             provider_id="nope",
@@ -485,7 +485,7 @@ async def test_delete_provider_soft_deletes() -> None:
 
 async def test_delete_provider_missing_raises() -> None:
     svc, _ = _make_svc()
-    with pytest.raises(ValidationError):
+    with pytest.raises(NotFoundError):
         await svc.delete_provider(tenant_id=1, provider_id="nope")
 
 
@@ -517,7 +517,7 @@ async def test_test_provider_by_id_missing_raises() -> None:
     svc, _ = _make_svc()
     registry = FakeRegistry()
     registry.add("bing")
-    with pytest.raises(ValidationError):
+    with pytest.raises(NotFoundError):
         await svc.test_provider_by_id(
             tenant_id=1,
             provider_id="nope",

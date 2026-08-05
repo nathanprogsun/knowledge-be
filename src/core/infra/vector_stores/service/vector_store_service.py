@@ -35,8 +35,9 @@ from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import cast
 
-from src.common.exception import ConflictError, NotFoundError, ValidationError
+from src.common.exception import ApplicationError, ConflictError, NotFoundError, ValidationError
 from src.common.json import JsonObject, JsonValue
+from src.common.oidc_client import validate_ssrf_safe_url
 from src.core.contracts.infra import (
     CreateVectorStoreRequest,
     TestVectorStoreResponse,
@@ -120,7 +121,7 @@ class VectorStoreService:
         _require_tenant_id(tenant_id)
         row = await self._vector_store_repo.get_by_id(tenant_id, store_id)
         if row is None:
-            raise ValidationError(
+            raise NotFoundError(
                 code=_NOT_FOUND_CODE,
                 message=f"vector store {store_id} not found",
             )
@@ -191,7 +192,21 @@ class VectorStoreService:
             created_at=now,
             updated_at=now,
         )
-        persisted = await self._vector_store_repo.insert(row)
+        try:
+            persisted = await self._vector_store_repo.insert(row)
+        except Exception as exc:  # pragma: no cover - rare race path
+            # The DB-level unique constraint (tenant + name) is a second
+            # line of defence behind the endpoint+index pre-check; a
+            # same-name store with a different endpoint collides here.
+            name = exc.__class__.__name__
+            if "UniqueViolation" in name and "tenant_name" in str(exc):
+                raise ConflictError(
+                    code="vector_store.duplicate_name",
+                    message=(
+                        f"a vector store named {clean_name!r} already exists in this workspace"
+                    ),
+                ) from exc
+            raise
         return VectorStoreInfo.map_from_db(persisted)
 
     # ── Update ──────────────────────────────────────────────────────
@@ -220,11 +235,11 @@ class VectorStoreService:
         clean_name = _require_name(body.name)
         now = _now()
         updated = await self._vector_store_repo.update_by_primary_key(
-            {"id": store_id, "tenant_id": tenant_id},
+            {"id": store_id},
             {"name": clean_name, "updated_at": now},
         )
         if updated is None:
-            raise ValidationError(
+            raise NotFoundError(
                 code=_NOT_FOUND_CODE,
                 message=f"vector store {store_id} not found",
             )
@@ -247,7 +262,7 @@ class VectorStoreService:
             return False
         now = _now()
         updated = await self._vector_store_repo.update_by_primary_key(
-            {"id": store_id, "tenant_id": tenant_id},
+            {"id": store_id},
             {"deleted_at": now, "updated_at": now},
             exclude_deleted_or_archived=False,
         )
@@ -312,6 +327,20 @@ class VectorStoreService:
                 message=f"connection test is not supported for engine type: {engine_type}",
             )
         self._validate_connection_config(engine_type, connection_config)
+        # SSRF guard on the probe target, mirroring the storage-backend
+        # test endpoints: the probe must not be usable as an internal
+        # port scanner. ``addr`` (elasticsearch/milvus/...) or ``host``
+        # (qdrant) carries the endpoint.
+        endpoint = connection_config.get("addr") or connection_config.get("host")
+        if isinstance(endpoint, str) and endpoint.strip():
+            try:
+                await validate_ssrf_safe_url(endpoint)
+            except ApplicationError as exc:
+                raise ValidationError(
+                    code="vector_store.endpoint_ssrf_blocked",
+                    message="vector store endpoint failed SSRF validation",
+                    details={"reason": exc.message},
+                ) from exc
         version, error = await test_connection_async(engine_type, connection_config)
         if error is not None:
             return TestVectorStoreResponse(

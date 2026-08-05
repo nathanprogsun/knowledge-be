@@ -115,11 +115,13 @@ class _FakeVectorStoreRepo:
         exclude_deleted_or_archived: bool = True,
     ) -> VectorStore | None:
         sid = primary_key_to_value.get("id")
-        tid = primary_key_to_value.get("tenant_id")
-        if not isinstance(sid, str) or not isinstance(tid, int):
+        if not isinstance(sid, str):
             return None
         row = self.rows.get(sid)
-        if row is None or row.tenant_id != tid:
+        if row is None:
+            return None
+        tid = primary_key_to_value.get("tenant_id")
+        if isinstance(tid, int) and row.tenant_id != tid:
             return None
         if exclude_deleted_or_archived and row.deleted_at is not None:
             return None
@@ -153,6 +155,10 @@ def fake_probe(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[tuple[str, dict
     monkeypatch.setattr(healthcheck_module, "test_connection_async", fake_test)
     monkeypatch.setattr(service_module, "test_connection_async", fake_test)
     yield calls
+
+
+async def _noop_ssrf(_url: str) -> None:
+    """Test-only SSRF guard bypass (the guard has its own tests)."""
 
 
 # ── Service-level tests ──────────────────────────────────────────────
@@ -329,10 +335,10 @@ async def test_get_store_returns_match(
 async def test_get_store_raises_on_unknown_id(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
-    """``get_store`` raises ``ValidationError`` for an unknown id."""
+    """``get_store`` raises ``NotFoundError`` for an unknown id."""
     repo = _FakeVectorStoreRepo()
     service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
-    with pytest.raises(ValidationError) as exc:
+    with pytest.raises(NotFoundError) as exc:
         await service.get_store(tenant_id=1, store_id="missing")
     assert exc.value.code == "vector_store.not_found"
 
@@ -347,7 +353,7 @@ async def test_get_store_raises_for_other_tenant(
         tenant_id=1,
         body=_sample_create_body(),
     )
-    with pytest.raises(ValidationError) as exc:
+    with pytest.raises(NotFoundError) as exc:
         await service.get_store(tenant_id=2, store_id=info.id)
     assert exc.value.code == "vector_store.not_found"
 
@@ -451,10 +457,12 @@ async def test_require_store_raises_not_found(
 
 async def test_test_by_id_invokes_probe_with_stored_config(
     fake_probe: list[tuple[str, dict[str, object]]],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``test_by_id`` runs the probe with the stored config and returns a success response."""
     repo = _FakeVectorStoreRepo()
     service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    monkeypatch.setattr(service_module, "validate_ssrf_safe_url", _noop_ssrf)
     info = await service.create_store(
         tenant_id=1,
         body=_sample_create_body(
@@ -475,6 +483,7 @@ async def test_test_by_id_returns_probe_error(
     """``test_by_id`` surfaces a failed probe as ``success=False``."""
     repo = _FakeVectorStoreRepo()
     service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    monkeypatch.setattr(service_module, "validate_ssrf_safe_url", _noop_ssrf)
     info = await service.create_store(
         tenant_id=1,
         body=_sample_create_body(),
@@ -530,10 +539,14 @@ async def test_test_raw_validates_required_fields(
 
 async def test_test_raw_returns_probe_success(
     fake_probe: list[tuple[str, dict[str, object]]],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``test_raw`` returns the probe's success payload on the happy path."""
     repo = _FakeVectorStoreRepo()
     service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    # The SSRF guard is exercised by its own tests; bypass it here so the
+    # probe path can run against the sample internal endpoint.
+    monkeypatch.setattr(service_module, "validate_ssrf_safe_url", _noop_ssrf)
     result = await service.test_raw(
         engine_type="elasticsearch",
         connection_config={"addr": "http://es:9200"},
@@ -557,6 +570,9 @@ async def test_test_raw_returns_probe_version(
 
     monkeypatch.setattr(healthcheck_module, "test_connection_async", fake_test)
     monkeypatch.setattr(service_module, "test_connection_async", fake_test)
+    # The SSRF guard is exercised by its own tests; bypass it here so the
+    # probe path can run against the sample internal endpoint.
+    monkeypatch.setattr(service_module, "validate_ssrf_safe_url", _noop_ssrf)
     result = await service.test_raw(
         engine_type="elasticsearch",
         connection_config={"addr": "http://es:9200"},

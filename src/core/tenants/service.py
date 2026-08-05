@@ -19,6 +19,9 @@ from src.db.models.tenants.tenants import DEFAULT_STORAGE_QUOTA_BYTES, Tenant
 # A fresh workspace starts in this status, regardless of caller input.
 _INITIAL_STATUS = "active"
 
+# API-principal authentication strategies (Go ``UpdateAPIPrincipalConfig``).
+_PRINCIPAL_MODES: frozenset[str] = frozenset({"tenant", "direct_header", "signed_token"})
+
 # Default page size for the search endpoint.
 _DEFAULT_PAGE_SIZE = 20
 
@@ -208,6 +211,20 @@ class TenantService:
     ) -> JsonObject:
         """Persist the workspace's API-principal config; return the stored value."""
         self._require_valid_id(tenant_id)
+        # Mirrors Go's ``UpdateAPIPrincipalConfig`` guards: the mode must
+        # be one of the three known strategies, and ``signed_token``
+        # requires the HMAC secret to be supplied.
+        mode = config.get("mode")
+        if mode is not None and mode not in _PRINCIPAL_MODES:
+            raise ValidationError(
+                code="tenant.principal_mode_invalid",
+                message="mode must be tenant, direct_header, or signed_token",
+            )
+        if mode == "signed_token" and not config.get("hmac_secret"):
+            raise ValidationError(
+                code="tenant.principal_hmac_required",
+                message="hmac_secret is required for signed_token mode",
+            )
         updated = await self._tenants_repo.update_by_primary_key(
             {"id": tenant_id},
             {

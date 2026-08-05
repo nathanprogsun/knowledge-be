@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.app_context.request_context import get_tenant_id, get_user_id
 from src.common.exception import NotFoundError, ValidationError
@@ -36,8 +37,32 @@ from src.web.deps import (
     TenantMemberServiceDep,
     TenantServiceDep,
 )
+from src.web.deps.rbac import require_role_dep
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
+
+
+class TenantAPIKeyWithToken(TenantAPIKey):
+    """``TenantAPIKey`` plus the one-time plaintext ``api_key``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    api_key: str = Field(default="")
+
+
+class TenantAPIKeyCreateEnvelope(BaseModel):
+    """``{"success": true, "data": {..., "api_key": "<plaintext>"}}``.
+
+    The plaintext token is returned only by the create endpoint (mirrors
+    Go's ``tenantWithAPIKey``); every later read carries the key without
+    the credential.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool = True
+    data: TenantAPIKeyWithToken
+
 
 # Paging values are clamped rather than rejected: a page below 1 becomes
 # 1, a page size outside [1, 100] becomes the default (20) or the cap (100).
@@ -51,8 +76,14 @@ async def create_tenant(
     _auth: AuthDep,
     body: CreateTenantRequest,
     tenant_service: TenantServiceDep,
+    member_service: TenantMemberServiceDep,
 ) -> TenantEnvelope:
-    """Create a workspace; the status is assigned server-side."""
+    """Create a workspace; the status is assigned server-side.
+
+    The creator becomes an Owner of the new workspace (mirrors Go's
+    ``memberService.EnsureOwner`` after create), so the workspace is
+    reachable through the membership-scoped endpoints immediately.
+    """
     info = await tenant_service.create_tenant(
         name=body.name,
         description=body.description,
@@ -60,6 +91,9 @@ async def create_tenant(
         retriever_engines=_engines_payload(body),
         storage_quota=body.storage_quota,
     )
+    user_id = get_user_id()
+    if user_id is not None:
+        await member_service.ensure_owner(user_id=user_id, tenant_id=info.id)
     return tenant_envelope(info)
 
 
@@ -131,7 +165,11 @@ async def list_api_keys(
     return [_api_key_info_to_contract(k) for k in keys]
 
 
-@router.post("/{tenant_id}/api-keys", response_model=TenantAPIKey, status_code=201)
+@router.post(
+    "/{tenant_id}/api-keys",
+    response_model=TenantAPIKeyCreateEnvelope,
+    status_code=201,
+)
 async def create_api_key(
     _auth: AuthDep,
     _owner: RoleOwnerDep,
@@ -139,8 +177,12 @@ async def create_api_key(
     tenant_id: int,
     body: CreateAPIKeyRequest,
     api_key_service: TenantAPIKeyServiceDep,
-) -> TenantAPIKey:
-    """Mint a workspace-scoped API key."""
+) -> TenantAPIKeyCreateEnvelope:
+    """Mint a workspace-scoped API key.
+
+    The plaintext token is embedded in the response once (mirrors Go's
+    ``tenantWithAPIKey``); later reads return the key without it.
+    """
     result = await api_key_service.create_api_key(
         name=body.name,
         tenant_id=tenant_id,
@@ -148,7 +190,12 @@ async def create_api_key(
         knowledge_base_ids=body.knowledge_base_ids,
         capabilities=body.capabilities,
     )
-    return _api_key_info_to_contract(result.key)
+    return TenantAPIKeyCreateEnvelope(
+        data=TenantAPIKeyWithToken(
+            **_api_key_info_to_contract(result.key).model_dump(),
+            api_key=result.token,
+        )
+    )
 
 
 @router.delete("/{tenant_id}/api-keys/{key_id}", response_model=DeleteTenantResponse)
@@ -200,15 +247,45 @@ async def update_api_principal_config(
 
 # ── Tenant KV config ──────────────────────────────────────────────────
 
+# Supported KV keys (Go ``GetTenantKV`` / ``UpdateTenantKV``). The three
+# integration-config keys carry secrets and require admin access to read.
+_KV_SUPPORTED_KEYS: frozenset[str] = frozenset(
+    {
+        "web-search-config",
+        "prompt-templates",
+        "parser-engine-config",
+        "storage-engine-config",
+        "chat-history-config",
+        "retrieval-config",
+    }
+)
+_KV_INTEGRATION_KEYS: frozenset[str] = frozenset(
+    {"web-search-config", "parser-engine-config", "storage-engine-config"}
+)
+
+
+def _require_supported_kv_key(key: str) -> None:
+    """Reject keys outside the Go-supported set (400 ``unsupported key``)."""
+    if key not in _KV_SUPPORTED_KEYS:
+        raise ValidationError(
+            code="tenant_kv.unsupported_key",
+            message=f"unsupported key: {key}",
+        )
+
 
 @router.get("/kv/{key}", response_model=JsonObject)
 async def get_tenant_kv(
     _auth: AuthDep,
     _viewer: RoleViewerDep,
+    request: Request,
     key: str,
     kv_service: TenantKVServiceDep,
 ) -> JsonObject:
     """Return the current workspace's KV config for ``key``."""
+    _require_supported_kv_key(key)
+    if key in _KV_INTEGRATION_KEYS:
+        # Mirrors Go: integration configs carry secrets and require admin.
+        await require_role_dep(request, "admin")
     tenant_id = _require_context_tenant()
     value = await kv_service.get(tenant_id=tenant_id, key=key)
     if value is None:
@@ -233,6 +310,7 @@ async def put_tenant_kv(
     kv_service: TenantKVServiceDep,
 ) -> JsonObject:
     """Set the current workspace's KV config for ``key``."""
+    _require_supported_kv_key(key)
     tenant_id = _require_context_tenant()
     stored = await kv_service.set(tenant_id=tenant_id, key=key, value=body)
     if not isinstance(stored, dict):

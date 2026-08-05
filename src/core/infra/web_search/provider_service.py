@@ -28,7 +28,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Protocol
 
-from src.common.exception import ValidationError
+from src.common.exception import NotFoundError, ValidationError
 from src.common.json import BindParams, JsonObject
 from src.core.contracts.infra import WebSearchProviderParameters
 from src.core.infra.web_search.types import (
@@ -96,7 +96,7 @@ class WebSearchProviderService:
         """Return one provider by id, or raise ``ValidationError``."""
         row = await self._repo.get_by_id(tenant_id, provider_id)
         if row is None:
-            raise ValidationError(
+            raise NotFoundError(
                 code=_NOT_FOUND_CODE,
                 message=f"web search provider {provider_id} not found",
             )
@@ -157,7 +157,7 @@ class WebSearchProviderService:
         _require_tenant_id(tenant_id)
         existing = await self._repo.get_by_id(tenant_id, provider_id)
         if existing is None:
-            raise ValidationError(
+            raise NotFoundError(
                 code=_NOT_FOUND_CODE,
                 message=f"web search provider {provider_id} not found",
             )
@@ -187,7 +187,7 @@ class WebSearchProviderService:
             "updated_at": datetime.now(UTC),
         }
         persisted = await self._repo.update_by_primary_key(
-            {"id": provider_id, "tenant_id": tenant_id},
+            {"id": provider_id},
             column_to_update,
         )
         if persisted is None:
@@ -202,12 +202,12 @@ class WebSearchProviderService:
         _require_tenant_id(tenant_id)
         existing = await self._repo.get_by_id(tenant_id, provider_id)
         if existing is None:
-            raise ValidationError(
+            raise NotFoundError(
                 code=_NOT_FOUND_CODE,
                 message=f"web search provider {provider_id} not found",
             )
         await self._repo.update_by_primary_key(
-            {"id": provider_id, "tenant_id": tenant_id},
+            {"id": provider_id},
             BindParams(deleted_at=datetime.now(UTC)),
             exclude_deleted_or_archived=False,
         )

@@ -171,15 +171,18 @@ class StorageBackendRepository(GenericRepository[StorageBackend]):
 
         Returns 0 when the relation is absent. The savepoint keeps the
         surrounding transaction usable after Postgres aborts it on the
-        undefined-table error.
+        undefined-table error — the exception must be caught OUTSIDE the
+        ``begin_nested`` block so ``ROLLBACK TO SAVEPOINT`` runs first;
+        catching inside leaves the savepoint aborted and the release
+        raises ``InFailedSQLTransactionError``.
         """
-        async with self._session.begin_nested():
-            try:
+        try:
+            async with self._session.begin_nested():
                 result = await self._session.execute(text(sql).bindparams(**params))
-            except Exception:  # relation absent until the table exists
-                return 0
-            row = result.mappings().first()
-            return int(row["n"]) if row is not None else 0
+        except Exception:  # relation absent until the table exists
+            return 0
+        row = result.mappings().first()
+        return int(row["n"]) if row is not None else 0
 
 
 __all__ = ["StorageBackendRepository"]

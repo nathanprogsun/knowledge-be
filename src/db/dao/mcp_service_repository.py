@@ -12,11 +12,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import cast
 
-from sqlalchemy import CursorResult, text
+from sqlalchemy import CursorResult, bindparam, text
 
 from src.common.exception import NotFoundError
 from src.common.json import BindParams, SqlValue
-from src.db.dao.generic_repository import GenericRepository
+from src.db.dao.generic_repository import _JSON_BIND_TYPE, GenericRepository
 from src.db.models.infra.mcp_services import MCPService
 
 # Code used when ``find_by_id`` cannot find a row. Matches the Go
@@ -139,7 +139,15 @@ class MCPServiceRepository(GenericRepository[MCPService]):
         stmt_text = (
             f"update {self._table} set {set_clause} where {where_sql} and deleted_at is null"
         )
-        stmt = text(stmt_text).bindparams(**update_params, **where_params)
+        # JSONB columns must be bound with the JSON type so asyncpg
+        # serialises dict values; without it the driver rejects the
+        # raw dict (``'dict' object has no attribute 'encode'``).
+        json_bps = [
+            bindparam(f"u_{col}", type_=_JSON_BIND_TYPE)
+            for col in columns
+            if col in self._json_columns
+        ]
+        stmt = text(stmt_text).bindparams(*json_bps, **update_params, **where_params)
         result = await self._session.execute(stmt)
         return cast("CursorResult[SqlValue]", result).rowcount
 

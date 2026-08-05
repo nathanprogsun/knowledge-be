@@ -70,6 +70,7 @@ async def test_create_service_assigns_a_new_id(service: MCPServiceService) -> No
         tenant_id=1,
         name="acme",
         transport_type="sse",
+        url="https://example.com/mcp",
     )
     assert info.id, "service id should be a non-empty uuid"
     assert info.name == "acme"
@@ -79,7 +80,9 @@ async def test_create_service_assigns_a_new_id(service: MCPServiceService) -> No
 
 async def test_create_service_trims_blank_name(service: MCPServiceService) -> None:
     with pytest.raises(ValidationError) as excinfo:
-        await service.create_service(tenant_id=1, name="   ", transport_type="sse")
+        await service.create_service(
+            tenant_id=1, name="   ", transport_type="sse", url="https://example.com/mcp"
+        )
     assert excinfo.value.code == "mcp_service.name_required"
 
 
@@ -114,9 +117,13 @@ async def test_create_service_duplicate_name_raises_conflict(
     ``mcp_service.duplicate_name`` code so the web layer can render a
     targeted error message.
     """
-    await service.create_service(tenant_id=1, name="dup", transport_type="sse")
+    await service.create_service(
+        tenant_id=1, name="dup", transport_type="sse", url="https://example.com/mcp"
+    )
     with pytest.raises(ConflictError) as excinfo:
-        await service.create_service(tenant_id=1, name="dup", transport_type="sse")
+        await service.create_service(
+            tenant_id=1, name="dup", transport_type="sse", url="https://example.com/mcp"
+        )
     assert excinfo.value.code == "mcp_service.duplicate_name"
 
 
@@ -124,9 +131,13 @@ async def test_create_service_same_name_different_tenant_is_allowed(
     service: MCPServiceService,
 ) -> None:
     """Name uniqueness is scoped to (tenant_id, name), not global."""
-    await service.create_service(tenant_id=1, name="shared", transport_type="sse")
+    await service.create_service(
+        tenant_id=1, name="shared", transport_type="sse", url="https://example.com/mcp"
+    )
     # No conflict on a different tenant.
-    info = await service.create_service(tenant_id=2, name="shared", transport_type="sse")
+    info = await service.create_service(
+        tenant_id=2, name="shared", transport_type="sse", url="https://example.com/mcp"
+    )
     assert info.tenant_id == 2
 
 
@@ -137,6 +148,7 @@ async def test_create_service_preserves_auth_config(
         tenant_id=1,
         name="acme",
         transport_type="sse",
+        url="https://example.com/mcp",
         auth_config={
             "auth_type": "api_key",
             "api_key": "should-be-preserved",

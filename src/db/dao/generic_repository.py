@@ -418,6 +418,12 @@ class GenericRepository(Generic[ModelType]):
                     code="db.primary_key_in_update",
                     message=f"primary key '{pk}' must not appear in column_to_update",
                 )
+        # The WHERE clause binds only the actual primary-key columns.
+        # Drop any extra keys callers passed (e.g. a tenant_id scoping
+        # key) so ``bindparams`` never sees an unbound parameter.
+        primary_key_to_value = {
+            k: v for k, v in primary_key_to_value.items() if k in self._pk_columns
+        }
         pk_cols = self.model_class.ordered_primary_keys()
         where_pk = " and ".join(f'"{c}" = :{c}' for c in pk_cols)
         set_clause = ", ".join(f'"{k}" = :u_{k}' for k in column_to_update)

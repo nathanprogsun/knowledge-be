@@ -267,7 +267,7 @@ async def set_mcp_tool_approval(
 )
 async def start_oauth_authorization(
     _auth: AuthDep,
-    _viewer: RoleViewerDep,
+    _admin: RoleAdminDep,
     service_id: str,
     body: OAuthAuthorizeRequestBody,
     mcp_service: MCPServiceDep,
@@ -332,7 +332,7 @@ async def get_oauth_status(
 )
 async def revoke_oauth_token(
     _auth: AuthDep,
-    _viewer: RoleViewerDep,
+    _admin: RoleAdminDep,
     service_id: str,
     mcp_service: MCPServiceDep,
     tenant_id: RequireTenantIdDep,

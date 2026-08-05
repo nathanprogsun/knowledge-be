@@ -16,10 +16,12 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from src.app_context.lifespan import create_app
+from src.core.tenants.member_service import TenantMemberService
 from src.core.tenants.service import TenantService
 from src.db.models.tenants.tenants import DEFAULT_STORAGE_QUOTA_BYTES, Tenant
-from src.web.deps import get_tenant_service
+from src.web.deps import get_tenant_member_service, get_tenant_service
 from tests.fakes.auth_gates import override_auth_gates
+from tests.fakes.tenant_members import FakeTenantMemberRepository
 from tests.fakes.tenants import FakeTenantRepository
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
@@ -37,7 +39,13 @@ def app(repo: FakeTenantRepository) -> FastAPI:
     def _override_service() -> TenantService:
         return TenantService(tenants_repo=repo)  # type: ignore[arg-type]
 
+    def _override_member_service() -> TenantMemberService:
+        return TenantMemberService(
+            members_repo=FakeTenantMemberRepository(),  # type: ignore[arg-type]
+        )
+
     application.dependency_overrides[get_tenant_service] = _override_service
+    application.dependency_overrides[get_tenant_member_service] = _override_member_service
     override_auth_gates(application)
     return application
 
