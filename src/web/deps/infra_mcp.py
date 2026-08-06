@@ -5,19 +5,19 @@ Per-domain forwarder for the MCP service module: the per-request
 so the request's reads and writes share one transactional unit of work
 on the shared ``AsyncSession``.
 
-PR-17.5b also reads the live MCP singletons the lifespan registered
+The factory also reads the live MCP singletons the lifespan registered
 (connection pool, OAuth state + secret stores, OAuth factory) and
 forwards them to :func:`src.core.infra.mcp_services.factory.build_mcp_service`
 so the per-request service can drive the live transport layer when
 the lifespan was started, while keeping the dependency-overrides path
 green for tests that bypass lifespan.
 
-PR-30.6c C7: ``build_live_resolvers`` / ``build_live_discovery_provider``
-/ ``build_live_connectivity_probe`` moved into
-:mod:`src.core.infra.mcp_services.factory`. The web layer no longer
-imports ``db.dao.mcp_service_repository`` directly — the core factory
-owns repository construction on the request session. The web layer
-keeps these names available as re-exports so the lifespan-side
+The live resolver builders (``build_live_resolvers`` /
+``build_live_discovery_provider`` / ``build_live_connectivity_probe``)
+live in :mod:`src.core.infra.mcp_services.factory`. The web layer no
+longer imports ``db.dao.mcp_service_repository`` directly — the core
+factory owns repository construction on the request session. The web
+layer keeps these names available as re-exports so the lifespan-side
 forwarder (and any tests that patched the symbol) keep working.
 
 Adds two FastAPI dependency factories for ``tenant_id`` and ``user_id``
@@ -79,17 +79,17 @@ def get_mcp_service(
 ) -> MCPServiceService:
     """Build a per-request ``MCPServiceService`` on the shared session.
 
-    PR-17.5b: when the lifespan registered a live MCP connection pool
+    When the lifespan registered a live MCP connection pool
     we forward it (plus the OAuth factory the lifespan owns) to the
     factory so the service can drive live discovery, connectivity, and
     OAuth flows. When the lifespan was bypassed (the test-app path)
     we hand the factory ``None`` so the static fakes take over.
 
-    PR-17.5c C2: the live providers are constructed with the active
+    The live providers are constructed with the active
     ``tenant_id`` (not a hard-coded zero) so cross-tenant lookups
     cannot leak via the resolver.
 
-    PR-30.6c C7: the live discovery / connectivity builders were
+    The live discovery / connectivity builders were
     moved into ``src.core.infra.mcp_services.factory`` so the web
     layer no longer reaches into ``db.dao``. The factory constructs
     the resolvers internally on the request ``AsyncSession``.
