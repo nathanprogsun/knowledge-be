@@ -30,12 +30,6 @@ from src.web.deps import (
     get_system_setting_service,
 )
 from src.web.middleware.auth import require_auth
-from src.web.middleware.context import (
-    set_is_system_admin,
-    set_tenant_id,
-    set_tenant_role,
-    set_user_info,
-)
 
 
 class _FakeUserRepo:
@@ -149,20 +143,17 @@ def app(
         user = fake_users.users.get("usr-1")
         if user is None:
             raise UnauthorizedError(code="auth.missing_authentication", message="missing auth")
-        set_user_info(
-            request,
-            {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
-                "is_active": "1",
-                "can_access_all_tenants": "1" if user.can_access_all_tenants else "0",
-                "is_system_admin": "1" if user.is_system_admin else "0",
-            },
-        )
-        set_is_system_admin(request, user.is_system_admin)
-        set_tenant_id(request, 1)
-        set_tenant_role(request, principal_role["role"])
+        request.state.user_info = {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "is_active": "1",
+            "can_access_all_tenants": "1" if user.can_access_all_tenants else "0",
+            "is_system_admin": "1" if user.is_system_admin else "0",
+        }
+        request.state.is_system_admin = user.is_system_admin
+        request.state.tenant_id = "1"
+        request.state.tenant_role = principal_role["role"]
 
     application.dependency_overrides[require_auth] = _override_auth
     application.dependency_overrides[get_auth_service] = lambda: AuthService(

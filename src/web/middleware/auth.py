@@ -1,4 +1,4 @@
-"""Global authentication dependency — resolve JWT / API-key principals.
+"""Global authentication dependency - resolve JWT / API-key principals.
 
 Populates ``request.state`` with the authenticated principal so the RBAC
 guards and API-key gate can read it:
@@ -34,13 +34,6 @@ from src.core.tenants.factory import build_tenant_api_key_service, build_tenant_
 from src.db.dao.users_repository import UserRepository
 from src.settings import get_settings
 from src.web.deps.session import SessionDep
-from src.web.middleware.context import (
-    set_api_key_scope,
-    set_is_system_admin,
-    set_tenant_id,
-    set_tenant_role,
-    set_user_info,
-)
 
 # Routes that need no authentication. FastAPI paths use ``{param}``;
 # exact-match entries here must equal the registered route path.
@@ -119,14 +112,14 @@ async def _resolve_jwt(
             await session.rollback()
             role = ""
 
-    set_user_info(request, _build_user_info(info))
-    set_is_system_admin(request, info.is_system_admin)
+    request.state.user_info = _build_user_info(info)
+    request.state.is_system_admin = info.is_system_admin
     if tenant_id is not None:
-        set_tenant_id(request, tenant_id)
-        set_tenant_role(request, role)
+        request.state.tenant_id = str(tenant_id)
+        request.state.tenant_role = role
     else:
-        set_tenant_id(request, 0)
-        set_tenant_role(request, "")
+        request.state.tenant_id = str(0)
+        request.state.tenant_role = ""
 
     # Populate the contextvar store for context-aware endpoints.
     request_context.set_tenant_id(str(tenant_id) if tenant_id is not None else "")
@@ -158,9 +151,9 @@ async def _resolve_api_key(
         knowledge_base_ids=key_info.knowledge_base_ids,
         capabilities=key_info.capabilities,
     )
-    set_api_key_scope(request, scope)
+    request.state.api_key_scope = scope
     if key_info.tenant_id is not None:
-        set_tenant_id(request, key_info.tenant_id)
+        request.state.tenant_id = str(key_info.tenant_id)
         request_context.set_tenant_id(str(key_info.tenant_id))
     return True
 
@@ -174,16 +167,16 @@ async def _resolve_header_auth(
 
     Headers (all configurable via ``Settings``):
 
-    - ``x-knowledge-user-id`` — required, the user id
-    - ``x-knowledge-tenant-id`` — required, the active tenant id (int)
-    - ``x-knowledge-roles`` — optional, comma-separated role list; the
+    - ``x-knowledge-user-id`` - required, the user id
+    - ``x-knowledge-tenant-id`` - required, the active tenant id (int)
+    - ``x-knowledge-roles`` - optional, comma-separated role list; the
       first role wins as the tenant role. Presence of ``system_admin``
       in the list grants platform-admin powers.
 
     A real ``User`` row must exist and be active; the header alone is
     not sufficient. Failure to resolve raises ``UnauthorizedError``
     (the caller in :func:`require_auth` returns ``False`` only when the
-    header is **not present** — header-present-but-invalid fails closed).
+    header is **not present** - header-present-but-invalid fails closed).
     """
     settings = get_settings()
     user_id = request.headers.get(settings.auth_header_user_id)
@@ -231,11 +224,11 @@ async def _resolve_header_auth(
         "can_access_all_tenants": "1" if is_system_admin else "0",
         "is_system_admin": "1" if is_system_admin else "0",
     }
-    set_user_info(request, user_info)
-    set_tenant_id(request, tenant_id)
-    set_tenant_role(request, role)
-    set_is_system_admin(request, is_system_admin)
-    set_api_key_scope(request, None)
+    request.state.user_info = user_info
+    request.state.tenant_id = str(tenant_id)
+    request.state.tenant_role = role
+    request.state.is_system_admin = is_system_admin
+    request.state.api_key_scope = None
     request_context.set_tenant_id(str(tenant_id))
     request_context.set_user_id(str(user.id))
     return True

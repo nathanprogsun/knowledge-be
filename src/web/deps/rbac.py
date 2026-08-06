@@ -14,17 +14,43 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from src.common.exception import PermissionDeniedError, UnauthorizedError, ValidationError
-from src.core.auth.permissions import TenantRole
+from src.common.exception import UnauthorizedError
+from src.core.auth.permissions import TenantAPIKeyScope, TenantRole
 from src.settings import get_settings
 from src.web.middleware.audit import get_audit_service
-from src.web.middleware.context import (
-    get_api_key_scope,
-    get_is_system_admin,
-    get_tenant_id,
-    get_user_info,
-)
 from src.web.middleware.rbac import require_role, require_system_admin
+
+
+def _api_key_scope(request: Request) -> TenantAPIKeyScope | None:
+    """Read the API-key scope from ``request.state`` (None for JWT)."""
+    return getattr(request.state, "api_key_scope", None)
+
+
+def _is_system_admin(request: Request) -> bool:
+    """Read the system-admin flag from ``request.state``."""
+    return bool(getattr(request.state, "is_system_admin", False))
+
+
+def _tenant_role(request: Request) -> str:
+    """Read the tenant role from ``request.state`` (empty when unset)."""
+    role: str = getattr(request.state, "tenant_role", "") or ""
+    return role or ""
+
+
+def _user_info(request: Request) -> dict[str, str] | None:
+    """Read the principal user-info dict (None when not set)."""
+    return getattr(request.state, "user_info", None)
+
+
+def _principal_tenant_id(request: Request) -> int:
+    """Read the active tenant id from ``request.state`` (0 when unset)."""
+    raw = getattr(request.state, "tenant_id", None)
+    if raw is None or raw == "":
+        return 0
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return 0
 
 
 async def require_role_dep(
@@ -37,13 +63,13 @@ async def require_role_dep(
     does not reject (rollout behaviour, mirroring the upstream).
     """
     audit_svc = get_audit_service(request)
-    if get_api_key_scope(request) is not None:
+    if _api_key_scope(request) is not None:
         return  # API-key principals authorized by the API Key Gate.
 
-    role = getattr(request.state, "tenant_role", "") or ""
+    role = _tenant_role(request)
     if TenantRole.has_permission(role, min_role):
         return
-    if get_is_system_admin(request):
+    if _is_system_admin(request):
         return
 
     if not get_settings().rbac_enforced:
@@ -59,11 +85,11 @@ async def require_role_dep(
 async def require_system_admin_dep(request: Request) -> None:
     """Gate: caller must be a system administrator. Always enforced."""
     audit_svc = get_audit_service(request)
-    if get_api_key_scope(request) is not None:
-        scope = get_api_key_scope(request)
+    if _api_key_scope(request) is not None:
+        scope = _api_key_scope(request)
         if scope is not None and scope.is_platform():
             return
-    if get_is_system_admin(request):
+    if _is_system_admin(request):
         return
     await require_system_admin(request=request, audit_svc=audit_svc)
 
@@ -101,7 +127,7 @@ async def require_path_tenant_match_dep(request: Request) -> None:
 
 def _get_principal_user_id(request: Request) -> str | None:
     """Read the caller's user id from ``request.state`` (None when unset)."""
-    info = get_user_info(request)
+    info = _user_info(request)
     if info is None:
         return None
     return info.get("id")
@@ -109,7 +135,7 @@ def _get_principal_user_id(request: Request) -> str | None:
 
 def _get_principal_tenant_id(request: Request) -> int:
     """Read the caller's active tenant id from ``request.state`` (0 when unset)."""
-    return get_tenant_id(request)
+    return _principal_tenant_id(request)
 
 
 async def validate_active_tenant_association(

@@ -51,8 +51,22 @@ from src.core.infra.mcp_services.factory import (
 )
 from src.core.infra.mcp_services.service import MCPServiceService
 from src.web.deps.session import SessionDep
-from src.web.middleware.context import get_tenant_id as _gtid
-from src.web.middleware.context import get_user_info as _gui
+
+
+def _state_tenant_id(request: Request) -> int:
+    """Read the active tenant id from ``request.state`` (0 when unset)."""
+    raw = getattr(request.state, "tenant_id", None)
+    if raw is None or raw == "":
+        return 0
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _state_user_info(request: Request) -> dict[str, str] | None:
+    """Read the principal user-info dict (None when not set)."""
+    return getattr(request.state, "user_info", None)
 
 
 def _resolve_lifespan_service(request: Request) -> LifeSpanService | None:
@@ -133,7 +147,7 @@ def get_request_tenant_id(request: Request) -> int:
     contextvar mirror is read for endpoints that don't go through the
     middleware path (e.g. test-only routes).
     """
-    state_value = _gtid(request)
+    state_value = _state_tenant_id(request)
     if state_value:
         return state_value
     raw = request_context.get_tenant_id()
@@ -151,7 +165,7 @@ def get_request_user_id(request: Request) -> str:
     Empty string is the fail-closed sentinel — endpoints that actually
     require a user (oauth management, ... ) check it explicitly.
     """
-    info = _gui(request)
+    info = _state_user_info(request)
     if info is not None and isinstance(info, dict):
         user_id = info.get("id")
         if isinstance(user_id, str):

@@ -1,8 +1,8 @@
 """Unit tests for the FastAPI context deps in ``src.web.deps.context``.
 
-The deps are thin wrappers over the underlying
-``src.web.middleware.context`` accessors; tests assert that they
-delegate correctly and that the typed signatures match.
+The deps read the authenticated principal from ``request.state`` and
+return typed values. Tests assert the typed signatures and the
+int-coercion default behaviour.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from src.web.deps.context import (
     get_is_system_admin_dep,
     get_tenant_id_dep,
     get_tenant_role_dep,
+    get_user_id_dep,
     get_user_info_dep,
 )
 
@@ -60,6 +61,16 @@ def test_get_is_system_admin_dep_returns_bool() -> None:
     assert get_is_system_admin_dep(request) is True
 
 
+def test_get_user_id_dep_returns_user_id_when_set() -> None:
+    request = _make_request({"user_info": {"id": "u-1"}})
+    assert get_user_id_dep(request) == "u-1"
+
+
+def test_get_user_id_dep_returns_none_when_unset() -> None:
+    request = _make_request({})
+    assert get_user_id_dep(request) is None
+
+
 def test_get_user_info_dep_returns_dict_or_none() -> None:
     request = _make_request({"user_info": {"id": "u-1"}})
     assert get_user_info_dep(request) == {"id": "u-1"}
@@ -71,3 +82,4 @@ def test_get_user_info_dep_returns_dict_or_none() -> None:
 def test_get_api_key_scope_dep_returns_none_by_default() -> None:
     request = _make_request({})
     assert get_api_key_scope_dep(request) is None
+

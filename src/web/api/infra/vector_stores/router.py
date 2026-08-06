@@ -1,7 +1,7 @@
-"""VectorStore HTTP endpoints — CRUD + connectivity probes.
+"""VectorStore HTTP endpoints - CRUD + connectivity probes.
 
-Maps the eight endpoints from ``internal/handler/vectorstore.go`` and
-``docs/api/vector-store.md``:
+Maps the eight endpoints declared in the corresponding upstream handler
+and ``docs/api/vector-store.md``:
 
 | Method | Path                          | Role gate                  |
 | ------ | ----------------------------- | -------------------------- |
@@ -14,20 +14,20 @@ Maps the eight endpoints from ``internal/handler/vectorstore.go`` and
 | DELETE | `/vector-stores/{id}`         | Admin                      |
 | POST   | `/vector-stores/{id}/test`    | Admin                      |
 
-The Go handler merges env-store virtual entries (synthesised from
-``RETRIEVE_DRIVER``) into the list / get responses. The Python rewrite
-keeps that behaviour in the service layer so the web layer stays
-declarative: the list endpoint returns DB rows + env entries, with
-``source`` / ``readonly`` overridden on the wire.
+The upstream handler merges env-store virtual entries (synthesised
+from ``RETRIEVE_DRIVER``) into the list / get responses. The Python
+rewrite keeps that behaviour in the service layer so the web layer
+stays declarative: the list endpoint returns DB rows + env entries,
+with ``source`` / ``readonly`` overridden on the wire.
 """
 
 from __future__ import annotations
 
 import os
 from datetime import UTC, datetime
-from typing import cast
+from typing import Annotated, cast
 
-from fastapi import APIRouter, Path, Request
+from fastapi import APIRouter, Depends, Path
 
 from src.common.exception import NotFoundError, ValidationError
 from src.common.json import JsonObject
@@ -55,43 +55,45 @@ from src.web.deps import (
     RoleAdminDep,
     RoleViewerDep,
 )
+from src.web.deps.context import get_tenant_id_dep
 from src.web.deps.infra_vector_stores import VectorStoreServiceDep
-from src.web.middleware.context import get_tenant_id as _get_tenant_id_from_state
+
+# Function-arg-style principal dep alias.
+_PrincipalTenant = Annotated[int, Depends(get_tenant_id_dep)]
+
 
 router = APIRouter(prefix="/vector-stores", tags=["vector-stores"])
 
-# Constants for env-store synthesis. The Go side reads RETRIEVE_DRIVER
-# via ``os.Getenv``; the Python rewrite mirrors that.
+# Constants for env-store synthesis. The upstream side reads
+# ``RETRIEVE_DRIVER`` via ``os.Getenv``; the Python rewrite mirrors
+# that.
 _ENV_STORE_ID_PREFIX = "__env_"
 
 
-def _require_tenant_id(request: Request) -> int:
-    """Return the current tenant id from request state, or raise."""
-    raw = _get_tenant_id_from_state(request)
-    if raw == 0:
+def _require_tenant_id(tenant_id: int) -> int:
+    """Return the current tenant id, or raise when missing."""
+    if tenant_id == 0:
         raise ValidationError(
             code="tenant.context_missing",
             message="No active workspace in request context",
         )
-    return raw
+    return tenant_id
 
 
 # ── Env-store synthesis ──────────────────────────────────────────────
 
 
 def _is_env_store_id(store_id: str) -> bool:
-    """Mirror of Go's ``types.IsEnvStoreID``."""
+    """Mirror of the upstream ``types.IsEnvStoreID``."""
     return store_id.startswith(_ENV_STORE_ID_PREFIX)
 
 
 def _build_env_store_entries(retrieve_driver: str) -> list[VectorStoreInfo]:
     """Synthesise env-store virtual entries from ``RETRIEVE_DRIVER``.
 
-    The Go side builds the list from
-    ``types.BuildEnvVectorStores(os.Getenv("RETRIEVE_DRIVER"), os.Getenv)``;
-    the Python rewrite mirrors the same shape. Drivers with no store
-    (postgres, sqlite) are still surfaced so the UI can render
-    "System default" badges.
+    Mirrors the same shape as the upstream ``types.BuildEnvVectorStores``.
+    Drivers with no store (postgres, sqlite) are still surfaced so the
+    UI can render "System default" badges.
     """
     entries: list[VectorStoreInfo] = []
     if not retrieve_driver:
@@ -329,9 +331,9 @@ async def list_vector_store_types(
 ) -> VectorStoreTypesResponse:
     """Return the registry metadata for every supported engine type.
 
-    Mirrors the Go ``GET /vector-stores/types`` endpoint. The answer is
-    static (mirrors ``types.GetVectorStoreTypes``) so no service call
-    is needed.
+    Mirrors the upstream ``GET /vector-stores/types`` endpoint. The
+    answer is static (mirrors ``types.GetVectorStoreTypes``) so no
+    service call is needed.
     """
     types = cast("list[VectorStoreTypeInfo]", list(vector_store_types()))
     return VectorStoreTypesResponse(success=True, data=types)
@@ -347,7 +349,7 @@ async def test_vector_store_raw(
     """Test a raw user-supplied connection config (no persistence).
 
     A validation failure (SSRF block, missing field) answers 200 with
-    ``success=false`` — Go's ``TestRawConnection`` keeps the HTTP
+    ``success=false`` - upstream ``TestRawConnection`` keeps the HTTP
     status at 200 and reports the error in the body.
     """
     try:
@@ -365,10 +367,10 @@ async def create_vector_store(
     _admin: RoleAdminDep,
     body: CreateVectorStoreRequest,
     service: VectorStoreServiceDep,
-    request: Request,
+    tenant_id: _PrincipalTenant,
 ) -> VectorStoreEnvelope:
     """Create a new vector store for the active workspace."""
-    tenant_id = _require_tenant_id(request)
+    tenant_id = _require_tenant_id(tenant_id)
     info = await service.create_store(tenant_id=tenant_id, body=body)
     return vector_store_envelope(info)
 
@@ -378,7 +380,7 @@ async def list_vector_stores(
     _auth: AuthDep,
     _viewer: RoleViewerDep,
     service: VectorStoreServiceDep,
-    request: Request,
+    tenant_id: _PrincipalTenant,
 ) -> VectorStoreListResponse:
     """List every vector store visible to the active workspace.
 
@@ -387,7 +389,7 @@ async def list_vector_stores(
     entry carries ``source`` and ``readonly`` so the UI can render
     the right badges.
     """
-    tenant_id = _require_tenant_id(request)
+    tenant_id = _require_tenant_id(tenant_id)
     env_entries = _build_env_store_entries(os.environ.get("RETRIEVE_DRIVER", ""))
     db_entries = await service.list_stores(tenant_id)
     combined = env_entries + db_entries
@@ -405,7 +407,7 @@ async def get_vector_store(
     _auth: AuthDep,
     _viewer: RoleViewerDep,
     service: VectorStoreServiceDep,
-    request: Request,
+    tenant_id: _PrincipalTenant,
     store_id: str = Path(...),
 ) -> VectorStoreEnvelope:
     """Return one vector store by id; env-store virtual entries are allowed.
@@ -413,7 +415,7 @@ async def get_vector_store(
     Env-store entries surface with ``source="env"`` and ``readonly=True``
     so the UI can render the same badge shape as the list endpoint.
     """
-    tenant_id = _require_tenant_id(request)
+    tenant_id = _require_tenant_id(tenant_id)
     if _is_env_store_id(store_id):
         env_entries = _build_env_store_entries(os.environ.get("RETRIEVE_DRIVER", ""))
         for entry in env_entries:
@@ -433,14 +435,14 @@ async def update_vector_store(
     _admin: RoleAdminDep,
     service: VectorStoreServiceDep,
     body: UpdateVectorStoreRequest,
-    request: Request,
+    tenant_id: _PrincipalTenant,
     store_id: str = Path(...),
 ) -> VectorStoreEnvelope:
     """Update the mutable ``name`` field of a vector store.
 
     Env-store entries and unknown ids are rejected.
     """
-    tenant_id = _require_tenant_id(request)
+    tenant_id = _require_tenant_id(tenant_id)
     if _is_env_store_id(store_id):
         raise ValidationError(
             code="vector_store.env_store_readonly",
@@ -459,15 +461,15 @@ async def delete_vector_store(
     _auth: AuthDep,
     _admin: RoleAdminDep,
     service: VectorStoreServiceDep,
-    request: Request,
+    tenant_id: _PrincipalTenant,
     store_id: str = Path(...),
 ) -> DeleteVectorStoreResponse:
     """Soft-delete a vector store. Env-store entries are rejected.
 
-    An unknown id answers 404 — Go's handler checks ownership first
-    (``vectorstore.go`` ``DeleteVectorStore``).
+    An unknown id answers 404 - upstream handler checks ownership
+    first (the upstream ``DeleteVectorStore`` handler).
     """
-    tenant_id = _require_tenant_id(request)
+    tenant_id = _require_tenant_id(tenant_id)
     if _is_env_store_id(store_id):
         raise ValidationError(
             code="vector_store.env_store_readonly",
@@ -487,15 +489,15 @@ async def test_vector_store_by_id(
     _auth: AuthDep,
     _admin: RoleAdminDep,
     service: VectorStoreServiceDep,
-    request: Request,
+    tenant_id: _PrincipalTenant,
     store_id: str = Path(...),
 ) -> TestVectorStoreResponse:
     """Run the connectivity probe against an existing store.
 
     Env-store entries are probed in place (the same probe path used
-    by the Go handler). The DB-row path uses the stored config.
+    by the upstream handler). The DB-row path uses the stored config.
     """
-    tenant_id = _require_tenant_id(request)
+    tenant_id = _require_tenant_id(tenant_id)
     try:
         if _is_env_store_id(store_id):
             env_entries = _build_env_store_entries(os.environ.get("RETRIEVE_DRIVER", ""))
@@ -511,7 +513,7 @@ async def test_vector_store_by_id(
             )
         return await service.test_by_id(tenant_id, store_id)
     except ValidationError as exc:
-        # Go's ``TestStoreByID`` answers 200 with the error in the body.
+        # Upstream ``TestStoreByID`` answers 200 with the error in the body.
         return TestVectorStoreResponse(success=False, version=None, error=exc.message)
 
 

@@ -10,9 +10,8 @@ from __future__ import annotations
 import time
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
-from src.app_context.request_context import get_tenant_id
 from src.common.exception import ValidationError
 from src.common.json import JsonValue
 from src.core.contracts.infra import (
@@ -36,8 +35,13 @@ from src.web.deps import (
     RoleAdminDep,
     RoleViewerDep,
 )
+from src.web.deps.context import get_is_system_admin_dep, get_tenant_id_dep
 from src.web.deps.infra_models import ModelServiceDep
-from src.web.middleware.context import get_is_system_admin
+
+# Function-arg-style principal dep aliases.
+_PrincipalTenant = Annotated[int, Depends(get_tenant_id_dep)]
+_PrincipalSystemAdmin = Annotated[bool, Depends(get_is_system_admin_dep)]
+
 
 router = APIRouter(prefix="/models", tags=["models"])
 
@@ -46,26 +50,14 @@ router = APIRouter(prefix="/models", tags=["models"])
 _DEBUG_MAX_INPUT_BYTES = 64 * 1024
 
 
-def _require_context_tenant_id() -> int:
-    """Return the request's tenant id as ``int``, or raise."""
-    raw = get_tenant_id()
-    if raw is None or raw == "":
+def _require_tenant(tenant_id: int) -> int:
+    """Return the resolved workspace id, or raise when missing."""
+    if tenant_id == 0:
         raise ValidationError(
             code="model.context_missing",
             message="No active workspace in request context",
         )
-    try:
-        return int(raw)
-    except ValueError:
-        raise ValidationError(
-            code="model.context_invalid",
-            message="Active workspace id is invalid",
-        ) from None
-
-
-def _is_system_admin(request: Request) -> bool:
-    """Read the system-admin flag from request context."""
-    return get_is_system_admin(request)
+    return tenant_id
 
 
 # ── Provider catalog ────────────────────────────────────────────────
@@ -79,11 +71,11 @@ async def list_model_providers(
 ) -> ProviderListEnvelope:
     """Return the provider catalog filtered by model type.
 
-    The Go handler returns a list of provider descriptors built from
-    ``provider.List`` / ``provider.ListByModelType``. This build ships
-    a static catalog (no inference-provider land yet) behind the same
-    wire shape so the implementation can be swapped later without
-    breaking callers.
+    The upstream handler returns a list of provider descriptors built
+    from ``provider.List`` / ``provider.ListByModelType``. This build
+    ships a static catalog (no inference-provider land yet) behind
+    the same wire shape so the implementation can be swapped later
+    without breaking callers.
     """
     providers = _static_providers(model_type)
     return provider_list_envelope(providers)
@@ -110,9 +102,10 @@ async def create_model(
     _admin: RoleAdminDep,
     body: CreateModelRequest,
     model_service: ModelServiceDep,
+    tenant_id: _PrincipalTenant,
 ) -> ModelEnvelope:
     """Create a model; status defaults to ``active``."""
-    tenant_id = _require_context_tenant_id()
+    tenant_id = _require_tenant(tenant_id)
     info = await model_service.create_model(tenant_id=tenant_id, body=body)
     return model_envelope(info)
 
@@ -122,12 +115,13 @@ async def list_models(
     _auth: AuthDep,
     _viewer: RoleViewerDep,
     model_service: ModelServiceDep,
+    tenant_id: _PrincipalTenant,
     type: str | None = Query(default=None),
     source: str | None = Query(default=None),
     include_builtin: bool = Query(default=True),
 ) -> ModelListEnvelope:
     """List every model visible to the active workspace."""
-    tenant_id = _require_context_tenant_id()
+    tenant_id = _require_tenant(tenant_id)
     infos = await model_service.list_models(
         tenant_id=tenant_id,
         model_type=type,
@@ -143,9 +137,10 @@ async def get_model(
     _viewer: RoleViewerDep,
     model_id: str,
     model_service: ModelServiceDep,
+    tenant_id: _PrincipalTenant,
 ) -> ModelEnvelope:
     """Return one model; ``model.not_found`` when absent."""
-    tenant_id = _require_context_tenant_id()
+    tenant_id = _require_tenant(tenant_id)
     info = await model_service.get_model(tenant_id=tenant_id, model_id=model_id)
     return model_envelope(info)
 
@@ -154,18 +149,19 @@ async def get_model(
 async def update_model(
     _auth: AuthDep,
     _admin_or_system: RoleAdminDep,
-    request: Request,
     model_id: str,
     body: UpdateModelRequest,
     model_service: ModelServiceDep,
+    tenant_id: _PrincipalTenant,
+    is_system_admin: _PrincipalSystemAdmin,
 ) -> ModelEnvelope:
     """Update a model; built-ins require a system admin (enforced in service)."""
-    tenant_id = _require_context_tenant_id()
+    tenant_id = _require_tenant(tenant_id)
     info = await model_service.update_model(
         tenant_id=tenant_id,
         model_id=model_id,
         body=body,
-        is_system_admin=_is_system_admin(request),
+        is_system_admin=is_system_admin,
     )
     return model_envelope(info)
 
@@ -176,9 +172,10 @@ async def delete_model(
     _admin: RoleAdminDep,
     model_id: str,
     model_service: ModelServiceDep,
+    tenant_id: _PrincipalTenant,
 ) -> DeleteModelResponse:
     """Delete a model; idempotent for unknown ids, refuses built-ins."""
-    tenant_id = _require_context_tenant_id()
+    tenant_id = _require_tenant(tenant_id)
     await model_service.delete_model(tenant_id=tenant_id, model_id=model_id)
     return DeleteModelResponse(success=True, message="Model deleted")
 
@@ -192,6 +189,7 @@ async def debug_model(
     _admin: RoleAdminDep,
     model_id: str,
     model_service: ModelServiceDep,
+    tenant_id: _PrincipalTenant,
     input: str = Form(default=""),
     options: str = Form(default=""),
     documents: str = Form(default=""),
@@ -199,21 +197,21 @@ async def debug_model(
 ) -> ModelDebugEnvelope:
     """Probe a saved model end-to-end.
 
-    Mirrors ``handler/model.go`` ``DebugModel`` on the Go side. The
-    real implementation dispatches by ``model.type`` to the right
+    Mirrors the upstream ``DebugModel`` handler.
+    The real implementation dispatches by ``model.type`` to the right
     inference client (chat / embedding / rerank / vllm / asr); the
     inference providers are not implemented yet. For now this endpoint
     returns a static response describing the request envelope so
     callers can wire their UI against the same shape.
     """
-    tenant_id = _require_context_tenant_id()
+    tenant_id = _require_tenant(tenant_id)
     if len(input.encode("utf-8")) > _DEBUG_MAX_INPUT_BYTES:
         raise ValidationError(
             code="model.debug_input_too_long",
             message="input is too long",
         )
-    # Resolve the model so a missing id surfaces as 404 (mirrors the Go
-    # behaviour) instead of an opaque debug probe failure.
+    # Resolve the model so a missing id surfaces as 404 (mirrors the
+    # upstream behaviour) instead of an opaque debug probe failure.
     info = await model_service.get_model(tenant_id=tenant_id, model_id=model_id)
     started = time.monotonic()
     data: dict[str, JsonValue] = {

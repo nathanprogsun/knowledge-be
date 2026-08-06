@@ -1,18 +1,19 @@
-"""RBAC middleware — tenant-scoped role gates.
+"""RBAC middleware - tenant-scoped role gates.
 
 Three guard types that gate endpoints by the caller's tenant role
 or system-admin flag.
 
-- :func:`require_role` — minimum tenant role; API-key principals
+- :func:`require_role` - minimum tenant role; API-key principals
   short-circuit (authorized by the API Key Gate).
-- :func:`require_system_admin` — platform-wide admin flag; always
+- :func:`require_system_admin` - platform-wide admin flag; always
   enforced (not subject to the RBAC rollout switch).
-- :func:`require_ownership_or_role` — role **or** resource-creator
+- :func:`require_ownership_or_role` - role **or** resource-creator
   match (the lookup closure is handler-specific).
 
-All three raise ``PermissionDeniedError`` (403) on failure and emit a
-durable audit row via the injected ``AuditLogService`` (when available),
-subject to the 1-minute sliding-window dedup inside the service.
+All three raise ``PermissionDeniedError`` (403) on failure and emit
+a durable audit row via the injected ``AuditLogService`` (when
+available), subject to the 1-minute sliding-window dedup inside the
+service.
 
 The RBAC enforcement flag (``tenant.rbac_enforced``) controls whether
 the guards reject or log-only. When false the guards log but do not
@@ -28,15 +29,9 @@ from collections.abc import Awaitable, Callable
 from fastapi import Request
 
 from src.common.exception import PermissionDeniedError
-from src.core.auth.permissions import TenantRole
+from src.core.auth.permissions import TenantAPIKeyScope, TenantRole
 from src.core.system.audit_actions import AuditAction
 from src.core.system.audit_service import AuditLogService
-from src.web.middleware.context import (
-    get_api_key_scope,
-    get_is_system_admin,
-    get_tenant_role,
-    get_user_info,
-)
 
 # Type alias for the creator-lookup closure used by ownership-or-role.
 CreatorLookup = Callable[[Request], Awaitable[tuple[str, Exception | None]]]
@@ -44,7 +39,7 @@ CreatorLookup = Callable[[Request], Awaitable[tuple[str, Exception | None]]]
 
 def _actor_user_id(request: Request) -> str:
     """Read the authenticated user's id from ``request.state``."""
-    info = get_user_info(request)
+    info = getattr(request.state, "user_info", None)
     if info is not None:
         return info.get("id", "")
     return getattr(request.state, "user_id", "") or ""
@@ -61,6 +56,22 @@ def _tenant_id(request: Request) -> int:
         return 0
 
 
+def _api_key_scope(request: Request) -> TenantAPIKeyScope | None:
+    """Read the API-key scope from ``request.state`` (None for JWT)."""
+    return getattr(request.state, "api_key_scope", None)
+
+
+def _is_system_admin(request: Request) -> bool:
+    """Read the system-admin flag from ``request.state``."""
+    return bool(getattr(request.state, "is_system_admin", False))
+
+
+def _tenant_role(request: Request) -> str:
+    """Read the tenant role from ``request.state`` (empty string when unset)."""
+    role: str = getattr(request.state, "tenant_role", "") or ""
+    return role or ""
+
+
 async def _emit_denied_audit(
     *,
     audit_svc: AuditLogService,
@@ -74,7 +85,7 @@ async def _emit_denied_audit(
     """Emit a durable audit row for a denied request.
 
     Subject to 1-minute dedup inside the service, so a probing client
-    cannot flood the table. Failures are swallowed — audit must never
+    cannot flood the table. Failures are swallowed - audit must never
     break the underlying business operation.
     """
     with contextlib.suppress(Exception):
@@ -101,15 +112,15 @@ async def require_role(
     enforcement is off, the guard logs but does not reject.
     """
     # API-key principals are authorized solely by the APIKeyGate.
-    if get_api_key_scope(request) is not None:
+    if _api_key_scope(request) is not None:
         return
 
-    role = get_tenant_role(request)
+    role = _tenant_role(request)
     if TenantRole.has_permission(role, min_role):
         return
 
     # Cross-tenant superuser bypass.
-    if get_is_system_admin(request):
+    if _is_system_admin(request):
         return
 
     actor_id = _actor_user_id(request)
@@ -143,7 +154,7 @@ async def require_system_admin(
     principals are admitted only if the scope is platform-level.
     """
     # Platform-scope API keys pass; workspace-bound keys are denied.
-    scope = get_api_key_scope(request)
+    scope = _api_key_scope(request)
     if scope is not None:
         if scope.is_platform():
             return
@@ -152,7 +163,7 @@ async def require_system_admin(
             message="Forbidden: API keys cannot access this endpoint",
         )
 
-    if get_is_system_admin(request):
+    if _is_system_admin(request):
         return
 
     actor_id = _actor_user_id(request)
@@ -190,14 +201,14 @@ async def require_ownership_or_role(
     5. otherwise → 403 + audit.
     """
     # API-key principals are authorized solely by the APIKeyGate.
-    if get_api_key_scope(request) is not None:
+    if _api_key_scope(request) is not None:
         return
 
-    role = get_tenant_role(request)
+    role = _tenant_role(request)
     if TenantRole.has_permission(role, min_role):
         return
 
-    if get_is_system_admin(request):
+    if _is_system_admin(request):
         return
 
     creator_id, lookup_err = await lookup(request)

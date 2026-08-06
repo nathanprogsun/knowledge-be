@@ -21,7 +21,6 @@ from fastapi import Request
 
 from src.common.exception import PermissionDeniedError
 from src.core.auth.permissions import APIKeyRoutePolicy, TenantAPIKeyScope
-from src.web.middleware.context import get_api_key_scope
 
 
 class APIKeyRouteAuthorizer:
@@ -77,7 +76,7 @@ async def api_key_gate(
     through. API-key principals are authorized purely from the declared
     policy table; absent policy → default deny.
     """
-    scope = get_api_key_scope(request)
+    scope: TenantAPIKeyScope | None = getattr(request.state, "api_key_scope", None)
     if scope is None:
         return  # JWT principal — not our jurisdiction.
 
