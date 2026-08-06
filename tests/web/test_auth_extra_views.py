@@ -1,7 +1,8 @@
 """Web-layer tests for the added auth endpoints (register/me/validate/change-password).
 
-Uses in-memory fake repos and a real JWT minted via the login flow, so
-token-bearing endpoints exercise the actual decode + user lookup path.
+Uses ``AsyncMock(spec=...)`` repositories configured with stateful closures
+so the registered user can be looked up by email / id on subsequent
+requests. The login flow still runs through the real JWT pipeline.
 
 Uses the shared ``web_app`` fixture (header-based auth) and applies
 the service dep override on it; the real ``require_auth`` dep resolves
@@ -11,13 +12,16 @@ the principal via the ``x-knowledge-*`` header trio.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 
-from src.common.exception import NotFoundError
+from src.common.exception import ConflictError, NotFoundError
 from src.core.auth.service import AuthService
+from src.db.dao.auth_tokens_repository import AuthTokenRepository
+from src.db.dao.users_repository import UserRepository
 from src.db.models.auth.auth_tokens import AuthToken
 from src.db.models.auth.users import User
 from src.util.security import hash_password, verify_password
@@ -25,107 +29,111 @@ from src.web.deps import get_auth_service
 from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 
 
-class _FakeUserRepo:
-    def __init__(self) -> None:
-        self.users: dict[str, User] = {}
+@pytest.fixture
+def users_repo() -> AsyncMock:
+    repo = AsyncMock(spec=UserRepository)
+    store: dict[str, User] = {}
 
-    async def find_by_email(self, email: str) -> User:
-        for u in self.users.values():
+    async def _insert(row: User) -> User:
+        for u in store.values():
+            if u.email == row.email or u.username == row.username:
+                raise ConflictError(code="user.exists", message="User already exists")
+        store[row.id] = row
+        return row
+
+    async def _find_by_email(email: str) -> User:
+        for u in store.values():
             if u.email == email:
                 return u
         raise NotFoundError(code="user.not_found", message=f"User {email} not found")
 
-    async def find_by_username(self, username: str) -> User:
-        for u in self.users.values():
+    async def _find_by_username(username: str) -> User:
+        for u in store.values():
             if u.username == username:
                 return u
         raise NotFoundError(code="user.not_found", message=f"User {username} not found")
 
-    async def find_by_id(self, user_id: str) -> User:
-        user = self.users.get(user_id)
+    async def _find_by_id(user_id: str) -> User:
+        user = store.get(user_id)
         if user is None:
             raise NotFoundError(code="user.not_found", message=f"User {user_id} not found")
         return user
 
-    async def insert(self, row: User) -> User:
-        if any(u.email == row.email for u in self.users.values()) or any(
-            u.username == row.username for u in self.users.values()
-        ):
-            from src.common.exception import ConflictError
-
-            raise ConflictError(code="user.exists", message="User already exists")
-        self.users[row.id] = row
-        return row
-
-    async def update_by_primary_key(
-        self, pk: dict[str, str], cols: dict[str, object]
+    async def _update_by_primary_key(
+        pk: dict[str, str], cols: dict[str, object]
     ) -> User | None:
         user_id = pk.get("id")
-        if user_id is None or user_id not in self.users:
+        if user_id is None or user_id not in store:
             return None
-        updated = self.users[user_id].model_copy(update=cols)
-        self.users[user_id] = updated
+        updated = store[user_id].model_copy(update=cols)
+        store[user_id] = updated
         return updated
 
+    repo.insert.side_effect = _insert
+    repo.find_by_email.side_effect = _find_by_email
+    repo.find_by_username.side_effect = _find_by_username
+    repo.find_by_id.side_effect = _find_by_id
+    repo.update_by_primary_key.side_effect = _update_by_primary_key
+    repo._store = store  # type: ignore[attr-defined]
+    return repo
 
-class _FakeTokenRepo:
-    def __init__(self) -> None:
-        self.tokens: dict[str, AuthToken] = {}
-        self._by_value: dict[str, str] = {}
 
-    async def insert(self, row: AuthToken) -> AuthToken:
-        self.tokens[row.id] = row
-        self._by_value[row.token] = row.id
+@pytest.fixture
+def tokens_repo() -> AsyncMock:
+    repo = AsyncMock(spec=AuthTokenRepository)
+    store: dict[str, AuthToken] = {}
+    by_value: dict[str, str] = {}
+
+    async def _insert(row: AuthToken) -> AuthToken:
+        store[row.id] = row
+        by_value[row.token] = row.id
         return row
 
-    async def find_by_token_value(self, token: str) -> AuthToken:
-        tid = self._by_value.get(token)
+    async def _find_by_token_value(token: str) -> AuthToken:
+        tid = by_value.get(token)
         if tid is None:
             raise NotFoundError(code="token.not_found", message="Token not found")
-        return self.tokens[tid]
+        return store[tid]
 
-    async def revoke(self, token_id: str) -> int:
-        t = self.tokens.get(token_id)
+    async def _revoke(token_id: str) -> int:
+        t = store.get(token_id)
         if t is None or t.is_revoked:
             return 0
-        self.tokens[token_id] = t.model_copy(update={"is_revoked": True})
+        store[token_id] = t.model_copy(update={"is_revoked": True})
         return 1
 
-    async def revoke_all_for_user(self, user_id: str) -> int:
+    async def _revoke_all_for_user(user_id: str) -> int:
         n = 0
-        for tid, t in list(self.tokens.items()):
+        for tid, t in list(store.items()):
             if t.user_id == user_id and not t.is_revoked:
-                self.tokens[tid] = t.model_copy(update={"is_revoked": True})
+                store[tid] = t.model_copy(update={"is_revoked": True})
                 n += 1
         return n
 
-
-@pytest.fixture
-def fake_users() -> _FakeUserRepo:
-    return _FakeUserRepo()
-
-
-@pytest.fixture
-def fake_tokens() -> _FakeTokenRepo:
-    return _FakeTokenRepo()
+    repo.insert.side_effect = _insert
+    repo.find_by_token_value.side_effect = _find_by_token_value
+    repo.revoke.side_effect = _revoke
+    repo.revoke_all_for_user.side_effect = _revoke_all_for_user
+    repo._store = store  # type: ignore[attr-defined]
+    return repo
 
 
 @pytest.fixture(autouse=True)
 def _override_services(
     web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
-    fake_users: _FakeUserRepo,
-    fake_tokens: _FakeTokenRepo,
+    users_repo: AsyncMock,
+    tokens_repo: AsyncMock,
 ) -> FastAPI:
     """Override the auth service dep on the shared web app (autouse)."""
     web_app.dependency_overrides[get_auth_service] = lambda: AuthService(
-        users_repo=fake_users,  # type: ignore[arg-type]
-        tokens_repo=fake_tokens,  # type: ignore[arg-type]
+        users_repo=users_repo,
+        tokens_repo=tokens_repo,
     )
     return web_app
 
 
 def _seed_user(
-    repo: _FakeUserRepo,
+    users_repo: AsyncMock,
     *,
     email: str = "alice@example.com",
     username: str = "alice",
@@ -147,7 +155,7 @@ def _seed_user(
         created_at=now,
         updated_at=now,
     )
-    repo.users[user.id] = user
+    users_repo._store[user.id] = user  # type: ignore[attr-defined]
     return user
 
 
@@ -167,7 +175,7 @@ async def _login(
 
 
 async def test_register_success(
-    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+    web_authed_client: AsyncClient, users_repo: AsyncMock
 ) -> None:
     resp = await web_authed_client.post(
         "/auth/register",
@@ -182,9 +190,9 @@ async def test_register_success(
 
 
 async def test_register_duplicate_email(
-    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+    web_authed_client: AsyncClient, users_repo: AsyncMock
 ) -> None:
-    _seed_user(fake_users)
+    _seed_user(users_repo)
     resp = await web_authed_client.post(
         "/auth/register",
         json={"username": "alice2", "email": "alice@example.com", "password": "secret1"},
@@ -205,9 +213,9 @@ async def test_register_empty_username(web_authed_client: AsyncClient) -> None:
 
 
 async def test_me_success(
-    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+    web_authed_client: AsyncClient, users_repo: AsyncMock
 ) -> None:
-    _seed_user(fake_users)
+    _seed_user(users_repo)
     token = await _login(web_authed_client)
     resp = await web_authed_client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
@@ -226,9 +234,9 @@ async def test_me_missing_header(web_authed_client: AsyncClient) -> None:
 
 
 async def test_validate_valid_token(
-    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+    web_authed_client: AsyncClient, users_repo: AsyncMock
 ) -> None:
-    _seed_user(fake_users)
+    _seed_user(users_repo)
     token = await _login(web_authed_client)
     resp = await web_authed_client.get(
         "/auth/validate", headers={"Authorization": f"Bearer {token}"}
@@ -251,9 +259,9 @@ async def test_validate_invalid_token(web_authed_client: AsyncClient) -> None:
 
 
 async def test_change_password_success(
-    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+    web_authed_client: AsyncClient, users_repo: AsyncMock
 ) -> None:
-    _seed_user(fake_users)
+    _seed_user(users_repo)
     token = await _login(web_authed_client)
     resp = await web_authed_client.post(
         "/auth/change-password",
@@ -262,14 +270,14 @@ async def test_change_password_success(
     )
     assert resp.status_code == 200
     assert resp.json()["success"] is True
-    stored = fake_users.users["usr-1"]
+    stored = users_repo._store["usr-1"]  # type: ignore[attr-defined]
     assert verify_password("new-secret", stored.password_hash)
 
 
 async def test_change_password_wrong_old(
-    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+    web_authed_client: AsyncClient, users_repo: AsyncMock
 ) -> None:
-    _seed_user(fake_users)
+    _seed_user(users_repo)
     token = await _login(web_authed_client)
     resp = await web_authed_client.post(
         "/auth/change-password",

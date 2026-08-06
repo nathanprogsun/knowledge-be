@@ -1,9 +1,10 @@
 """Web-layer tests for the storage-backend router.
 
-Per AGENTS.md §9, web routers are tested via ``httpx.AsyncClient`` against
-the app. The service dependency is overridden with a service backed by an
-in-memory repository, so the tests exercise the full HTTP path (routing,
-role gates, serialization, exception handling) without a database.
+Exercises the router over HTTP via ``httpx.AsyncClient`` against the
+app. The service dependency is overridden with a service backed by an
+``AsyncMock(spec=StorageBackendRepository)`` configured with stateful
+closures, so the tests exercise the full HTTP path (routing, role
+gates, serialization, exception handling) without a database.
 
 Uses the shared ``web_app`` fixture (header-based auth) and applies
 the service dep override on it; the real ``require_auth`` dep resolves
@@ -13,6 +14,7 @@ the principal via the ``x-knowledge-*`` header trio.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
@@ -26,6 +28,7 @@ from src.core.infra.storage_backends.types import (
     REDACTED_SECRET_PLACEHOLDER,
     StorageBackendConfigInfo,
 )
+from src.db.dao.storage_backend_repository import StorageBackendRepository
 from src.db.models.storage_backend import (
     STORAGE_BACKEND_SOURCE_ENV,
     STORAGE_BACKEND_SOURCE_USER,
@@ -35,7 +38,6 @@ from src.db.models.storage_backend import (
 )
 from src.web.deps.infra_storage_backends import get_storage_backend_service
 from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
-from tests.unit.fakes.storage_backends import FakeStorageBackendRepository
 
 # The header auth channel pins the active workspace to 1.
 _TENANT_ID = 1
@@ -85,19 +87,110 @@ def _stub_probes(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
-def repo() -> FakeStorageBackendRepository:
-    return FakeStorageBackendRepository()
+def repo() -> AsyncMock:
+    """``AsyncMock(spec=StorageBackendRepository)`` with stateful closuress."""
+    repo = AsyncMock(spec=StorageBackendRepository)
+    rows: dict[str, StorageBackend] = {}
+    default_backend_id: dict[int, str] = {}
+    kb_refs = [0]
+    resource_refs = [0]
+
+    def _live_for_tenant(tenant_id: int) -> dict[str, StorageBackend]:
+        return {
+            bid: r
+            for bid, r in rows.items()
+            if r.tenant_id == tenant_id and r.deleted_at is None
+        }
+
+    async def _get_by_id(*, tenant_id: int, id: str) -> StorageBackend | None:
+        row = rows.get(id)
+        if row is None or row.tenant_id != tenant_id or row.deleted_at is not None:
+            return None
+        return row
+
+    async def _list_for_tenant(tenant_id: int) -> list[StorageBackend]:
+        live = sorted(
+            _live_for_tenant(tenant_id).values(), key=lambda r: (r.created_at, r.id)
+        )
+        return live
+
+    async def _find_legacy_alias(
+        *, tenant_id: int, provider: str
+    ) -> StorageBackend | None:
+        for r in await _list_for_tenant(tenant_id):
+            if r.provider == provider and r.legacy_alias:
+                return r
+        return None
+
+    async def _find_by_name(*, tenant_id: int, name: str) -> StorageBackend | None:
+        for r in await _list_for_tenant(tenant_id):
+            if r.name == name:
+                return r
+        return None
+
+    async def _create(row: StorageBackend) -> StorageBackend:
+        rows[row.id] = row
+        return row
+
+    async def _update_columns(
+        *, tenant_id: int, id: str, columns: dict[str, object]
+    ) -> StorageBackend | None:
+        existing = await _get_by_id(tenant_id=tenant_id, id=id)
+        if existing is None:
+            return None
+        updated = existing.model_copy(update=dict(columns))
+        rows[id] = updated
+        return updated
+
+    async def _soft_delete(*, tenant_id: int, id: str) -> bool:
+        existing = await _get_by_id(tenant_id=tenant_id, id=id)
+        if existing is None:
+            return False
+        now = datetime.now(UTC)
+        rows[id] = existing.model_copy(update={"deleted_at": now, "updated_at": now})
+        return True
+
+    async def _get_default_backend_id(tenant_id: int) -> str | None:
+        return default_backend_id.get(tenant_id)
+
+    async def _set_default_backend_id(*, tenant_id: int, id: str) -> bool:
+        default_backend_id[tenant_id] = id
+        return True
+
+    async def _count_kb_references(*, tenant_id: int, id: str) -> int:
+        return kb_refs[0]
+
+    async def _count_active_resource_references(
+        *, tenant_id: int, id: str
+    ) -> int:
+        return resource_refs[0]
+
+    repo.get_by_id.side_effect = _get_by_id
+    repo.list_for_tenant.side_effect = _list_for_tenant
+    repo.find_legacy_alias.side_effect = _find_legacy_alias
+    repo.find_by_name.side_effect = _find_by_name
+    repo.create.side_effect = _create
+    repo.update_columns.side_effect = _update_columns
+    repo.soft_delete.side_effect = _soft_delete
+    repo.get_default_backend_id.side_effect = _get_default_backend_id
+    repo.set_default_backend_id.side_effect = _set_default_backend_id
+    repo.count_knowledge_base_references.side_effect = _count_kb_references
+    repo.count_active_resource_references.side_effect = _count_active_resource_references
+    repo._rows = rows  # type: ignore[attr-defined]
+    repo._default_backend_id = default_backend_id  # type: ignore[attr-defined]
+    repo._kb_refs = kb_refs  # type: ignore[attr-defined]
+    return repo
 
 
 @pytest.fixture
 def app(
     request: pytest.FixtureRequest,  # noqa: ARG001 - explicit fixture-param
     web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> FastAPI:
     """Override ``get_storage_backend_service`` on the shared web app."""
     web_app.dependency_overrides[get_storage_backend_service] = (
-        lambda: StorageBackendService(backend_repo=repo)  # type: ignore[arg-type]
+        lambda: StorageBackendService(backend_repo=repo)
     )
     return web_app
 
@@ -110,7 +203,7 @@ def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa
 
 
 def _seed(
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
     *,
     id: str = "backend-1",
     tenant_id: int = _TENANT_ID,
@@ -132,7 +225,7 @@ def _seed(
         created_at=_NOW,
         updated_at=_NOW,
     )
-    repo.rows[id] = row
+    repo._rows[id] = row  # type: ignore[attr-defined]
     return row
 
 
@@ -154,7 +247,7 @@ async def test_list_provider_types_returns_the_allowed_set(client: AsyncClient) 
 
 async def test_create_returns_201_with_the_created_backend(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     resp = await client.post(
         "/storage-backends",
@@ -167,12 +260,13 @@ async def test_create_returns_201_with_the_created_backend(
     assert body["data"]["name"] == "Primary MinIO"
     assert body["data"]["provider"] == "minio"
     assert body["data"]["source"] == STORAGE_BACKEND_SOURCE_USER
-    assert len(repo.rows) == 1
+    rows = repo._rows  # type: ignore[attr-defined]
+    assert len(rows) == 1
 
 
 async def test_create_rejects_a_duplicate_name_with_409(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, name="Primary MinIO")
 
@@ -211,11 +305,11 @@ async def test_create_rejects_a_missing_required_config_field_with_422(
 
 async def test_list_masks_credentials_and_reports_the_default(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, id="backend-1", name="A")
     _seed(repo, id="backend-2", name="B")
-    repo.default_backend_id[_TENANT_ID] = "backend-2"
+    repo._default_backend_id[_TENANT_ID] = "backend-2"  # type: ignore[attr-defined]
 
     resp = await client.get("/storage-backends")
 
@@ -240,7 +334,7 @@ async def test_list_is_empty_for_a_workspace_with_no_backends(
 
 async def test_list_excludes_other_workspaces(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, id="mine")
     _seed(repo, id="theirs", tenant_id=99)
@@ -255,7 +349,7 @@ async def test_list_excludes_other_workspaces(
 
 async def test_get_returns_the_backend_with_masked_credentials(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
 
@@ -275,7 +369,7 @@ async def test_get_of_a_missing_backend_returns_404(client: AsyncClient) -> None
 
 async def test_get_does_not_cross_workspaces(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, tenant_id=99)
 
@@ -289,7 +383,7 @@ async def test_get_does_not_cross_workspaces(
 
 async def test_update_renames_and_preserves_redacted_secrets(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
     masked_config = dict(_MINIO_BODY_CONFIG)
@@ -303,13 +397,14 @@ async def test_update_renames_and_preserves_redacted_secrets(
 
     assert resp.status_code == 200
     assert resp.json()["data"]["name"] == "Renamed"
-    stored = StorageBackendConfigInfo.from_json(repo.rows["backend-1"].config)
+    rows = repo._rows  # type: ignore[attr-defined]
+    stored = StorageBackendConfigInfo.from_json(rows["backend-1"].config)
     assert stored.secret_access_key == "secret-example"
 
 
 async def test_update_rejects_a_location_change_with_422(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
     moved = dict(_MINIO_BODY_CONFIG)
@@ -322,7 +417,7 @@ async def test_update_rejects_a_location_change_with_422(
 
 async def test_update_of_an_env_backend_returns_422(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, source=STORAGE_BACKEND_SOURCE_ENV)
 
@@ -333,7 +428,7 @@ async def test_update_of_an_env_backend_returns_422(
 
 async def test_update_can_disable_an_unreferenced_backend(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
 
@@ -357,7 +452,7 @@ async def test_update_of_a_missing_backend_returns_404(client: AsyncClient) -> N
 
 async def test_delete_acknowledges_and_soft_deletes(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
 
@@ -365,15 +460,16 @@ async def test_delete_acknowledges_and_soft_deletes(
 
     assert resp.status_code == 200
     assert resp.json() == {"success": True}
-    assert repo.rows["backend-1"].deleted_at is not None
+    rows = repo._rows  # type: ignore[attr-defined]
+    assert rows["backend-1"].deleted_at is not None
 
 
 async def test_delete_of_the_default_returns_422(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
-    repo.default_backend_id[_TENANT_ID] = "backend-1"
+    repo._default_backend_id[_TENANT_ID] = "backend-1"  # type: ignore[attr-defined]
 
     resp = await client.delete("/storage-backends/backend-1")
 
@@ -382,10 +478,10 @@ async def test_delete_of_the_default_returns_422(
 
 async def test_delete_of_a_bound_backend_returns_422(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
-    repo.knowledge_base_references = 2
+    repo._kb_refs[0] = 2  # type: ignore[attr-defined]
 
     resp = await client.delete("/storage-backends/backend-1")
 
@@ -461,7 +557,7 @@ async def test_test_raw_config_reports_an_invalid_body_with_200(
 
 async def test_test_saved_backend_returns_success_true(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
 
@@ -482,7 +578,7 @@ async def test_test_of_a_missing_backend_returns_404(client: AsyncClient) -> Non
 
 async def test_set_default_acknowledges_and_points_the_workspace(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
 
@@ -490,12 +586,12 @@ async def test_set_default_acknowledges_and_points_the_workspace(
 
     assert resp.status_code == 200
     assert resp.json() == {"success": True}
-    assert repo.default_backend_id[_TENANT_ID] == "backend-1"
+    assert repo._default_backend_id[_TENANT_ID] == "backend-1"  # type: ignore[attr-defined]
 
 
 async def test_set_default_of_a_disabled_backend_returns_422(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, status=STORAGE_BACKEND_STATUS_DISABLED)
 
@@ -517,7 +613,7 @@ async def test_set_default_of_a_missing_backend_returns_404(
 
 async def test_types_route_wins_over_the_id_route(
     client: AsyncClient,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     # No row named "types" exists, so a captured id would 404.
     resp = await client.get("/storage-backends/types")

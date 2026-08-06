@@ -2,8 +2,8 @@
 
 Exercises the router over HTTP via ``httpx.AsyncClient`` with
 ``get_model_service`` overridden to use a real ``ModelService`` backed
-by the shared in-memory fake repository, so the full web -> service
-path runs without a database.
+by an ``AsyncMock(spec=ModelRepository)`` configured with stateful
+closures, so the full web -> service path runs without a database.
 
 Uses the shared ``web_app`` fixture (header-based auth) and applies
 the service dep override on it; the real ``require_auth`` dep resolves
@@ -12,36 +12,137 @@ the principal via the ``x-knowledge-*`` header trio.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 
+from src.common.exception import NotFoundError
 from src.core.infra.models.service.model_service import ModelService
+from src.db.dao.model_repository import ModelRepository
+from src.db.models.infra.model import Model
 from src.web.deps.infra_models import get_model_service
 from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
-from tests.unit.fakes.models import FakeModelRepository
-
-_NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
 
 @pytest.fixture
-def repo() -> FakeModelRepository:
-    return FakeModelRepository()
+def repo() -> AsyncMock:
+    """``AsyncMock(spec=ModelRepository)`` with stateful ``insert`` + lookups."""
+    repo = AsyncMock(spec=ModelRepository)
+    rows: dict[str, Model] = {}
+
+    def _live() -> dict[str, Model]:
+        return {mid: r for mid, r in rows.items() if r.deleted_at is None}
+
+    async def _insert(row: Model) -> Model:
+        rows[row.id] = row
+        return row
+
+    async def _update_row(row: Model) -> Model | None:
+        existing = rows.get(row.id)
+        if existing is None or existing.tenant_id != row.tenant_id:
+            return None
+        rows[row.id] = row
+        return row
+
+    async def _delete_by_tenant_and_id(*, tenant_id: int, id: str) -> int:
+        existing = rows.get(id)
+        if existing is None or existing.tenant_id != tenant_id:
+            return 0
+        del rows[id]
+        return 1
+
+    async def _clear_default_by_type(
+        *,
+        tenant_id: int,
+        model_type: str,
+        exclude_id: str | None = None,
+    ) -> int:
+        affected = 0
+        for k, v in list(rows.items()):
+            if v.deleted_at is not None:
+                continue
+            if v.tenant_id != tenant_id:
+                continue
+            if v.type != model_type:
+                continue
+            if not v.is_default:
+                continue
+            if exclude_id is not None and k == exclude_id:
+                continue
+            rows[k] = v.model_copy(update={"is_default": False})
+            affected += 1
+        return affected
+
+    async def _find_by_tenant_and_id(
+        *,
+        tenant_id: int,
+        id: str,
+        include_builtin: bool = True,
+    ) -> Model | None:
+        existing = _live().get(id)
+        if existing is None:
+            return None
+        if existing.tenant_id == tenant_id:
+            return existing
+        if include_builtin and existing.is_builtin:
+            return existing
+        return None
+
+    async def _find_by_tenant_and_id_or_fail(
+        *,
+        tenant_id: int,
+        id: str,
+        include_builtin: bool = True,
+    ) -> Model:
+        row = await _find_by_tenant_and_id(
+            tenant_id=tenant_id, id=id, include_builtin=include_builtin
+        )
+        if row is None:
+            raise NotFoundError(code="model.not_found", message=f"Model {id} not found")
+        return row
+
+    async def _list_by_tenant(
+        *,
+        tenant_id: int,
+        model_type: str | None = None,
+        source: str | None = None,
+        include_builtin: bool = True,
+    ) -> list[Model]:
+        results: list[Model] = []
+        for row in _live().values():
+            if row.tenant_id != tenant_id and not (include_builtin and row.is_builtin):
+                continue
+            if model_type is not None and row.type != model_type:
+                continue
+            if source is not None and row.source != source:
+                continue
+            results.append(row)
+        return results
+
+    repo.insert.side_effect = _insert
+    repo.update_row.side_effect = _update_row
+    repo.delete_by_tenant_and_id.side_effect = _delete_by_tenant_and_id
+    repo.clear_default_by_type.side_effect = _clear_default_by_type
+    repo.find_by_tenant_and_id.side_effect = _find_by_tenant_and_id
+    repo.find_by_tenant_and_id_or_fail.side_effect = _find_by_tenant_and_id_or_fail
+    repo.list_by_tenant.side_effect = _list_by_tenant
+    repo._rows = rows  # type: ignore[attr-defined]
+    return repo
 
 
 @pytest.fixture
 def app(
-    request: pytest.FixtureRequest,
+    request: pytest.FixtureRequest,  # noqa: ARG001 - explicit fixture-param
     web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
-    repo: FakeModelRepository,
+    repo: AsyncMock,
 ) -> FastAPI:
     """Override ``get_model_service`` on the shared web app."""
 
     def _override_service() -> ModelService:
-        return ModelService(models_repo=repo)  # type: ignore[arg-type]
+        return ModelService(models_repo=repo)
 
     web_app.dependency_overrides[get_model_service] = _override_service
     return web_app
@@ -76,7 +177,7 @@ def _create_body(**overrides: Any) -> dict[str, Any]:
 
 async def test_create_model_returns_201_envelope(
     client: AsyncClient,
-    repo: FakeModelRepository,
+    repo: AsyncMock,
 ) -> None:
     resp = await client.post("/models", json=_create_body())
 
@@ -85,7 +186,8 @@ async def test_create_model_returns_201_envelope(
     assert payload["success"] is True
     assert payload["data"]["name"] == "gpt-4o"
     assert payload["data"]["status"] == "active"
-    assert payload["data"]["id"] in repo.rows
+    rows = repo._rows  # type: ignore[attr-defined]
+    assert payload["data"]["id"] in rows
 
 
 async def test_create_model_strips_credential_fields(
@@ -193,7 +295,7 @@ async def test_update_model_returns_404_when_absent(client: AsyncClient) -> None
 
 async def test_delete_model_removes_row(
     client: AsyncClient,
-    repo: FakeModelRepository,
+    repo: AsyncMock,
 ) -> None:
     created = await client.post("/models", json=_create_body())
     model_id = created.json()["data"]["id"]
@@ -203,7 +305,8 @@ async def test_delete_model_removes_row(
     assert resp.status_code == 200
     assert resp.json()["success"] is True
     assert resp.json()["message"] == "Model deleted"
-    assert model_id not in repo.rows
+    rows = repo._rows  # type: ignore[attr-defined]
+    assert model_id not in rows
 
 
 # ── GET /models/providers ───────────────────────────────────────────

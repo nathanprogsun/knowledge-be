@@ -1,9 +1,11 @@
 """Web-layer tests for the data-source router.
 
-Per AGENTS.md §9, web routers are tested via ``httpx.AsyncClient``
-against the app: the full HTTP path (routing, serialization, exception
-mapping) with the service dependency overridden by a service-backed fake
-so no database is involved.
+Exercises the router over HTTP via ``httpx.AsyncClient`` against the
+app: the full HTTP path (routing, serialization, exception mapping)
+with the service dependency overridden by a service-backed
+``AsyncMock(spec=...)`` repository so no database is involved. The
+non-repository doubles (``StubConnector``, ``RecordingIngestor``)
+remain as protocol doubles for the connector / ingestor seams.
 
 Uses the shared ``web_app`` fixture (header-based auth) and applies
 the service dep override on it; the real ``require_auth`` dep resolves
@@ -22,6 +24,7 @@ The load-bearing checks:
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
@@ -30,16 +33,16 @@ from httpx import AsyncClient
 from src.core.infra.datasources.connector_base import ConnectorRegistry
 from src.core.infra.datasources.service.datasource_service import DataSourceService
 from src.core.system.audit_service import AuditLogService
+from src.db.dao.audit_log_repository import AuditLogRepository
+from src.db.dao.datasource_repository import DataSourceRepository, SyncLogRepository
 from src.db.models.datasource import DataSource, SyncLog
+from src.db.models.system.audit_log import AuditLog
 from src.web.api.infra.datasources.router import router
 from src.web.deps.infra_datasources import get_datasource_service
 from src.web.deps.rbac import make_role_dep, require_role_dep
 from src.web.middleware.auth import require_auth
 from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
-from tests.unit.fakes.datasources import (
-    FakeAuditRepo,
-    FakeDataSourceRepo,
-    FakeSyncLogRepo,
+from tests.unit.fakes.datasources import (  # type: ignore[attr-defined]
     RecordingIngestor,
     StubConnector,
     unreachable_error,
@@ -54,13 +57,139 @@ NOW = datetime(2026, 4, 1, tzinfo=UTC)
 
 
 @pytest.fixture
-def ds_repo() -> FakeDataSourceRepo:
-    return FakeDataSourceRepo()
+def ds_repo() -> AsyncMock:
+    """``AsyncMock(spec=DataSourceRepository)`` with stateful closures."""
+    repo = AsyncMock(spec=DataSourceRepository)
+    rows: dict[str, DataSource] = {}
+    items_synced: dict[str, int] = {}
+
+    async def _create(row: DataSource) -> DataSource:
+        rows[row.id] = row
+        return row
+
+    async def _find_by_id_or_none(id: str) -> DataSource | None:
+        row = rows.get(id)
+        if row is None or row.deleted_at is not None:
+            return None
+        return row
+
+    async def _find_by_knowledge_base(
+        knowledge_base_id: str,
+    ) -> list[DataSource]:
+        out = [
+            r
+            for r in rows.values()
+            if r.knowledge_base_id == knowledge_base_id and r.deleted_at is None
+        ]
+        return sorted(out, key=lambda r: r.created_at, reverse=True)
+
+    async def _update(row: DataSource) -> DataSource:
+        existing = rows.get(row.id)
+        if existing is None:
+            from src.common.exception import ValidationError
+
+            raise ValidationError(code="db.not_found", message="row missing")
+        # Immutable columns are preserved exactly as the real repo does.
+        persisted = row.model_copy(
+            update={
+                "tenant_id": existing.tenant_id,
+                "knowledge_base_id": existing.knowledge_base_id,
+                "created_at": existing.created_at,
+            }
+        )
+        rows[row.id] = persisted
+        return persisted
+
+    async def _soft_delete(*, id: str, now: datetime) -> bool:
+        existing = rows.get(id)
+        if existing is None or existing.deleted_at is not None:
+            return False
+        rows[id] = existing.model_copy(update={"deleted_at": now, "updated_at": now})
+        return True
+
+    async def _count_items_synced(data_source_id: str) -> int:
+        return items_synced.get(data_source_id, 0)
+
+    repo.create.side_effect = _create
+    repo.find_by_id_or_none.side_effect = _find_by_id_or_none
+    repo.find_by_knowledge_base.side_effect = _find_by_knowledge_base
+    repo.update.side_effect = _update
+    repo.soft_delete.side_effect = _soft_delete
+    repo.count_items_synced.side_effect = _count_items_synced
+    repo._rows = rows  # type: ignore[attr-defined]
+    repo._items_synced = items_synced  # type: ignore[attr-defined]
+    return repo
 
 
 @pytest.fixture
-def sync_log_repo() -> FakeSyncLogRepo:
-    return FakeSyncLogRepo()
+def sync_log_repo() -> AsyncMock:
+    """``AsyncMock(spec=SyncLogRepository)`` with stateful closures."""
+    repo = AsyncMock(spec=SyncLogRepository)
+    rows: dict[str, SyncLog] = {}
+
+    async def _create(row: SyncLog) -> SyncLog:
+        rows[row.id] = row
+        return row
+
+    async def _find_by_id_or_none(id: str) -> SyncLog | None:
+        return rows.get(id)
+
+    async def _find_by_data_source(
+        data_source_id: str, *, limit: int, offset: int
+    ) -> list[SyncLog]:
+        out = [r for r in rows.values() if r.data_source_id == data_source_id]
+        out = sorted(out, key=lambda r: r.started_at, reverse=True)
+        return out[offset : offset + limit]
+
+    async def _find_latest(data_source_id: str) -> SyncLog | None:
+        out = [r for r in rows.values() if r.data_source_id == data_source_id]
+        if not out:
+            return None
+        return max(out, key=lambda r: r.started_at)
+
+    async def _update(row: SyncLog) -> SyncLog:
+        rows[row.id] = row
+        return row
+
+    async def _cancel_pending(*, data_source_id: str, now: datetime) -> int:
+        count = 0
+        for log_id, row in list(rows.items()):
+            if row.data_source_id == data_source_id and row.status == "running":
+                rows[log_id] = row.model_copy(
+                    update={
+                        "status": "canceled",
+                        "finished_at": now,
+                        "updated_at": now,
+                    }
+                )
+                count += 1
+        return count
+
+    repo.create.side_effect = _create
+    repo.find_by_id_or_none.side_effect = _find_by_id_or_none
+    repo.find_by_data_source.side_effect = _find_by_data_source
+    repo.find_latest.side_effect = _find_latest
+    repo.update.side_effect = _update
+    repo.cancel_pending_by_data_source.side_effect = _cancel_pending
+    repo._rows = rows  # type: ignore[attr-defined]
+    return repo
+
+
+@pytest.fixture
+def audit_repo() -> AsyncMock:
+    """``AsyncMock(spec=AuditLogRepository)`` for the audit pipeline."""
+    repo = AsyncMock(spec=AuditLogRepository)
+    audit_rows: list[AuditLog] = []
+    counter = [0]
+
+    async def _create(entry: AuditLog) -> AuditLog:
+        counter[0] += 1
+        persisted = entry.model_copy(update={"id": counter[0]})
+        audit_rows.append(persisted)
+        return persisted
+
+    repo.create.side_effect = _create
+    return repo
 
 
 @pytest.fixture
@@ -70,17 +199,18 @@ def connector() -> StubConnector:
 
 @pytest.fixture
 def service(
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
+    audit_repo: AsyncMock,
     connector: StubConnector,
 ) -> DataSourceService:
     registry = ConnectorRegistry()
     registry.register(connector)
     return DataSourceService(
-        ds_repo=ds_repo,  # type: ignore[arg-type]
-        sync_log_repo=sync_log_repo,  # type: ignore[arg-type]
+        ds_repo=ds_repo,
+        sync_log_repo=sync_log_repo,
         connector_registry=registry,
-        audit_service=AuditLogService(audit_repo=FakeAuditRepo()),  # type: ignore[arg-type]
+        audit_service=AuditLogService(audit_repo=audit_repo),
     )
 
 
@@ -339,10 +469,10 @@ async def test_create_rejects_missing_required_fields(client: AsyncClient) -> No
 
 async def test_list_returns_kb_sources(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row()
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = await client.get("/datasource", params={"kb_id": KB_ID})
 
@@ -352,12 +482,13 @@ async def test_list_returns_kb_sources(
 
 async def test_list_excludes_other_tenants(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     mine = _row(id="ds-mine")
     theirs = _row(id="ds-theirs", tenant_id=99)
-    ds_repo.rows[mine.id] = mine
-    ds_repo.rows[theirs.id] = theirs
+    rows = ds_repo._rows  # type: ignore[attr-defined]
+    rows[mine.id] = mine
+    rows[theirs.id] = theirs
 
     resp = await client.get("/datasource", params={"kb_id": KB_ID})
 
@@ -375,13 +506,13 @@ async def test_list_without_kb_id_returns_422(client: AsyncClient) -> None:
 
 async def test_get_returns_entity_with_latest_sync_log(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
 ) -> None:
     row = _row()
-    ds_repo.rows[row.id] = row
-    ds_repo.items_synced[row.id] = 11
-    sync_log_repo.rows["log-1"] = _log()
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
+    ds_repo._items_synced[row.id] = 11  # type: ignore[attr-defined]
+    sync_log_repo._rows["log-1"] = _log()  # type: ignore[attr-defined]
 
     resp = await client.get(f"/datasource/{row.id}")
 
@@ -399,10 +530,10 @@ async def test_get_missing_returns_404(client: AsyncClient) -> None:
 
 async def test_get_cross_tenant_returns_404(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row(tenant_id=99)
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = await client.get(f"/datasource/{row.id}")
 
@@ -415,10 +546,10 @@ async def test_get_cross_tenant_returns_404(
 
 async def test_update_patches_name(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row()
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = await client.put(f"/datasource/{row.id}", json={"name": "renamed"})
 
@@ -428,10 +559,10 @@ async def test_update_patches_name(
 
 async def test_update_cannot_overwrite_credentials(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row(config={"credentials": {"api_key": "original"}})
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = await client.put(
         f"/datasource/{row.id}",
@@ -439,7 +570,7 @@ async def test_update_cannot_overwrite_credentials(
     )
 
     assert resp.status_code == 200
-    stored = ds_repo.rows[row.id].config
+    stored = ds_repo._rows[row.id].config  # type: ignore[attr-defined]
     assert stored is not None
     assert stored["credentials"] == {"api_key": "original"}
 
@@ -455,15 +586,15 @@ async def test_update_missing_returns_404(client: AsyncClient) -> None:
 
 async def test_delete_returns_204_and_soft_deletes(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row()
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = await client.delete(f"/datasource/{row.id}")
 
     assert resp.status_code == 204
-    assert ds_repo.rows[row.id].deleted_at is not None
+    assert ds_repo._rows[row.id].deleted_at is not None  # type: ignore[attr-defined]
 
 
 async def test_delete_missing_returns_404(client: AsyncClient) -> None:
@@ -477,10 +608,10 @@ async def test_delete_missing_returns_404(client: AsyncClient) -> None:
 
 async def test_validate_connection_returns_connected(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row()
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = await client.post(f"/datasource/{row.id}/validate")
 
@@ -490,18 +621,19 @@ async def test_validate_connection_returns_connected(
 
 async def test_validate_connection_failure_records_error_state(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row()
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
     connector.validate_error = unreachable_error("token expired")
 
     resp = await client.post(f"/datasource/{row.id}/validate")
 
     assert resp.status_code == 502
-    assert ds_repo.rows[row.id].status == "error"
-    assert ds_repo.rows[row.id].error_message == "token expired"
+    stored = ds_repo._rows[row.id]  # type: ignore[attr-defined]
+    assert stored.status == "error"
+    assert stored.error_message == "token expired"
 
 
 # ── GET /datasources/{id}/resources ──────────────────────────────────
@@ -509,13 +641,13 @@ async def test_validate_connection_failure_records_error_state(
 
 async def test_list_resources_returns_connector_output(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     from src.core.infra.datasources.types import Resource
 
     row = _row()
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
     connector.resources = [
         Resource(external_id="page-1", name="Page", type="page", has_children=True)
     ]
@@ -530,11 +662,11 @@ async def test_list_resources_returns_connector_output(
 
 async def test_list_resources_forwards_parent_id(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row()
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = await client.get(f"/datasource/{row.id}/resources", params={"parent_id": "root-9"})
 
@@ -547,11 +679,11 @@ async def test_list_resources_forwards_parent_id(
 
 async def test_resolve_ancestors_returns_ancestor_list(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row()
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
     connector.ancestors = ["root-1", "mid-2"]
 
     resp = await client.post(
@@ -565,10 +697,10 @@ async def test_resolve_ancestors_returns_ancestor_list(
 
 async def test_resolve_ancestors_empty_request_returns_empty(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row()
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = await client.post(
         f"/datasource/{row.id}/resource-ancestors",
@@ -584,10 +716,10 @@ async def test_resolve_ancestors_empty_request_returns_empty(
 
 async def test_manual_sync_returns_running_log(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row()
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = await client.post(f"/datasource/{row.id}/sync")
 
@@ -599,10 +731,10 @@ async def test_manual_sync_returns_running_log(
 
 async def test_manual_sync_on_unsyncable_source_returns_422(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row(status="deleted")
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = await client.post(f"/datasource/{row.id}/sync")
 
@@ -614,30 +746,30 @@ async def test_manual_sync_on_unsyncable_source_returns_422(
 
 async def test_pause_returns_paused(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row()
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = await client.post(f"/datasource/{row.id}/pause")
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "paused"}
-    assert ds_repo.rows[row.id].status == "paused"
+    assert ds_repo._rows[row.id].status == "paused"  # type: ignore[attr-defined]
 
 
 async def test_resume_returns_active(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row(status="paused")
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = await client.post(f"/datasource/{row.id}/resume")
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "active"}
-    assert ds_repo.rows[row.id].status == "active"
+    assert ds_repo._rows[row.id].status == "active"  # type: ignore[attr-defined]
 
 
 # ── sync logs ────────────────────────────────────────────────────────
@@ -645,12 +777,12 @@ async def test_resume_returns_active(
 
 async def test_list_sync_logs_returns_history(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
 ) -> None:
     row = _row()
-    ds_repo.rows[row.id] = row
-    sync_log_repo.rows["log-1"] = _log()
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
+    sync_log_repo._rows["log-1"] = _log()  # type: ignore[attr-defined]
 
     resp = await client.get(f"/datasource/{row.id}/logs")
 
@@ -660,10 +792,10 @@ async def test_list_sync_logs_returns_history(
 
 async def test_list_sync_logs_rejects_oversized_limit(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row()
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = await client.get(f"/datasource/{row.id}/logs", params={"limit": 5000})
 
@@ -672,12 +804,12 @@ async def test_list_sync_logs_rejects_oversized_limit(
 
 async def test_get_sync_log_returns_entry(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
 ) -> None:
     row = _row()
-    ds_repo.rows[row.id] = row
-    sync_log_repo.rows["log-1"] = _log()
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
+    sync_log_repo._rows["log-1"] = _log()  # type: ignore[attr-defined]
 
     resp = await client.get("/datasource/logs/log-1")
 
@@ -693,11 +825,11 @@ async def test_get_sync_log_missing_returns_404(client: AsyncClient) -> None:
 
 async def test_sync_log_route_is_not_shadowed_by_id_route(
     client: AsyncClient,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     # "logs" must never be captured as a data-source id.
     row = _row(id="logs")
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = await client.get("/datasource/logs/nope")
 
@@ -711,14 +843,13 @@ async def test_sync_log_route_is_not_shadowed_by_id_route(
 async def test_sync_result_tally_visible_through_log_endpoint(
     client: AsyncClient,
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     from src.core.infra.datasources.types import FetchedItem
 
     row = _row()
-    ds_repo.rows[row.id] = row
+    ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
     connector.items = [
         FetchedItem(external_id="a", title="A"),
         FetchedItem(external_id="b", title="B"),

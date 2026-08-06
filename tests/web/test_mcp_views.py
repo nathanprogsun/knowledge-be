@@ -2,8 +2,9 @@
 
 Exercises the 13 endpoints over HTTP via ``httpx.AsyncClient`` with
 ``get_mcp_service`` overridden to a real ``MCPServiceService`` backed
-by the shared in-memory fake repository. The discovery + connectivity
-fakes are also injected so the routes reach a known state.
+by ``AsyncMock(spec=...)`` repositories configured with stateful
+closures. The discovery + connectivity probes are also injected so the
+routes reach a known state.
 
 Uses the shared ``web_app`` fixture (header-based auth) and applies
 the service dep override on it; the real ``require_auth`` dep resolves
@@ -13,11 +14,13 @@ the principal via the ``x-knowledge-*`` header trio.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 
+from src.common.exception import NotFoundError
 from src.core.infra.mcp_services.connectivity import (
     ConnectivityResult,
     StaticConnectivityProbe,
@@ -28,34 +31,132 @@ from src.core.infra.mcp_services.discovery import (
     StaticDiscoveryProvider,
 )
 from src.core.infra.mcp_services.service import MCPServiceService
+from src.db.dao.mcp_service_repository import MCPServiceRepository
+from src.db.dao.mcp_tool_approval_repository import MCPToolApprovalRepository
+from src.db.models.infra.mcp_services import MCPToolApproval
 from src.web.deps.infra_mcp import get_mcp_service
 from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
-from tests.unit.fakes.mcp_services import (
-    FakeMCPServiceRepository,
-    FakeMCPToolApprovalRepository,
-)
 
 
 @pytest.fixture
-def mcp_repo() -> FakeMCPServiceRepository:
-    return FakeMCPServiceRepository()
+def mcp_repo() -> AsyncMock:
+    """``AsyncMock(spec=MCPServiceRepository)`` with stateful closures."""
+    repo = AsyncMock(spec=MCPServiceRepository)
+    rows: dict[str, "MCPServiceStub"] = {}
+
+    async def _find_for_tenant(tenant_id: int, id: str):
+        row = rows.get(id)
+        if row is None or row.tenant_id != tenant_id or row.deleted_at is not None:
+            return None
+        return row
+
+    async def _get_by_id(tenant_id: int, id: str):
+        row = await _find_for_tenant(tenant_id, id)
+        if row is None:
+            raise NotFoundError(
+                code="mcp_service.not_found",
+                message=f"MCP service {id} not found",
+            )
+        return row
+
+    async def _list_for_tenant(tenant_id: int) -> list:
+        out = [
+            r
+            for r in rows.values()
+            if r.tenant_id == tenant_id and not r.is_builtin and r.deleted_at is None
+        ]
+        return sorted(out, key=lambda r: r.created_at, reverse=True)
+
+    async def _find_builtin(id: str):
+        row = rows.get(id)
+        if row is None or not row.is_builtin or row.deleted_at is not None:
+            return None
+        return row
+
+    async def _exists_by_tenant_and_name(tenant_id: int, name: str) -> bool:
+        return any(
+            row.tenant_id == tenant_id and row.name == name and row.deleted_at is None
+            for row in rows.values()
+        )
+
+    async def _insert(row) -> object:  # type: ignore[no-untyped-def]
+        rows[row.id] = row
+        return row
+
+    async def _soft_delete(tenant_id: int, id: str, *, deleted_at: datetime) -> bool:
+        row = await _find_for_tenant(tenant_id, id)
+        if row is None:
+            return False
+        rows[id] = row.model_copy(
+            update={"deleted_at": deleted_at, "updated_at": deleted_at},
+        )
+        return True
+
+    async def _update(tenant_id: int, id: str, *, columns: dict) -> object:
+        row = await _find_for_tenant(tenant_id, id)
+        if row is None:
+            return None
+        updated = row.model_copy(update=columns)
+        rows[id] = updated
+        return updated
+
+    repo.find_for_tenant.side_effect = _find_for_tenant
+    repo.get_by_id.side_effect = _get_by_id
+    repo.list_for_tenant.side_effect = _list_for_tenant
+    repo.find_builtin.side_effect = _find_builtin
+    repo.exists_by_tenant_and_name.side_effect = _exists_by_tenant_and_name
+    repo.insert.side_effect = _insert
+    repo.soft_delete.side_effect = _soft_delete
+    repo.update.side_effect = _update
+    repo._rows = rows  # type: ignore[attr-defined]
+    return repo
 
 
 @pytest.fixture
-def approvals_repo() -> FakeMCPToolApprovalRepository:
-    return FakeMCPToolApprovalRepository()
+def approvals_repo() -> AsyncMock:
+    """``AsyncMock(spec=MCPToolApprovalRepository)`` with stateful upsert."""
+    repo = AsyncMock(spec=MCPToolApprovalRepository)
+    rows: dict[str, MCPToolApproval] = {}
+
+    async def _list_by_service(tenant_id: int, service_id: str) -> list[MCPToolApproval]:
+        live = [
+            r
+            for r in rows.values()
+            if r.tenant_id == tenant_id and r.service_id == service_id
+        ]
+        return sorted(live, key=lambda r: r.tool_name)
+
+    async def _upsert(*, row: MCPToolApproval) -> MCPToolApproval:
+        existing = next(
+            (
+                r
+                for r in rows.values()
+                if (r.tenant_id, r.service_id, r.tool_name)
+                == (row.tenant_id, row.service_id, row.tool_name)
+            ),
+            None,
+        )
+        stored_id = existing.id if existing is not None else row.id
+        merged = row.model_copy(update={"id": stored_id, "updated_at": row.created_at})
+        rows[stored_id] = merged
+        return merged
+
+    repo.list_by_service.side_effect = _list_by_service
+    repo.upsert.side_effect = _upsert
+    repo._rows = rows  # type: ignore[attr-defined]
+    return repo
 
 
 @pytest.fixture(autouse=True)
 def _override_services(
     web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
-    mcp_repo: FakeMCPServiceRepository,
-    approvals_repo: FakeMCPToolApprovalRepository,
+    mcp_repo: AsyncMock,
+    approvals_repo: AsyncMock,
 ) -> FastAPI:
     """Override ``get_mcp_service`` on the shared web app (autouse)."""
     web_app.dependency_overrides[get_mcp_service] = lambda: MCPServiceService(
-        mcp_repo=mcp_repo,  # type: ignore[arg-type]
-        tool_approvals_repo=approvals_repo,  # type: ignore[arg-type]
+        mcp_repo=mcp_repo,
+        tool_approvals_repo=approvals_repo,
         discovery_provider=StaticDiscoveryProvider(
             tools={"seed-alpha": [DiscoveryTool(name="search")]},
             resources={
@@ -76,9 +177,7 @@ def _override_services(
     return web_app
 
 
-async def _seed(mcp_repo: FakeMCPServiceRepository, *, name: str = "alpha") -> str:
-    from datetime import UTC, datetime
-
+async def _seed(mcp_repo: AsyncMock, *, name: str = "alpha") -> str:
     from src.db.models.infra.mcp_services import MCPService
 
     now = datetime.now(UTC)
@@ -93,6 +192,12 @@ async def _seed(mcp_repo: FakeMCPServiceRepository, *, name: str = "alpha") -> s
     )
     await mcp_repo.insert(row)
     return row.id
+
+
+# Sentinel type alias to keep the find_for_tenant type narrow without
+# importing the real model class at module level (the tests use it
+# through the insert call).
+MCPServiceStub = object
 
 
 # ── POST /mcp-services ──────────────────────────────────────────────
@@ -181,7 +286,7 @@ async def test_create_service_never_echoes_secrets(web_authed_client: AsyncClien
 
 
 async def test_list_services_returns_envelope(
-    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: AsyncMock
 ) -> None:
     await _seed(mcp_repo, name="alpha")
     resp = await web_authed_client.get("/mcp-services")
@@ -195,7 +300,7 @@ async def test_list_services_returns_envelope(
 
 
 async def test_get_service_returns_envelope(
-    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: AsyncMock
 ) -> None:
     await _seed(mcp_repo, name="alpha")
     resp = await web_authed_client.get("/mcp-services/seed-alpha")
@@ -213,7 +318,7 @@ async def test_get_service_missing_returns_404(web_authed_client: AsyncClient) -
 
 
 async def test_update_service_patches_columns(
-    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: AsyncMock
 ) -> None:
     await _seed(mcp_repo, name="alpha")
     resp = await web_authed_client.put(
@@ -224,7 +329,7 @@ async def test_update_service_patches_columns(
 
 
 async def test_update_service_preserves_secret_auth(
-    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: AsyncMock
 ) -> None:
     await _seed(mcp_repo, name="alpha")
     resp = await web_authed_client.put(
@@ -248,7 +353,7 @@ async def test_update_service_preserves_secret_auth(
 
 
 async def test_delete_service_returns_ack(
-    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: AsyncMock
 ) -> None:
     await _seed(mcp_repo, name="alpha")
     resp = await web_authed_client.delete("/mcp-services/seed-alpha")
@@ -265,10 +370,8 @@ async def test_delete_missing_service_returns_404(web_authed_client: AsyncClient
 
 
 async def test_delete_rejects_builtin(
-    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: AsyncMock
 ) -> None:
-    from datetime import UTC, datetime
-
     from src.db.models.infra.mcp_services import MCPService
 
     await mcp_repo.insert(
@@ -291,7 +394,7 @@ async def test_delete_rejects_builtin(
 
 
 async def test_test_runs_connectivity_probe(
-    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: AsyncMock
 ) -> None:
     await _seed(mcp_repo, name="alpha")
     resp = await web_authed_client.post("/mcp-services/seed-alpha/test")
@@ -306,7 +409,7 @@ async def test_test_runs_connectivity_probe(
 
 
 async def test_list_tools_returns_baked_results(
-    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: AsyncMock
 ) -> None:
     await _seed(mcp_repo, name="alpha")
     resp = await web_authed_client.get("/mcp-services/seed-alpha/tools")
@@ -320,7 +423,7 @@ async def test_list_tools_returns_baked_results(
 
 
 async def test_list_resources_returns_baked_results(
-    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: AsyncMock
 ) -> None:
     await _seed(mcp_repo, name="alpha")
     resp = await web_authed_client.get("/mcp-services/seed-alpha/resources")
@@ -333,7 +436,7 @@ async def test_list_resources_returns_baked_results(
 
 
 async def test_tool_approval_round_trip(
-    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: AsyncMock
 ) -> None:
     await _seed(mcp_repo, name="alpha")
     put = await web_authed_client.put(
@@ -355,7 +458,7 @@ async def test_tool_approval_round_trip(
 
 
 async def test_oauth_authorize_url(
-    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: AsyncMock
 ) -> None:
     await _seed(mcp_repo, name="alpha")
     resp = await web_authed_client.post(
@@ -371,7 +474,7 @@ async def test_oauth_authorize_url(
 
 
 async def test_oauth_authorize_url_requires_redirect(
-    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: AsyncMock
 ) -> None:
     await _seed(mcp_repo, name="alpha")
     resp = await web_authed_client.post(
@@ -381,7 +484,7 @@ async def test_oauth_authorize_url_requires_redirect(
 
 
 async def test_oauth_status_for_seeded_service(
-    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: AsyncMock
 ) -> None:
     await _seed(mcp_repo, name="alpha")
     resp = await web_authed_client.get("/mcp-services/seed-alpha/oauth/status")
@@ -392,7 +495,7 @@ async def test_oauth_status_for_seeded_service(
 
 
 async def test_oauth_revoke(
-    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: AsyncMock
 ) -> None:
     await _seed(mcp_repo, name="alpha")
     resp = await web_authed_client.delete("/mcp-services/seed-alpha/oauth/token")

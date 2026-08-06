@@ -6,11 +6,12 @@ this file covers the live path - when the lifespan wires the
 /mcp-services/{id}/tools`` endpoint must return the upstream tools
 mocked at the ``httpx`` layer with ``respx``.
 
-The fixture seeds a real ``MCPServiceRepository`` row, attaches the
-live MCP singletons (connection pool + OAuth factory) to the shared
-``web_app`` lifespan service, and overrides ``get_mcp_service`` so
-the per-request handler threads the fake DB session into the live
-discovery + connectivity probes.
+The fixture seeds a fake MCP service row in an
+``AsyncMock(spec=MCPServiceRepository)`` with a stateful closure,
+attaches the live MCP singletons (connection pool + OAuth factory) to
+the shared ``web_app`` lifespan service, and overrides
+``get_mcp_service`` so the per-request handler threads the mock repo
+into the live discovery + connectivity probes.
 
 Uses the shared ``web_app`` fixture (header-based auth) and applies
 the service dep override on it; the real ``require_auth`` dep resolves
@@ -24,6 +25,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 from typing import cast as _cast
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -61,10 +63,6 @@ from src.db.dao.mcp_tool_approval_repository import (
 from src.db.models.infra.mcp_services import MCPService
 from src.web.deps.infra_mcp import get_mcp_service
 from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
-from tests.unit.fakes.mcp_services import (
-    FakeMCPServiceRepository,
-    FakeMCPToolApprovalRepository,
-)
 
 
 def _sse_body(events: list[tuple[str, str]]) -> bytes:
@@ -76,29 +74,85 @@ def _sse_body(events: list[tuple[str, str]]) -> bytes:
 
 
 @pytest.fixture
-def mcp_repo() -> FakeMCPServiceRepository:
-    return FakeMCPServiceRepository()
+def mcp_repo() -> AsyncMock:
+    """``AsyncMock(spec=MCPServiceRepository)`` with stateful insert/lookup."""
+    repo = AsyncMock(spec=_MCPServiceRepository)
+    rows: dict[str, MCPService] = {}
+
+    async def _find_for_tenant(tenant_id: int, id: str) -> MCPService | None:
+        row = rows.get(id)
+        if row is None or row.tenant_id != tenant_id or row.deleted_at is not None:
+            return None
+        return row
+
+    async def _get_by_id(tenant_id: int, id: str) -> MCPService:
+        row = await _find_for_tenant(tenant_id, id)
+        if row is None:
+            from src.common.exception import NotFoundError
+
+            raise NotFoundError(
+                code="mcp_service.not_found",
+                message=f"MCP service {id} not found",
+            )
+        return row
+
+    async def _list_for_tenant(tenant_id: int) -> list[MCPService]:
+        out = [
+            r
+            for r in rows.values()
+            if r.tenant_id == tenant_id and not r.is_builtin and r.deleted_at is None
+        ]
+        return sorted(out, key=lambda r: r.created_at, reverse=True)
+
+    async def _insert(row: MCPService) -> MCPService:
+        rows[row.id] = row
+        return row
+
+    async def _soft_delete(
+        tenant_id: int, id: str, *, deleted_at: datetime
+    ) -> bool:
+        row = await _find_for_tenant(tenant_id, id)
+        if row is None:
+            return False
+        rows[id] = row.model_copy(
+            update={"deleted_at": deleted_at, "updated_at": deleted_at},
+        )
+        return True
+
+    async def _exists_by_tenant_and_name(tenant_id: int, name: str) -> bool:
+        return any(
+            row.tenant_id == tenant_id and row.name == name and row.deleted_at is None
+            for row in rows.values()
+        )
+
+    repo.find_for_tenant.side_effect = _find_for_tenant
+    repo.get_by_id.side_effect = _get_by_id
+    repo.list_for_tenant.side_effect = _list_for_tenant
+    repo.insert.side_effect = _insert
+    repo.soft_delete.side_effect = _soft_delete
+    repo.exists_by_tenant_and_name.side_effect = _exists_by_tenant_and_name
+    repo._rows = rows  # type: ignore[attr-defined]
+    return repo
 
 
 @pytest.fixture
-def approvals_repo() -> FakeMCPToolApprovalRepository:
-    return FakeMCPToolApprovalRepository()
+def approvals_repo() -> AsyncMock:
+    """``AsyncMock(spec=MCPToolApprovalRepository)``."""
+    return AsyncMock(spec=_MCPToolApprovalRepository)
 
 
 @pytest_asyncio.fixture
 async def app(
-    mcp_repo: FakeMCPServiceRepository,
-    approvals_repo: FakeMCPToolApprovalRepository,
+    mcp_repo: AsyncMock,
+    approvals_repo: AsyncMock,
     web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
 ) -> AsyncIterator[FastAPI]:
     """Configure the shared ``web_app`` with live MCP singletons + dep overrides.
 
     Mirrors what ``src.app_context.lifespan`` does in production: the
     per-request ``MCPServiceService`` factory is rebuilt to bridge the
-    fake DB repos with the live connection pool so ``GET
-    /mcp-services/{id}/tools`` reaches the upstream MCP server. The
-    shared ``web_app`` already carries the test ``db_engine`` on its
-    ``LifeSpanService``; we attach the live MCP fields on top of it.
+    mock DB repos with the live connection pool so ``GET
+    /mcp-services/{id}/tools`` reaches the upstream MCP server.
     """
     state_store = OAuthStateStore()
     secret_store = InMemorySecretStore()
@@ -124,11 +178,12 @@ async def app(
         resolved_tenant_id: int,
         service_id: str,
     ) -> MCPServiceInfo | JsonObject:
-        # The fake repo stores rows in-memory; look them up directly
-        # via the public ``rows`` dict to bypass the SQLAlchemy
+        # The mock repo stores rows in-memory; look them up directly
+        # via the public ``rows`` attribute to bypass the SQLAlchemy
         # session the production resolver would use.
         del resolved_tenant_id  # tenant filter is the resolver's responsibility
-        for row in mcp_repo.rows.values():
+        rows = mcp_repo._rows  # type: ignore[attr-defined]
+        for row in rows.values():
             if row.id == service_id and row.deleted_at is None:
                 return MCPServiceInfo.map_from_db(row)
         return _cast(JsonObject, {})
@@ -147,9 +202,8 @@ async def app(
             connection_manager=_cast("_ConnProbeLike", connection_manager),
             resolver=_cast("Any", _resolver),
         )
-        # Build the service directly so the fake DB repos are wired
-        # through without a real SQLAlchemy session: the production
-        # ``build_mcp_service`` constructs fresh DAO repos per request.
+        # Build the service directly so the mock DB repos are wired
+        # through without a real SQLAlchemy session.
         return MCPServiceService(
             mcp_repo=_cast("_MCPServiceRepository", mcp_repo),
             tool_approvals_repo=_cast("_MCPToolApprovalRepository", approvals_repo),
@@ -180,7 +234,7 @@ def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa
 
 
 async def _seed(
-    mcp_repo: FakeMCPServiceRepository,
+    mcp_repo: AsyncMock,
     *,
     service_id: str = "svc-live",
     name: str = "live",
@@ -207,7 +261,7 @@ async def _seed(
 
 async def test_list_tools_returns_upstream_tools_over_http_streamable(
     client: AsyncClient,
-    mcp_repo: FakeMCPServiceRepository,
+    mcp_repo: AsyncMock,
 ) -> None:
     """``GET /tools`` reaches the upstream via the live HTTP-streamable pool."""
     await _seed(mcp_repo)
@@ -242,7 +296,7 @@ async def test_list_tools_returns_upstream_tools_over_http_streamable(
 
 async def test_list_tools_does_not_silently_succeed_when_upstream_fails(
     client: AsyncClient,
-    mcp_repo: FakeMCPServiceRepository,
+    mcp_repo: AsyncMock,
 ) -> None:
     """An upstream failure degrades to an empty list (the contract
     from the original static-fakes path).
@@ -267,7 +321,7 @@ async def test_list_tools_does_not_silently_succeed_when_upstream_fails(
 
 async def test_list_tools_uses_sse_transport_when_configured(
     client: AsyncClient,
-    mcp_repo: FakeMCPServiceRepository,
+    mcp_repo: AsyncMock,
 ) -> None:
     """``transport_type=sse`` routes through the SSE client (not streamable)."""
     await _seed(
@@ -308,7 +362,7 @@ async def test_list_tools_uses_sse_transport_when_configured(
 
 async def test_oauth_authorize_url_still_returns_legacy_shape(
     client: AsyncClient,
-    mcp_repo: FakeMCPServiceRepository,
+    mcp_repo: AsyncMock,
 ) -> None:
     """``POST /oauth/authorize-url`` routes through the lifespan-wired manager."""
     await _seed(

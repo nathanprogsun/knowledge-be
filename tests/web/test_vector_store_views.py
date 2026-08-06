@@ -1,8 +1,9 @@
 """Web-layer tests for the vector-store router (CRUD + types + test).
 
-Per AGENTS.md §9, web routers are tested via ``httpx.AsyncClient``
-against the app. The service dependency is overridden with a
-service-backed fake so the tests exercise the full HTTP path (routing,
+Exercises the router over HTTP via ``httpx.AsyncClient`` against the
+app. The service dependency is overridden with an
+``AsyncMock(spec=VectorStoreService)`` configured with stateful
+closures, so the tests exercise the full HTTP path (routing,
 serialization, exception handling) without touching a real database.
 
 The env-store synthesis lives inside the router; the tests assert
@@ -16,11 +17,13 @@ the principal via the ``x-knowledge-*`` header trio.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
 
+from src.common.exception import ValidationError
 from src.core.contracts.infra import (
     CreateVectorStoreRequest,
     UpdateVectorStoreRequest,
@@ -28,53 +31,41 @@ from src.core.contracts.infra import (
 from src.core.contracts.infra import (
     TestVectorStoreResponse as _TestResponse,
 )
+from src.core.infra.vector_stores.service.vector_store_service import VectorStoreService
 from src.core.infra.vector_stores.types import VectorStoreInfo
 from src.db.models.infra.vector_store import VectorStore
 from src.web.deps.infra_vector_stores import get_vector_store_service
 from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 
-# ── In-memory fake service ──────────────────────────────────────────
 
+@pytest.fixture
+def fake_service() -> AsyncMock:
+    """``AsyncMock(spec=VectorStoreService)`` with stateful closures."""
+    repo = AsyncMock(spec=VectorStoreService)
+    rows: dict[str, VectorStore] = {}
+    counter = [0]
 
-class _FakeService:
-    """In-memory ``VectorStoreService`` replacement.
-
-    Mirrors the service surface used by the router: ``list_stores``,
-    ``get_store``, ``create_store``, ``update_store``, ``delete_store``,
-    ``test_by_id``, ``test_raw``. Soft-delete semantics match the real
-    repository: a deleted row is invisible to reads.
-    """
-
-    def __init__(self) -> None:
-        self.rows: dict[str, VectorStore] = {}
-        self._next_call: int = 0
-
-    async def list_stores(self, tenant_id: int) -> list[VectorStoreInfo]:
-        out = [r for r in self.rows.values() if r.tenant_id == tenant_id and r.deleted_at is None]
+    async def _list_stores(tenant_id: int) -> list[VectorStoreInfo]:
+        out = [r for r in rows.values() if r.tenant_id == tenant_id and r.deleted_at is None]
         out.sort(key=lambda r: r.created_at, reverse=True)
         return [VectorStoreInfo.map_from_db(r) for r in out]
 
-    async def get_store(self, tenant_id: int, store_id: str) -> VectorStoreInfo:
-        for r in self.rows.values():
+    async def _get_store(tenant_id: int, store_id: str) -> VectorStoreInfo:
+        for r in rows.values():
             if r.id == store_id and r.tenant_id == tenant_id and r.deleted_at is None:
                 return VectorStoreInfo.map_from_db(r)
-        from src.common.exception import ValidationError
-
         raise ValidationError(
             code="vector_store.not_found",
             message=f"vector store {store_id} not found",
         )
 
-    async def create_store(
-        self,
-        *,
-        tenant_id: int,
-        body: CreateVectorStoreRequest,
+    async def _create_store(
+        *, tenant_id: int, body: CreateVectorStoreRequest
     ) -> VectorStoreInfo:
         now = datetime.now(UTC)
-        self._next_call += 1
+        counter[0] += 1
         row = VectorStore(
-            id=f"vs-{self._next_call}",
+            id=f"vs-{counter[0]}",
             tenant_id=tenant_id,
             name=body.name,
             engine_type=body.engine_type,
@@ -85,42 +76,34 @@ class _FakeService:
             created_at=now,
             updated_at=now,
         )
-        self.rows[row.id] = row
+        rows[row.id] = row
         return VectorStoreInfo.map_from_db(row)
 
-    async def update_store(
-        self,
-        *,
-        tenant_id: int,
-        store_id: str,
-        body: UpdateVectorStoreRequest,
+    async def _update_store(
+        *, tenant_id: int, store_id: str, body: UpdateVectorStoreRequest
     ) -> VectorStoreInfo:
-        for r in self.rows.values():
+        for r in rows.values():
             if r.id == store_id and r.tenant_id == tenant_id:
-                updated = r.model_copy(update={"name": body.name, "updated_at": datetime.now(UTC)})
-                self.rows[store_id] = updated
+                updated = r.model_copy(
+                    update={"name": body.name, "updated_at": datetime.now(UTC)}
+                )
+                rows[store_id] = updated
                 return VectorStoreInfo.map_from_db(updated)
-        from src.common.exception import ValidationError
-
         raise ValidationError(
             code="vector_store.not_found",
             message=f"vector store {store_id} not found",
         )
 
-    async def delete_store(self, tenant_id: int, store_id: str) -> bool:
-        for r in self.rows.values():
+    async def _delete_store(tenant_id: int, store_id: str) -> bool:
+        for r in rows.values():
             if r.id == store_id and r.tenant_id == tenant_id:
                 updated = r.model_copy(update={"deleted_at": datetime.now(UTC)})
-                self.rows[store_id] = updated
+                rows[store_id] = updated
                 return True
         return False
 
-    async def test_by_id(
-        self,
-        tenant_id: int,
-        store_id: str,
-    ) -> _TestResponse:
-        for r in self.rows.values():
+    async def _test_by_id(tenant_id: int, store_id: str) -> _TestResponse:
+        for r in rows.values():
             if r.id == store_id and r.tenant_id == tenant_id:
                 return _TestResponse(success=True, version="", error=None)
         return _TestResponse(
@@ -129,27 +112,27 @@ class _FakeService:
             error="not found",
         )
 
-    async def test_raw(
-        self,
-        engine_type: str,
-        connection_config: dict[str, object],
+    async def _test_raw(
+        engine_type: str, connection_config: dict[str, object]
     ) -> _TestResponse:
         return _TestResponse(success=True, version="", error=None)
 
-
-# ── Fixtures ─────────────────────────────────────────────────────────
-
-
-@pytest.fixture
-def fake_service() -> _FakeService:
-    return _FakeService()
+    repo.list_stores.side_effect = _list_stores
+    repo.get_store.side_effect = _get_store
+    repo.create_store.side_effect = _create_store
+    repo.update_store.side_effect = _update_store
+    repo.delete_store.side_effect = _delete_store
+    repo.test_by_id.side_effect = _test_by_id
+    repo.test_raw.side_effect = _test_raw
+    repo._rows = rows  # type: ignore[attr-defined]
+    return repo
 
 
 @pytest.fixture
 def app(
     request: pytest.FixtureRequest,  # noqa: ARG001 - explicit fixture-param
     web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
-    fake_service: _FakeService,
+    fake_service: AsyncMock,
 ) -> FastAPI:
     """Override ``get_vector_store_service`` on the shared web app."""
     web_app.dependency_overrides[get_vector_store_service] = lambda: fake_service
@@ -204,7 +187,7 @@ async def test_test_raw_returns_success(client: AsyncClient) -> None:
 
 async def test_create_vector_store_returns_envelope(
     client: AsyncClient,
-    fake_service: _FakeService,
+    fake_service: AsyncMock,
 ) -> None:
     """A create call returns the wrapped envelope with masked credentials."""
     resp = await client.post(
@@ -223,7 +206,8 @@ async def test_create_vector_store_returns_envelope(
     assert body["data"]["readonly"] is False
     # Sensitive fields are masked.
     assert body["data"]["connection_config"]["password"] == "***"
-    assert len(fake_service.rows) == 1
+    rows = fake_service._rows  # type: ignore[attr-defined]
+    assert len(rows) == 1
 
 
 # ── GET /vector-stores ──────────────────────────────────────────────
@@ -231,7 +215,7 @@ async def test_create_vector_store_returns_envelope(
 
 async def test_list_stores_returns_db_rows(
     client: AsyncClient,
-    fake_service: _FakeService,
+    fake_service: AsyncMock,
 ) -> None:
     """The list endpoint returns the DB-managed rows."""
     await client.post(

@@ -1,12 +1,14 @@
 """Web-layer tests for the added tenant endpoints (api-keys, KV, principal).
 
-Uses in-memory fakes for the api-key repository; KV and principal-config
-endpoints are exercised against fakes of the underlying tenant repos.
+Uses ``AsyncMock(spec=...)`` repositories configured with stateful
+closures for the api-key and KV repos. Principal-config endpoints are
+exercised against the same tenant mocks.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
@@ -14,30 +16,68 @@ from httpx import AsyncClient
 
 from src.core.tenants.api_key_service import TenantAPIKeyService
 from src.core.tenants.kv_service import TenantKVService
+from src.db.dao.tenant_api_keys_repository import TenantAPIKeyRepository
+from src.db.dao.tenant_kv_repository import TenantKVRepository
 from src.db.models.tenants.tenant_api_keys import TenantAPIKey
 from src.db.models.tenants.tenant_kv import TenantKV
 from src.web.deps import (
     get_tenant_api_key_service,
     get_tenant_kv_service,
 )
-from tests.unit.fakes.tenant_api_keys import FakeTenantAPIKeyRepository
+from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
 
-class _FakeKVRepo:
-    """Minimal in-memory tenant_kv repository (upsert + find + delete)."""
+@pytest.fixture
+def api_key_repo() -> AsyncMock:
+    repo = AsyncMock(spec=TenantAPIKeyRepository)
+    rows: dict[int, TenantAPIKey] = {}
+    counter = [0]
 
-    def __init__(self) -> None:
-        self._store: dict[tuple[int, str], TenantKV] = {}
-        self._next_id = 1
+    def _live() -> dict[int, TenantAPIKey]:
+        return {kid: r for kid, r in rows.items() if r.revoked_at is None}
 
-    async def find_value(self, *, tenant_id: int, key: str) -> TenantKV | None:
-        return self._store.get((tenant_id, key))
+    async def _insert(row: TenantAPIKey) -> TenantAPIKey:
+        counter[0] += 1
+        stored = row.model_copy(update={"id": counter[0]})
+        rows[stored.id] = stored
+        return stored
 
-    async def upsert(self, *, tenant_id: int, key: str, value: object) -> TenantKV:
+    async def _list_for_tenant(tenant_id: int) -> list[TenantAPIKey]:
+        live = [r for r in _live().values() if r.tenant_id == tenant_id]
+        return sorted(live, key=lambda r: r.created_at, reverse=True)
+
+    async def _revoke(key_id: int, *, tenant_id: int, revoked_at: datetime) -> None:
+        row = _live().get(key_id)
+        if row is None or row.tenant_id != tenant_id:
+            from src.common.exception import NotFoundError
+
+            raise NotFoundError(
+                code="tenant_api_key.not_found", message="Tenant API key not found"
+            )
+        rows[key_id] = row.model_copy(update={"revoked_at": revoked_at})
+
+    repo.insert.side_effect = _insert
+    repo.list_for_tenant.side_effect = _list_for_tenant
+    repo.revoke.side_effect = _revoke
+    repo._rows = rows  # type: ignore[attr-defined]
+    return repo
+
+
+@pytest.fixture
+def kv_repo() -> AsyncMock:
+    repo = AsyncMock(spec=TenantKVRepository)
+    store: dict[tuple[int, str], TenantKV] = {}
+    counter = [0]
+
+    async def _find_value(*, tenant_id: int, key: str) -> TenantKV | None:
+        return store.get((tenant_id, key))
+
+    async def _upsert(*, tenant_id: int, key: str, value: object) -> TenantKV:
+        counter[0] += 1
         row = TenantKV(
-            id=self._next_id,
+            id=counter[0],
             tenant_id=tenant_id,
             key=key,
             value=value,  # type: ignore[arg-type]
@@ -45,51 +85,45 @@ class _FakeKVRepo:
             updated_at=_NOW,
             deleted_at=None,
         )
-        self._next_id += 1
-        self._store[(tenant_id, key)] = row
+        store[(tenant_id, key)] = row
         return row
 
-    async def delete(self, *, tenant_id: int, key: str) -> bool:
-        return self._store.pop((tenant_id, key), None) is not None
+    async def _delete(*, tenant_id: int, key: str) -> bool:
+        return store.pop((tenant_id, key), None) is not None
 
-
-@pytest.fixture
-def api_key_repo() -> FakeTenantAPIKeyRepository:
-    return FakeTenantAPIKeyRepository()
-
-
-@pytest.fixture
-def kv_repo() -> _FakeKVRepo:
-    return _FakeKVRepo()
+    repo.find_value.side_effect = _find_value
+    repo.upsert.side_effect = _upsert
+    repo.delete.side_effect = _delete
+    return repo
 
 
 @pytest.fixture(autouse=True)
 def _override_services(
     web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
-    api_key_repo: FakeTenantAPIKeyRepository,
-    kv_repo: _FakeKVRepo,
+    api_key_repo: AsyncMock,
+    kv_repo: AsyncMock,
 ) -> FastAPI:
     """Override tenant service deps on the shared web app (autouse)."""
     web_app.dependency_overrides[get_tenant_api_key_service] = (
         lambda: TenantAPIKeyService(
-            api_keys_repo=api_key_repo,  # type: ignore[arg-type]
+            api_keys_repo=api_key_repo,
         )
     )
     web_app.dependency_overrides[get_tenant_kv_service] = (
         lambda: TenantKVService(
-            kv_repo=kv_repo,  # type: ignore[arg-type]
+            kv_repo=kv_repo,
         )
     )
     return web_app
 
 
 async def _seed_key(
-    repo: FakeTenantAPIKeyRepository,
+    api_key_repo: AsyncMock,
     *,
     tenant_id: int = 7,
     name: str = "deploy",
 ) -> TenantAPIKey:
-    return await repo.insert(
+    return await api_key_repo.insert(
         TenantAPIKey(
             id=0,
             tenant_id=tenant_id,
@@ -108,7 +142,7 @@ async def _seed_key(
 
 async def test_list_api_keys(
     web_authed_client: AsyncClient,
-    api_key_repo: FakeTenantAPIKeyRepository,
+    api_key_repo: AsyncMock,
 ) -> None:
     await _seed_key(api_key_repo)
     resp = await web_authed_client.get("/tenants/7/api-keys")
@@ -143,7 +177,7 @@ async def test_create_api_key(web_authed_client: AsyncClient) -> None:
 
 async def test_revoke_api_key(
     web_authed_client: AsyncClient,
-    api_key_repo: FakeTenantAPIKeyRepository,
+    api_key_repo: AsyncMock,
 ) -> None:
     key = await _seed_key(api_key_repo)
     resp = await web_authed_client.delete(f"/tenants/7/api-keys/{key.id}")
@@ -157,7 +191,7 @@ async def test_revoke_api_key(
 
 async def test_put_and_get_kv(
     web_authed_client: AsyncClient,
-    kv_repo: _FakeKVRepo,
+    kv_repo: AsyncMock,
 ) -> None:
     put = await web_authed_client.put(
         "/tenants/kv/web-search-config", json={"max_results": 20}
