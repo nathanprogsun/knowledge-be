@@ -17,6 +17,7 @@ Three surfaces live here:
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Self, cast
 
@@ -42,8 +43,8 @@ def _scalar(value: str | int | bool) -> JsonValue:
 
 # ── Vector-store type metadata (registry) ────────────────────────────
 #
-# Mirrors ``internal/types/vectorstore.go::GetVectorStoreTypes`` with the
-# same seven engine types (Postgres and SQLite are excluded because they
+# The engine-type registry declares the same seven engine types
+# (Postgres and SQLite are excluded because they
 # only support the app's default DB connection). Each block declares the
 # connection fields + optional index fields exposed to the UI; the wire
 # contract is the frozen ``VectorStoreTypeInfo`` in
@@ -474,8 +475,8 @@ REDACTED_SECRET_PLACEHOLDER: str = "***"
 # placeholder above before the service layer projects the row.
 _SENSITIVE_KEYS: frozenset[str] = frozenset({"password", "api_key"})
 
-# PR-30.6c H2: storage columns that must not cross into the
-# service-output projection per AGENTS.md §9. ``deleted_at`` is the
+# Storage columns that must not cross into the
+# service-output projection per §9. ``deleted_at`` is the
 # soft-delete tombstone; the service layer treats a missing row as the
 # only delete signal.
 VECTOR_STORE_EXCLUDE_COLUMNS: frozenset[str] = frozenset({"deleted_at"})
@@ -484,8 +485,7 @@ VECTOR_STORE_EXCLUDE_COLUMNS: frozenset[str] = frozenset({"deleted_at"})
 class VectorStoreInfo(BaseModel):
     """Service-side projection of a `vector_stores` row.
 
-    Mirrors ``internal/types/vectorstore.go::VectorStore``. The wire
-    contract (``VectorStore``) is identical at the field level; the
+    The wire contract (``VectorStore``) is identical at the field level; the
     service layer masks sensitive fields so the wire never sees
     plaintext credentials on the list response. The ``source`` and
     ``readonly`` columns are persisted on the row but mirrored from the
@@ -507,16 +507,36 @@ class VectorStoreInfo(BaseModel):
     deleted_at: datetime | None = None
 
     @classmethod
+    def from_json(cls, raw: JsonObject | str | None) -> JsonObject | None:
+        """Decode a JSON-backed column (``connection_config``/``index_config``).
+
+        Accepts both a parsed ``dict`` and a raw JSON string (SQLite
+        persists some JSON columns as text). ``None`` / empty /
+        unparseable input yields ``None``.
+        """
+        if raw is None or raw == "":
+            return None
+        if isinstance(raw, str):
+            try:
+                decoded = json.loads(raw)
+            except json.JSONDecodeError:
+                return None
+            return decoded if isinstance(decoded, dict) else None
+        return raw
+
+    @classmethod
     def map_from_db(cls, db: VectorStore) -> Self:
         """Build a projection from the raw storage row.
 
-        PR-30.6c H2: ``VECTOR_STORE_EXCLUDE_COLUMNS`` (frozen per §9)
+        ``VECTOR_STORE_EXCLUDE_COLUMNS`` (frozen per §9)
         declares the storage-only columns that must not cross into the
         service boundary. ``deleted_at`` is the soft-delete tombstone;
         the service layer treats a missing row as the only delete
         signal so the DTO deliberately drops it.
         """
         record = db.model_dump(exclude=set(VECTOR_STORE_EXCLUDE_COLUMNS))
+        record["connection_config"] = VectorStoreInfo.from_json(record.get("connection_config"))
+        record["index_config"] = VectorStoreInfo.from_json(record.get("index_config"))
         return cls.model_validate(record)
 
 

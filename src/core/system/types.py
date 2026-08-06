@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import Self
+from typing import Self, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -50,14 +50,27 @@ class AuditLogInfo(BaseModel):
     created_at: datetime
 
     @classmethod
+    def from_json(cls, raw: JsonObject | str | None) -> JsonObject:
+        """Decode the ``details`` JSON column.
+
+        Accepts both a parsed ``dict`` and a raw JSON string (SQLite
+        persists some JSON columns as text). ``None`` / empty /
+        unparseable input yields an empty object.
+        """
+        if raw is None or raw == "":
+            return {}
+        if isinstance(raw, str):
+            try:
+                decoded = json.loads(raw)
+            except json.JSONDecodeError:
+                return {}
+            return decoded if isinstance(decoded, dict) else {}
+        return raw
+
+    @classmethod
     def map_from_db(cls, db: AuditLog) -> Self:
         record = db.model_dump()
-        details = record.get("details")
-        if isinstance(details, str):
-            details = json.loads(details)
-        if details is None:
-            details = {}
-        record["details"] = details
+        record["details"] = AuditLogInfo.from_json(record.get("details"))
         return cls.model_validate(record)
 
 
@@ -85,6 +98,33 @@ class SystemSettingInfo(BaseModel):
     last_modified_by_name: str = ""
 
     @classmethod
+    def from_json(
+        cls,
+        raw: JsonObject | list[str] | list[JsonValue] | str | int | bool | None,
+    ) -> JsonObject | list[str] | list[JsonValue] | str | int | bool:
+        """Decode the ``value`` column, mirroring the SQLite round-trip.
+
+        Persisted scalars (int / bool / string) round-trip as strings
+        when the ``value_type`` is non-JSON; only strings that look like
+        a JSON document (``{`` / ``[``) are parsed. ``None`` yields an
+        empty object.
+        """
+        if raw is None:
+            return {}
+        if isinstance(raw, str):
+            stripped = raw.strip()
+            if stripped.startswith(("{", "[")):
+                try:
+                    return cast(
+                        "JsonObject | list[str] | list[JsonValue] | str | int | bool",
+                        json.loads(stripped),
+                    )
+                except json.JSONDecodeError:
+                    return raw
+            return raw
+        return raw
+
+    @classmethod
     def map_from_db(
         cls,
         db: SystemSetting,
@@ -93,17 +133,7 @@ class SystemSettingInfo(BaseModel):
         last_modified_by_name: str = "",
     ) -> Self:
         record = db.model_dump()
-        value = record.get("value")
-        if isinstance(value, str):
-            # Persisted scalars (int / bool / string) round-trip as
-            # strings when the value_type is non-JSON; only try to
-            # parse when the string looks like a JSON document.
-            stripped = value.strip()
-            if stripped.startswith(("{", "[")):
-                value = json.loads(stripped)
-        if value is None:
-            value = {}
-        record["value"] = value
+        record["value"] = SystemSettingInfo.from_json(record.get("value"))
         record["enum"] = enum or []
         record["last_modified_by_name"] = last_modified_by_name
         return cls.model_validate(record)

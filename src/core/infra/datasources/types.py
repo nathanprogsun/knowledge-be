@@ -124,9 +124,29 @@ class SyncLogInfo(BaseModel):
     updated_at: datetime
 
     @classmethod
+    def from_json(cls, raw: JsonObject | str | None) -> JsonObject | None:
+        """Decode the ``result`` JSON column.
+
+        Accepts both a parsed ``dict`` and a raw JSON string (SQLite
+        persists some JSON columns as text). ``None`` / empty /
+        unparseable input yields ``None``.
+        """
+        if raw is None or raw == "":
+            return None
+        if isinstance(raw, str):
+            try:
+                decoded = json.loads(raw)
+            except json.JSONDecodeError:
+                return None
+            return decoded if isinstance(decoded, dict) else None
+        return raw
+
+    @classmethod
     def map_from_db(cls, db: SyncLog) -> Self:
         """Project a storage row onto the wire shape."""
-        return cls.model_validate(db.model_dump())
+        record = db.model_dump()
+        record["result"] = SyncLogInfo.from_json(record.get("result"))
+        return cls.model_validate(record)
 
 
 class DataSourceInfo(BaseModel):
@@ -167,6 +187,23 @@ class DataSourceInfo(BaseModel):
     credentials_configured: bool = False
 
     @classmethod
+    def from_json(cls, raw: JsonObject | str | None) -> JsonObject | None:
+        """Decode a JSON-backed column (``last_sync_cursor``/``last_sync_result``).
+
+        Accepts both a parsed ``dict`` and a raw JSON string. ``None`` /
+        empty / unparseable input yields ``None``.
+        """
+        if raw is None or raw == "":
+            return None
+        if isinstance(raw, str):
+            try:
+                decoded = json.loads(raw)
+            except json.JSONDecodeError:
+                return None
+            return decoded if isinstance(decoded, dict) else None
+        return raw
+
+    @classmethod
     def map_from_db(
         cls,
         db: DataSource,
@@ -194,6 +231,8 @@ class DataSourceInfo(BaseModel):
             else None
         )
         record["credentials_configured"] = configured
+        record["last_sync_cursor"] = DataSourceInfo.from_json(record.get("last_sync_cursor"))
+        record["last_sync_result"] = DataSourceInfo.from_json(record.get("last_sync_result"))
         return cls.model_validate(record)
 
 

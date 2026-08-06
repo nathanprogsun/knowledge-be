@@ -109,10 +109,29 @@ class TenantInfo(BaseModel):
     deleted_at: datetime | None = Field(default=None)
 
     @classmethod
+    def from_json(cls, raw: JsonObject | str | None) -> JsonObject | None:
+        """Decode a JSON-backed column (``context_config``/``web_search_config``/...).
+
+        Accepts both a parsed ``dict`` and a raw JSON string (SQLite
+        persists some JSON columns as text). ``None`` / empty /
+        unparseable input yields ``None``.
+        """
+        if raw is None or raw == "":
+            return None
+        if isinstance(raw, str):
+            try:
+                decoded = json.loads(raw)
+            except json.JSONDecodeError:
+                return None
+            return decoded if isinstance(decoded, dict) else None
+        return raw
+
+    @classmethod
     def map_from_db(cls, db: Tenant) -> Self:
         """Project a storage ``Tenant`` row to the service-side DTO."""
         record = db.model_dump(exclude=set(_TENANT_EXCLUDE_COLUMNS))
         record["retriever_engines"] = RetrieverEngines.from_json(record.get("retriever_engines"))
+        record["context_config"] = TenantInfo.from_json(record.get("context_config"))
         return cls.model_validate(record)
 
 

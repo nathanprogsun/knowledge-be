@@ -14,7 +14,6 @@ from typing import Self, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.common.exception import ValidationError
 from src.common.json import JsonObject, JsonValue
 from src.db.models.infra.mcp_services import MCPService, MCPToolApproval
 
@@ -25,7 +24,7 @@ from src.db.models.infra.mcp_services import MCPService, MCPToolApproval
 # the API, so credential stripping is intentionally not done at this
 # layer.
 
-# PR-30.6c H2 / H4: storage columns that must not cross into the
+# Storage columns that must not cross into the
 # service-output projection. ``deleted_at`` is a soft-delete tombstone;
 # the service layer treats a missing row as the only delete signal.
 # ``_MCP_SERVICE_EXCLUDE_COLUMNS`` is a frozenset (per AGENTS.md §9)
@@ -65,18 +64,35 @@ class MCPServiceInfo(BaseModel):
     updated_at: datetime
 
     @classmethod
+    def from_json(cls, raw: JsonValue | str | None) -> JsonValue | None:
+        """Decode a JSON-backed column (``headers``/``auth_config``/...).
+
+        Accepts both a parsed ``dict``/``list`` and a raw JSON string
+        (SQLite persists some JSON columns as text). ``None`` / empty /
+        unparseable input yields ``None``.
+        """
+        if raw is None or raw == "":
+            return None
+        if isinstance(raw, (dict, list)):
+            return cast("JsonValue", raw)
+        if isinstance(raw, str):
+            try:
+                return cast("JsonValue", json.loads(raw))
+            except json.JSONDecodeError:
+                return None
+        return None
+
+    @classmethod
     def map_from_db(cls, db: MCPService) -> Self:
         """Project the storage row, parsing JSON columns; redact secrets.
 
-        PR-30.6c H2 / H4:
-
-        - ``_MCP_SERVICE_EXCLUDE_COLUMNS`` (frozen per AGENTS.md §9)
+        - ``_MCP_SERVICE_EXCLUDE_COLUMNS`` (frozen per §9)
           drops the soft-delete tombstone (``deleted_at``) before the
           Pydantic model is built.
         - ``headers`` keys carrying a credential (``Authorization`` /
           ``Cookie`` / ``Proxy-Authorization``) are replaced with
           ``"***"`` so the wire contract never sees a plaintext bearer
-          token, mirroring Go's ``redactAuthHeader`` behaviour.
+          token, mirroring the ``redactAuthHeader`` behaviour.
         - ``env_vars`` are replaced with a presence map
           (``{name: "***"}``) — only the keys survive, values are
           stripped, so the UI can show "var set" without leaking the
@@ -87,7 +103,7 @@ class MCPServiceInfo(BaseModel):
         """
         record = db.model_dump(exclude=set(_MCP_SERVICE_EXCLUDE_COLUMNS))
         for column in ("headers", "auth_config", "advanced_config", "stdio_config", "env_vars"):
-            record[column] = _parse_json_blob(record.get(column), column)
+            record[column] = MCPServiceInfo.from_json(record.get(column))
         record = _redact_mcp_secrets(record)
         return cls.model_validate(record)
 
@@ -110,35 +126,12 @@ class MCPToolApprovalInfo(BaseModel):
         return cls.model_validate(db.model_dump())
 
 
-def _parse_json_blob(raw: JsonValue, column: str) -> JsonValue:
-    """Decode a JSON-backed column, accepting the persisted raw shape.
-
-    SQLite stores JSON columns as text on some paths; Pydantic may
-    receive a dict directly. Normalise both to a JSON object (or pass
-    through ``None``).
-    """
-    if raw is None:
-        return None
-    if isinstance(raw, (dict, list)):
-        return cast("JsonValue", raw)
-    if isinstance(raw, str):
-        try:
-            decoded = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise ValidationError(
-                code="mcp_service.json_column_invalid",
-                message=f"mcp_services.{column} is not valid JSON: {exc}",
-            ) from exc
-        return cast("JsonValue", decoded)
-    return None
-
-
 def _redact_mcp_secrets(record: JsonObject) -> JsonObject:
     """Apply the §9 projection: redact credential columns.
 
-    PR-30.6c H4: redact known auth headers (``Authorization`` /
-    ``Cookie`` / ``Proxy-Authorization``) to ``"***"`` and reduce
-    ``env_vars`` to a presence map (``{name: "***"}``).
+    Redacts known auth headers (``Authorization`` / ``Cookie`` /
+    ``Proxy-Authorization``) to ``"***"`` and reduces ``env_vars`` to a
+    presence map (``{name: "***"}``).
 
     Note: storage-only columns (``deleted_at``) are already dropped
     by the caller's ``model_dump(exclude=...)``; this helper only
@@ -171,7 +164,7 @@ def _redact_mcp_secrets(record: JsonObject) -> JsonObject:
     return out
 
 
-# PR-30.6c H2: §9 public name — consumers reference this frozenset by
+# §9 public name — consumers reference this frozenset by
 # its module-level public name (per spec: ``_<NAME>_EXCLUDE_COLUMNS``
 # becomes ``<NAME>_EXCLUDE_COLUMNS``).
 MCP_SERVICE_EXCLUDE_COLUMNS: frozenset[str] = _MCP_SERVICE_EXCLUDE_COLUMNS
