@@ -300,6 +300,57 @@ class LayerVisitor(ast.NodeVisitor):
         self._check_annotation(node.annotation, node.lineno, "variable annotation")
         self.generic_visit(node)
 
+    def visit_Call(self, node: ast.Call) -> None:
+        """Flag ``cast(Any/object, ...)`` and ``cast("...Any/object...", ...)``.
+
+        Type-cast arguments commonly hide bare ``Any`` / ``object`` in
+        type parameters (``cast(CursorResult[object], result)``). They
+        are easy to miss on AnnAssign because the cast type lives in a
+        call expression rather than an annotation.
+        """
+        func = node.func
+        is_cast = (isinstance(func, ast.Name) and func.id == "cast") or (
+            isinstance(func, ast.Attribute) and func.attr == "cast"
+        )
+        if is_cast and node.args:
+            type_arg = node.args[0]
+            if _expr_uses_any_or_object(type_arg):
+                self.errors.append(
+                    f"{self.path}:{type_arg.lineno}: cast() type argument "
+                    f"uses forbidden Any/object — substitute a concrete "
+                    f"generic like SqlValue, JsonValue, or a typed Protocol"
+                )
+        self.generic_visit(node)
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        """Flag module-level aliases that hide ``Any`` / ``object`` sentinels.
+
+        A bare ``_STREAM_CLOSED: object = object()`` is technically
+        annotated, but the same shape can also appear as a plain
+        ``_STREAM_CLOSED = object()`` once the file is refactored. Treat
+        plain ``Assign`` nodes that target the bare names ``Any`` /
+        ``object`` as the same anti-pattern as ``AnnAssign`` so the
+        lint cannot be defeated by dropping the annotation.
+        """
+        value = node.value
+        if (
+            isinstance(value, ast.Call)
+            and isinstance(value.func, ast.Name)
+            and value.func.id in {"Any", "object"}
+        ):
+            self.errors.append(
+                f"{self.path}:{node.lineno}: module-level assignment uses "
+                f"forbidden Any/object — declare a typed sentinel class "
+                f"or use a concrete value (UUID, Enum, dataclass) instead"
+            )
+        elif isinstance(value, ast.Name) and value.id in {"Any", "object"}:
+            self.errors.append(
+                f"{self.path}:{node.lineno}: module-level assignment uses "
+                f"forbidden Any/object — declare a typed sentinel class "
+                f"or use a concrete value (UUID, Enum, dataclass) instead"
+            )
+        self.generic_visit(node)
+
     # ── db/models class-body policy ─────────────────────────────────
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         if self.layer == "db_models":

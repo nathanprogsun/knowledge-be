@@ -30,6 +30,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.ai.mcp_transport.connection_manager import MCPSession
 from src.ai.mcp_transport.errors import MCPError, MCPTransportError
 from src.ai.mcp_transport.jsonrpc import JSONRPCResponse
+from src.common.exception import ValidationError
 from src.common.json import JsonObject, JsonValue
 from src.core.infra.mcp_services.types import MCPServiceInfo
 
@@ -235,8 +236,9 @@ class HTTPMCPDiscoveryProvider:
             payload.setdefault("advanced_timeout_seconds", None)
             payload.setdefault("name", service_id)
             return payload
-        raise TypeError(
-            "service_resolver must return an MCPServiceInfo or a resolver dict",
+        raise ValidationError(
+            code="mcp_service.resolver_payload_invalid",
+            message="service_resolver must return an MCPServiceInfo or a resolver dict",
         )
 
 

@@ -18,7 +18,7 @@ from sqlalchemy import JSON, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import CursorResult, RowMapping
 
-from src.common.exception import NotFoundError
+from src.common.exception import NotFoundError, ValidationError
 from src.common.json import BindParams
 from src.db.dao.generic_repository import GenericRepository
 from src.db.models.infra.model import Model
@@ -130,7 +130,10 @@ class ModelRepository(GenericRepository[Model]):
         persisted state.
         """
         if row.tenant_id == 0:
-            raise ValueError("Model.tenant_id must be set for update")
+            raise ValidationError(
+                code="model.tenant_id_required",
+                message="Model.tenant_id must be set for update",
+            )
         columns = self.model_class.insert_sql_column_list()
         update_cols = tuple(c for c in columns if c not in self._pk_columns)
         set_clause = ", ".join(f'"{c}" = :u_{c}' for c in update_cols)

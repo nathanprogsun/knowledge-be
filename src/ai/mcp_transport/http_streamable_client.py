@@ -26,7 +26,6 @@ errors. Those concerns live in
 from __future__ import annotations
 
 import json
-from typing import Any
 
 import httpx
 
@@ -36,6 +35,7 @@ from src.ai.mcp_transport.sse_client import (
     _raise_oauth_required_if_advertised,
     _resolve_post_url,
 )
+from src.common.json import JsonValue
 
 # The MCP HTTP-streamable transport lets the server choose between a JSON
 # response and an SSE response by inspecting the request ``Accept``
@@ -109,7 +109,7 @@ class HTTPStreamableClient:
         self,
         *,
         method: str,
-        params: dict[str, Any] | None = None,
+        params: dict[str, JsonValue] | None = None,
         request_id: str | None = None,
         timeout_seconds: float | None = None,
     ) -> JSONRPCResponse:

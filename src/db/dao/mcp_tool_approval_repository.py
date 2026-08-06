@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy import text
 
+from src.common.exception import DataError
 from src.db.dao.generic_repository import GenericRepository
 from src.db.models.infra.mcp_services import MCPToolApproval
 
@@ -69,7 +70,10 @@ class MCPToolApprovalRepository(GenericRepository[MCPToolApproval]):
         mapping = result.mappings().first()
         # Upsert returning * yields exactly one row.
         if mapping is None:  # pragma: no cover — defensive
-            raise RuntimeError("mcp_tool_approvals upsert returned no row")
+            raise DataError(
+                code="db.upsert_no_row",
+                message="mcp_tool_approvals upsert returned no row",
+            )
         return self._hydrate(mapping)
 
 
