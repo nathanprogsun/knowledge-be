@@ -69,7 +69,7 @@ def resolve_src_root(explicit: str | None) -> Path | None:
 
 
 DEFAULT_BASELINE = (
-    Path(__file__).resolve().parents[3] / "docs/migration/baselines/contracts_pr1.json"
+    Path(__file__).resolve().parents[1] / "docs/migration/baselines/contracts_pr1.json"
 )
 
 
@@ -285,9 +285,10 @@ def main() -> int:
 
     if not baseline and classes and not baseline_loaded:
         print(
-            f"[WARN] No baseline at {baseline_path} — skipping field-drift "
-            f"check (frozen + no-logic rules still enforced)"
+            f"[FAIL] No baseline at {baseline_path} — field-drift check "
+            f"required; refusing to skip (exit 1)."
         )
+        sys.exit(1)
 
     errors: list[str] = []
 

@@ -57,7 +57,7 @@ check-layer:
 	python scripts/check_layer_violation.py --src-root src/ --domains $(STAGE1_DOMAINS),$(STAGE2_INFRA_DOMAINS)
 
 check-singleton:
-	python scripts/check_service_singleton.py --src-root src/
+	bash scripts/run_check_service_singleton.sh --src-root src/
 
 check-endpoint:
 	python scripts/check_endpoint_coverage.py --src-root src/ --domains auth,tenants,vector_stores,storage_backends,web_search
