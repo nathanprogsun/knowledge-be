@@ -42,7 +42,7 @@ from src.db.dao.audit_log_repository import AuditLogRepository
 from src.db.dao.datasource_repository import DataSourceRepository, SyncLogRepository
 from src.db.models.datasource import DataSource, SyncLog
 from src.db.models.system.audit_log import AuditLog
-from tests.unit.fakes.datasources import (
+from tests.util.datasource_doubles import (
     RecordingIngestor,
     StubConnector,
     unreachable_error,

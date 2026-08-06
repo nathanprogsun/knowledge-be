@@ -42,7 +42,7 @@ from src.web.deps.infra_datasources import get_datasource_service
 from src.web.deps.rbac import make_role_dep, require_role_dep
 from src.web.middleware.auth import require_auth
 from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
-from tests.unit.fakes.datasources import (  # type: ignore[attr-defined]
+from tests.util.datasource_doubles import (  # type: ignore[attr-defined]
     RecordingIngestor,
     StubConnector,
     unreachable_error,
