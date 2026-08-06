@@ -152,7 +152,11 @@ class StorageBackendService:
             created_at=now,
             updated_at=now,
         )
-        return StorageBackendInfo.map_from_db(await self._repo.create(row))
+        # Mask before returning so POST responses never carry plaintext
+        # credentials. Mirrors ``NewStorageBackendResponse`` in Go, which
+        # always routes through ``MaskSensitiveFields`` — the same
+        # invariant ``list_backends`` / ``get_backend`` already enforce.
+        return StorageBackendInfo.map_from_db(await self._repo.create(row)).masked()
 
     # ── Update ──────────────────────────────────────────────────────
 
@@ -222,7 +226,11 @@ class StorageBackendService:
                 code="storage_backend.not_found",
                 message="storage backend not found",
             )
-        return StorageBackendInfo.map_from_db(updated)
+        # Mask before returning so PUT responses never carry plaintext
+        # credentials. Mirrors ``NewStorageBackendResponse`` in Go, which
+        # always routes through ``MaskSensitiveFields`` — the same
+        # invariant ``list_backends`` / ``get_backend`` already enforce.
+        return StorageBackendInfo.map_from_db(updated).masked()
 
     # ── Delete / default ────────────────────────────────────────────
 

@@ -457,9 +457,16 @@ async def test_update_renames_and_keeps_stored_secrets(
         tenant_id=_TENANT_ID, id="backend-1", name="Renamed", config=redacted
     )
 
+    # The service-level DTO is masked on return (POST/PUT responses
+    # must never carry plaintext credentials), but the underlying
+    # storage still preserves the original value because the
+    # redacted-placeholder round-trip resolves to "preserve".
     assert info.name == "Renamed"
-    assert info.config.access_key_id == "AKIA_EXAMPLE"
-    assert info.config.secret_access_key == "secret-example"
+    assert info.config.access_key_id == REDACTED_SECRET_PLACEHOLDER
+    assert info.config.secret_access_key == REDACTED_SECRET_PLACEHOLDER
+    stored = repo.rows["backend-1"].config
+    assert stored["access_key_id"] == "AKIA_EXAMPLE"
+    assert stored["secret_access_key"] == "secret-example"
 
 
 async def test_update_accepts_a_credential_rotation(
@@ -471,7 +478,13 @@ async def test_update_accepts_a_credential_rotation(
 
     info = await service.update(tenant_id=_TENANT_ID, id="backend-1", config=rotated)
 
-    assert info.config.secret_access_key == "rotated"
+    # The service-level DTO is masked on return; the actual rotation
+    # must be verified by reading the row directly from storage (no
+    # masking there) so a regression that forgets to persist cannot
+    # masquerade as a successful rotation.
+    assert info.config.secret_access_key == REDACTED_SECRET_PLACEHOLDER
+    stored = repo.rows["backend-1"].config
+    assert stored["secret_access_key"] == "rotated"
 
 
 async def test_update_rejects_a_location_change(
