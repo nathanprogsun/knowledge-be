@@ -15,7 +15,7 @@ import httpx
 import pytest
 
 from src.common.exception import ExternalServiceError, ValidationError
-from src.core.infra.models.service.weknora_cloud_service import (
+from src.core.infra.models.service.provider_service import (
     ENC_PREFIX,
     WEKNORA_CLOUD_BASE_URL,
     WeKnoraCloudService,
@@ -265,7 +265,7 @@ async def test_check_status_reports_no_models_when_a_field_is_blank() -> None:
         # Act
         status = await service.check_status(tenant_id=tenant.id)
 
-    # Assert — mirrors ``CredentialsConfig.GetWeKnoraCloud`` returning nil
+    # Assert — empty credentials resolve to the "not configured" shape
     assert status.has_models is False
     assert status.needs_reinit is False
 

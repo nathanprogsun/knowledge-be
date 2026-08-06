@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Diff WeKnora (Go) SQL migrations against knowledge-be Pydantic ``TableModel``
-classes.
+"""Diff upstream SQL migrations against knowledge-be Pydantic
+``TableModel`` classes.
 
 Reference documentation: ``migrations/{versioned,sqlite,mysql,paradedb}/*.up.sql``.
 

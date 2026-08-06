@@ -14,13 +14,14 @@ plumbing is covered in ``test_sse_client.py``. Here we focus on:
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 from src.ai.mcp_transport.connection_manager import (
     MCPConnectionManager,
     MCPSession,
+    TransportClient,
     _default_transport_factory,
 )
 from src.ai.mcp_transport.errors import (
@@ -92,8 +93,8 @@ def _build_manager(*, fake: _FakeTransportClient) -> MCPConnectionManager:
         url: str,
         headers: dict[str, str] | None,
         timeout_seconds: float,
-    ) -> _FakeTransportClient:
-        return fake
+    ) -> TransportClient:
+        return cast(TransportClient, fake)
 
     return MCPConnectionManager(
         transport_factory=_factory,
@@ -208,7 +209,7 @@ async def test_get_or_create_rejects_unsupported_transport() -> None:
 
 
 async def test_get_or_create_returns_http_streamable_client_for_http_streamable() -> None:
-    """PR-17.5b: ``http-streamable`` now builds an :class:`HTTPStreamableClient`.
+    """``http-streamable`` now builds an :class:`HTTPStreamableClient`.
 
     The factory no longer rejects the transport type — it builds the
     client and the network call is what surfaces a transport error.
@@ -237,7 +238,7 @@ async def test_get_or_create_wraps_unexpected_exceptions_as_transport_error() ->
             raise RuntimeError("boom")
 
     manager = MCPConnectionManager(
-        transport_factory=lambda **_kwargs: _BoomClient(),
+        transport_factory=lambda **_kwargs: cast(TransportClient, _BoomClient()),
         default_timeout_seconds=5.0,
     )
     try:
@@ -619,7 +620,7 @@ async def test_list_tools_on_dead_session_raises_session_not_connected() -> None
 
 
 async def test_invoke_evict_on_session_invalid_returns_fresh_session() -> None:
-    """PR-17.5c H1: ``evict_on_session_invalid=True`` drops the stale
+    """``evict_on_session_invalid=True`` drops the stale
     session on a session-invalid hint, and the next ``get_or_create``
     rebuilds it.
 
@@ -680,7 +681,7 @@ async def test_cleanup_loop_drops_dead_sessions() -> None:
     session = MCPSession(
         service_id="svc-ghost",
         transport_type="sse",
-        client=fake,
+        client=cast(TransportClient, fake),
     )
     session.initialized = True
     session.connected = False
@@ -727,7 +728,7 @@ def test_default_transport_factory_builds_sse_client() -> None:
 
 
 def test_default_transport_factory_returns_http_streamable_client() -> None:
-    """PR-17.5b: the default factory now returns an :class:`HTTPStreamableClient`."""
+    """The default factory now returns an :class:`HTTPStreamableClient`."""
     from src.ai.mcp_transport.http_streamable_client import HTTPStreamableClient
 
     client = _default_transport_factory(

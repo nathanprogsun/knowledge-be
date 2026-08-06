@@ -181,10 +181,6 @@ def _check_import_policy(
     - ``ai``                → must not import ``core`` / ``db`` / ``web``
     - ``workers``           → must not import ``web`` / ``db`` (must go via ``core``)
 
-    Exemptions:
-    - ``web/deps/**`` may import ``db.dao.*`` (per-domain forwarders
-      that construct repositories on the request-scoped session — PR-17.5c C4).
-
     ``common``, ``app_context``, ``util``, and ``unknown`` are not gated here.
     """
     forbidden_prefixes: set[str]
@@ -200,17 +196,7 @@ def _check_import_policy(
         forbidden_prefixes = WORKERS_FORBIDDEN_PREFIXES
     else:
         return
-    # Per-domain forwarders under ``web/deps/**`` are allowed to import
-    # ``db.dao.*`` so they can construct repositories on the request-
-    # scoped ``AsyncSession``. PR-17.5c C4.
-    if (
-        layer in {"web", "web_api"}
-        and file
-        and Path(file).as_posix().endswith(".py")
-        and "/web/deps/" in Path(file).as_posix()
-        and (module.startswith("db.dao") or module == "db.dao")
-    ):
-        return
+
     prefixes = set(_prefixes_of(module))
 
     for forbidden in forbidden_prefixes:
@@ -300,6 +286,57 @@ class LayerVisitor(ast.NodeVisitor):
         self._check_annotation(node.annotation, node.lineno, "variable annotation")
         self.generic_visit(node)
 
+    def visit_Call(self, node: ast.Call) -> None:
+        """Flag ``cast(Any/object, ...)`` and ``cast("...Any/object...", ...)``.
+
+        Type-cast arguments commonly hide bare ``Any`` / ``object`` in
+        type parameters (``cast(CursorResult[object], result)``). They
+        are easy to miss on AnnAssign because the cast type lives in a
+        call expression rather than an annotation.
+        """
+        func = node.func
+        is_cast = (isinstance(func, ast.Name) and func.id == "cast") or (
+            isinstance(func, ast.Attribute) and func.attr == "cast"
+        )
+        if is_cast and node.args:
+            type_arg = node.args[0]
+            if _expr_uses_any_or_object(type_arg):
+                self.errors.append(
+                    f"{self.path}:{type_arg.lineno}: cast() type argument "
+                    f"uses forbidden Any/object — substitute a concrete "
+                    f"generic like SqlValue, JsonValue, or a typed Protocol"
+                )
+        self.generic_visit(node)
+
+    def visit_Assign(self, node: ast.Assign) -> None:
+        """Flag module-level aliases that hide ``Any`` / ``object`` sentinels.
+
+        A bare ``_STREAM_CLOSED: object = object()`` is technically
+        annotated, but the same shape can also appear as a plain
+        ``_STREAM_CLOSED = object()`` once the file is refactored. Treat
+        plain ``Assign`` nodes that target the bare names ``Any`` /
+        ``object`` as the same anti-pattern as ``AnnAssign`` so the
+        lint cannot be defeated by dropping the annotation.
+        """
+        value = node.value
+        if (
+            isinstance(value, ast.Call)
+            and isinstance(value.func, ast.Name)
+            and value.func.id in {"Any", "object"}
+        ):
+            self.errors.append(
+                f"{self.path}:{node.lineno}: module-level assignment uses "
+                f"forbidden Any/object — declare a typed sentinel class "
+                f"or use a concrete value (UUID, Enum, dataclass) instead"
+            )
+        elif isinstance(value, ast.Name) and value.id in {"Any", "object"}:
+            self.errors.append(
+                f"{self.path}:{node.lineno}: module-level assignment uses "
+                f"forbidden Any/object — declare a typed sentinel class "
+                f"or use a concrete value (UUID, Enum, dataclass) instead"
+            )
+        self.generic_visit(node)
+
     # ── db/models class-body policy ─────────────────────────────────
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         if self.layer == "db_models":
@@ -338,7 +375,7 @@ ALWAYS_INCLUDE_PREFIXES: tuple[tuple[str, ...], ...] = (
 )
 
 
-# Stage-2 infra domains keep the domain name in the second segment
+# Infrastructure domains keep the domain name in the second segment
 # (``core/infra/<domain>/``, ``web/api/infra/<domain>/``,
 # ``db/models/infra/<domain>/``), and their DAOs use a singular / shortened
 # stem (``mcp_service_repository`` for domain ``mcp_services``). Map domain

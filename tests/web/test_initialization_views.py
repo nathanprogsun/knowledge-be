@@ -510,8 +510,9 @@ async def test_multimodal_rejects_non_image_upload(client: AsyncClient) -> None:
 async def test_multimodal_valid_request_reports_docreader_gap(
     client: AsyncClient,
 ) -> None:
-    # DocReader is a stage-3 dependency: Go's own handler returns
-    # data.success=false with this message when the reader is unset.
+    # DocReader is a downstream dependency: the upstream handler
+    # returns data.success=false with this message when the reader
+    # is unset.
     resp = await client.post(
         "/initialization/multimodal/test",
         files=_image_upload(),

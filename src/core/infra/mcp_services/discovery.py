@@ -30,6 +30,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.ai.mcp_transport.connection_manager import MCPSession
 from src.ai.mcp_transport.errors import MCPError, MCPTransportError
 from src.ai.mcp_transport.jsonrpc import JSONRPCResponse
+from src.common.exception import ValidationError
 from src.common.json import JsonObject, JsonValue
 from src.core.infra.mcp_services.types import MCPServiceInfo
 
@@ -127,12 +128,16 @@ class ServiceResolver(Protocol):
     ) -> Awaitable[MCPServiceInfo | JsonObject]: ...
 
 
-class _ConnectionManagerLike(Protocol):
+class ConnectionManagerLike(Protocol):
     """Minimal surface the discovery provider needs from the connection manager.
 
     Declared as a Protocol so callers can pass any object that exposes
     ``get_or_create`` / ``list_tools`` / ``list_resources`` without
     forcing this module to import the AI layer.
+
+    PR-30.6c C7: promoted from ``_ConnectionManagerLike`` to a public
+    name so web-layer forwarders can import a typed alias without
+    re-introducing a bare ``object`` annotation.
     """
 
     async def get_or_create(  # type: ignore[no-untyped-def]
@@ -150,6 +155,10 @@ class _ConnectionManagerLike(Protocol):
 
     async def list_resources(self, *, session: MCPSession) -> JSONRPCResponse: ...
 
+# Backwards-compatibility alias for code that still imports the
+# underscore-prefixed name from earlier PRs.
+_ConnectionManagerLike = ConnectionManagerLike
+
 
 class HTTPMCPDiscoveryProvider:
     """Live discovery through the MCP connection manager.
@@ -166,7 +175,7 @@ class HTTPMCPDiscoveryProvider:
     def __init__(
         self,
         *,
-        connection_manager: _ConnectionManagerLike,
+        connection_manager: ConnectionManagerLike,
         service_resolver: ServiceResolver,
     ) -> None:
         self._manager = connection_manager
@@ -235,8 +244,9 @@ class HTTPMCPDiscoveryProvider:
             payload.setdefault("advanced_timeout_seconds", None)
             payload.setdefault("name", service_id)
             return payload
-        raise TypeError(
-            "service_resolver must return an MCPServiceInfo or a resolver dict",
+        raise ValidationError(
+            code="mcp_service.resolver_payload_invalid",
+            message="service_resolver must return an MCPServiceInfo or a resolver dict",
         )
 
 
@@ -315,7 +325,7 @@ def _extract_tools(response: JSONRPCResponse) -> list[DiscoveryTool]:
             DiscoveryTool(
                 name=name,
                 description=description if isinstance(description, str) else None,
-                input_schema=cast("JsonObject | None", input_schema),
+                input_schema=input_schema,
                 require_approval=False,
             ),
         )
@@ -367,6 +377,7 @@ def _info_to_resolver_payload(info: MCPServiceInfo) -> JsonObject:
 
 
 __all__ = [
+    "ConnectionManagerLike",
     "DiscoveryCache",
     "DiscoveryProvider",
     "DiscoveryResource",

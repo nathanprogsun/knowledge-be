@@ -6,15 +6,32 @@ clients can share exception types without risking a circular import.
 Mirrors ``internal/mcp`` in the upstream Go project: the same three
 exception families (transport-level failure, OAuth-required, session
 no-longer-connected) surface on the Python side.
+
+Hierarchy: ``MCPError`` inherits :class:`src.common.exception.ExternalServiceError`
+so the web layer's exception handler maps it to HTTP 502 — the right
+status for "we called an upstream service and it failed" — without
+each subclass having to opt in. :class:`OAuthRequiredError` keeps
+:class:`UnauthorizedError` in its MRO so it still maps to HTTP 401 when
+the server-side auth challenge is the headline failure.
 """
 
 from __future__ import annotations
 
-from src.common.exception import UnauthorizedError
+from src.common.exception import ExternalServiceError, UnauthorizedError
 
 
-class MCPError(Exception):
-    """Base class for every MCP transport error."""
+class MCPError(ExternalServiceError):
+    """Base class for every MCP transport error.
+
+    Inherits :class:`ExternalServiceError` so the web-layer exception
+    handler resolves ``_STATUS_BY_TYPE[MCPError]`` to HTTP 502 via the
+    MRO walk in :mod:`src.web.exception_handler`. ``code`` /
+    ``message`` are inherited but explicitly set so the wire-side error
+    payload carries the canonical "mcp_service.transport_error" code.
+    """
+
+    code: str = "mcp_service.transport_error"
+    message: str = "MCP transport error"
 
 
 class MCPTransportError(MCPError):
@@ -53,6 +70,10 @@ class OAuthRequiredError(UnauthorizedError, MCPError):
     maps to HTTP 401 via the standard exception handler) and
     :class:`MCPError` so the existing ``except MCPError`` clauses in
     the discovery + connectivity paths continue to match.
+
+    The ``code`` defaults to ``UnauthorizedError.code`` ("unauthorized")
+    rather than ``MCPError.code`` ("mcp_service.transport_error") so
+    the API response carries the more specific signal.
     """
 
     def __init__(self, *, metadata_url: str, message: str | None = None) -> None:
@@ -61,6 +82,9 @@ class OAuthRequiredError(UnauthorizedError, MCPError):
         # code/message and ``MCPError`` is satisfied for isinstance.
         UnauthorizedError.__init__(self, text)
         MCPError.__init__(self, text)
+        # ``UnauthorizedError`` is the more specific code, so restore it
+        # after ``MCPError.__init__`` set ``code`` to its default.
+        self.code = UnauthorizedError.code
         self.metadata_url = metadata_url
 
 

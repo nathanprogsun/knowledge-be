@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 
 import pytest
-from pydantic import ValidationError
+from pydantic import ValidationError as PydanticValidationError
 
 from src.ai.mcp_transport.jsonrpc import (
     INTERNAL_ERROR_CODE,
@@ -24,6 +24,7 @@ from src.ai.mcp_transport.jsonrpc import (
     build_request,
     is_session_invalid_error,
 )
+from src.common.exception import ValidationError
 
 # ── Build helpers ───────────────────────────────────────────────────
 
@@ -51,13 +52,13 @@ def test_build_request_reuses_supplied_id() -> None:
 
 def test_build_request_rejects_empty_method() -> None:
     """``build_request`` validates the method name before serialising."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         build_request(method="", params={})
 
 
 def test_build_error_response_requires_request_id() -> None:
     """An error response without an id is rejected (JSON-RPC 2.0 §5)."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         build_error_response(
             request_id="",
             code=INVALID_PARAMS_CODE,
@@ -148,7 +149,7 @@ def test_response_accepts_neither_result_nor_error_for_compatibility() -> None:
 def test_request_is_frozen() -> None:
     """Frozen dataclass — mutation must raise."""
     req = build_request(method=METHOD_TOOLS_LIST, params={})
-    with pytest.raises(ValidationError):
+    with pytest.raises(PydanticValidationError):
         req.method = "tools/call"
 
 

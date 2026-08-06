@@ -1,7 +1,7 @@
 """Storage row for the `system_settings` table.
 
-Mirrors ``internal/types/system_setting.go::SystemSetting``. The table
-holds platform-wide tunables (NOT tenant-scoped), gated by SystemAdmin.
+The table holds platform-wide tunables (NOT tenant-scoped), gated
+by SystemAdmin.
 
 ``value`` is JSONB so the same column can hold ints / strings /
 booleans / arrays; ``value_type`` tells the service how to decode the

@@ -1,6 +1,5 @@
 """System-setting service — 3-tier resolver + CRUD + audit.
 
-Maps ``internal/application/service/system_setting.go::systemSettingService``.
 Operations:
 
 - ``list`` — return every known setting (DB-persisted + registry-backed

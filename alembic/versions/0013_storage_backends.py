@@ -5,11 +5,11 @@ register several instances of the same provider and bind each knowledge
 base to a different one; ``tenants.default_storage_backend_id`` (added in
 0003_tenants) points at the workspace default.
 
-Mirrors ``internal/types/storagebackend.go::StorageBackend``. ``id`` is a
-service-assigned UUID string (Go's ``BeforeCreate`` hook), ``config`` is
-the JSONB normalized union of provider settings, and rows are
-soft-deleted so a legacy alias still referenced by old file paths is
-never physically removed.
+Mirrors the storage backend contract captured during the initial
+migration freeze. ``id`` is a service-assigned UUID string,
+``config`` is the JSONB normalized union of provider settings, and
+rows are soft-deleted so a legacy alias still referenced by old
+file paths is never physically removed.
 
 The revision id is a placeholder — the numeric ordering is assigned when
 the infra migrations are sequenced together.

@@ -13,7 +13,8 @@ from typing import cast
 from sqlalchemy import JSON, CursorResult, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from src.common.json import JsonValue
+from src.common.exception import DataError
+from src.common.json import JsonValue, SqlValue
 from src.db.dao.generic_repository import GenericRepository
 from src.db.models.tenants.tenant_kv import TenantKV
 
@@ -60,7 +61,10 @@ class TenantKVRepository(GenericRepository[TenantKV]):
         )
         mapping = result.mappings().first()
         if mapping is None:
-            raise RuntimeError("tenant_kv upsert returned no row")
+            raise DataError(
+                code="db.upsert_no_row",
+                message="tenant_kv upsert returned no row",
+            )
         return self._hydrate(mapping)
 
     async def delete(self, *, tenant_id: int, key: str) -> bool:
@@ -73,7 +77,7 @@ class TenantKVRepository(GenericRepository[TenantKV]):
             stmt,
             {"tenant_id": tenant_id, "key": key, "now": datetime.now(UTC)},
         )
-        return (cast(CursorResult[object], result).rowcount or 0) > 0
+        return (cast("CursorResult[SqlValue]", result).rowcount or 0) > 0
 
 
 __all__ = ["TenantKVRepository"]

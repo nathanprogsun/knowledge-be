@@ -166,9 +166,15 @@ def _audit_to_response(info: AuditLogInfo) -> AuditLogEntryResponse:
 
 
 def _audit_list_to_response(result: AuditLogListResult) -> AuditLogListResponse:
+    """Render an :class:`AuditLogListResult` to the wire shape.
+
+    The service already projects each row into
+    :class:`AuditLogInfo` via ``map_from_db``; this layer just renders
+    the wire shape — it no longer performs the §9 projection.
+    """
     return AuditLogListResponse(
         success=True,
-        data=[_audit_to_response(AuditLogInfo.map_from_db(e)) for e in result.entries],
+        data=[_audit_to_response(e) for e in result.entries],
         next_cursor=result.next_cursor,
     )
 

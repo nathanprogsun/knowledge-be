@@ -1,8 +1,8 @@
-"""Stage-1 frozen contract surface: auth + tenants + system.
+"""Auth + tenant + system frozen contract surface.
 
-Re-exported for the stage-1 contract tests and for downstream Stage 2 PRs.
-Each entry names the frozen Pydantic model, its wire endpoint, and the
-fixture key it is compared against.
+Re-exported for the auth/tenant contract tests and for downstream
+infrastructure PRs. Each entry names the frozen Pydantic model, its
+wire endpoint, and the fixture key it is compared against.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from src.core.contracts import auth, system, tenants
 
-# (contract_name, model, wire_endpoint) — the auth stage-1 surface.
+# (contract_name, model, wire_endpoint) — the auth surface.
 AUTH_CONTRACTS: tuple[tuple[str, type[BaseModel], str], ...] = (
     ("RegisterRequest", auth.RegisterRequest, "POST /auth/register"),
     ("RegisterResponse", auth.RegisterResponse, "POST /auth/register"),
@@ -32,7 +32,7 @@ AUTH_CONTRACTS: tuple[tuple[str, type[BaseModel], str], ...] = (
     ("AuthUser", auth.AuthUser, "auth.user"),
 )
 
-# (contract_name, model, wire_endpoint) — the tenants stage-1 surface.
+# (contract_name, model, wire_endpoint) — the tenants surface.
 TENANT_CONTRACTS: tuple[tuple[str, type[BaseModel], str], ...] = (
     ("Tenant", tenants.Tenant, "tenant"),
     ("TenantList", tenants.TenantList, "GET /tenants"),
@@ -49,7 +49,7 @@ TENANT_CONTRACTS: tuple[tuple[str, type[BaseModel], str], ...] = (
     ("Membership", tenants.Membership, "tenant.membership"),
 )
 
-# (contract_name, model, wire_endpoint) — the system stage-1 surface.
+# (contract_name, model, wire_endpoint) — the system surface.
 SYSTEM_CONTRACTS: tuple[tuple[str, type[BaseModel], str], ...] = (
     ("SystemInfo", system.SystemInfo, "GET /system/info"),
     ("ParserEnginesList", system.ParserEnginesList, "GET /system/parser-engines"),
@@ -60,8 +60,8 @@ SYSTEM_CONTRACTS: tuple[tuple[str, type[BaseModel], str], ...] = (
     ),
 )
 
-# Every stage-1 wire contract, flattened for uniform iteration.
-ALL_STAGE1_CONTRACTS: tuple[tuple[str, type[BaseModel], str], ...] = (
+# Every auth+tenant+system wire contract, flattened for uniform iteration.
+ALL_AUTH_TENANT_CONTRACTS: tuple[tuple[str, type[BaseModel], str], ...] = (
     AUTH_CONTRACTS + TENANT_CONTRACTS + SYSTEM_CONTRACTS
 )
 
@@ -95,7 +95,7 @@ def model_wire_fields(model: type[BaseModel]) -> list[str]:
 JsonFixture: TypeAlias = dict[str, object]
 
 __all__ = [
-    "ALL_STAGE1_CONTRACTS",
+    "ALL_AUTH_TENANT_CONTRACTS",
     "AUTH_CONTRACTS",
     "FIXTURE_PATH",
     "SYSTEM_CONTRACTS",

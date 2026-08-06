@@ -1,9 +1,8 @@
 """Storage row for the `audit_logs` table.
 
-Mirrors ``internal/types/audit_log.go::AuditLog``. The table is
-append-only — no ``updated_at``, no ``deleted_at``. The monotonic
-``id`` (BIGSERIAL) doubles as the pagination cursor (newest-first is
-``WHERE id < after_id ORDER BY id DESC``).
+The table is append-only — no ``updated_at``, no ``deleted_at``. The
+monotonic ``id`` (BIGSERIAL) doubles as the pagination cursor
+(newest-first is ``WHERE id < after_id ORDER BY id DESC``).
 
 ``tenant_id = 0`` is the system-scope convention used by
 ``system.setting_changed``, admin promote/revoke, and the

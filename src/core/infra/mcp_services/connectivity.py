@@ -117,12 +117,16 @@ class StaticConnectivityProbe:
         return self._result
 
 
-class _ConnectionManagerLike(Protocol):
+class ConnectionManagerLike(Protocol):
     """Minimal surface the live connectivity probe needs.
 
     Declared as a Protocol so callers can pass any object that exposes
     ``get_or_create`` / ``list_tools`` / ``list_resources`` without
     forcing this module to import the AI layer.
+
+    PR-30.6c C7: promoted from ``_ConnectionManagerLike`` to a public
+    name so the web-layer forwarder can import a typed alias without
+    re-introducing a bare ``object`` annotation.
     """
 
     async def get_or_create(  # type: ignore[no-untyped-def]
@@ -140,6 +144,10 @@ class _ConnectionManagerLike(Protocol):
 
     async def list_resources(self, *, session: MCPSession) -> JSONRPCResponse: ...
 
+# Backwards-compatibility alias for code that still imports the
+# underscore-prefixed name from earlier PRs.
+_ConnectionManagerLike = ConnectionManagerLike
+
 
 class HTTPMCPConnectivityProbe:
     """Probe a live MCP service through the connection manager.
@@ -154,7 +162,7 @@ class HTTPMCPConnectivityProbe:
     def __init__(
         self,
         *,
-        connection_manager: _ConnectionManagerLike,
+        connection_manager: ConnectionManagerLike,
         resolver: ConnectivityResolver,
     ) -> None:
         self._manager = connection_manager
@@ -274,7 +282,7 @@ def _as_tools(response: JSONRPCResponse) -> tuple[DiscoveryTool, ...]:
             DiscoveryTool(
                 name=name,
                 description=description if isinstance(description, str) else None,
-                input_schema=cast("JsonObject | None", input_schema),
+                input_schema=input_schema,
                 require_approval=False,
             ),
         )
@@ -320,6 +328,7 @@ def to_wire(result: ConnectivityResult) -> MCPTestResultWire:
 
 
 __all__ = [
+    "ConnectionManagerLike",
     "ConnectivityProbe",
     "ConnectivityResolver",
     "ConnectivityResult",

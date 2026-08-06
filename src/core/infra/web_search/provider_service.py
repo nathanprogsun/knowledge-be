@@ -34,10 +34,11 @@ from src.core.contracts.infra import WebSearchProviderParameters
 from src.core.infra.web_search.types import (
     SUPPORTED_PROVIDER_TYPES,
     WebSearchProviderInfo,
+    _parameters_from_json,
 )
 from src.db.dao.web_search_provider_repository import WebSearchProviderRepository
 from src.db.models.infra.web_search_provider import WebSearchProvider
-from src.util.crypto import decrypt_stored_secret_lenient, encrypt_aesgcm, get_aes_key
+from src.util.crypto import encrypt_aesgcm, get_aes_key
 
 _NOT_FOUND_CODE = "web_search_provider.not_found"
 
@@ -291,34 +292,6 @@ def _validate_provider_parameters(
             message="base URL is required for SearXNG provider",
         )
     return params
-
-
-def _parameters_from_json(raw: JsonObject | None) -> WebSearchProviderParameters:
-    if raw is None:
-        return WebSearchProviderParameters()
-    extra = raw.get("extra_config")
-    extra_dict: dict[str, str] | None = None
-    if isinstance(extra, dict):
-        extra_dict = {
-            str(k): str(v) for k, v in extra.items() if isinstance(v, (str, int, float, bool))
-        }
-    api_key = raw.get("api_key")
-    if isinstance(api_key, str) and api_key:
-        # Decrypt an ``enc:v1:`` blob; legacy plaintext passes through.
-        # A decrypt failure (rotated key) blanks the field so the row
-        # stays visible — Go ``WebSearchProviderParameters.Scan``.
-        plain, ok = decrypt_stored_secret_lenient(api_key)
-        api_key = plain if ok else ""
-    cx_raw = raw.get("cx") or raw.get("engine_id") or raw.get("engineId")
-    base_url = raw.get("base_url")
-    proxy_url = raw.get("proxy_url")
-    return WebSearchProviderParameters(
-        api_key=str(api_key) if isinstance(api_key, (str, int, float, bool)) else None,
-        cx=str(cx_raw) if isinstance(cx_raw, (str, int, float, bool)) else None,
-        base_url=str(base_url) if isinstance(base_url, (str, int, float, bool)) else None,
-        proxy_url=str(proxy_url) if isinstance(proxy_url, (str, int, float, bool)) else None,
-        extra_config=extra_dict,
-    )
 
 
 def _parameters_to_json(params: WebSearchProviderParameters) -> JsonObject:

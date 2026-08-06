@@ -11,7 +11,7 @@ echo ""
 
 FAILED=0
 
-for script in check_layer_violation check_service_singleton check_endpoint_coverage check_schema_compatibility check_contract_invariants check_imports; do
+for script in check_layer_violation check_service_singleton check_endpoint_coverage check_schema_compatibility check_contract_invariants check_imports check_sql_format check_pr_leak check_map_from_db check_exception_types; do
     echo "--- $script ---"
     if python3 "$SCRIPT_DIR/$script.py" --src-root "$SRC_ROOT"; then
         echo "[PASS] $script"

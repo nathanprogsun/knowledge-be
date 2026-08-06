@@ -23,6 +23,11 @@ _MEMBER_ORDER = "joined_at asc, id asc"
 
 _LIVE = "deleted_at is null"
 
+# Module-level alias for the table name — every ``text(f"...")`` in this
+# file interpolates either this constant or ``self._table``; user input
+# is always bound via ``:search`` / ``:user_id`` / etc.
+_TABLE_NAME = "tenant_members"
+
 # LIKE wildcards must be neutralised in user-supplied search terms.
 _LIKE_ESCAPE_CHAR = "\\"
 _LIKE_SPECIAL_CHARS = ("\\", "%", "_")
@@ -70,7 +75,7 @@ class TenantMemberRepository(GenericRepository[TenantMember]):
     async def has_any_members(self, tenant_id: int) -> bool:
         """Whether the workspace has at least one active member."""
         stmt = text(
-            f"select 1 from {self._table} "
+            f"select 1 from {_TABLE_NAME} "
             f"where tenant_id = :tenant_id and status = :status and {_LIVE} limit 1"
         ).bindparams(tenant_id=tenant_id, status=STATUS_ACTIVE)
         result = await self._session.execute(stmt)
@@ -79,7 +84,7 @@ class TenantMemberRepository(GenericRepository[TenantMember]):
     async def count_by_tenant(self, tenant_id: int, *, search: str | None = None) -> int:
         """Count live memberships, optionally filtered by user email/username."""
         join, where, params = self._search_fragments(tenant_id, search)
-        stmt = text(f"select count(*) from {self._table} {join} where {where}").bindparams(**params)
+        stmt = text(f"select count(*) from {_TABLE_NAME} {join} where {where}").bindparams(**params)
         return int((await self._session.execute(stmt)).scalar_one())
 
     async def list_page_by_tenant(
@@ -93,8 +98,8 @@ class TenantMemberRepository(GenericRepository[TenantMember]):
         """One page of live memberships, oldest join first."""
         join, where, params = self._search_fragments(tenant_id, search)
         stmt = text(
-            f"select {self._table}.* from {self._table} {join} where {where} "
-            f"order by {self._table}.joined_at asc, {self._table}.id asc "
+            f"select {_TABLE_NAME}.* from {_TABLE_NAME} {join} where {where} "
+            f"order by {_TABLE_NAME}.joined_at asc, {_TABLE_NAME}.id asc "
             "limit :limit offset :offset"
         ).bindparams(**params, limit=limit, offset=offset)
         result = await self._session.execute(stmt)
@@ -103,7 +108,7 @@ class TenantMemberRepository(GenericRepository[TenantMember]):
     async def count_active_owners(self, tenant_id: int) -> int:
         """Count live, active Owner rows in the workspace."""
         stmt = text(
-            f"select count(*) from {self._table} "
+            f"select count(*) from {_TABLE_NAME} "
             f"where tenant_id = :tenant_id and role = :role and status = :status and {_LIVE}"
         ).bindparams(tenant_id=tenant_id, role=ROLE_OWNER, status=STATUS_ACTIVE)
         return int((await self._session.execute(stmt)).scalar_one())
@@ -123,7 +128,7 @@ class TenantMemberRepository(GenericRepository[TenantMember]):
         with the caller.
         """
         stmt = text(
-            f"select id from {self._table} "
+            f"select id from {_TABLE_NAME} "
             "where tenant_id = :tenant_id and user_id <> :user_id "
             f"and role = :role and status = :status and {_LIVE} for update"
         ).bindparams(
@@ -148,7 +153,7 @@ class TenantMemberRepository(GenericRepository[TenantMember]):
         column_list = ", ".join(f'"{c}"' for c in columns)
         value_list = ", ".join(f":{c}" for c in columns)
         stmt = text(
-            f"insert into {self._table} ({column_list}) values ({value_list}) "
+            f"insert into {_TABLE_NAME} ({column_list}) values ({value_list}) "
             f"on conflict (user_id, tenant_id) where {_LIVE} do nothing returning *"
         ).bindparams(**row.insert_bind_params())
         result = await self._session.execute(stmt)
@@ -212,7 +217,7 @@ class TenantMemberRepository(GenericRepository[TenantMember]):
         params: BindParams,
     ) -> list[TenantMember]:
         stmt = text(
-            f"select * from {self._table} where {conditions} and {_LIVE} order by {_MEMBER_ORDER}"
+            f"select * from {_TABLE_NAME} where {conditions} and {_LIVE} order by {_MEMBER_ORDER}"
         ).bindparams(**params)
         result = await self._session.execute(stmt)
         return [self._hydrate(m) for m in result.mappings().all()]
@@ -225,7 +230,7 @@ class TenantMemberRepository(GenericRepository[TenantMember]):
         where: str = "user_id = :user_id and tenant_id = :tenant_id",
     ) -> int:
         stmt = text(
-            f"update {self._table} set {set_clause} where {where} and {_LIVE}"
+            f"update {_TABLE_NAME} set {set_clause} where {where} and {_LIVE}"
         ).bindparams(**params)
         result = await self._session.execute(stmt)
         return cast("CursorResult[SqlValue]", result).rowcount
@@ -236,7 +241,7 @@ class TenantMemberRepository(GenericRepository[TenantMember]):
         search: str | None,
     ) -> tuple[str, str, BindParams]:
         """Build (join, where, params) for the filtered listing queries."""
-        where = f"{self._table}.tenant_id = :tenant_id and {self._table}.{_LIVE}"
+        where = f"{_TABLE_NAME}.tenant_id = :tenant_id and {_TABLE_NAME}.{_LIVE}"
         params: BindParams = {"tenant_id": tenant_id}
         term = (search or "").strip()
         if not term:

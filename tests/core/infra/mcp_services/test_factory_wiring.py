@@ -1,10 +1,10 @@
-"""Tests for the per-request MCP factory wiring (PR-17.5b).
+"""Tests for the per-request MCP factory wiring.
 
-The factory is a thin forwarder to :class:`MCPServiceService`; PR-17.5b
-extends its surface to accept the APP-scope discovery / connectivity /
-OAuth deps the lifespan owns. These tests verify:
+The factory is a thin forwarder to :class:`MCPServiceService`; its
+surface accepts the APP-scope discovery / connectivity / OAuth
+deps the lifespan owns. These tests verify:
 
-- passing nothing preserves the PR-17.5a behaviour (``None`` deps);
+- passing nothing preserves the legacy behaviour (``None`` deps);
 - passing a discovery provider / connectivity probe / OAuth factory
   threads them straight through to the underlying service;
 - the legacy ``build_mcp_service(session)`` call shape (no kwargs)
@@ -176,7 +176,7 @@ def test_build_mcp_service_succeeds_with_full_arg_set() -> None:
 
 
 def test_mcp_service_service_accepts_legacy_kwargs_only() -> None:
-    """``MCPServiceService`` keeps working with the PR-17.5a ctor surface."""
+    """``MCPServiceService`` keeps working with the legacy ctor surface."""
     service = MCPServiceService(
         mcp_repo=cast("MCPServiceRepository", _StubSession()),
         tool_approvals_repo=cast("MCPToolApprovalRepository", _StubSession()),

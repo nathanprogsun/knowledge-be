@@ -1,7 +1,7 @@
-"""Web-layer tests for live MCP transport endpoints (PR-17.5b).
+"""Web-layer tests for live MCP transport endpoints.
 
-The PR-17.5a ``tests/web/test_mcp_views.py`` covers the static-fakes
-path; this file covers the live path - when the lifespan wires the
+The ``tests/web/test_mcp_views.py`` covers the static-fakes path;
+this file covers the live path - when the lifespan wires the
 ``HTTPStreamableClient`` connection pool, the ``GET
 /mcp-services/{id}/tools`` endpoint must return the upstream tools
 mocked at the ``httpx`` layer with ``respx``.
@@ -142,7 +142,7 @@ def app(
         session: object = None,
         tenant_id: int = 1,
     ) -> MCPServiceService:
-        del request, session  # overridden deps — see PR-17.5c C2
+        del request, session  # overridden deps — see dependency-override block
         discovery = HTTPMCPDiscoveryProvider(
             connection_manager=_cast("_ConnDiscLike", connection_manager),
             service_resolver=_cast("Any", _resolver),
@@ -245,9 +245,10 @@ async def test_list_tools_does_not_silently_succeed_when_upstream_fails(
     client: AsyncClient,
     mcp_repo: FakeMCPServiceRepository,
 ) -> None:
-    """An upstream failure degrades to an empty list (PR-17.5a contract).
+    """An upstream failure degrades to an empty list (the contract
+    from the original static-fakes path).
 
-    PR-17.5c C3: the discovery provider now wraps transport errors as
+    The discovery provider now wraps transport errors as
     :class:`MCPError` instead of ``RuntimeError`` so the service
     layer's ``except MCPError`` clause can degrade to an empty list.
     The route returns ``200`` with ``data=[]`` rather than a 500;
@@ -331,20 +332,25 @@ async def test_oauth_authorize_url_still_returns_legacy_shape(
     assert resp.status_code == 422
 
 
-# ── PR-17.5c review follow-ups ─────────────────────────────────────
+# ── Review follow-ups ──────────────────────────────────────────────
 
 
 async def test_resolver_uses_request_tenant_id_not_zero() -> None:
-    """PR-17.5c C2: ``build_live_resolvers`` passes the active tenant_id
-    into the lookup, not a hard-coded ``0``.
+    """``build_mcp_resolvers`` (core factory) passes the active
+    ``tenant_id`` into the lookup, not a hard-coded ``0``.
 
     Pins the cross-tenant leak fix: a row that lives in tenant=2 must
     not be returned to a tenant=1 caller just because the resolver
     fallback used to look up ``find_for_tenant(0, id)``.
+
+    The resolver builder was moved into
+    ``src.core.infra.mcp_services.factory`` so the web layer no longer
+    reaches into ``db.dao``. The test patches the symbol on the core
+    factory module instead.
     """
-    import src.web.deps.infra_mcp as _infra_mcp
+    import src.core.infra.mcp_services.factory as _core_factory
+    from src.core.infra.mcp_services.factory import build_mcp_resolvers
     from src.db.dao.mcp_service_repository import MCPServiceRepository
-    from src.web.deps.infra_mcp import build_live_resolvers
 
     seen_tenant_id: list[int] = []
     seen_service_id: list[str] = []
@@ -386,19 +392,19 @@ async def test_resolver_uses_request_tenant_id_not_zero() -> None:
         pass
 
     real_repo = MCPServiceRepository
-    # Patch the MCPServiceRepository symbol in the web/deps/infra_mcp
-    # module so ``build_live_resolvers`` sees our spy. ``setattr``
-    # routes through the module ``__dict__`` directly — mypy cannot
-    # see cross-module rebinds otherwise.
-    setattr(_infra_mcp, "MCPServiceRepository", _SpyRepo)  # noqa: B010, SIM
+    # Patch the MCPServiceRepository symbol in the core factory module
+    # so ``build_mcp_resolvers`` sees our spy. ``setattr`` routes
+    # through the module ``__dict__`` directly — mypy cannot see
+    # cross-module rebinds otherwise.
+    setattr(_core_factory, "MCPServiceRepository", _SpyRepo)  # noqa: B010, SIM
     try:
-        discovery_resolver, _ = build_live_resolvers(
+        discovery_resolver, _ = build_mcp_resolvers(
             session=_cast(Any, _StubSession()),
             tenant_id=1,
         )
         result = await discovery_resolver(1, "svc-shared")
     finally:
-        setattr(_infra_mcp, "MCPServiceRepository", real_repo)  # noqa: B010, SIM
+        setattr(_core_factory, "MCPServiceRepository", real_repo)  # noqa: B010, SIM
 
     assert seen_tenant_id == [1], "resolver must use the active tenant_id, not 0"
     assert seen_service_id == ["svc-shared"]

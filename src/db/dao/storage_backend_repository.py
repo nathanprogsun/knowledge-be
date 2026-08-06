@@ -16,13 +16,17 @@ from typing import cast
 from sqlalchemy import JSON, CursorResult, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from src.common.json import BindParams
+from src.common.json import BindParams, SqlValue
 from src.db.dao.generic_repository import GenericRepository
 from src.db.models.storage_backend import StorageBackend
 
 _JSON_BIND_TYPE = JSON().with_variant(JSONB(), "postgresql")
 
 _LIVE = "deleted_at is null"
+
+# Module-level alias for the table name — used in every ``text(f"...")``
+# in this file; user input is bound via ``:tenant_id`` / ``:id``.
+_TABLE_NAME = "storage_backends"
 
 
 class StorageBackendRepository(GenericRepository[StorageBackend]):
@@ -117,7 +121,7 @@ class StorageBackendRepository(GenericRepository[StorageBackend]):
             f"where tenant_id = :tenant_id and id = :id and {_LIVE}"
         ).bindparams(tenant_id=tenant_id, id=id, now=now)
         result = await self._session.execute(stmt)
-        return (cast("CursorResult[object]", result).rowcount or 0) > 0
+        return (cast("CursorResult[SqlValue]", result).rowcount or 0) > 0
 
     # ── Workspace default pointer (tenants.default_storage_backend_id) ──
 
@@ -141,7 +145,7 @@ class StorageBackendRepository(GenericRepository[StorageBackend]):
             "where id = :tenant_id and deleted_at is null"
         ).bindparams(tenant_id=tenant_id, id=id, now=datetime.now(UTC))
         result = await self._session.execute(stmt)
-        return (cast("CursorResult[object]", result).rowcount or 0) > 0
+        return (cast("CursorResult[SqlValue]", result).rowcount or 0) > 0
 
     # ── Reference counts (delete / disable guards) ──────────────────
 

@@ -7,13 +7,16 @@ typed DTO.
 
 The DTO keeps every column that the service layer needs. Sensitive
 credential fields (``parameters.api_key``, ``parameters.app_secret``)
-are redacted at this boundary so they never cross into the wire
-contract — the wire contract carries a credential-presence map
-instead, mirroring ``dto.ModelResponse`` on the Go side.
+are redacted at this boundary so they never cross out of the service
+layer in plaintext -- mirroring ``dto.NewModelResponse`` on the Go
+side, which omits the secret fields altogether. The wire layer
+(``views.py``) then translates the placeholder into the visible
+``"sk-***"`` form the UI already expects.
 """
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Self
 
@@ -22,16 +25,24 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.core.contracts.infra import ModelParameters
 from src.db.models.infra.model import Model
 
-# Columns on the storage ``Model`` row that map straight through. The
-# service never redacts them; the wire layer (``views.py``) drops the
-# secret-bearing parameter fields instead.
-#
-# ``parameters`` carries ``api_key`` / ``app_secret`` (encrypted at
-# rest on the Go side, plain on the Python scaffold). The service
-# DTO keeps the values verbatim so the wire layer can emit the
-# documented ``"sk-***"`` redaction placeholder on the response.
-# Built-in / cross-tenant masking for builtins lives at the wire
-# boundary (not in this module).
+# Placeholder substituted for any stored credential at the service
+# boundary. Kept identical to
+# ``src/core/infra/storage_backends/types.REDACTED_SECRET_PLACEHOLDER``
+# and the Go ``internal/types/secret.go::RedactedSecretPlaceholder`` so
+# a UI that already special-cases the value stays compatible.
+REDACTED_SECRET_PLACEHOLDER: str = "***"
+
+# Credential-bearing fields on ``parameters`` that must never leak past
+# the service boundary. ``api_key`` / ``app_secret`` are the two
+# provider-supplied secrets (Go ``ModelParameters.APIKey`` /
+# ``AppSecret``).
+_SENSITIVE_PARAMETER_FIELDS: frozenset[str] = frozenset({"api_key", "app_secret"})
+
+# PR-30.6c H2: storage columns that must not cross into the
+# service-output projection per AGENTS.md §9. ``deleted_at`` is the
+# soft-delete tombstone; the service layer treats a missing row as the
+# only delete signal.
+MODEL_EXCLUDE_COLUMNS: frozenset[str] = frozenset({"deleted_at"})
 
 
 class ModelInfo(BaseModel):
@@ -59,29 +70,34 @@ class ModelInfo(BaseModel):
     def map_from_db(cls, db: Model) -> Self:
         """Project a storage ``Model`` row to the service DTO.
 
-        Hydrates ``parameters`` from the JSON column, redacting
+        Hydrates ``parameters`` from the JSON column and redacts
         ``api_key`` / ``app_secret`` so they never cross the service
         boundary in plaintext.
+
+        - ``MODEL_EXCLUDE_COLUMNS`` (frozen per §9) drops
+          ``deleted_at`` before ``model_validate``.
+        - ``parameters`` is decoded from a raw JSON string when the
+          storage layer persists it as text (SQLite path) so the
+          downstream layer never has to handle the unparsed blob.
+        - Sensitive parameter values are substituted with
+          ``REDACTED_SECRET_PLACEHOLDER`` so a buggy caller that
+          bypasses the wire-layer masking still cannot leak the raw
+          credential.
         """
-        return cls.model_validate(
-            {
-                "id": db.id,
-                "tenant_id": db.tenant_id,
-                "name": db.name,
-                "display_name": db.display_name,
-                "type": db.type,
-                "source": db.source,
-                "description": db.description,
-                "parameters": dict(db.parameters),
-                "is_default": db.is_default,
-                "is_builtin": db.is_builtin,
-                "managed_by": db.managed_by,
-                "status": db.status,
-                "created_at": db.created_at,
-                "updated_at": db.updated_at,
-                "deleted_at": db.deleted_at,
-            }
-        )
+        record = db.model_dump(exclude=set(MODEL_EXCLUDE_COLUMNS))
+        parameters = record.get("parameters")
+        if isinstance(parameters, str):
+            try:
+                parameters = json.loads(parameters)
+            except json.JSONDecodeError:
+                parameters = {}
+        if not isinstance(parameters, dict):
+            parameters = {}
+        for field_name in _SENSITIVE_PARAMETER_FIELDS:
+            if parameters.get(field_name):
+                parameters[field_name] = REDACTED_SECRET_PLACEHOLDER
+        record["parameters"] = parameters
+        return cls.model_validate(record)
 
 
-__all__ = ["ModelInfo"]
+__all__ = ["MODEL_EXCLUDE_COLUMNS", "REDACTED_SECRET_PLACEHOLDER", "ModelInfo"]

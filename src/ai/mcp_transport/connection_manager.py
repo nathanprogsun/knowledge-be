@@ -34,7 +34,7 @@ import asyncio
 import contextlib
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Protocol, cast
+from typing import Protocol
 
 from src.ai.mcp_transport.errors import (
     MCPError,
@@ -51,6 +51,15 @@ from src.ai.mcp_transport.jsonrpc import (
     JSONRPCResponse,
 )
 from src.ai.mcp_transport.sse_client import SSEClient
+from src.common.json import JsonValue
+
+# Union of every concrete transport client the manager can hand out. The
+# connection-manager never reaches into transport-specific helpers, so the
+# ``call_tool`` / ``request`` surface it consumes is captured here as a
+# ``Protocol`` (``TransportClient``). The Protocol keeps the
+# ``client: Any`` annotation off the data classes without forcing a
+# hard dependency on the SSE / HTTP-streamable modules.
+TransportClient = SSEClient | HTTPStreamableClient
 
 # Strings copied verbatim from the Go layer. A match on the lower-cased
 # error text is the operational signal that the server-side session is
@@ -72,7 +81,7 @@ class MCPSession:
 
     service_id: str
     transport_type: str
-    client: Any  # ``SSEClient`` (``HTTPStreamableClient`` once implemented)
+    client: TransportClient
     session_id: str = ""
     connected: bool = False
     initialized: bool = False
@@ -95,9 +104,7 @@ class _TransportFactory(Protocol):
     The manager asks the factory for a fresh client when the cache
     misses. ``url`` is the service's configured URL; ``headers`` is the
     per-request header map (auth + custom). The return type is the
-    union of the SSE / HTTP-streamable client classes — typed as
-    ``Any`` here so the protocol does not force a static dependency on
-    the transport module.
+    union of the SSE / HTTP-streamable client classes.
     """
 
     def __call__(
@@ -108,7 +115,7 @@ class _TransportFactory(Protocol):
         url: str,
         headers: dict[str, str] | None,
         timeout_seconds: float,
-    ) -> Any: ...
+    ) -> TransportClient: ...
 
 
 def _default_transport_factory(
@@ -118,7 +125,7 @@ def _default_transport_factory(
     url: str,
     headers: dict[str, str] | None,
     timeout_seconds: float,
-) -> Any:
+) -> TransportClient:
     """Build a transport client by inspecting ``transport_type``.
 
     Mirrors the Go switch in ``NewMCPClient`` — ``sse`` gets an
@@ -284,7 +291,7 @@ class MCPConnectionManager:
         *,
         session: MCPSession,
         tool_name: str,
-        arguments: dict[str, object] | None,
+        arguments: dict[str, JsonValue] | None,
     ) -> JSONRPCResponse:
         """Invoke ``tools/call`` on the cached session."""
         return await self._invoke(
@@ -313,7 +320,7 @@ class MCPConnectionManager:
         session: MCPSession,
         *,
         method: str,
-        params: dict[str, object],
+        params: dict[str, JsonValue],
         evict_on_session_invalid: bool,
     ) -> JSONRPCResponse:
         """Send one JSON-RPC request and surface the response.
@@ -330,8 +337,7 @@ class MCPConnectionManager:
                 f"session for {session.service_id!r} is not connected",
             )
         try:
-            response = await session.client.request(method=method, params=params)
-            return cast("JSONRPCResponse", response)
+            return await session.client.request(method=method, params=params)
         except MCPTransportError as exc:
             if evict_on_session_invalid and _looks_like_session_invalid(exc):
                 await self._evict(session.service_id)
@@ -340,7 +346,7 @@ class MCPConnectionManager:
 
     async def _initialize(self, session: MCPSession) -> None:
         """Send the MCP ``initialize`` handshake."""
-        params = {
+        params: dict[str, JsonValue] = {
             "protocolVersion": "2024-11-05",
             "capabilities": {},
             "clientInfo": {"name": "knowledge-be", "version": "0.1.0"},

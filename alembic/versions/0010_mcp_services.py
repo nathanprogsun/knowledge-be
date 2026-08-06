@@ -1,6 +1,6 @@
 """Create the MCP service domain tables.
 
-Mirrors ``migrations/sqlite/000000_init.up.sql`` (Go DDL):
+Tables created:
 
   - ``mcp_services``         — MCP server configurations
   - ``mcp_tool_approvals``   — per-tool approval overrides
@@ -9,8 +9,6 @@ Mirrors ``migrations/sqlite/000000_init.up.sql`` (Go DDL):
 
 Storage-only columns (``api_key`` / ``token`` inside ``auth_config``)
 live inside the JSON blob and are never a column on the SQL side.
-Numbering is left as a placeholder ``mcp_services`` because the
-migration sequence is finalised at checkpoint-2.
 """
 
 from __future__ import annotations

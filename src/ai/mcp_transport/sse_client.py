@@ -20,7 +20,7 @@ import asyncio
 import contextlib
 import json
 import re
-from typing import Any
+from contextlib import AbstractAsyncContextManager
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
@@ -29,6 +29,7 @@ from httpx_sse._exceptions import SSEError
 
 from src.ai.mcp_transport.errors import MCPTransportError, OAuthRequiredError
 from src.ai.mcp_transport.jsonrpc import JSONRPCResponse, build_request
+from src.common.json import JsonValue
 
 # Match the RFC 9728 resource-metadata link advertised in the
 # ``WWW-Authenticate`` header by an MCP server that requires OAuth.
@@ -64,13 +65,18 @@ class SSEClient:
         self._post_endpoint: str = ""
         self._connected = False
         # The ``aconnect_sse`` async context manager stays open until
-        # :meth:`disconnect` exits it.
-        self._context_manager: Any = None
+        # :meth:`disconnect` exits it. ``httpx_sse`` types it as an
+        # ``AbstractAsyncContextManager[EventSource]`` so we use the same
+        # shape; ``__aexit__`` swallows the connection error so the
+        # ``event_source`` payload never escapes through us.
+        self._context_manager: AbstractAsyncContextManager[EventSource] | None = None
         # The ``httpx`` stream iterator is single-pass; we drain it
         # into this queue so :meth:`_wait_for_endpoint` and
         # :meth:`_await_message` can read sequentially without
         # exhausting the response.
-        self._event_queue: asyncio.Queue[ServerSentEvent | BaseException] | None = None
+        self._event_queue: (
+            asyncio.Queue[ServerSentEvent | BaseException | _StreamClosed] | None
+        ) = None
         self._drain_task: asyncio.Task[None] | None = None
 
     # ── Lifecycle ──────────────────────────────────────────────────
@@ -161,7 +167,7 @@ class SSEClient:
         self,
         *,
         method: str,
-        params: dict[str, Any] | None = None,
+        params: dict[str, JsonValue] | None = None,
         request_id: str | None = None,
         timeout_seconds: float | None = None,
     ) -> JSONRPCResponse:
@@ -231,7 +237,7 @@ class SSEClient:
             await queue.put(exc)
             return
         # Sentinel: stream ended cleanly.
-        await queue.put(_STREAM_CLOSED)  # type: ignore[arg-type]
+        await queue.put(_STREAM_CLOSED)
 
     async def _wait_for_endpoint(self) -> None:
         """Wait for the ``endpoint`` SSE event from the server.
@@ -252,7 +258,7 @@ class SSEClient:
                 raise MCPTransportError(
                     f"SSE handshake failed: {type(event).__name__}: {event}",
                 ) from event
-            if event is _STREAM_CLOSED:
+            if isinstance(event, _StreamClosed):
                 raise MCPTransportError("SSE stream closed before endpoint event")
             if event.event == "endpoint":
                 post_url = (event.data or "").strip()
@@ -274,7 +280,7 @@ class SSEClient:
                 raise MCPTransportError(
                     f"SSE stream invalidated mid-call: {type(event).__name__}: {event}",
                 ) from event
-            if event is _STREAM_CLOSED:
+            if isinstance(event, _StreamClosed):
                 raise MCPTransportError(
                     f"SSE stream closed before response for id={request_id!r}",
                 )
@@ -296,9 +302,14 @@ class SSEClient:
 
 
 # Internal sentinel pushed onto the event queue when the SSE stream
-# ends cleanly. ``_STREAM_CLOSED`` is intentionally a private object
-# so consumers cannot accidentally inject it from outside.
-_STREAM_CLOSED: object = object()
+# ends cleanly. ``_StreamClosed`` is intentionally a private type
+# so consumers cannot accidentally inject an instance from outside.
+class _StreamClosed:
+    """Marker instance pushed onto the SSE event queue at stream end."""
+
+
+
+_STREAM_CLOSED = _StreamClosed()
 
 
 def _raise_oauth_required_if_advertised(response: httpx.Response) -> None:
