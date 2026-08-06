@@ -6,15 +6,12 @@ endpoints are exercised against fakes of the underlying tenant repos.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 
-from src.app_context import request_context
-from src.app_context.lifespan import create_app
 from src.core.tenants.api_key_service import TenantAPIKeyService
 from src.core.tenants.kv_service import TenantKVService
 from src.db.models.tenants.tenant_api_keys import TenantAPIKey
@@ -23,7 +20,6 @@ from src.web.deps import (
     get_tenant_api_key_service,
     get_tenant_kv_service,
 )
-from tests.unit.fakes.auth_gates import override_auth_gates
 from tests.unit.fakes.tenant_api_keys import FakeTenantAPIKeyRepository
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
@@ -67,29 +63,24 @@ def kv_repo() -> _FakeKVRepo:
     return _FakeKVRepo()
 
 
-@pytest.fixture
-def app(
+@pytest.fixture(autouse=True)
+def _override_services(
+    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
     api_key_repo: FakeTenantAPIKeyRepository,
     kv_repo: _FakeKVRepo,
 ) -> FastAPI:
-    application = create_app()
-    override_auth_gates(application)
-    application.dependency_overrides[get_tenant_api_key_service] = lambda: TenantAPIKeyService(
-        api_keys_repo=api_key_repo,  # type: ignore[arg-type]
+    """Override tenant service deps on the shared web app (autouse)."""
+    web_app.dependency_overrides[get_tenant_api_key_service] = (
+        lambda: TenantAPIKeyService(
+            api_keys_repo=api_key_repo,  # type: ignore[arg-type]
+        )
     )
-    application.dependency_overrides[get_tenant_kv_service] = lambda: TenantKVService(
-        kv_repo=kv_repo,  # type: ignore[arg-type]
+    web_app.dependency_overrides[get_tenant_kv_service] = (
+        lambda: TenantKVService(
+            kv_repo=kv_repo,  # type: ignore[arg-type]
+        )
     )
-    return application
-
-
-@pytest.fixture
-async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app)
-    token_tenant = request_context.set_tenant_id("7")
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
-    request_context._tenant_id.reset(token_tenant)
+    return web_app
 
 
 async def _seed_key(
@@ -115,9 +106,12 @@ async def _seed_key(
 # ── GET /tenants/{id}/api-keys ────────────────────────────────────────
 
 
-async def test_list_api_keys(client: AsyncClient, api_key_repo: FakeTenantAPIKeyRepository) -> None:
+async def test_list_api_keys(
+    web_authed_client: AsyncClient,
+    api_key_repo: FakeTenantAPIKeyRepository,
+) -> None:
     await _seed_key(api_key_repo)
-    resp = await client.get("/tenants/7/api-keys")
+    resp = await web_authed_client.get("/tenants/7/api-keys")
     assert resp.status_code == 200
     body = resp.json()
     assert isinstance(body, list)
@@ -130,8 +124,8 @@ async def test_list_api_keys(client: AsyncClient, api_key_repo: FakeTenantAPIKey
 # ── POST /tenants/{id}/api-keys ───────────────────────────────────────
 
 
-async def test_create_api_key(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_create_api_key(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.post(
         "/tenants/7/api-keys",
         json={"name": "ci", "full_access": True},
     )
@@ -148,10 +142,11 @@ async def test_create_api_key(client: AsyncClient) -> None:
 
 
 async def test_revoke_api_key(
-    client: AsyncClient, api_key_repo: FakeTenantAPIKeyRepository
+    web_authed_client: AsyncClient,
+    api_key_repo: FakeTenantAPIKeyRepository,
 ) -> None:
     key = await _seed_key(api_key_repo)
-    resp = await client.delete(f"/tenants/7/api-keys/{key.id}")
+    resp = await web_authed_client.delete(f"/tenants/7/api-keys/{key.id}")
     assert resp.status_code == 200
     assert resp.json()["success"] is True
     assert await api_key_repo.list_for_tenant(7) == []
@@ -160,18 +155,23 @@ async def test_revoke_api_key(
 # ── GET/PUT /tenants/kv/{key} ─────────────────────────────────────────
 
 
-async def test_put_and_get_kv(client: AsyncClient, kv_repo: _FakeKVRepo) -> None:
-    put = await client.put("/tenants/kv/web-search-config", json={"max_results": 20})
+async def test_put_and_get_kv(
+    web_authed_client: AsyncClient,
+    kv_repo: _FakeKVRepo,
+) -> None:
+    put = await web_authed_client.put(
+        "/tenants/kv/web-search-config", json={"max_results": 20}
+    )
     assert put.status_code == 200
     assert put.json() == {"max_results": 20}
 
-    get = await client.get("/tenants/kv/web-search-config")
+    get = await web_authed_client.get("/tenants/kv/web-search-config")
     assert get.status_code == 200
     assert get.json() == {"max_results": 20}
 
 
-async def test_get_kv_unsupported_key(client: AsyncClient) -> None:
-    resp = await client.get("/tenants/kv/nonexistent")
+async def test_get_kv_unsupported_key(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.get("/tenants/kv/nonexistent")
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "tenant_kv.unsupported_key"
 

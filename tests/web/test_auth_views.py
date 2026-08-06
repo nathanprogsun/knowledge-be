@@ -7,20 +7,17 @@ in-memory fake repos.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 
-from src.app_context.lifespan import create_app
 from src.core.auth.service import AuthService
 from src.db.models.auth.auth_tokens import AuthToken
 from src.db.models.auth.users import User
 from src.util.security import hash_password
 from src.web.deps import get_auth_service
-from tests.unit.fakes.auth_gates import override_auth_gates
 
 # ── In-memory fakes ──────────────────────────────────────────────────
 
@@ -106,22 +103,18 @@ def fake_tokens() -> _FakeTokenRepo:
     return _FakeTokenRepo()
 
 
-@pytest.fixture
-def app(fake_users: _FakeUserRepo, fake_tokens: _FakeTokenRepo) -> FastAPI:
-    application = create_app()
-    override_auth_gates(application)
-    application.dependency_overrides[get_auth_service] = lambda: AuthService(
+@pytest.fixture(autouse=True)
+def _override_services(
+    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
+    fake_users: _FakeUserRepo,
+    fake_tokens: _FakeTokenRepo,
+) -> FastAPI:
+    """Override the auth service dep on the shared web app (autouse)."""
+    web_app.dependency_overrides[get_auth_service] = lambda: AuthService(
         users_repo=fake_users,  # type: ignore[arg-type]
         tokens_repo=fake_tokens,  # type: ignore[arg-type]
     )
-    return application
-
-
-@pytest.fixture
-async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
+    return web_app
 
 
 # ── Helpers ─────────────────────────────────────────────────────────
@@ -156,9 +149,11 @@ def _seed_user(
 # ── POST /auth/login ────────────────────────────────────────────────
 
 
-async def test_login_success(client: AsyncClient, fake_users: _FakeUserRepo) -> None:
+async def test_login_success(
+    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+) -> None:
     _seed_user(fake_users)
-    resp = await client.post(
+    resp = await web_authed_client.post(
         "/auth/login",
         json={"email": "alice@example.com", "password": "correct-horse"},
     )
@@ -174,9 +169,11 @@ async def test_login_success(client: AsyncClient, fake_users: _FakeUserRepo) -> 
     assert body["refresh_token"]
 
 
-async def test_login_wrong_password(client: AsyncClient, fake_users: _FakeUserRepo) -> None:
+async def test_login_wrong_password(
+    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+) -> None:
     _seed_user(fake_users)
-    resp = await client.post(
+    resp = await web_authed_client.post(
         "/auth/login",
         json={"email": "alice@example.com", "password": "wrong"},
     )
@@ -186,18 +183,22 @@ async def test_login_wrong_password(client: AsyncClient, fake_users: _FakeUserRe
     assert body["error"]["code"] == "auth.invalid_credentials"
 
 
-async def test_login_unknown_email(client: AsyncClient, fake_users: _FakeUserRepo) -> None:
+async def test_login_unknown_email(
+    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+) -> None:
     _seed_user(fake_users)
-    resp = await client.post(
+    resp = await web_authed_client.post(
         "/auth/login",
         json={"email": "nobody@example.com", "password": "x"},
     )
     assert resp.status_code == 401
 
 
-async def test_login_inactive_user(client: AsyncClient, fake_users: _FakeUserRepo) -> None:
+async def test_login_inactive_user(
+    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+) -> None:
     _seed_user(fake_users, is_active=False)
-    resp = await client.post(
+    resp = await web_authed_client.post(
         "/auth/login",
         json={"email": "alice@example.com", "password": "correct-horse"},
     )
@@ -207,15 +208,17 @@ async def test_login_inactive_user(client: AsyncClient, fake_users: _FakeUserRep
 # ── POST /auth/refresh ──────────────────────────────────────────────
 
 
-async def test_refresh_success(client: AsyncClient, fake_users: _FakeUserRepo) -> None:
+async def test_refresh_success(
+    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+) -> None:
     _seed_user(fake_users)
-    login = await client.post(
+    login = await web_authed_client.post(
         "/auth/login",
         json={"email": "alice@example.com", "password": "correct-horse"},
     )
     refresh_token = login.json()["refresh_token"]
 
-    resp = await client.post(
+    resp = await web_authed_client.post(
         "/auth/refresh",
         json={"refreshToken": refresh_token},
     )
@@ -228,24 +231,24 @@ async def test_refresh_success(client: AsyncClient, fake_users: _FakeUserRepo) -
 
 
 async def test_refresh_with_access_token_fails(
-    client: AsyncClient, fake_users: _FakeUserRepo
+    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
 ) -> None:
     _seed_user(fake_users)
-    login = await client.post(
+    login = await web_authed_client.post(
         "/auth/login",
         json={"email": "alice@example.com", "password": "correct-horse"},
     )
     access_token = login.json()["token"]
 
-    resp = await client.post(
+    resp = await web_authed_client.post(
         "/auth/refresh",
         json={"refreshToken": access_token},
     )
     assert resp.status_code == 401
 
 
-async def test_refresh_garbage_token(client: AsyncClient, fake_users: _FakeUserRepo) -> None:
-    resp = await client.post(
+async def test_refresh_garbage_token(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.post(
         "/auth/refresh",
         json={"refreshToken": "not-a-jwt"},
     )
@@ -255,15 +258,17 @@ async def test_refresh_garbage_token(client: AsyncClient, fake_users: _FakeUserR
 # ── POST /auth/logout ───────────────────────────────────────────────
 
 
-async def test_logout_success(client: AsyncClient, fake_users: _FakeUserRepo) -> None:
+async def test_logout_success(
+    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+) -> None:
     _seed_user(fake_users)
-    login = await client.post(
+    login = await web_authed_client.post(
         "/auth/login",
         json={"email": "alice@example.com", "password": "correct-horse"},
     )
     token = login.json()["token"]
 
-    resp = await client.post(
+    resp = await web_authed_client.post(
         "/auth/logout",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -273,15 +278,15 @@ async def test_logout_success(client: AsyncClient, fake_users: _FakeUserRepo) ->
     assert body["message"] == "Logout successful"
 
 
-async def test_logout_missing_header(client: AsyncClient) -> None:
-    resp = await client.post("/auth/logout")
+async def test_logout_missing_header(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.post("/auth/logout")
     assert resp.status_code == 422
     body = resp.json()
     assert body["error"]["code"] == "auth.missing_authorization"
 
 
-async def test_logout_invalid_header_format(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_logout_invalid_header_format(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.post(
         "/auth/logout",
         headers={"Authorization": "Basic abc"},
     )
@@ -290,9 +295,11 @@ async def test_logout_invalid_header_format(client: AsyncClient) -> None:
     assert body["error"]["code"] == "auth.invalid_authorization"
 
 
-async def test_logout_garbage_token(client: AsyncClient, fake_users: _FakeUserRepo) -> None:
+async def test_logout_garbage_token(
+    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+) -> None:
     _seed_user(fake_users)
-    resp = await client.post(
+    resp = await web_authed_client.post(
         "/auth/logout",
         headers={"Authorization": "Bearer not-a-jwt"},
     )

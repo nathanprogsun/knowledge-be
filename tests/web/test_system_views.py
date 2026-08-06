@@ -8,14 +8,12 @@ serialization, exception handling) without touching a real database.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 
-from src.app_context.lifespan import create_app
 from src.core.system.audit_service import AuditLogService
 from src.core.system.system_setting_service import SystemSettingService
 from src.db.models.system.audit_log import AuditLog
@@ -24,7 +22,7 @@ from src.web.deps import (
     get_audit_log_service,
     get_system_setting_service,
 )
-from tests.unit.fakes.auth_gates import override_auth_gates
+from src.web.deps.rbac import require_system_admin_dep
 
 # ── In-memory fakes (reuse the service-test fakes' shape) ───────────
 
@@ -130,37 +128,36 @@ def fake_settings_repo() -> _FakeSystemSettingRepo:
     return _FakeSystemSettingRepo()
 
 
-@pytest.fixture
-def app(
+@pytest.fixture(autouse=True)
+def _override_services(
+    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
     fake_audit_repo: _FakeAuditLogRepo,
     fake_settings_repo: _FakeSystemSettingRepo,
 ) -> FastAPI:
-    application = create_app()
-    override_auth_gates(application)
-    application.dependency_overrides[get_system_setting_service] = lambda: SystemSettingService(
+    """Override system service deps on the shared web app (autouse).
+
+    The system-admin router gates on ``SystemAdminDep``; the header
+    channel uses role ``owner`` (not ``system_admin``), so we bypass
+    the dep locally — the test is exercising settings CRUD, not RBAC.
+    """
+    web_app.dependency_overrides[require_system_admin_dep] = lambda: None
+    web_app.dependency_overrides[get_system_setting_service] = lambda: SystemSettingService(
         settings_repo=fake_settings_repo,  # type: ignore[arg-type]
         audit_repo=fake_audit_repo,  # type: ignore[arg-type]
     )
-    application.dependency_overrides[get_audit_log_service] = lambda: AuditLogService(
+    web_app.dependency_overrides[get_audit_log_service] = lambda: AuditLogService(
         audit_repo=fake_audit_repo,  # type: ignore[arg-type]
     )
-    return application
-
-
-@pytest.fixture
-async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
+    return web_app
 
 
 # ── GET /system/admin/settings ──────────────────────────────────────
 
 
 async def test_list_settings_returns_registry_keys(
-    client: AsyncClient,
+    web_authed_client: AsyncClient,
 ) -> None:
-    resp = await client.get("/system/admin/settings")
+    resp = await web_authed_client.get("/system/admin/settings")
     assert resp.status_code == 200
     body = resp.json()
     keys = {r["key"] for r in body}
@@ -175,16 +172,16 @@ async def test_list_settings_returns_registry_keys(
 # ── GET /system/admin/settings/{key} ────────────────────────────────
 
 
-async def test_get_setting_returns_virtual_row(client: AsyncClient) -> None:
-    resp = await client.get("/system/admin/settings/auth.registration_mode")
+async def test_get_setting_returns_virtual_row(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.get("/system/admin/settings/auth.registration_mode")
     assert resp.status_code == 200
     body = resp.json()
     assert body["key"] == "auth.registration_mode"
     assert body["enum"] == ["self_serve", "invite_only"]
 
 
-async def test_get_unknown_setting_returns_422(client: AsyncClient) -> None:
-    resp = await client.get("/system/admin/settings/nope.does_not_exist")
+async def test_get_unknown_setting_returns_422(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.get("/system/admin/settings/nope.does_not_exist")
     assert resp.status_code == 422
 
 
@@ -192,10 +189,10 @@ async def test_get_unknown_setting_returns_422(client: AsyncClient) -> None:
 
 
 async def test_update_setting_persists_and_audits(
-    client: AsyncClient,
+    web_authed_client: AsyncClient,
     fake_audit_repo: _FakeAuditLogRepo,
 ) -> None:
-    resp = await client.put(
+    resp = await web_authed_client.put(
         "/system/admin/settings/auth.registration_mode",
         json={"value": "invite_only"},
     )
@@ -208,9 +205,9 @@ async def test_update_setting_persists_and_audits(
 
 
 async def test_update_setting_type_mismatch_returns_422(
-    client: AsyncClient,
+    web_authed_client: AsyncClient,
 ) -> None:
-    resp = await client.put(
+    resp = await web_authed_client.put(
         "/system/admin/settings/auth.registration_mode",
         json={"value": 123},
     )
@@ -218,9 +215,9 @@ async def test_update_setting_type_mismatch_returns_422(
 
 
 async def test_update_setting_enum_violation_returns_422(
-    client: AsyncClient,
+    web_authed_client: AsyncClient,
 ) -> None:
-    resp = await client.put(
+    resp = await web_authed_client.put(
         "/system/admin/settings/auth.registration_mode",
         json={"value": "bogus"},
     )
@@ -230,15 +227,15 @@ async def test_update_setting_enum_violation_returns_422(
 # ── DELETE /system/admin/settings/{key} ─────────────────────────────
 
 
-async def test_reset_setting_idempotent(client: AsyncClient) -> None:
-    resp = await client.delete("/system/admin/settings/auth.registration_mode")
+async def test_reset_setting_idempotent(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.delete("/system/admin/settings/auth.registration_mode")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
 
 
-async def test_reset_unknown_setting_returns_422(client: AsyncClient) -> None:
-    resp = await client.delete("/system/admin/settings/nope")
+async def test_reset_unknown_setting_returns_422(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.delete("/system/admin/settings/nope")
     assert resp.status_code == 422
 
 
@@ -246,7 +243,7 @@ async def test_reset_unknown_setting_returns_422(client: AsyncClient) -> None:
 
 
 async def test_system_audit_log_returns_newest_first(
-    client: AsyncClient,
+    web_authed_client: AsyncClient,
     fake_audit_repo: _FakeAuditLogRepo,
 ) -> None:
     now = datetime.now(UTC)
@@ -262,7 +259,7 @@ async def test_system_audit_log_returns_newest_first(
             )
         )
     fake_audit_repo._next_id = 100
-    resp = await client.get("/system/admin/audit-log?limit=2")
+    resp = await web_authed_client.get("/system/admin/audit-log?limit=2")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -273,7 +270,7 @@ async def test_system_audit_log_returns_newest_first(
 
 
 async def test_system_audit_log_filter_by_action(
-    client: AsyncClient,
+    web_authed_client: AsyncClient,
     fake_audit_repo: _FakeAuditLogRepo,
 ) -> None:
     now = datetime.now(UTC)
@@ -297,7 +294,7 @@ async def test_system_audit_log_filter_by_action(
             created_at=now,
         )
     )
-    resp = await client.get("/system/admin/audit-log?action=system.admin_promoted")
+    resp = await web_authed_client.get("/system/admin/audit-log?action=system.admin_promoted")
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["data"]) == 1
