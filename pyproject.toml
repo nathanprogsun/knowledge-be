@@ -50,6 +50,10 @@ dev = [
     "types-passlib>=1.7",
     "types-python-jose>=3.3",
     "types-redis>=4.6",
+    # Test scaffolding: polyfactory generates Pydantic row models for tests,
+    # faker backs the underlying faker provider for non-trivial types.
+    "polyfactory>=2.15",
+    "faker>=24.0",
 ]
 
 [build-system]
