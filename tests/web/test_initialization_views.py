@@ -30,7 +30,7 @@ from src.core.infra.initialization.provider_detect import (
 from src.core.infra.initialization.service.initialization_service import InitializationService
 from src.web.api.infra.initialization.router import router as initialization_router
 from src.web.deps.infra_initialization import get_initialization_service
-from tests.fakes.auth_gates import override_auth_gates
+from tests.unit.fakes.auth_gates import override_auth_gates
 
 _OLLAMA_BASE = "http://ollama.test:11434"
 _REMOTE_BASE = "https://example.com/v1"

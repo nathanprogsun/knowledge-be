@@ -17,7 +17,7 @@ from src.common.exception import NotFoundError, ValidationError
 from src.core.tenants.service import TenantService
 from src.db.dao.tenants_repository import TenantRepository
 from src.db.models.tenants.tenants import DEFAULT_STORAGE_QUOTA_BYTES, Tenant
-from tests.fakes.tenants import FakeTenantRepository
+from tests.unit.fakes.tenants import FakeTenantRepository
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 

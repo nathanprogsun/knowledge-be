@@ -25,8 +25,8 @@ from src.core.infra.models.service.model_service import ModelService
 from src.web.api.infra.models.router import router as models_router
 from src.web.deps.infra_models import get_model_service
 from src.web.exception_handler import register_exception_handlers
-from tests.core.infra.models.fake_model_repository import FakeModelRepository
-from tests.fakes.auth_gates import override_auth_gates
+from tests.unit.fakes.models import FakeModelRepository
+from tests.unit.fakes.auth_gates import override_auth_gates
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 

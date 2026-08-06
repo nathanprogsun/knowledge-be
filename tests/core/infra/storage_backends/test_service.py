@@ -39,7 +39,7 @@ from src.db.models.storage_backend import (
     STORAGE_BACKEND_STATUS_DISABLED,
     StorageBackend,
 )
-from tests.fakes.storage_backends import FakeStorageBackendRepository
+from tests.unit.fakes.storage_backends import FakeStorageBackendRepository
 
 _TENANT_ID = 7
 _OTHER_TENANT_ID = 8

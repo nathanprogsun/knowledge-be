@@ -20,7 +20,7 @@ from src.db.models.auth.auth_tokens import AuthToken
 from src.db.models.auth.users import User
 from src.util.security import hash_password, verify_password
 from src.web.deps import get_auth_service
-from tests.fakes.auth_gates import override_auth_gates
+from tests.unit.fakes.auth_gates import override_auth_gates
 
 
 class _FakeUserRepo:

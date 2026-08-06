@@ -37,8 +37,8 @@ from src.web.deps.infra_datasources import get_datasource_service
 from src.web.deps.rbac import make_role_dep, require_role_dep
 from src.web.exception_handler import register_exception_handlers
 from src.web.middleware.auth import require_auth
-from tests.fakes.auth_gates import override_auth_gates
-from tests.fakes.datasources import (
+from tests.unit.fakes.auth_gates import override_auth_gates
+from tests.unit.fakes.datasources import (
     FakeAuditRepo,
     FakeDataSourceRepo,
     FakeSyncLogRepo,

@@ -23,7 +23,7 @@ from src.core.infra.models.service.provider_service import (
     sign_request_headers,
 )
 from src.db.models.tenants.tenants import Tenant
-from tests.fakes.tenants import FakeTenantRepository
+from tests.unit.fakes.tenants import FakeTenantRepository
 
 _HEALTH_URL = f"{WEKNORA_CLOUD_BASE_URL}/api/v1/health"
 

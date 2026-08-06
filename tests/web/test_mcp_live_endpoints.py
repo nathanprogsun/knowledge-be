@@ -57,8 +57,8 @@ from src.db.dao.mcp_tool_approval_repository import (
 from src.db.models.infra.mcp_services import MCPService
 from src.web.api.infra.mcp_services.router import router as mcp_router
 from src.web.deps.infra_mcp import get_mcp_service
-from tests.fakes.auth_gates import override_auth_gates
-from tests.fakes.mcp_services import (
+from tests.unit.fakes.auth_gates import override_auth_gates
+from tests.unit.fakes.mcp_services import (
     FakeMCPServiceRepository,
     FakeMCPToolApprovalRepository,
 )

@@ -23,8 +23,8 @@ from src.web.deps import (
     get_tenant_api_key_service,
     get_tenant_kv_service,
 )
-from tests.fakes.auth_gates import override_auth_gates
-from tests.fakes.tenant_api_keys import FakeTenantAPIKeyRepository
+from tests.unit.fakes.auth_gates import override_auth_gates
+from tests.unit.fakes.tenant_api_keys import FakeTenantAPIKeyRepository
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 

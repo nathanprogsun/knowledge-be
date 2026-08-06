@@ -36,8 +36,8 @@ from src.db.models.storage_backend import (
 )
 from src.web.api.infra.storage_backends.router import router as storage_backends_router
 from src.web.deps.infra_storage_backends import get_storage_backend_service
-from tests.fakes.auth_gates import override_auth_gates
-from tests.fakes.storage_backends import FakeStorageBackendRepository
+from tests.unit.fakes.auth_gates import override_auth_gates
+from tests.unit.fakes.storage_backends import FakeStorageBackendRepository
 
 # ``override_auth_gates`` sets the active workspace to 1.
 _TENANT_ID = 1

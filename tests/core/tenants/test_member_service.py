@@ -18,7 +18,7 @@ from src.core.tenants.member_service import (
     role_level,
 )
 from src.db.models.tenants.tenant_members import TenantMember
-from tests.fakes.tenant_members import FakeTenantMemberRepository
+from tests.unit.fakes.tenant_members import FakeTenantMemberRepository
 
 _TENANT_ID = 7
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)

@@ -27,8 +27,8 @@ from src.core.infra.mcp_services.discovery import (
 from src.core.infra.mcp_services.service import MCPServiceService
 from src.web.api.infra.mcp_services.router import router as mcp_router
 from src.web.deps.infra_mcp import get_mcp_service
-from tests.fakes.auth_gates import override_auth_gates
-from tests.fakes.mcp_services import (
+from tests.unit.fakes.auth_gates import override_auth_gates
+from tests.unit.fakes.mcp_services import (
     FakeMCPServiceRepository,
     FakeMCPToolApprovalRepository,
 )

@@ -18,7 +18,7 @@ from src.core.tenants.api_key_service import (
     normalize_scope_type,
 )
 from src.db.models.tenants.tenant_api_keys import TenantAPIKey
-from tests.fakes.tenant_api_keys import FakeTenantAPIKeyRepository
+from tests.unit.fakes.tenant_api_keys import FakeTenantAPIKeyRepository
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 _TENANT_ID = 7

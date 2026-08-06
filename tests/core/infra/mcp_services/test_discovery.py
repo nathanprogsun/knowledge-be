@@ -17,7 +17,7 @@ from src.core.infra.mcp_services.discovery import (
 )
 from src.core.infra.mcp_services.service import MCPServiceService
 from src.db.models.infra.mcp_services import MCPService
-from tests.fakes.mcp_services import (
+from tests.unit.fakes.mcp_services import (
     FakeMCPServiceRepository,
     FakeMCPToolApprovalRepository,
 )

@@ -24,7 +24,7 @@ from src.web.deps import (
     get_audit_log_service,
     get_system_setting_service,
 )
-from tests.fakes.auth_gates import override_auth_gates
+from tests.unit.fakes.auth_gates import override_auth_gates
 
 # ── In-memory fakes (reuse the service-test fakes' shape) ───────────
 

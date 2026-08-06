@@ -38,7 +38,7 @@ from src.core.infra.datasources.types import (
 )
 from src.core.system.audit_service import AuditLogService
 from src.db.models.datasource import DataSource, SyncLog
-from tests.fakes.datasources import (
+from tests.unit.fakes.datasources import (
     FakeAuditRepo,
     FakeDataSourceRepo,
     FakeSyncLogRepo,

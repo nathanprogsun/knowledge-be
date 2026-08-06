@@ -29,7 +29,7 @@ from src.core.contracts.infra import (
 from src.core.infra.vector_stores.types import VectorStoreInfo
 from src.db.models.infra.vector_store import VectorStore
 from src.web.deps.infra_vector_stores import get_vector_store_service
-from tests.fakes.auth_gates import override_auth_gates
+from tests.unit.fakes.auth_gates import override_auth_gates
 
 # ── In-memory fake service ──────────────────────────────────────────
 

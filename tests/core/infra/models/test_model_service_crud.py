@@ -23,7 +23,7 @@ from src.core.contracts.infra import (
 )
 from src.core.infra.models.service.model_service import ModelService
 from src.core.infra.models.types import ModelInfo
-from tests.core.infra.models.fake_model_repository import FakeModelRepository
+from tests.unit.fakes.models import FakeModelRepository
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 

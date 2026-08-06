@@ -29,8 +29,8 @@ from src.db.models.tenants.tenant_invitations import (
     STATUS_PENDING,
     STATUS_REVOKED,
 )
-from tests.fakes.tenant_invitations import FakeTenantInvitationRepository
-from tests.fakes.tenant_members import FakeTenantMemberRepository
+from tests.unit.fakes.tenant_invitations import FakeTenantInvitationRepository
+from tests.unit.fakes.tenant_members import FakeTenantMemberRepository
 
 _TENANT_ID = 7
 _INVITEE = "usr-invitee"

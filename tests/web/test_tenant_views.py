@@ -20,9 +20,9 @@ from src.core.tenants.member_service import TenantMemberService
 from src.core.tenants.service import TenantService
 from src.db.models.tenants.tenants import DEFAULT_STORAGE_QUOTA_BYTES, Tenant
 from src.web.deps import get_tenant_member_service, get_tenant_service
-from tests.fakes.auth_gates import override_auth_gates
-from tests.fakes.tenant_members import FakeTenantMemberRepository
-from tests.fakes.tenants import FakeTenantRepository
+from tests.unit.fakes.auth_gates import override_auth_gates
+from tests.unit.fakes.tenant_members import FakeTenantMemberRepository
+from tests.unit.fakes.tenants import FakeTenantRepository
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
