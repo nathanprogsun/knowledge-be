@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -20,6 +21,7 @@ from src.common.exception import (
     StorageBackendError,
     ValidationError,
 )
+from src.common.json import BindParams
 from src.core.infra.storage_backends.service.storage_backend_service import (
     StorageBackendService,
 )
@@ -32,6 +34,7 @@ from src.core.infra.storage_backends.types import (
     allowed_providers,
     is_provider_allowed,
 )
+from src.db.dao.storage_backend_repository import StorageBackendRepository
 from src.db.models.storage_backend import (
     STORAGE_BACKEND_SOURCE_ENV,
     STORAGE_BACKEND_SOURCE_USER,
@@ -39,7 +42,6 @@ from src.db.models.storage_backend import (
     STORAGE_BACKEND_STATUS_DISABLED,
     StorageBackend,
 )
-from tests.unit.fakes.storage_backends import FakeStorageBackendRepository
 
 _TENANT_ID = 7
 _OTHER_TENANT_ID = 8
@@ -55,14 +57,120 @@ _MINIO_CONFIG = StorageBackendConfigInfo(
 )
 
 
-@pytest.fixture
-def repo() -> FakeStorageBackendRepository:
-    return FakeStorageBackendRepository()
+def _make_repo() -> AsyncMock:
+    """Build an ``AsyncMock(spec=StorageBackendRepository)`` with closure-captured state.
+
+    The returned mock exposes ``rows``, ``default_backend_id``,
+    ``knowledge_base_references`` and ``active_resource_references`` as
+    attributes so test setup and assertions can read/write them
+    directly without going through the service.
+    """
+    repo = AsyncMock(spec=StorageBackendRepository)
+    repo.rows = {}  # type: ignore[attr-defined]
+    repo.default_backend_id = {}  # type: ignore[attr-defined]
+    repo.knowledge_base_references = 0  # type: ignore[attr-defined]
+    repo.active_resource_references = 0  # type: ignore[attr-defined]
+
+    def _live_rows() -> dict[str, StorageBackend]:
+        return {
+            i: r for i, r in repo.rows.items() if r.deleted_at is None  # type: ignore[attr-defined]
+        }
+
+    async def _get_by_id(
+        *, tenant_id: int, id: str
+    ) -> StorageBackend | None:
+        row = repo.rows.get(id)  # type: ignore[attr-defined]
+        if row is None or row.tenant_id != tenant_id or row.deleted_at is not None:
+            return None
+        return row
+
+    async def _list_for_tenant(tenant_id: int) -> list[StorageBackend]:
+        live = [
+            row
+            for row in _live_rows().values()
+            if row.tenant_id == tenant_id
+        ]
+        return sorted(live, key=lambda r: (r.created_at, r.id))
+
+    async def _find_legacy_alias(
+        *, tenant_id: int, provider: str
+    ) -> StorageBackend | None:
+        candidates = [
+            row
+            for row in await _list_for_tenant(tenant_id)
+            if row.provider == provider and row.legacy_alias
+        ]
+        return candidates[0] if candidates else None
+
+    async def _find_by_name(
+        *, tenant_id: int, name: str
+    ) -> StorageBackend | None:
+        for row in await _list_for_tenant(tenant_id):
+            if row.name == name:
+                return row
+        return None
+
+    async def _create(row: StorageBackend) -> StorageBackend:
+        repo.rows[row.id] = row  # type: ignore[attr-defined]
+        return row
+
+    async def _update_columns(
+        *, tenant_id: int, id: str, columns: BindParams
+    ) -> StorageBackend | None:
+        existing = await _get_by_id(tenant_id=tenant_id, id=id)
+        if existing is None:
+            return None
+        updated = existing.model_copy(update=dict(columns))
+        repo.rows[id] = updated  # type: ignore[attr-defined]
+        return updated
+
+    async def _soft_delete(*, tenant_id: int, id: str) -> bool:
+        existing = await _get_by_id(tenant_id=tenant_id, id=id)
+        if existing is None:
+            return False
+        now = datetime.now(UTC)
+        repo.rows[id] = existing.model_copy(  # type: ignore[attr-defined]
+            update={"deleted_at": now, "updated_at": now}
+        )
+        return True
+
+    async def _get_default_backend_id(tenant_id: int) -> str | None:
+        return repo.default_backend_id.get(tenant_id)  # type: ignore[attr-defined]
+
+    async def _set_default_backend_id(
+        *, tenant_id: int, id: str
+    ) -> bool:
+        repo.default_backend_id[tenant_id] = id  # type: ignore[attr-defined]
+        return True
+
+    async def _count_kb_refs(*, tenant_id: int, id: str) -> int:
+        return repo.knowledge_base_references  # type: ignore[attr-defined]
+
+    async def _count_active_refs(*, tenant_id: int, id: str) -> int:
+        return repo.active_resource_references  # type: ignore[attr-defined]
+
+    repo.get_by_id.side_effect = _get_by_id
+    repo.list_for_tenant.side_effect = _list_for_tenant
+    repo.find_legacy_alias.side_effect = _find_legacy_alias
+    repo.find_by_name.side_effect = _find_by_name
+    repo.create.side_effect = _create
+    repo.update_columns.side_effect = _update_columns
+    repo.soft_delete.side_effect = _soft_delete
+    repo.get_default_backend_id.side_effect = _get_default_backend_id
+    repo.set_default_backend_id.side_effect = _set_default_backend_id
+    repo.count_knowledge_base_references.side_effect = _count_kb_refs
+    repo.count_active_resource_references.side_effect = _count_active_refs
+    return repo
 
 
 @pytest.fixture
-def service(repo: FakeStorageBackendRepository) -> StorageBackendService:
-    return StorageBackendService(backend_repo=repo)  # type: ignore[arg-type]
+def repo() -> AsyncMock:
+    return _make_repo()
+
+
+@pytest.fixture
+def service(repo: AsyncMock) -> StorageBackendService:
+    return StorageBackendService(backend_repo=repo)
 
 
 @pytest.fixture(autouse=True)
@@ -102,7 +210,7 @@ def clean_allow_list() -> Iterator[None]:
 
 
 def _seed(
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
     *,
     id: str = "backend-1",
     tenant_id: int = _TENANT_ID,
@@ -288,7 +396,7 @@ def test_validate_s3_requires_endpoint_and_region() -> None:
 
 async def test_create_persists_a_user_sourced_active_backend(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     info = await service.create(
         tenant_id=_TENANT_ID,
@@ -307,7 +415,7 @@ async def test_create_persists_a_user_sourced_active_backend(
 
 async def test_create_rejects_a_duplicate_name(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, name="Primary MinIO")
 
@@ -367,7 +475,7 @@ async def test_create_rejects_an_invalid_status(service: StorageBackendService) 
 
 async def test_create_refuses_when_the_probe_fails(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
@@ -394,7 +502,7 @@ async def test_create_refuses_when_the_probe_fails(
 
 async def test_get_masks_credentials(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
 
@@ -406,7 +514,7 @@ async def test_get_masks_credentials(
 
 async def test_get_does_not_cross_tenants(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, tenant_id=_OTHER_TENANT_ID)
 
@@ -418,7 +526,7 @@ async def test_get_does_not_cross_tenants(
 
 async def test_list_returns_masked_rows_and_the_default_id(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, id="backend-1", name="A")
     _seed(repo, id="backend-2", name="B")
@@ -433,7 +541,7 @@ async def test_list_returns_masked_rows_and_the_default_id(
 
 async def test_list_excludes_other_tenants(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, id="mine")
     _seed(repo, id="theirs", tenant_id=_OTHER_TENANT_ID)
@@ -448,7 +556,7 @@ async def test_list_excludes_other_tenants(
 
 async def test_update_renames_and_keeps_stored_secrets(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
     redacted = _MINIO_CONFIG.mask_sensitive_fields()
@@ -471,7 +579,7 @@ async def test_update_renames_and_keeps_stored_secrets(
 
 async def test_update_accepts_a_credential_rotation(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
     rotated = _MINIO_CONFIG.model_copy(update={"secret_access_key": "rotated"})
@@ -489,7 +597,7 @@ async def test_update_accepts_a_credential_rotation(
 
 async def test_update_rejects_a_location_change(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
     moved = _MINIO_CONFIG.model_copy(update={"bucket_name": "elsewhere"})
@@ -502,7 +610,7 @@ async def test_update_rejects_a_location_change(
 
 async def test_update_rejects_an_env_sourced_backend(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, source=STORAGE_BACKEND_SOURCE_ENV)
 
@@ -514,7 +622,7 @@ async def test_update_rejects_an_env_sourced_backend(
 
 async def test_update_can_disable_an_unreferenced_backend(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
 
@@ -527,7 +635,7 @@ async def test_update_can_disable_an_unreferenced_backend(
 
 async def test_update_cannot_disable_the_workspace_default(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
     repo.default_backend_id[_TENANT_ID] = "backend-1"
@@ -542,7 +650,7 @@ async def test_update_cannot_disable_the_workspace_default(
 
 async def test_update_cannot_disable_a_backend_with_bound_knowledge_bases(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
     repo.knowledge_base_references = 2
@@ -557,7 +665,7 @@ async def test_update_cannot_disable_a_backend_with_bound_knowledge_bases(
 
 async def test_update_of_an_already_disabled_backend_skips_the_guard(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, status=STORAGE_BACKEND_STATUS_DISABLED)
     repo.knowledge_base_references = 5
@@ -583,7 +691,7 @@ async def test_update_of_a_missing_backend_raises_not_found(
 
 async def test_delete_soft_deletes_an_unreferenced_backend(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
 
@@ -595,7 +703,7 @@ async def test_delete_soft_deletes_an_unreferenced_backend(
 
 async def test_delete_refuses_the_workspace_default(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
     repo.default_backend_id[_TENANT_ID] = "backend-1"
@@ -608,7 +716,7 @@ async def test_delete_refuses_the_workspace_default(
 
 async def test_delete_refuses_a_backend_with_bound_knowledge_bases(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
     repo.knowledge_base_references = 3
@@ -622,7 +730,7 @@ async def test_delete_refuses_a_backend_with_bound_knowledge_bases(
 
 async def test_delete_refuses_a_backend_with_active_resources(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
     repo.active_resource_references = 4
@@ -635,7 +743,7 @@ async def test_delete_refuses_a_backend_with_active_resources(
 
 async def test_delete_refuses_an_env_sourced_backend(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, source=STORAGE_BACKEND_SOURCE_ENV)
 
@@ -647,7 +755,7 @@ async def test_delete_refuses_an_env_sourced_backend(
 
 async def test_delete_refuses_a_legacy_alias(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, legacy_alias=True)
 
@@ -662,7 +770,7 @@ async def test_delete_refuses_a_legacy_alias(
 
 async def test_set_default_points_the_workspace_at_an_active_backend(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
 
@@ -673,7 +781,7 @@ async def test_set_default_points_the_workspace_at_an_active_backend(
 
 async def test_set_default_refuses_a_disabled_backend(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, status=STORAGE_BACKEND_STATUS_DISABLED)
 
@@ -741,7 +849,7 @@ async def test_test_config_still_rejects_an_invalid_request(
 
 async def test_test_backend_probes_a_saved_row(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo)
 
@@ -762,7 +870,7 @@ async def test_test_backend_of_a_missing_row_raises_not_found(
 
 async def test_resolve_prefers_an_explicit_backend_id(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, id="explicit")
     _seed(repo, id="alias", name="Alias", legacy_alias=True)
@@ -778,7 +886,7 @@ async def test_resolve_prefers_an_explicit_backend_id(
 
 async def test_resolve_falls_back_to_the_legacy_alias_for_a_bare_provider(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, id="alias", name="Alias", legacy_alias=True)
     repo.default_backend_id[_TENANT_ID] = "other"
@@ -791,7 +899,7 @@ async def test_resolve_falls_back_to_the_legacy_alias_for_a_bare_provider(
 
 async def test_resolve_uses_the_workspace_default_when_nothing_is_specified(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, id="default-backend")
     repo.default_backend_id[_TENANT_ID] = "default-backend"
@@ -819,7 +927,7 @@ async def test_resolve_raises_when_the_named_backend_is_absent(
 
 async def test_resolve_raises_when_the_resolved_backend_is_disabled(
     service: StorageBackendService,
-    repo: FakeStorageBackendRepository,
+    repo: AsyncMock,
 ) -> None:
     _seed(repo, status=STORAGE_BACKEND_STATUS_DISABLED)
 

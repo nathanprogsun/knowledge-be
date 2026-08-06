@@ -2,14 +2,15 @@
 
 Covers authorization-URL building + signed-state round-trip and the
 existing-user bind path; new-user provisioning raises
-``oidc.provisioning_unavailable``. ``OidcClient`` and repos are faked;
-``mint_token_pair`` runs for real.
+``oidc.provisioning_unavailable``. ``OidcClient`` and repos are mocked
+via ``AsyncMock(spec=...)``; ``mint_token_pair`` runs for real.
 """
 
 from __future__ import annotations
 
 import time
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -27,36 +28,15 @@ from src.core.auth.oidc import (
     _sign_state,
     _verify_state,
 )
+from src.db.dao.auth_tokens_repository import AuthTokenRepository
+from src.db.dao.users_repository import UserRepository
 from src.db.models.auth.auth_tokens import AuthToken
 from src.db.models.auth.users import User
 from src.settings import reset_settings_cache
 from src.util.security import decode_token, hash_password, reset_secret_cache
+from tests.util.service_test import ServiceTest
 
-# ── Fakes ────────────────────────────────────────────────────────────
-
-
-class _FakeUsersRepo:
-    """Minimal stand-in for ``UserRepository`` (``find_by_email`` only)."""
-
-    def __init__(self) -> None:
-        self.users: dict[str, User] = {}
-
-    async def find_by_email(self, email: str) -> User:
-        for user in self.users.values():
-            if user.email == email:
-                return user
-        raise NotFoundError(code="user.not_found", message=f"User {email} not found")
-
-
-class _FakeTokensRepo:
-    """Minimal stand-in for ``AuthTokenRepository`` (``insert`` only)."""
-
-    def __init__(self) -> None:
-        self.inserted: list[AuthToken] = []
-
-    async def insert(self, row: AuthToken) -> AuthToken:
-        self.inserted.append(row)
-        return row
+# ── Protocol doubles (non-repository collaborators) ──────────────────
 
 
 class _FakeOidcClient:
@@ -120,15 +100,41 @@ def _oidc_env(monkeypatch: pytest.MonkeyPatch) -> object:
     reset_secret_cache()
 
 
+def _make_users_repo(*, user: User | None = None) -> AsyncMock:
+    """Build a users-repo mock that resolves ``user`` (or raises) on lookup."""
+    repo = AsyncMock(spec=UserRepository)
+    if user is None:
+
+        async def raise_not_found(email: str) -> User:
+            raise NotFoundError(code="user.not_found", message=f"User {email} not found")
+
+        repo.find_by_email.side_effect = raise_not_found
+    else:
+        repo.find_by_email.return_value = user
+    return repo
+
+
+def _make_tokens_repo() -> tuple[AsyncMock, list[AuthToken]]:
+    """Build a tokens-repo mock and return it alongside the captured list."""
+    repo = AsyncMock(spec=AuthTokenRepository)
+    inserted: list[AuthToken] = []
+
+    async def _capture(row: AuthToken) -> AuthToken:
+        inserted.append(row)
+        return row
+
+    repo.insert.side_effect = _capture
+    return repo, inserted
+
+
 def _seed_user(
-    users: _FakeUsersRepo,
     *,
     id: str = "usr-1",
     email: str = "alice@example.com",
     is_active: bool = True,
 ) -> User:
     now = datetime(2026, 1, 1, tzinfo=UTC)
-    user = User(
+    return User(
         id=id,
         username="alice",
         email=email,
@@ -142,18 +148,16 @@ def _seed_user(
         created_at=now,
         updated_at=now,
     )
-    users.users[user.id] = user
-    return user
 
 
 def _make_service(
-    users: _FakeUsersRepo,
-    tokens: _FakeTokensRepo,
+    users_repo: AsyncMock,
+    tokens_repo: AsyncMock,
     client: _FakeOidcClient,
 ) -> OidcService:
     return OidcService(
-        users_repo=users,  # type: ignore[arg-type]
-        tokens_repo=tokens,  # type: ignore[arg-type]
+        users_repo=users_repo,
+        tokens_repo=tokens_repo,
         oidc_client=client,  # type: ignore[arg-type]
     )
 
@@ -170,152 +174,155 @@ def _userinfo(email: str, *, username: str = "Alice") -> OIDCUserInfoClaims:
 # ── get_authorization_url ────────────────────────────────────────────
 
 
-async def test_get_authorization_url_builds_query_and_state() -> None:
-    users = _FakeUsersRepo()
-    tokens = _FakeTokensRepo()
-    client = _FakeOidcClient(
-        token=OIDCTokenResponse(access_token="at", id_token="", token_type="Bearer"),
-        userinfo=_userinfo("alice@example.com"),
-    )
-    service = _make_service(users, tokens, client)
-
-    result = await service.get_authorization_url(redirect_uri="https://app.example.com/cb")
-
-    assert result.provider_display_name == "Test IdP"
-    assert "https://idp.example.com/authorize?" in result.authorization_url
-    assert "response_type=code" in result.authorization_url
-    assert "client_id=test-client" in result.authorization_url
-    assert "redirect_uri=https%3A%2F%2Fapp.example.com%2Fcb" in result.authorization_url
-    assert "scope=openid+profile+email" in result.authorization_url
-    assert "state=" in result.authorization_url
-    # State round-trips and carries the redirect_uri back.
-    payload = _verify_state(result.state)
-    assert payload.redirect_uri == "https://app.example.com/cb"
-    assert payload.nonce == result.nonce
-
-
-async def test_get_authorization_url_requires_redirect_uri() -> None:
-    service = _make_service(
-        _FakeUsersRepo(),
-        _FakeTokensRepo(),
-        _FakeOidcClient(
+class TestAuthorizationUrl(ServiceTest):
+    async def test_builds_query_and_state(self) -> None:
+        users_repo = _make_users_repo()
+        tokens_repo, _ = _make_tokens_repo()
+        client = _FakeOidcClient(
             token=OIDCTokenResponse(access_token="at", id_token="", token_type="Bearer"),
-            userinfo=_userinfo("a@b.c"),
-        ),
-    )
-    with pytest.raises(ValidationError, match="redirect_uri is required"):
-        await service.get_authorization_url(redirect_uri="   ")
+            userinfo=_userinfo("alice@example.com"),
+        )
+        service = _make_service(users_repo, tokens_repo, client)
+
+        result = await service.get_authorization_url(redirect_uri="https://app.example.com/cb")
+
+        assert result.provider_display_name == "Test IdP"
+        assert "https://idp.example.com/authorize?" in result.authorization_url
+        assert "response_type=code" in result.authorization_url
+        assert "client_id=test-client" in result.authorization_url
+        assert "redirect_uri=https%3A%2F%2Fapp.example.com%2Fcb" in result.authorization_url
+        assert "scope=openid+profile+email" in result.authorization_url
+        assert "state=" in result.authorization_url
+        # State round-trips and carries the redirect_uri back.
+        payload = _verify_state(result.state)
+        assert payload.redirect_uri == "https://app.example.com/cb"
+        assert payload.nonce == result.nonce
+
+    async def test_requires_redirect_uri(self) -> None:
+        users_repo = _make_users_repo()
+        tokens_repo, _ = _make_tokens_repo()
+        service = _make_service(
+            users_repo,
+            tokens_repo,
+            _FakeOidcClient(
+                token=OIDCTokenResponse(access_token="at", id_token="", token_type="Bearer"),
+                userinfo=_userinfo("a@b.c"),
+            ),
+        )
+        with pytest.raises(ValidationError, match="redirect_uri is required"):
+            await service.get_authorization_url(redirect_uri="   ")
 
 
 # ── login_with_oidc ──────────────────────────────────────────────────
 
 
-async def test_login_with_oidc_existing_user_mints_tokens() -> None:
-    users = _FakeUsersRepo()
-    _seed_user(users, email="alice@example.com")
-    tokens = _FakeTokensRepo()
-    client = _FakeOidcClient(
-        token=OIDCTokenResponse(access_token="at", id_token="idt", token_type="Bearer"),
-        userinfo=_userinfo("alice@example.com"),
-    )
-    service = _make_service(users, tokens, client)
+class TestLoginWithOidc(ServiceTest):
+    async def test_existing_user_mints_tokens(self) -> None:
+        users_repo = _make_users_repo(user=_seed_user(email="alice@example.com"))
+        tokens_repo, inserted = _make_tokens_repo()
+        client = _FakeOidcClient(
+            token=OIDCTokenResponse(access_token="at", id_token="idt", token_type="Bearer"),
+            userinfo=_userinfo("alice@example.com"),
+        )
+        service = _make_service(users_repo, tokens_repo, client)
 
-    result = await service.login_with_oidc(code="c", redirect_uri="https://app.example.com/cb")
+        result = await service.login_with_oidc(code="c", redirect_uri="https://app.example.com/cb")
 
-    assert result.success is True
-    assert result.message == "登录成功"
-    assert result.is_new_user is False
-    assert result.user is not None
-    assert result.user.email == "alice@example.com"
-    assert result.access_token
-    assert result.refresh_token
-    # Two token rows persisted (access + refresh).
-    assert len(tokens.inserted) == 2
-    types_inserted = {row.token_type for row in tokens.inserted}
-    assert types_inserted == {"access_token", "refresh_token"}
-    # The access token is a real, decodable JWT bound to the user.
-    claims = decode_token(result.access_token)
-    assert claims["type"] == "access"
-    assert claims["user_id"] == "usr-1"
+        assert result.success is True
+        assert result.message == "登录成功"
+        assert result.is_new_user is False
+        assert result.user is not None
+        assert result.user.email == "alice@example.com"
+        assert result.access_token
+        assert result.refresh_token
+        # Two token rows persisted (access + refresh).
+        assert len(inserted) == 2
+        types_inserted = {row.token_type for row in inserted}
+        assert types_inserted == {"access_token", "refresh_token"}
+        # The access token is a real, decodable JWT bound to the user.
+        claims = decode_token(result.access_token)
+        assert claims["type"] == "access"
+        assert claims["user_id"] == "usr-1"
 
+    async def test_new_user_raises_provisioning_unavailable(self) -> None:
+        users_repo = _make_users_repo()  # no seeded user -> NotFoundError
+        tokens_repo, inserted = _make_tokens_repo()
+        client = _FakeOidcClient(
+            token=OIDCTokenResponse(access_token="at", id_token="idt", token_type="Bearer"),
+            userinfo=_userinfo("nobody@example.com"),
+        )
+        service = _make_service(users_repo, tokens_repo, client)
 
-async def test_login_with_oidc_new_user_raises_provisioning_unavailable() -> None:
-    users = _FakeUsersRepo()  # no seeded user
-    tokens = _FakeTokensRepo()
-    client = _FakeOidcClient(
-        token=OIDCTokenResponse(access_token="at", id_token="idt", token_type="Bearer"),
-        userinfo=_userinfo("nobody@example.com"),
-    )
-    service = _make_service(users, tokens, client)
+        with pytest.raises(ExternalServiceError) as exc_info:
+            await service.login_with_oidc(code="c", redirect_uri="https://app.example.com/cb")
+        assert exc_info.value.code == "oidc.provisioning_unavailable"
+        assert inserted == []
 
-    with pytest.raises(ExternalServiceError) as exc_info:
-        await service.login_with_oidc(code="c", redirect_uri="https://app.example.com/cb")
-    assert exc_info.value.code == "oidc.provisioning_unavailable"
+    async def test_missing_email_raises(self) -> None:
+        users_repo = _make_users_repo(user=_seed_user(email="alice@example.com"))
+        tokens_repo, inserted = _make_tokens_repo()
+        client = _FakeOidcClient(
+            token=OIDCTokenResponse(access_token="at", id_token="idt", token_type="Bearer"),
+            userinfo=_userinfo(email=""),
+        )
+        service = _make_service(users_repo, tokens_repo, client)
 
+        with pytest.raises(ValidationError) as exc_info:
+            await service.login_with_oidc(code="c", redirect_uri="https://app.example.com/cb")
+        assert exc_info.value.code == "oidc.missing_email"
+        assert inserted == []
 
-async def test_login_with_oidc_missing_email_raises() -> None:
-    users = _FakeUsersRepo()
-    _seed_user(users, email="alice@example.com")
-    tokens = _FakeTokensRepo()
-    client = _FakeOidcClient(
-        token=OIDCTokenResponse(access_token="at", id_token="idt", token_type="Bearer"),
-        userinfo=_userinfo(email=""),
-    )
-    service = _make_service(users, tokens, client)
+    async def test_inactive_user_returns_failure(self) -> None:
+        """Inactive user -> success=False (HTTP 200 body), not a raise."""
+        users_repo = _make_users_repo(
+            user=_seed_user(email="alice@example.com", is_active=False)
+        )
+        tokens_repo, inserted = _make_tokens_repo()
+        client = _FakeOidcClient(
+            token=OIDCTokenResponse(access_token="at", id_token="idt", token_type="Bearer"),
+            userinfo=_userinfo("alice@example.com"),
+        )
+        service = _make_service(users_repo, tokens_repo, client)
 
-    with pytest.raises(ValidationError) as exc_info:
-        await service.login_with_oidc(code="c", redirect_uri="https://app.example.com/cb")
-    assert exc_info.value.code == "oidc.missing_email"
+        result = await service.login_with_oidc(code="c", redirect_uri="https://app.example.com/cb")
 
+        assert result.success is False
+        assert result.message == "Account is disabled"
+        assert result.user is None
+        assert result.access_token == ""
+        # No token rows minted for a disabled user.
+        assert inserted == []
 
-async def test_login_with_oidc_inactive_user_returns_failure() -> None:
-    """Inactive user -> success=False (HTTP 200 body), not a raise."""
-    users = _FakeUsersRepo()
-    _seed_user(users, email="alice@example.com", is_active=False)
-    tokens = _FakeTokensRepo()
-    client = _FakeOidcClient(
-        token=OIDCTokenResponse(access_token="at", id_token="idt", token_type="Bearer"),
-        userinfo=_userinfo("alice@example.com"),
-    )
-    service = _make_service(users, tokens, client)
+    async def test_requires_code(self) -> None:
+        users_repo = _make_users_repo()
+        tokens_repo, _ = _make_tokens_repo()
+        service = _make_service(
+            users_repo,
+            tokens_repo,
+            _FakeOidcClient(
+                token=OIDCTokenResponse(access_token="at", id_token="", token_type="Bearer"),
+                userinfo=_userinfo("a@b.c"),
+            ),
+        )
+        with pytest.raises(ValidationError, match="code is required"):
+            await service.login_with_oidc(code="   ", redirect_uri="https://app.example.com/cb")
 
-    result = await service.login_with_oidc(code="c", redirect_uri="https://app.example.com/cb")
-
-    assert result.success is False
-    assert result.message == "Account is disabled"
-    assert result.user is None
-    assert result.access_token == ""
-    # No token rows minted for a disabled user.
-    assert tokens.inserted == []
-
-
-async def test_login_with_oidc_requires_code() -> None:
-    service = _make_service(
-        _FakeUsersRepo(),
-        _FakeTokensRepo(),
-        _FakeOidcClient(
-            token=OIDCTokenResponse(access_token="at", id_token="", token_type="Bearer"),
-            userinfo=_userinfo("a@b.c"),
-        ),
-    )
-    with pytest.raises(ValidationError, match="code is required"):
-        await service.login_with_oidc(code="   ", redirect_uri="https://app.example.com/cb")
-
-
-async def test_login_with_oidc_disabled_when_oidc_off(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("OIDC_ENABLE", "false")
-    reset_settings_cache()
-    service = _make_service(
-        _FakeUsersRepo(),
-        _FakeTokensRepo(),
-        _FakeOidcClient(
-            token=OIDCTokenResponse(access_token="at", id_token="", token_type="Bearer"),
-            userinfo=_userinfo("a@b.c"),
-        ),
-    )
-    with pytest.raises(PermissionDeniedError) as exc_info:
-        await service.login_with_oidc(code="c", redirect_uri="https://app.example.com/cb")
-    assert exc_info.value.code == "oidc.disabled"
+    async def test_disabled_when_oidc_off(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("OIDC_ENABLE", "false")
+        reset_settings_cache()
+        users_repo = _make_users_repo()
+        tokens_repo, _ = _make_tokens_repo()
+        service = _make_service(
+            users_repo,
+            tokens_repo,
+            _FakeOidcClient(
+                token=OIDCTokenResponse(access_token="at", id_token="", token_type="Bearer"),
+                userinfo=_userinfo("a@b.c"),
+            ),
+        )
+        with pytest.raises(PermissionDeniedError) as exc_info:
+            await service.login_with_oidc(code="c", redirect_uri="https://app.example.com/cb")
+        assert exc_info.value.code == "oidc.disabled"
 
 
 # ── State signing ────────────────────────────────────────────────────

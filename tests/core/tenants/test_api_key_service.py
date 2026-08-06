@@ -1,8 +1,14 @@
-"""Unit tests for `TenantAPIKeyService` and its token helpers."""
+"""Unit tests for `TenantAPIKeyService` and its token helpers.
+
+The service is exercised against an ``AsyncMock(spec=TenantAPIKeyRepository)``
+with closure-captured state. Revoked rows are filtered from reads so
+``list_for_tenant`` and friends behave like the SQL they mirror.
+"""
 
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -17,392 +23,388 @@ from src.core.tenants.api_key_service import (
     normalize_knowledge_base_ids,
     normalize_scope_type,
 )
+from src.db.dao.tenant_api_keys_repository import PLACEHOLDER_KEY_HASH_PREFIX, TenantAPIKeyRepository
 from src.db.models.tenants.tenant_api_keys import TenantAPIKey
-from tests.unit.fakes.tenant_api_keys import FakeTenantAPIKeyRepository
+from tests.util.service_test import ServiceTest
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 _TENANT_ID = 7
 
 
-@pytest.fixture
-def repo() -> FakeTenantAPIKeyRepository:
-    return FakeTenantAPIKeyRepository()
+def _make_repo() -> tuple[AsyncMock, dict[int, TenantAPIKey]]:
+    """Tenant-API-key repo mock with closure-captured state."""
+    repo = AsyncMock(spec=TenantAPIKeyRepository)
+    rows: dict[int, TenantAPIKey] = {}
+    _next_id = {"value": 0}
+
+    def _live() -> dict[int, TenantAPIKey]:
+        return {i: r for i, r in rows.items() if r.revoked_at is None}
+
+    @staticmethod
+    def _sorted(rs: list[TenantAPIKey]) -> list[TenantAPIKey]:
+        return sorted(rs, key=lambda r: r.created_at, reverse=True)
+
+    async def _insert(row: TenantAPIKey) -> TenantAPIKey:
+        _next_id["value"] += 1
+        stored = row.model_copy(update={"id": _next_id["value"]})
+        rows[stored.id] = stored
+        return stored
+
+    async def _revoke(key_id: int, *, tenant_id: int, revoked_at: datetime) -> None:
+        row = _live().get(key_id)
+        if row is None or row.tenant_id != tenant_id:
+            raise NotFoundError(code="tenant_api_key.not_found", message="Tenant API key not found")
+        rows[key_id] = row.model_copy(update={"revoked_at": revoked_at})
+
+    async def _revoke_platform(key_id: int, *, revoked_at: datetime) -> None:
+        row = _live().get(key_id)
+        if row is None or row.scope_type != "platform":
+            raise NotFoundError(code="tenant_api_key.not_found", message="Tenant API key not found")
+        rows[key_id] = row.model_copy(update={"revoked_at": revoked_at})
+
+    async def _touch_last_used(key_id: int, *, used_at: datetime) -> int:
+        row = _live().get(key_id)
+        if row is None:
+            return 0
+        rows[key_id] = row.model_copy(update={"last_used_at": used_at})
+        return 1
+
+    async def _update_hash(key_id: int, *, key_hash: str) -> int:
+        row = _live().get(key_id)
+        if row is None:
+            return 0
+        rows[key_id] = row.model_copy(update={"key_hash": key_hash})
+        return 1
+
+    async def _find_by_hash(key_hash: str) -> TenantAPIKey:
+        for row in _live().values():
+            if row.key_hash == key_hash:
+                return row
+        raise NotFoundError(code="tenant_api_key.not_found", message="Tenant API key not found")
+
+    async def _list_for_tenant(tenant_id: int) -> list[TenantAPIKey]:
+        return _sorted([r for r in _live().values() if r.tenant_id == tenant_id])
+
+    async def _list_platform() -> list[TenantAPIKey]:
+        return _sorted([r for r in _live().values() if r.scope_type == "platform"])
+
+    async def _list_with_placeholder_hash() -> list[TenantAPIKey]:
+        return _sorted(
+            [r for r in _live().values() if r.key_hash.startswith(PLACEHOLDER_KEY_HASH_PREFIX)]
+        )
+
+    async def _has_placeholder_hash() -> bool:
+        return bool(await _list_with_placeholder_hash())
+
+    repo.insert.side_effect = _insert
+    repo.revoke.side_effect = _revoke
+    repo.revoke_platform.side_effect = _revoke_platform
+    repo.touch_last_used.side_effect = _touch_last_used
+    repo.update_hash.side_effect = _update_hash
+    repo.find_by_hash.side_effect = _find_by_hash
+    repo.list_for_tenant.side_effect = _list_for_tenant
+    repo.list_platform.side_effect = _list_platform
+    repo.list_with_placeholder_hash.side_effect = _list_with_placeholder_hash
+    repo.has_placeholder_hash.side_effect = _has_placeholder_hash
+    return repo, rows
 
 
 @pytest.fixture
-def service(repo: FakeTenantAPIKeyRepository) -> TenantAPIKeyService:
-    return TenantAPIKeyService(api_keys_repo=repo)  # type: ignore[arg-type]
+def repo_and_rows() -> tuple[AsyncMock, dict[int, TenantAPIKey]]:
+    return _make_repo()
+
+
+@pytest.fixture
+def repo(repo_and_rows: tuple[AsyncMock, dict[int, TenantAPIKey]]) -> AsyncMock:
+    return repo_and_rows[0]
+
+
+@pytest.fixture
+def rows(repo_and_rows: tuple[AsyncMock, dict[int, TenantAPIKey]]) -> dict[int, TenantAPIKey]:
+    return repo_and_rows[1]
+
+
+@pytest.fixture
+def service(repo: AsyncMock) -> TenantAPIKeyService:
+    return TenantAPIKeyService(api_keys_repo=repo)
 
 
 # ── token helpers ───────────────────────────────────────────────────
 
 
-def test_generate_token_is_prefixed_and_unpadded() -> None:
-    token = generate_api_key_token()
+class TestTokenHelpers(ServiceTest):
+    def test_generate_token_is_prefixed_and_unpadded(self) -> None:
+        token = generate_api_key_token()
+        assert token.startswith("sk-")
+        assert "=" not in token
 
-    assert token.startswith("sk-")
-    assert "=" not in token
+    def test_generate_token_is_unique_per_call(self) -> None:
+        assert generate_api_key_token() != generate_api_key_token()
 
+    def test_hash_is_stable_sha256_hex(self) -> None:
+        digest = hash_api_key_token("sk-example")
+        assert digest == hash_api_key_token("sk-example")
+        assert len(digest) == 64
 
-def test_generate_token_is_unique_per_call() -> None:
-    assert generate_api_key_token() != generate_api_key_token()
+    def test_normalize_scope_type_defaults_to_tenant(self) -> None:
+        assert normalize_scope_type(None) == SCOPE_TENANT
+        assert normalize_scope_type("  nonsense ") == SCOPE_TENANT
+        assert normalize_scope_type(" Platform ") == SCOPE_PLATFORM
 
+    def test_normalize_capabilities_drops_unknown_and_duplicates(self) -> None:
+        assert normalize_capabilities(["Chat", "chat", "nope", " ingest "]) == ["chat", "ingest"]
 
-def test_hash_is_stable_sha256_hex() -> None:
-    digest = hash_api_key_token("sk-example")
-
-    assert digest == hash_api_key_token("sk-example")
-    assert len(digest) == 64
-
-
-def test_normalize_scope_type_defaults_to_tenant() -> None:
-    assert normalize_scope_type(None) == SCOPE_TENANT
-    assert normalize_scope_type("  nonsense ") == SCOPE_TENANT
-    assert normalize_scope_type(" Platform ") == SCOPE_PLATFORM
-
-
-def test_normalize_capabilities_drops_unknown_and_duplicates() -> None:
-    assert normalize_capabilities(["Chat", "chat", "nope", " ingest "]) == ["chat", "ingest"]
-
-
-def test_normalize_knowledge_base_ids_keeps_case_and_order() -> None:
-    assert normalize_knowledge_base_ids([" KB-1 ", "kb-1", "KB-1", ""]) == ["KB-1", "kb-1"]
+    def test_normalize_knowledge_base_ids_keeps_case_and_order(self) -> None:
+        assert normalize_knowledge_base_ids([" KB-1 ", "kb-1", "KB-1", ""]) == ["KB-1", "kb-1"]
 
 
 # ── create_api_key ──────────────────────────────────────────────────
 
 
-async def test_create_api_key_returns_token_once_and_stores_only_its_hash(
-    service: TenantAPIKeyService,
-    repo: FakeTenantAPIKeyRepository,
-) -> None:
-    result = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
+class TestCreateApiKey(ServiceTest):
+    async def test_returns_token_once_and_stores_only_its_hash(
+        self, service: TenantAPIKeyService, rows: dict[int, TenantAPIKey]
+    ) -> None:
+        result = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
 
-    stored = repo.rows[result.key.id]
-    assert result.token.startswith("sk-")
-    assert stored.key_hash == hash_api_key_token(result.token)
-    assert set(result.key.model_dump()).isdisjoint({"key_hash", "api_key"})
+        stored = rows[result.key.id]
+        assert result.token.startswith("sk-")
+        assert stored.key_hash == hash_api_key_token(result.token)
+        assert set(result.key.model_dump()).isdisjoint({"key_hash", "api_key"})
 
+    async def test_trims_name(self, service: TenantAPIKeyService) -> None:
+        result = await service.create_api_key(name="  ci  ", tenant_id=_TENANT_ID, full_access=True)
+        assert result.key.name == "ci"
 
-async def test_create_api_key_trims_name(service: TenantAPIKeyService) -> None:
-    result = await service.create_api_key(name="  ci  ", tenant_id=_TENANT_ID, full_access=True)
+    async def test_rejects_blank_name(self, service: TenantAPIKeyService) -> None:
+        with pytest.raises(ValidationError) as excinfo:
+            await service.create_api_key(name="   ", tenant_id=_TENANT_ID, full_access=True)
+        assert excinfo.value.code == "tenant_api_key.name_required"
 
-    assert result.key.name == "ci"
+    async def test_tenant_key_requires_a_tenant_id(self, service: TenantAPIKeyService) -> None:
+        with pytest.raises(ValidationError):
+            await service.create_api_key(name="ci", full_access=False)
 
+    async def test_tenant_key_requires_capabilities_when_not_full_access(
+        self, service: TenantAPIKeyService
+    ) -> None:
+        with pytest.raises(ValidationError) as excinfo:
+            await service.create_api_key(name="ci", tenant_id=_TENANT_ID, capabilities=[])
+        assert excinfo.value.code == "tenant_api_key.capabilities_required"
 
-async def test_create_api_key_rejects_blank_name(service: TenantAPIKeyService) -> None:
-    with pytest.raises(ValidationError) as excinfo:
-        await service.create_api_key(name="   ", tenant_id=_TENANT_ID, full_access=True)
+    async def test_platform_key_rejects_full_access(self, service: TenantAPIKeyService) -> None:
+        with pytest.raises(ValidationError) as excinfo:
+            await service.create_api_key(
+                name="ops", scope_type=SCOPE_PLATFORM, full_access=True, capabilities=["chat"]
+            )
+        assert excinfo.value.code == "tenant_api_key.platform_full_access"
 
-    assert excinfo.value.code == "tenant_api_key.name_required"
+    async def test_platform_key_requires_capabilities(self, service: TenantAPIKeyService) -> None:
+        with pytest.raises(ValidationError) as excinfo:
+            await service.create_api_key(
+                name="ops", scope_type=SCOPE_PLATFORM, capabilities=[]
+            )
+        assert excinfo.value.code == "tenant_api_key.capabilities_required"
 
-
-async def test_create_tenant_key_requires_a_tenant_id(service: TenantAPIKeyService) -> None:
-    with pytest.raises(ValidationError) as excinfo:
-        await service.create_api_key(name="ci")
-
-    assert excinfo.value.code == "tenant_api_key.tenant_required"
-
-
-async def test_create_platform_key_rejects_full_access(service: TenantAPIKeyService) -> None:
-    with pytest.raises(ValidationError) as excinfo:
-        await service.create_api_key(
+    async def test_full_access_clears_narrowing_lists(
+        self, service: TenantAPIKeyService, rows: dict[int, TenantAPIKey]
+    ) -> None:
+        result = await service.create_api_key(
             name="ci",
-            scope_type=SCOPE_PLATFORM,
+            tenant_id=_TENANT_ID,
             full_access=True,
-            capabilities=["system_tenants_read"],
+            knowledge_base_ids=["kb-1"],
+            capabilities=["chat"],
+        )
+        assert result.key.knowledge_base_ids == []
+        assert result.key.capabilities == []
+
+
+# ── authentication ──────────────────────────────────────────────────
+
+
+class TestAuthenticate(ServiceTest):
+    async def test_resolves_a_valid_token(self, service: TenantAPIKeyService) -> None:
+        created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
+
+        found = await service.authenticate(created.token)
+
+        assert found.id == created.key.id
+
+    async def test_rejects_empty_token(self, service: TenantAPIKeyService) -> None:
+        with pytest.raises(NotFoundError):
+            await service.authenticate("   ")
+
+    async def test_rejects_unknown_token(self, service: TenantAPIKeyService) -> None:
+        with pytest.raises(NotFoundError):
+            await service.authenticate("sk-never-issued")
+
+    async def test_rejects_revoked_key(self, service: TenantAPIKeyService) -> None:
+        created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
+        await service.revoke_api_key(created.key.id, tenant_id=_TENANT_ID)
+
+        with pytest.raises(NotFoundError):
+            await service.authenticate(created.token)
+
+    async def test_rejects_expired_key(self, service: TenantAPIKeyService) -> None:
+        created = await service.create_api_key(
+            name="ci",
+            tenant_id=_TENANT_ID,
+            full_access=True,
+            expires_at=datetime.now(UTC) - timedelta(seconds=1),
         )
 
-    assert excinfo.value.code == "tenant_api_key.platform_full_access"
+        with pytest.raises(NotFoundError):
+            await service.authenticate(created.token)
 
+    async def test_stamps_last_used_on_first_use(
+        self, service: TenantAPIKeyService, rows: dict[int, TenantAPIKey]
+    ) -> None:
+        created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
 
-async def test_create_platform_key_requires_capabilities(service: TenantAPIKeyService) -> None:
-    with pytest.raises(ValidationError) as excinfo:
-        await service.create_api_key(name="ci", scope_type=SCOPE_PLATFORM)
-
-    assert excinfo.value.code == "tenant_api_key.capabilities_required"
-
-
-async def test_create_platform_key_has_no_tenant(service: TenantAPIKeyService) -> None:
-    result = await service.create_api_key(
-        name="ci",
-        tenant_id=_TENANT_ID,
-        scope_type=SCOPE_PLATFORM,
-        capabilities=["system_tenants_read"],
-    )
-
-    assert result.key.tenant_id is None
-    assert result.key.scope_type == SCOPE_PLATFORM
-
-
-async def test_create_full_access_key_clears_narrowing_lists(
-    service: TenantAPIKeyService,
-) -> None:
-    result = await service.create_api_key(
-        name="ci",
-        tenant_id=_TENANT_ID,
-        full_access=True,
-        knowledge_base_ids=["kb-1"],
-        capabilities=["chat"],
-    )
-
-    assert result.key.knowledge_base_ids == []
-    assert result.key.capabilities == []
-
-
-async def test_create_scoped_key_normalizes_its_lists(service: TenantAPIKeyService) -> None:
-    result = await service.create_api_key(
-        name="ci",
-        tenant_id=_TENANT_ID,
-        knowledge_base_ids=["kb-1", "kb-1", " "],
-        capabilities=["chat", "bogus", "CHAT"],
-    )
-
-    assert result.key.knowledge_base_ids == ["kb-1"]
-    assert result.key.capabilities == ["chat"]
-
-
-async def test_create_api_key_normalizes_expiry_to_utc(service: TenantAPIKeyService) -> None:
-    expires = datetime(2026, 6, 1, 12, tzinfo=UTC).astimezone()
-
-    result = await service.create_api_key(
-        name="ci",
-        tenant_id=_TENANT_ID,
-        full_access=True,
-        expires_at=expires,
-    )
-
-    assert result.key.expires_at is not None
-    assert result.key.expires_at.utcoffset() == timedelta(0)
-
-
-# ── authenticate ────────────────────────────────────────────────────
-
-
-async def test_authenticate_resolves_a_live_key(
-    service: TenantAPIKeyService,
-) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
-
-    found = await service.authenticate(created.token)
-
-    assert found.id == created.key.id
-    assert found.tenant_id == _TENANT_ID
-
-
-async def test_authenticate_trims_the_token(service: TenantAPIKeyService) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
-
-    found = await service.authenticate(f"  {created.token}  ")
-
-    assert found.id == created.key.id
-
-
-@pytest.mark.parametrize("token", ["", "   "])
-async def test_authenticate_rejects_empty_token(
-    service: TenantAPIKeyService,
-    token: str,
-) -> None:
-    with pytest.raises(NotFoundError) as excinfo:
-        await service.authenticate(token)
-
-    assert excinfo.value.code == "tenant_api_key.not_found"
-
-
-async def test_authenticate_rejects_unknown_token(service: TenantAPIKeyService) -> None:
-    with pytest.raises(NotFoundError):
-        await service.authenticate("sk-never-issued")
-
-
-async def test_authenticate_rejects_revoked_key(service: TenantAPIKeyService) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
-    await service.revoke_api_key(created.key.id, tenant_id=_TENANT_ID)
-
-    with pytest.raises(NotFoundError):
         await service.authenticate(created.token)
 
+        assert rows[created.key.id].last_used_at is not None
 
-async def test_authenticate_rejects_expired_key(
-    service: TenantAPIKeyService,
-) -> None:
-    created = await service.create_api_key(
-        name="ci",
-        tenant_id=_TENANT_ID,
-        full_access=True,
-        expires_at=datetime.now(UTC) - timedelta(seconds=1),
-    )
+    async def test_throttles_repeated_last_used_writes(
+        self, service: TenantAPIKeyService, rows: dict[int, TenantAPIKey]
+    ) -> None:
+        created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
+        await service.authenticate(created.token)
+        first_touch = rows[created.key.id].last_used_at
 
-    with pytest.raises(NotFoundError):
         await service.authenticate(created.token)
 
+        assert rows[created.key.id].last_used_at == first_touch
 
-async def test_authenticate_stamps_last_used_on_first_use(
-    service: TenantAPIKeyService,
-    repo: FakeTenantAPIKeyRepository,
-) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
+    async def test_refreshes_last_used_after_the_interval(
+        self, service: TenantAPIKeyService, rows: dict[int, TenantAPIKey]
+    ) -> None:
+        created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
+        stale = datetime.now(UTC) - timedelta(minutes=5)
+        rows[created.key.id] = rows[created.key.id].model_copy(update={"last_used_at": stale})
 
-    await service.authenticate(created.token)
+        await service.authenticate(created.token)
 
-    assert repo.rows[created.key.id].last_used_at is not None
-
-
-async def test_authenticate_throttles_repeated_last_used_writes(
-    service: TenantAPIKeyService,
-    repo: FakeTenantAPIKeyRepository,
-) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
-    await service.authenticate(created.token)
-    first_touch = repo.rows[created.key.id].last_used_at
-
-    await service.authenticate(created.token)
-
-    assert repo.rows[created.key.id].last_used_at == first_touch
-
-
-async def test_authenticate_refreshes_last_used_after_the_interval(
-    service: TenantAPIKeyService,
-    repo: FakeTenantAPIKeyRepository,
-) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
-    stale = datetime.now(UTC) - timedelta(minutes=5)
-    repo.rows[created.key.id] = repo.rows[created.key.id].model_copy(update={"last_used_at": stale})
-
-    await service.authenticate(created.token)
-
-    refreshed = repo.rows[created.key.id].last_used_at
-    assert refreshed is not None
-    assert refreshed > stale
+        refreshed = rows[created.key.id].last_used_at
+        assert refreshed is not None
+        assert refreshed > stale
 
 
 # ── listing ─────────────────────────────────────────────────────────
 
 
-async def test_list_api_keys_returns_only_that_tenants_live_keys(
-    service: TenantAPIKeyService,
-) -> None:
-    mine = await service.create_api_key(name="mine", tenant_id=_TENANT_ID, full_access=True)
-    await service.create_api_key(name="theirs", tenant_id=_TENANT_ID + 1, full_access=True)
-    revoked = await service.create_api_key(name="revoked", tenant_id=_TENANT_ID, full_access=True)
-    await service.revoke_api_key(revoked.key.id, tenant_id=_TENANT_ID)
+class TestListing(ServiceTest):
+    async def test_returns_only_that_tenants_live_keys(
+        self, service: TenantAPIKeyService
+    ) -> None:
+        mine = await service.create_api_key(name="mine", tenant_id=_TENANT_ID, full_access=True)
+        await service.create_api_key(name="theirs", tenant_id=_TENANT_ID + 1, full_access=True)
+        revoked = await service.create_api_key(name="revoked", tenant_id=_TENANT_ID, full_access=True)
+        await service.revoke_api_key(revoked.key.id, tenant_id=_TENANT_ID)
 
-    keys = await service.list_api_keys(_TENANT_ID)
+        keys = await service.list_api_keys(_TENANT_ID)
 
-    assert [k.id for k in keys] == [mine.key.id]
+        assert [k.id for k in keys] == [mine.key.id]
 
+    async def test_list_platform_filters_by_scope(self, service: TenantAPIKeyService) -> None:
+        platform = await service.create_api_key(
+            name="ops",
+            scope_type=SCOPE_PLATFORM,
+            capabilities=["system_tenants_read"],
+        )
+        await service.create_api_key(name="tenant-scoped", tenant_id=_TENANT_ID, full_access=True)
 
-async def test_list_platform_api_keys_filters_by_scope(
-    service: TenantAPIKeyService,
-) -> None:
-    platform = await service.create_api_key(
-        name="ops",
-        scope_type=SCOPE_PLATFORM,
-        capabilities=["system_tenants_read"],
-    )
-    await service.create_api_key(name="tenant-scoped", tenant_id=_TENANT_ID, full_access=True)
+        keys = await service.list_platform_api_keys()
 
-    keys = await service.list_platform_api_keys()
-
-    assert [k.id for k in keys] == [platform.key.id]
+        assert [k.id for k in keys] == [platform.key.id]
 
 
 # ── revocation ──────────────────────────────────────────────────────
 
 
-async def test_revoke_api_key_stamps_revoked_at(
-    service: TenantAPIKeyService,
-    repo: FakeTenantAPIKeyRepository,
-) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
+class TestRevocation(ServiceTest):
+    async def test_stamps_revoked_at(
+        self, service: TenantAPIKeyService, rows: dict[int, TenantAPIKey]
+    ) -> None:
+        created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
 
-    await service.revoke_api_key(created.key.id, tenant_id=_TENANT_ID)
-
-    assert repo.rows[created.key.id].revoked_at is not None
-
-
-async def test_revoke_api_key_rejects_another_tenants_key(
-    service: TenantAPIKeyService,
-) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
-
-    with pytest.raises(NotFoundError):
-        await service.revoke_api_key(created.key.id, tenant_id=_TENANT_ID + 1)
-
-
-async def test_revoke_api_key_twice_raises_not_found(service: TenantAPIKeyService) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
-    await service.revoke_api_key(created.key.id, tenant_id=_TENANT_ID)
-
-    with pytest.raises(NotFoundError):
         await service.revoke_api_key(created.key.id, tenant_id=_TENANT_ID)
 
+        assert rows[created.key.id].revoked_at is not None
 
-async def test_revoke_platform_api_key_rejects_a_tenant_key(
-    service: TenantAPIKeyService,
-) -> None:
-    created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
+    async def test_rejects_another_tenants_key(self, service: TenantAPIKeyService) -> None:
+        created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
 
-    with pytest.raises(NotFoundError):
-        await service.revoke_platform_api_key(created.key.id)
+        with pytest.raises(NotFoundError):
+            await service.revoke_api_key(created.key.id, tenant_id=_TENANT_ID + 1)
+
+    async def test_twice_raises_not_found(self, service: TenantAPIKeyService) -> None:
+        created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
+        await service.revoke_api_key(created.key.id, tenant_id=_TENANT_ID)
+
+        with pytest.raises(NotFoundError):
+            await service.revoke_api_key(created.key.id, tenant_id=_TENANT_ID)
+
+    async def test_revoke_platform_rejects_a_tenant_key(self, service: TenantAPIKeyService) -> None:
+        created = await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
+
+        with pytest.raises(NotFoundError):
+            await service.revoke_platform_api_key(created.key.id)
 
 
 # ── backfill ────────────────────────────────────────────────────────
 
 
 async def _seed_placeholder(
-    repo: FakeTenantAPIKeyRepository,
+    rows: dict[int, TenantAPIKey],
     *,
     api_key: str = "sk-legacy",
 ) -> TenantAPIKey:
-    return await repo.insert(
-        TenantAPIKey(
-            tenant_id=_TENANT_ID,
-            name="legacy",
-            key_hash=f"migrated-tenant-{_TENANT_ID}",
-            api_key=api_key,
-            full_access=True,
-            created_at=_NOW,
-            updated_at=_NOW,
-        )
+    next_id = max(rows.keys(), default=0) + 1
+    row = TenantAPIKey(
+        id=next_id,
+        tenant_id=_TENANT_ID,
+        name="legacy",
+        key_hash=f"migrated-tenant-{_TENANT_ID}",
+        api_key=api_key,
+        full_access=True,
+        created_at=_NOW,
+        updated_at=_NOW,
     )
+    rows[next_id] = row
+    return row
 
 
-async def test_backfill_replaces_placeholder_hashes(
-    service: TenantAPIKeyService,
-    repo: FakeTenantAPIKeyRepository,
-) -> None:
-    legacy = await _seed_placeholder(repo)
+class TestBackfill(ServiceTest):
+    async def test_replaces_placeholder_hashes(
+        self, service: TenantAPIKeyService, rows: dict[int, TenantAPIKey]
+    ) -> None:
+        legacy = await _seed_placeholder(rows)
 
-    backfilled = await service.backfill_missing_key_hashes()
+        backfilled = await service.backfill_missing_key_hashes()
 
-    assert backfilled == 1
-    assert repo.rows[legacy.id].key_hash == hash_api_key_token("sk-legacy")
+        assert backfilled == 1
+        assert rows[legacy.id].key_hash == hash_api_key_token("sk-legacy")
 
+    async def test_backfilled_key_authenticates(
+        self, service: TenantAPIKeyService, rows: dict[int, TenantAPIKey]
+    ) -> None:
+        legacy = await _seed_placeholder(rows)
+        await service.backfill_missing_key_hashes()
 
-async def test_backfilled_key_authenticates(
-    service: TenantAPIKeyService,
-    repo: FakeTenantAPIKeyRepository,
-) -> None:
-    legacy = await _seed_placeholder(repo)
-    await service.backfill_missing_key_hashes()
+        found = await service.authenticate("sk-legacy")
 
-    found = await service.authenticate("sk-legacy")
+        assert found.id == legacy.id
 
-    assert found.id == legacy.id
+    async def test_skips_rows_without_a_stored_token(
+        self, service: TenantAPIKeyService, rows: dict[int, TenantAPIKey]
+    ) -> None:
+        await _seed_placeholder(rows, api_key="   ")
 
+        assert await service.backfill_missing_key_hashes() == 0
 
-async def test_backfill_skips_rows_without_a_stored_token(
-    service: TenantAPIKeyService,
-    repo: FakeTenantAPIKeyRepository,
-) -> None:
-    await _seed_placeholder(repo, api_key="   ")
+    async def test_is_a_noop_without_placeholders(self, service: TenantAPIKeyService) -> None:
+        await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
 
-    assert await service.backfill_missing_key_hashes() == 0
-
-
-async def test_backfill_is_a_noop_without_placeholders(
-    service: TenantAPIKeyService,
-) -> None:
-    await service.create_api_key(name="ci", tenant_id=_TENANT_ID, full_access=True)
-
-    assert await service.backfill_missing_key_hashes() == 0
+        assert await service.backfill_missing_key_hashes() == 0

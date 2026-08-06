@@ -1,7 +1,7 @@
 """Unit tests for ``VectorStoreService`` + ``VectorStoreRepository``.
 
-Per AGENTS.md §9, core services are tested with Protocol-based fakes
-where they materially reduce test setup. The fakes mirror the real
+Per AGENTS.md §9, core services are tested with Protocol-based mocks
+where they materially reduce test setup. The mocks mirror the real
 repository contracts so the service exercises the same surface as it
 would in production (finders return storage rows; the service projects
 them to ``VectorStoreInfo`` via ``map_from_db``).
@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -37,54 +38,43 @@ from src.core.infra.vector_stores.types import (
     VectorStoreInfo,
     vector_store_types,
 )
+from src.db.dao.vector_store_repository import VectorStoreRepository
 from src.db.models.infra.vector_store import VectorStore
 
 # Silence unused-import warnings for the aliased wire model.
 __ = (_RawTestRequest,)
 
-# ── In-memory fakes ──────────────────────────────────────────────────
+
+# ── VectorStore repository mock (stateful via side_effect closures) ──
 
 
-class _FakeVectorStoreRepo:
-    """In-memory ``VectorStoreRepository`` replacement.
+def _make_repo() -> tuple[AsyncMock, dict[str, VectorStore]]:
+    """VectorStore-repo mock with closure-captured storage."""
+    repo = AsyncMock(spec=VectorStoreRepository)
+    rows: dict[str, VectorStore] = {}
 
-    Mirrors the real repository surface used by the service:
-    ``insert``, ``get_by_id``, ``list_for_tenant``,
-    ``exists_by_engine_type_endpoint_index``,
-    ``update_by_primary_key``. Soft-delete semantics are honoured so
-    a deleted row is invisible to reads.
-    """
-
-    def __init__(self) -> None:
-        self.rows: dict[str, VectorStore] = {}
-
-    async def insert(self, row: VectorStore) -> VectorStore:
-        if row.id in self.rows:
+    async def _insert(row: VectorStore) -> VectorStore:
+        if row.id in rows:
             raise ValueError(f"duplicate id: {row.id}")
-        self.rows[row.id] = row
+        rows[row.id] = row
         return row
 
-    async def get_by_id(
-        self,
-        tenant_id: int,
-        store_id: str,
-    ) -> VectorStore | None:
-        for row in self.rows.values():
+    async def _get_by_id(tenant_id: int, store_id: str) -> VectorStore | None:
+        for row in rows.values():
             if row.id == store_id and row.tenant_id == tenant_id and row.deleted_at is None:
                 return row
         return None
 
-    async def list_for_tenant(self, tenant_id: int) -> list[VectorStore]:
+    async def _list_for_tenant(tenant_id: int) -> list[VectorStore]:
         out = [
             row
-            for row in self.rows.values()
+            for row in rows.values()
             if row.tenant_id == tenant_id and row.deleted_at is None
         ]
         out.sort(key=lambda r: r.created_at, reverse=True)
         return out
 
-    async def exists_by_engine_type_endpoint_index(
-        self,
+    async def _exists_by_engine_type_endpoint_index(
         *,
         tenant_id: int,
         engine_type: str,
@@ -96,7 +86,7 @@ class _FakeVectorStoreRepo:
             _index_name_of,
         )
 
-        for row in self.rows.values():
+        for row in rows.values():
             if (
                 row.tenant_id == tenant_id
                 and row.engine_type == engine_type
@@ -107,8 +97,7 @@ class _FakeVectorStoreRepo:
                 return True
         return False
 
-    async def update_by_primary_key(
-        self,
+    async def _update_by_primary_key(
         primary_key_to_value: dict[str, object],
         column_to_update: dict[str, object],
         *,
@@ -117,7 +106,7 @@ class _FakeVectorStoreRepo:
         sid = primary_key_to_value.get("id")
         if not isinstance(sid, str):
             return None
-        row = self.rows.get(sid)
+        row = rows.get(sid)
         if row is None:
             return None
         tid = primary_key_to_value.get("tenant_id")
@@ -126,8 +115,15 @@ class _FakeVectorStoreRepo:
         if exclude_deleted_or_archived and row.deleted_at is not None:
             return None
         updated = row.model_copy(update=column_to_update)
-        self.rows[sid] = updated
+        rows[sid] = updated
         return updated
+
+    repo.insert.side_effect = _insert
+    repo.get_by_id.side_effect = _get_by_id
+    repo.list_for_tenant.side_effect = _list_for_tenant
+    repo.exists_by_engine_type_endpoint_index.side_effect = _exists_by_engine_type_endpoint_index
+    repo.update_by_primary_key.side_effect = _update_by_primary_key
+    return repo, rows
 
 
 @pytest.fixture(autouse=True)
@@ -208,8 +204,8 @@ async def test_create_store_persists_row(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """The create path inserts a row with a fresh UUID and stamps the timestamps."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, rows = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     info = await service.create_store(
         tenant_id=1,
         body=_sample_create_body(),
@@ -222,45 +218,45 @@ async def test_create_store_persists_row(
     assert info.readonly is False
     assert info.created_at is not None
     assert info.updated_at == info.created_at
-    assert len(repo.rows) == 1
+    assert len(rows) == 1
 
 
 async def test_create_store_rejects_empty_name(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """A blank name is rejected with a typed validation error."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, rows = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     with pytest.raises(ValidationError) as exc:
         await service.create_store(
             tenant_id=1,
             body=_sample_create_body(name="   "),
         )
     assert exc.value.code == "vector_store.name_required"
-    assert repo.rows == {}
+    assert rows == {}
 
 
 async def test_create_store_rejects_unsupported_engine(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """An engine type outside the registry is rejected before any write."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, rows = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     with pytest.raises(ValidationError) as exc:
         await service.create_store(
             tenant_id=1,
             body=_sample_create_body(engine_type="postgres"),
         )
     assert exc.value.code == "vector_store.invalid_engine_type"
-    assert repo.rows == {}
+    assert rows == {}
 
 
 async def test_create_store_rejects_missing_required_field(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """The service rejects an ES store without an ``addr`` field."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     with pytest.raises(ValidationError) as exc:
         await service.create_store(
             tenant_id=1,
@@ -273,8 +269,8 @@ async def test_create_store_rejects_duplicate(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """Two stores with the same engine+endpoint+index are rejected."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     body = _sample_create_body()
     await service.create_store(tenant_id=1, body=body)
     with pytest.raises(ConflictError) as exc:
@@ -286,21 +282,21 @@ async def test_create_store_allows_different_tenant(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """Two stores with the same endpoint in different tenants coexist."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, rows = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     body = _sample_create_body()
     await service.create_store(tenant_id=1, body=body)
     info = await service.create_store(tenant_id=2, body=body)
     assert info.tenant_id == 2
-    assert len(repo.rows) == 2
+    assert len(rows) == 2
 
 
 async def test_list_stores_returns_tenant_scoped_rows(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """The list endpoint returns only the active tenant's live rows, newest first."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     older = await service.create_store(
         tenant_id=1,
         body=_sample_create_body(name="es-a"),
@@ -329,8 +325,8 @@ async def test_get_store_returns_match(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """``get_store`` returns the row matching the (id, tenant) pair."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     info = await service.create_store(
         tenant_id=1,
         body=_sample_create_body(),
@@ -343,8 +339,8 @@ async def test_get_store_raises_on_unknown_id(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """``get_store`` raises ``NotFoundError`` for an unknown id."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     with pytest.raises(NotFoundError) as exc:
         await service.get_store(tenant_id=1, store_id="missing")
     assert exc.value.code == "vector_store.not_found"
@@ -354,8 +350,8 @@ async def test_get_store_raises_for_other_tenant(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """``get_store`` does not leak rows across tenant boundaries."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     info = await service.create_store(
         tenant_id=1,
         body=_sample_create_body(),
@@ -369,8 +365,8 @@ async def test_update_store_renames_row(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """``update_store`` only mutates the ``name`` column."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, rows = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     info = await service.create_store(
         tenant_id=1,
         body=_sample_create_body(),
@@ -385,15 +381,15 @@ async def test_update_store_renames_row(
     assert updated.updated_at is not None
     assert original_updated_at is not None
     assert updated.updated_at >= original_updated_at
-    assert repo.rows[info.id].engine_type == "elasticsearch"  # immutable
+    assert rows[info.id].engine_type == "elasticsearch"  # immutable
 
 
 async def test_update_store_rejects_empty_name(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """An empty name on update is rejected with a typed error."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     info = await service.create_store(
         tenant_id=1,
         body=_sample_create_body(),
@@ -411,8 +407,8 @@ async def test_update_store_raises_on_unknown_id(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """An unknown id on update is rejected with a typed error."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     with pytest.raises(ValidationError) as exc:
         await service.update_store(
             tenant_id=1,
@@ -426,8 +422,8 @@ async def test_delete_store_soft_deletes(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """``delete_store`` soft-deletes the row and removes it from list results."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, rows = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     info = await service.create_store(
         tenant_id=1,
         body=_sample_create_body(),
@@ -437,7 +433,7 @@ async def test_delete_store_soft_deletes(
     listed = await service.list_stores(tenant_id=1)
     assert listed == []
     # The row is still in the repo, with ``deleted_at`` set.
-    stored = repo.rows[info.id]
+    stored = rows[info.id]
     assert stored.deleted_at is not None
 
 
@@ -445,8 +441,8 @@ async def test_delete_store_idempotent_for_unknown_id(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """Deleting an unknown id returns ``False`` (idempotent semantics)."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     deleted = await service.delete_store(tenant_id=1, store_id="missing")
     assert deleted is False
 
@@ -455,8 +451,8 @@ async def test_require_store_raises_not_found(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """``require_store`` surfaces a :class:`NotFoundError` on miss."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     with pytest.raises(NotFoundError) as exc:
         await service.require_store(tenant_id=1, store_id="missing")
     assert exc.value.code == "vector_store.not_found"
@@ -467,8 +463,8 @@ async def test_test_by_id_invokes_probe_with_stored_config(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``test_by_id`` runs the probe with the stored config and returns a success response."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     monkeypatch.setattr(service_module, "validate_ssrf_safe_url", _noop_ssrf)
     info = await service.create_store(
         tenant_id=1,
@@ -488,8 +484,8 @@ async def test_test_by_id_returns_probe_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``test_by_id`` surfaces a failed probe as ``success=False``."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     monkeypatch.setattr(service_module, "validate_ssrf_safe_url", _noop_ssrf)
     info = await service.create_store(
         tenant_id=1,
@@ -516,8 +512,8 @@ async def test_test_raw_rejects_unsupported_engine(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """``test_raw`` rejects engines outside the allowlist before probing."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     body = _RawTestRequest(
         engine_type="postgres",
         connection_config={"use_default_connection": True},
@@ -534,8 +530,8 @@ async def test_test_raw_validates_required_fields(
     fake_probe: list[tuple[str, dict[str, object]]],
 ) -> None:
     """``test_raw`` rejects a missing required field before probing."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     with pytest.raises(ValidationError) as exc:
         await service.test_raw(
             engine_type="elasticsearch",
@@ -549,8 +545,8 @@ async def test_test_raw_returns_probe_success(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``test_raw`` returns the probe's success payload on the happy path."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
     # The SSRF guard is exercised by its own tests; bypass it here so the
     # probe path can run against the sample internal endpoint.
     monkeypatch.setattr(service_module, "validate_ssrf_safe_url", _noop_ssrf)
@@ -566,8 +562,8 @@ async def test_test_raw_returns_probe_version(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``test_raw`` passes the detected version through on success."""
-    repo = _FakeVectorStoreRepo()
-    service = VectorStoreService(vector_store_repo=repo)  # type: ignore[arg-type]
+    repo, _ = _make_repo()
+    service = VectorStoreService(vector_store_repo=repo)
 
     async def fake_test(
         engine_type: str,

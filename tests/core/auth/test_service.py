@@ -1,22 +1,19 @@
 """Unit tests for `AuthService` + `src.util.security`.
 
-Exercises the service with both in-memory fakes and the concrete
-repositories to guard against drift between the AuthService signature
-and the real repo signatures.
+Exercises the service with ``AsyncMock(spec=...)`` repositories so the
+stateful behavior the service expects (insert + lookup + revoke) is
+preserved while removing the hand-rolled Fake*Repository classes. The
+real-repository smoke test at the bottom guards against drift between
+the AuthService signature and the real repo signatures.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.common.exception import NotFoundError, UnauthorizedError
 from src.core.auth.service import AuthService, LoginResult
@@ -33,104 +30,79 @@ from src.util.security import (
     hash_password,
     verify_password,
 )
-
-# ── In-memory session factory ────────────────────────────────────────
-
-
-class _SessionFactory:
-    """AsyncSession factory used by service tests."""
-
-    def __init__(self, engine: AsyncEngine) -> None:
-        self._factory = async_sessionmaker(engine, expire_on_commit=False)
-
-    def __call__(self) -> AsyncSession:
-        return self._factory()
+from tests.util.service_test import ServiceTest
 
 
-@pytest.fixture
-async def session_factory() -> AsyncIterator[_SessionFactory]:
-    engine: AsyncEngine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    try:
-        yield _SessionFactory(engine)
-    finally:
-        await engine.dispose()
+# ── In-memory repository doubles (stateful via side_effect closures) ─
 
 
-# ── In-memory fakes ───────────────────────────────────────────────────
+def _make_users_repo() -> tuple[AsyncMock, dict[str, User]]:
+    """Build a users-repo mock backed by a closure-captured dict."""
+    repo = AsyncMock(spec=UserRepository)
+    store: dict[str, User] = {}
 
-
-class FakeUserRepository:
-    """In-memory replacement for `UserRepository`.
-
-    Holds the session in ``__init__`` (mirroring the real repo's
-    contract) but never executes against it — reads/writes hit the
-    in-memory ``users`` dict instead. Method signatures mirror the
-    real ``UserRepository``: finders return storage ``User`` rows
-    (the service projects them to ``UserInfo`` via
-    ``UserInfo.map_from_db``).
-    """
-
-    def __init__(self, session: AsyncSession) -> None:
-        self._session = session
-        self.users: dict[str, User] = {}  # storage rows (with password_hash)
-
-    async def find_by_email(self, email: str) -> User:
-        for u in self.users.values():
-            if u.email == email:
-                return u
+    async def _find_by_email(email: str) -> User:
+        for user in store.values():
+            if user.email == email:
+                return user
         raise NotFoundError(code="user.not_found", message=f"User {email} not found")
 
-    async def find_by_id(self, user_id: str) -> User:
-        user = self.users.get(user_id)
+    async def _find_by_id(user_id: str) -> User:
+        user = store.get(user_id)
         if user is None:
             raise NotFoundError(code="user.not_found", message=f"User {user_id} not found")
         return user
 
-    async def insert(self, row: User) -> User:
-        self.users[row.id] = row
+    async def _insert(row: User) -> User:
+        store[row.id] = row
         return row
 
+    repo.find_by_email.side_effect = _find_by_email
+    repo.find_by_id.side_effect = _find_by_id
+    repo.insert.side_effect = _insert
+    return repo, store
 
-class FakeAuthTokenRepository:
-    """In-memory replacement for `AuthTokenRepository`."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        self._session = session
-        self.tokens: dict[str, AuthToken] = {}
-        self.by_value: dict[str, str] = {}
+def _make_tokens_repo() -> tuple[AsyncMock, dict[str, AuthToken], dict[str, str]]:
+    """Build a tokens-repo mock backed by closure-captured dicts."""
+    repo = AsyncMock(spec=AuthTokenRepository)
+    tokens: dict[str, AuthToken] = {}
+    by_value: dict[str, str] = {}
 
-    async def insert(self, row: AuthToken) -> AuthToken:
-        self.tokens[row.id] = row
-        self.by_value[row.token] = row.id
+    async def _insert(row: AuthToken) -> AuthToken:
+        tokens[row.id] = row
+        by_value[row.token] = row.id
         return row
 
-    async def find_by_token_value(self, token: str) -> AuthToken:
-        token_id = self.by_value.get(token)
+    async def _find_by_token_value(token: str) -> AuthToken:
+        token_id = by_value.get(token)
         if token_id is None:
             raise NotFoundError(code="token.not_found", message="Token not found")
-        return self.tokens.get(token_id)  # type: ignore[return-value]
+        return tokens[token_id]  # type: ignore[return-value]
 
-    async def revoke_all_for_user(self, user_id: str) -> int:
+    async def _revoke_all_for_user(user_id: str) -> int:
         n = 0
-        for tid, t in list(self.tokens.items()):
+        for tid, t in list(tokens.items()):
             if t.user_id == user_id and not t.is_revoked:
-                self.tokens[tid] = t.model_copy(update={"is_revoked": True})
+                tokens[tid] = t.model_copy(update={"is_revoked": True})
                 n += 1
         return n
 
-    async def revoke(self, token_id: str) -> int:
-        t = self.tokens.get(token_id)
+    async def _revoke(token_id: str) -> int:
+        t = tokens.get(token_id)
         if t is None or t.is_revoked:
             return 0
-        self.tokens[token_id] = t.model_copy(update={"is_revoked": True})
+        tokens[token_id] = t.model_copy(update={"is_revoked": True})
         return 1
 
-
-# ── Helpers ──────────────────────────────────────────────────────────
+    repo.insert.side_effect = _insert
+    repo.find_by_token_value.side_effect = _find_by_token_value
+    repo.revoke_all_for_user.side_effect = _revoke_all_for_user
+    repo.revoke.side_effect = _revoke
+    return repo, tokens, by_value
 
 
 def _seed_user(
-    fake_users: FakeUserRepository,
     *,
     id: str = "usr-1",
     email: str = "alice@example.com",
@@ -139,7 +111,7 @@ def _seed_user(
     tenant_id: int | None = 7,
 ) -> User:
     now = datetime(2026, 1, 1, tzinfo=UTC)
-    user = User(
+    return User(
         id=id,
         username="alice",
         email=email,
@@ -153,18 +125,13 @@ def _seed_user(
         created_at=now,
         updated_at=now,
     )
-    fake_users.users[user.id] = user
-    return user
 
 
 def _make_service(
-    users: FakeUserRepository,
-    tokens: FakeAuthTokenRepository,
+    users: AsyncMock,
+    tokens: AsyncMock,
 ) -> AuthService:
-    return AuthService(
-        users_repo=users,  # type: ignore[arg-type]
-        tokens_repo=tokens,  # type: ignore[arg-type]
-    )
+    return AuthService(users_repo=users, tokens_repo=tokens)
 
 
 # ── Password helpers ────────────────────────────────────────────────
@@ -209,57 +176,52 @@ def test_decode_invalid_token_raises() -> None:
 # ── Login ────────────────────────────────────────────────────────────
 
 
-async def test_login_success(session_factory: _SessionFactory) -> None:
-    async with session_factory() as session:
-        users = FakeUserRepository(session)
-        tokens = FakeAuthTokenRepository(session)
-        _seed_user(users)
-        svc = _make_service(users, tokens)
+class TestLogin(ServiceTest):
+    async def test_success(self) -> None:
+        users_repo, _ = _make_users_repo()
+        tokens_repo, _, _ = _make_tokens_repo()
+        await users_repo.insert(_seed_user())
+        svc = _make_service(users_repo, tokens_repo)
+
         result = await svc.login(email="alice@example.com", password="correct-horse")
+
         assert isinstance(result, LoginResult)
         assert isinstance(result.user, UserInfo)
         assert result.user.id == "usr-1"
         assert result.access_token
         assert result.refresh_token
-        assert len(tokens.tokens) == 2
-        types = {t.token_type for t in tokens.tokens.values()}
+        assert tokens_repo.insert.call_count == 2
+        types = {call.args[0].token_type for call in tokens_repo.insert.call_args_list}
         assert types == {"access_token", "refresh_token"}
 
+    async def test_wrong_email_raises(self) -> None:
+        users_repo, _ = _make_users_repo()
+        tokens_repo, _, _ = _make_tokens_repo()
+        await users_repo.insert(_seed_user())
+        svc = _make_service(users_repo, tokens_repo)
 
-async def test_login_wrong_email_raises(
-    session_factory: _SessionFactory,
-) -> None:
-    async with session_factory() as session:
-        users = FakeUserRepository(session)
-        tokens = FakeAuthTokenRepository(session)
-        _seed_user(users)
-        svc = _make_service(users, tokens)
         with pytest.raises(UnauthorizedError):
             await svc.login(email="nobody@example.com", password="correct-horse")
-        assert tokens.tokens == {}
 
+        assert tokens_repo.insert.call_count == 0
 
-async def test_login_wrong_password_raises(
-    session_factory: _SessionFactory,
-) -> None:
-    async with session_factory() as session:
-        users = FakeUserRepository(session)
-        tokens = FakeAuthTokenRepository(session)
-        _seed_user(users)
-        svc = _make_service(users, tokens)
+    async def test_wrong_password_raises(self) -> None:
+        users_repo, _ = _make_users_repo()
+        tokens_repo, _, _ = _make_tokens_repo()
+        await users_repo.insert(_seed_user())
+        svc = _make_service(users_repo, tokens_repo)
+
         with pytest.raises(UnauthorizedError):
             await svc.login(email="alice@example.com", password="wrong")
-        assert tokens.tokens == {}
 
+        assert tokens_repo.insert.call_count == 0
 
-async def test_login_inactive_user_raises(
-    session_factory: _SessionFactory,
-) -> None:
-    async with session_factory() as session:
-        users = FakeUserRepository(session)
-        tokens = FakeAuthTokenRepository(session)
-        _seed_user(users, is_active=False)
-        svc = _make_service(users, tokens)
+    async def test_inactive_user_raises(self) -> None:
+        users_repo, _ = _make_users_repo()
+        tokens_repo, _, _ = _make_tokens_repo()
+        await users_repo.insert(_seed_user(is_active=False))
+        svc = _make_service(users_repo, tokens_repo)
+
         with pytest.raises(UnauthorizedError):
             await svc.login(email="alice@example.com", password="correct-horse")
 
@@ -267,29 +229,25 @@ async def test_login_inactive_user_raises(
 # ── validate_token ───────────────────────────────────────────────────
 
 
-async def test_validate_token_round_trip(
-    session_factory: _SessionFactory,
-) -> None:
-    async with session_factory() as session:
-        users = FakeUserRepository(session)
-        tokens = FakeAuthTokenRepository(session)
-        _seed_user(users, tenant_id=99)
-        svc = _make_service(users, tokens)
+class TestValidateToken(ServiceTest):
+    async def test_round_trip(self) -> None:
+        users_repo, _ = _make_users_repo()
+        tokens_repo, _, _ = _make_tokens_repo()
+        await users_repo.insert(_seed_user(tenant_id=99))
+        svc = _make_service(users_repo, tokens_repo)
         login = await svc.login(email="alice@example.com", password="correct-horse")
+
         user, tenant_id = await svc.validate_token(token=login.access_token)
+
         assert isinstance(user, UserInfo)
         assert user.id == "usr-1"
         assert tenant_id == 99
 
-
-async def test_validate_token_revoked_raises(
-    session_factory: _SessionFactory,
-) -> None:
-    async with session_factory() as session:
-        users = FakeUserRepository(session)
-        tokens = FakeAuthTokenRepository(session)
-        _seed_user(users)
-        svc = _make_service(users, tokens)
+    async def test_revoked_raises(self) -> None:
+        users_repo, _ = _make_users_repo()
+        tokens_repo, _, _ = _make_tokens_repo()
+        await users_repo.insert(_seed_user())
+        svc = _make_service(users_repo, tokens_repo)
         login = await svc.login(email="alice@example.com", password="correct-horse")
         revoked = await svc.revoke_token(token=login.access_token)
         assert revoked == 1
@@ -297,28 +255,22 @@ async def test_validate_token_revoked_raises(
         with pytest.raises(UnauthorizedError):
             await svc.validate_token(token=login.access_token)
 
-
-async def test_validate_token_with_refresh_raises(
-    session_factory: _SessionFactory,
-) -> None:
-    async with session_factory() as session:
-        users = FakeUserRepository(session)
-        tokens = FakeAuthTokenRepository(session)
-        _seed_user(users)
-        svc = _make_service(users, tokens)
+    async def test_with_refresh_raises(self) -> None:
+        users_repo, _ = _make_users_repo()
+        tokens_repo, _, _ = _make_tokens_repo()
+        await users_repo.insert(_seed_user())
+        svc = _make_service(users_repo, tokens_repo)
         login = await svc.login(email="alice@example.com", password="correct-horse")
+
         with pytest.raises(UnauthorizedError):
             await svc.validate_token(token=login.refresh_token)
 
+    async def test_garbage_raises(self) -> None:
+        users_repo, _ = _make_users_repo()
+        tokens_repo, _, _ = _make_tokens_repo()
+        await users_repo.insert(_seed_user())
+        svc = _make_service(users_repo, tokens_repo)
 
-async def test_validate_token_garbage_raises(
-    session_factory: _SessionFactory,
-) -> None:
-    async with session_factory() as session:
-        users = FakeUserRepository(session)
-        tokens = FakeAuthTokenRepository(session)
-        _seed_user(users)
-        svc = _make_service(users, tokens)
         with pytest.raises(UnauthorizedError):
             await svc.validate_token(token="not-a-jwt")
 
@@ -326,46 +278,42 @@ async def test_validate_token_garbage_raises(
 # ── refresh ──────────────────────────────────────────────────────────
 
 
-async def test_refresh_success(session_factory: _SessionFactory) -> None:
-    async with session_factory() as session:
-        users = FakeUserRepository(session)
-        tokens = FakeAuthTokenRepository(session)
-        _seed_user(users)
-        svc = _make_service(users, tokens)
+class TestRefresh(ServiceTest):
+    async def test_success(self) -> None:
+        users_repo, _ = _make_users_repo()
+        tokens_repo, tokens, _ = _make_tokens_repo()
+        await users_repo.insert(_seed_user())
+        svc = _make_service(users_repo, tokens_repo)
         login = await svc.login(email="alice@example.com", password="correct-horse")
+
         new = await svc.refresh(refresh_token=login.refresh_token)
+
         assert isinstance(new.user, UserInfo)
         assert new.access_token != login.access_token
         assert new.refresh_token != login.refresh_token
-        old = await tokens.find_by_token_value(login.refresh_token)
+        # Old refresh row revoked (its id is keyed by row.id).
+        old = await tokens_repo.find_by_token_value(login.refresh_token)
         assert old is not None and old.is_revoked is True
-        assert len(tokens.tokens) == 4  # access+refresh x 2
+        assert len(tokens) == 4  # access+refresh x 2
 
-
-async def test_refresh_revoked_raises(
-    session_factory: _SessionFactory,
-) -> None:
-    async with session_factory() as session:
-        users = FakeUserRepository(session)
-        tokens = FakeAuthTokenRepository(session)
-        _seed_user(users)
-        svc = _make_service(users, tokens)
+    async def test_revoked_raises(self) -> None:
+        users_repo, _ = _make_users_repo()
+        tokens_repo, _, _ = _make_tokens_repo()
+        await users_repo.insert(_seed_user())
+        svc = _make_service(users_repo, tokens_repo)
         login = await svc.login(email="alice@example.com", password="correct-horse")
         await svc.logout(token=login.access_token)
 
         with pytest.raises(UnauthorizedError):
             await svc.refresh(refresh_token=login.refresh_token)
 
-
-async def test_refresh_with_access_token_raises(
-    session_factory: _SessionFactory,
-) -> None:
-    async with session_factory() as session:
-        users = FakeUserRepository(session)
-        tokens = FakeAuthTokenRepository(session)
-        _seed_user(users)
-        svc = _make_service(users, tokens)
+    async def test_with_access_token_raises(self) -> None:
+        users_repo, _ = _make_users_repo()
+        tokens_repo, _, _ = _make_tokens_repo()
+        await users_repo.insert(_seed_user())
+        svc = _make_service(users_repo, tokens_repo)
         login = await svc.login(email="alice@example.com", password="correct-horse")
+
         with pytest.raises(UnauthorizedError):
             await svc.refresh(refresh_token=login.access_token)
 
@@ -373,43 +321,38 @@ async def test_refresh_with_access_token_raises(
 # ── logout ───────────────────────────────────────────────────────────
 
 
-async def test_logout_revokes_all_tokens(
-    session_factory: _SessionFactory,
-) -> None:
-    async with session_factory() as session:
-        users = FakeUserRepository(session)
-        tokens = FakeAuthTokenRepository(session)
-        _seed_user(users)
-        svc = _make_service(users, tokens)
+class TestLogout(ServiceTest):
+    async def test_revokes_all_tokens(self) -> None:
+        users_repo, _ = _make_users_repo()
+        tokens_repo, tokens, _ = _make_tokens_repo()
+        await users_repo.insert(_seed_user())
+        svc = _make_service(users_repo, tokens_repo)
         login = await svc.login(email="alice@example.com", password="correct-horse")
+
         n = await svc.logout(token=login.access_token)
+
         assert n == 2
-        for t in tokens.tokens.values():
+        for t in tokens.values():
             assert t.is_revoked is True
 
-
-async def test_logout_after_logout_is_noop(
-    session_factory: _SessionFactory,
-) -> None:
-    async with session_factory() as session:
-        users = FakeUserRepository(session)
-        tokens = FakeAuthTokenRepository(session)
-        _seed_user(users)
-        svc = _make_service(users, tokens)
+    async def test_after_logout_is_noop(self) -> None:
+        users_repo, _ = _make_users_repo()
+        tokens_repo, _, _ = _make_tokens_repo()
+        await users_repo.insert(_seed_user())
+        svc = _make_service(users_repo, tokens_repo)
         login = await svc.login(email="alice@example.com", password="correct-horse")
         await svc.logout(token=login.access_token)
+
         n = await svc.logout(token=login.access_token)
+
         assert n == 0
 
+    async def test_garbage_raises(self) -> None:
+        users_repo, _ = _make_users_repo()
+        tokens_repo, _, _ = _make_tokens_repo()
+        await users_repo.insert(_seed_user())
+        svc = _make_service(users_repo, tokens_repo)
 
-async def test_logout_garbage_raises(
-    session_factory: _SessionFactory,
-) -> None:
-    async with session_factory() as session:
-        users = FakeUserRepository(session)
-        tokens = FakeAuthTokenRepository(session)
-        _seed_user(users)
-        svc = _make_service(users, tokens)
         with pytest.raises(UnauthorizedError):
             await svc.logout(token="not-a-jwt")
 
@@ -417,30 +360,26 @@ async def test_logout_garbage_raises(
 # ── Real-repository smoke ────────────────────────────────────────────
 
 
-async def test_login_uses_real_repositories(
-    session_factory: _SessionFactory,
-) -> None:
+async def test_login_uses_real_repositories() -> None:
     """Service works end-to-end with the concrete repositories.
 
     This guards against drift between the AuthService protocol contract
     and the real ``UserRepository`` / ``AuthTokenRepository`` signatures.
     """
-    async with session_factory() as session:
-        users_repo = UserRepository(session)
-        tokens_repo = AuthTokenRepository(session)
-        svc = AuthService(
-            users_repo=users_repo,
-            tokens_repo=tokens_repo,
-        )
-        # The real UserRepository is a generic helper for ``users`` but
-        # doesn't auto-create the schema; tests that need the table use
-        # UserRepository only via the in-memory fakes. This guard just
-        # exercises that AuthService can be constructed with the
-        # concrete repos and exposes them under the documented names.
-        assert isinstance(svc._users_repo, UserRepository)
-        assert isinstance(svc._tokens_repo, AuthTokenRepository)
-        assert svc._users_repo is users_repo
-        assert svc._tokens_repo is tokens_repo
+
+    class _NoopSession:
+        """Bare-minimum session shim for constructor compatibility."""
+
+    session: AsyncSession = _NoopSession()  # type: ignore[assignment]
+    users_repo = UserRepository(session)
+    tokens_repo = AuthTokenRepository(session)
+    svc = AuthService(
+        users_repo=users_repo,
+        tokens_repo=tokens_repo,
+    )
+    # AuthService stores the repositories under documented names.
+    assert svc._users_repo is users_repo
+    assert svc._tokens_repo is tokens_repo
 
 
 __all__ = []

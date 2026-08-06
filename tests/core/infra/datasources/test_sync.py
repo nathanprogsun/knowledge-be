@@ -16,6 +16,7 @@ source itself into an error state and stops the schedule.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -37,11 +38,11 @@ from src.core.infra.datasources.types import (
     SyncCursor,
 )
 from src.core.system.audit_service import AuditLogService
+from src.db.dao.audit_log_repository import AuditLogRepository
+from src.db.dao.datasource_repository import DataSourceRepository, SyncLogRepository
 from src.db.models.datasource import DataSource, SyncLog
+from src.db.models.system.audit_log import AuditLog
 from tests.unit.fakes.datasources import (
-    FakeAuditRepo,
-    FakeDataSourceRepo,
-    FakeSyncLogRepo,
     RecordingIngestor,
     StubConnector,
     unreachable_error,
@@ -52,17 +53,158 @@ KB_ID = "kb-1"
 NOW = datetime(2026, 3, 1, tzinfo=UTC)
 
 
+# ── Repository mocks (stateful via side_effect closures) ─────────────
+
+
+def _make_ds_repo() -> AsyncMock:
+    """``AsyncMock(spec=DataSourceRepository)`` with closure-captured state."""
+    repo = AsyncMock(spec=DataSourceRepository)
+    repo.rows = {}  # type: ignore[attr-defined]
+    repo.items_synced = {}  # type: ignore[attr-defined]
+
+    async def _create(row: DataSource) -> DataSource:
+        repo.rows[row.id] = row  # type: ignore[attr-defined]
+        return row
+
+    async def _find_by_id_or_none(id: str) -> DataSource | None:
+        row = repo.rows.get(id)  # type: ignore[attr-defined]
+        if row is None or row.deleted_at is not None:
+            return None
+        return row
+
+    async def _find_by_knowledge_base(
+        knowledge_base_id: str,
+    ) -> list[DataSource]:
+        rows = [
+            r
+            for r in repo.rows.values()  # type: ignore[attr-defined]
+            if r.knowledge_base_id == knowledge_base_id and r.deleted_at is None
+        ]
+        return sorted(rows, key=lambda r: r.created_at, reverse=True)
+
+    async def _update(row: DataSource) -> DataSource:
+        existing = repo.rows.get(row.id)  # type: ignore[attr-defined]
+        if existing is None:
+            from src.common.exception import ValidationError
+
+            raise ValidationError(code="db.not_found", message="row missing")
+        persisted = row.model_copy(
+            update={
+                "tenant_id": existing.tenant_id,
+                "knowledge_base_id": existing.knowledge_base_id,
+                "created_at": existing.created_at,
+            }
+        )
+        repo.rows[row.id] = persisted  # type: ignore[attr-defined]
+        return persisted
+
+    async def _soft_delete(*, id: str, now: datetime) -> bool:
+        existing = repo.rows.get(id)  # type: ignore[attr-defined]
+        if existing is None or existing.deleted_at is not None:
+            return False
+        repo.rows[id] = existing.model_copy(  # type: ignore[attr-defined]
+            update={"deleted_at": now, "updated_at": now}
+        )
+        return True
+
+    async def _count_items_synced(data_source_id: str) -> int:
+        return repo.items_synced.get(data_source_id, 0)  # type: ignore[attr-defined]
+
+    repo.create.side_effect = _create
+    repo.find_by_id_or_none.side_effect = _find_by_id_or_none
+    repo.find_by_knowledge_base.side_effect = _find_by_knowledge_base
+    repo.update.side_effect = _update
+    repo.soft_delete.side_effect = _soft_delete
+    repo.count_items_synced.side_effect = _count_items_synced
+    return repo
+
+
+def _make_sync_log_repo() -> AsyncMock:
+    """``AsyncMock(spec=SyncLogRepository)`` with closure-captured state."""
+    repo = AsyncMock(spec=SyncLogRepository)
+    repo.rows = {}  # type: ignore[attr-defined]
+
+    async def _create(row: SyncLog) -> SyncLog:
+        repo.rows[row.id] = row  # type: ignore[attr-defined]
+        return row
+
+    async def _find_by_id_or_none(id: str) -> SyncLog | None:
+        return repo.rows.get(id)  # type: ignore[attr-defined]
+
+    async def _find_by_data_source(
+        data_source_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> list[SyncLog]:
+        rows = [r for r in repo.rows.values() if r.data_source_id == data_source_id]  # type: ignore[attr-defined]
+        rows = sorted(rows, key=lambda r: r.started_at, reverse=True)
+        return rows[offset : offset + limit]
+
+    async def _find_latest(data_source_id: str) -> SyncLog | None:
+        rows = [r for r in repo.rows.values() if r.data_source_id == data_source_id]  # type: ignore[attr-defined]
+        if not rows:
+            return None
+        return max(rows, key=lambda r: r.started_at)
+
+    async def _update(row: SyncLog) -> SyncLog:
+        repo.rows[row.id] = row  # type: ignore[attr-defined]
+        return row
+
+    async def _cancel_pending_by_data_source(
+        *,
+        data_source_id: str,
+        now: datetime,
+    ) -> int:
+        count = 0
+        for log_id, row in list(repo.rows.items()):  # type: ignore[attr-defined]
+            if row.data_source_id == data_source_id and row.status == "running":
+                repo.rows[log_id] = row.model_copy(  # type: ignore[attr-defined]
+                    update={
+                        "status": "canceled",
+                        "finished_at": now,
+                        "updated_at": now,
+                    }
+                )
+                count += 1
+        return count
+
+    repo.create.side_effect = _create
+    repo.find_by_id_or_none.side_effect = _find_by_id_or_none
+    repo.find_by_data_source.side_effect = _find_by_data_source
+    repo.find_latest.side_effect = _find_latest
+    repo.update.side_effect = _update
+    repo.cancel_pending_by_data_source.side_effect = _cancel_pending_by_data_source
+    return repo
+
+
+def _make_audit_repo() -> AsyncMock:
+    """``AsyncMock(spec=AuditLogRepository)`` with closure-captured state."""
+    repo = AsyncMock(spec=AuditLogRepository)
+    repo.rows = []  # type: ignore[attr-defined]
+    _next_id = {"value": 0}
+
+    async def _create(entry: AuditLog) -> AuditLog:
+        _next_id["value"] += 1
+        persisted = entry.model_copy(update={"id": _next_id["value"]})
+        repo.rows.append(persisted)  # type: ignore[attr-defined]
+        return persisted
+
+    repo.create.side_effect = _create
+    return repo
+
+
 # ── Fixtures ─────────────────────────────────────────────────────────
 
 
 @pytest.fixture
-def ds_repo() -> FakeDataSourceRepo:
-    return FakeDataSourceRepo()
+def ds_repo() -> AsyncMock:
+    return _make_ds_repo()
 
 
 @pytest.fixture
-def sync_log_repo() -> FakeSyncLogRepo:
-    return FakeSyncLogRepo()
+def sync_log_repo() -> AsyncMock:
+    return _make_sync_log_repo()
 
 
 @pytest.fixture
@@ -72,17 +214,17 @@ def connector() -> StubConnector:
 
 @pytest.fixture
 def service(
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
     connector: StubConnector,
 ) -> DataSourceService:
     registry = ConnectorRegistry()
     registry.register(connector)
     return DataSourceService(
-        ds_repo=ds_repo,  # type: ignore[arg-type]
-        sync_log_repo=sync_log_repo,  # type: ignore[arg-type]
+        ds_repo=ds_repo,
+        sync_log_repo=sync_log_repo,
         connector_registry=registry,
-        audit_service=AuditLogService(audit_repo=FakeAuditRepo()),  # type: ignore[arg-type]
+        audit_service=AuditLogService(audit_repo=_make_audit_repo()),
     )
 
 
@@ -136,8 +278,8 @@ def _item(external_id: str, *, is_deleted: bool = False, title: str = "") -> Fet
 
 async def test_manual_sync_opens_running_log(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
 ) -> None:
     row = _row()
     ds_repo.rows[row.id] = row
@@ -152,7 +294,7 @@ async def test_manual_sync_opens_running_log(
 
 async def test_manual_sync_allowed_on_paused_source(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     # A manual run is an explicit override of the schedule, not a resume.
     row = _row(status=DATA_SOURCE_STATUS_PAUSED)
@@ -166,7 +308,7 @@ async def test_manual_sync_allowed_on_paused_source(
 
 async def test_manual_sync_allowed_on_errored_source(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row(status=DATA_SOURCE_STATUS_ERROR)
     ds_repo.rows[row.id] = row
@@ -178,7 +320,7 @@ async def test_manual_sync_allowed_on_errored_source(
 
 async def test_manual_sync_rejects_unsyncable_status(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row(status="deleted")
     ds_repo.rows[row.id] = row
@@ -190,7 +332,7 @@ async def test_manual_sync_rejects_unsyncable_status(
 
 async def test_manual_sync_on_foreign_source_raises_not_found(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row()
     ds_repo.rows[row.id] = row
@@ -204,8 +346,8 @@ async def test_manual_sync_on_foreign_source_raises_not_found(
 
 async def test_fail_sync_closes_log_and_errors_source(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
 ) -> None:
     row = _row()
     ds_repo.rows[row.id] = row
@@ -225,8 +367,8 @@ async def test_fail_sync_closes_log_and_errors_source(
 
 async def test_fail_sync_keeps_paused_status(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
 ) -> None:
     # Pausing is a user decision a failed dispatch must not undo.
     row = _row(status=DATA_SOURCE_STATUS_PAUSED)
@@ -243,8 +385,8 @@ async def test_fail_sync_keeps_paused_status(
 
 async def test_process_sync_success_tallies_created_and_updated(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row()
@@ -265,8 +407,8 @@ async def test_process_sync_success_tallies_created_and_updated(
 
 async def test_process_sync_partial_when_some_items_fail(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row()
@@ -286,8 +428,8 @@ async def test_process_sync_partial_when_some_items_fail(
 
 async def test_process_sync_failed_when_every_item_fails(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row()
@@ -311,8 +453,8 @@ async def test_process_sync_failed_when_every_item_fails(
 
 async def test_process_sync_empty_run_is_success(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
 ) -> None:
     row = _row()
     ds_repo.rows[row.id] = row
@@ -326,8 +468,8 @@ async def test_process_sync_empty_run_is_success(
 
 async def test_process_sync_caps_error_samples(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     # Uncapped, a feed whose every item fails writes a huge JSONB blob.
@@ -353,8 +495,8 @@ async def test_process_sync_caps_error_samples(
 
 async def test_process_sync_applies_deletions_when_enabled(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row(sync_deletions=True)
@@ -372,8 +514,8 @@ async def test_process_sync_applies_deletions_when_enabled(
 
 async def test_process_sync_skips_deletions_when_disabled(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     # Opting out means upstream removals must not delete local knowledge.
@@ -396,8 +538,8 @@ async def test_process_sync_skips_deletions_when_disabled(
 
 async def test_process_sync_uses_incremental_when_cursor_present(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row(last_sync_cursor={"connector_cursor": {"page": 2}})
@@ -416,8 +558,8 @@ async def test_process_sync_uses_incremental_when_cursor_present(
 
 async def test_process_sync_force_full_ignores_cursor(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row(last_sync_cursor={"connector_cursor": {"page": 2}})
@@ -437,8 +579,8 @@ async def test_process_sync_force_full_ignores_cursor(
 
 async def test_process_sync_full_mode_ignores_cursor(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row(sync_mode=SYNC_MODE_FULL, last_sync_cursor={"connector_cursor": {"page": 2}})
@@ -454,8 +596,8 @@ async def test_process_sync_full_mode_ignores_cursor(
 
 async def test_process_sync_respects_max_items(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row()
@@ -474,8 +616,8 @@ async def test_process_sync_respects_max_items(
 
 async def test_process_sync_advances_last_sync_at(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row()
@@ -491,8 +633,8 @@ async def test_process_sync_advances_last_sync_at(
 
 async def test_process_sync_keeps_paused_status_after_manual_run(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row(status=DATA_SOURCE_STATUS_PAUSED)
@@ -507,8 +649,8 @@ async def test_process_sync_keeps_paused_status_after_manual_run(
 
 async def test_process_sync_propagates_fetch_failure(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row()
@@ -528,7 +670,7 @@ async def test_process_sync_rejects_missing_source(service: DataSourceService) -
 
 async def test_process_sync_rejects_missing_log(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row()
     ds_repo.rows[row.id] = row
@@ -540,8 +682,8 @@ async def test_process_sync_rejects_missing_log(
 
 async def test_process_sync_rejects_unconfigured_source(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
 ) -> None:
     row = _row(config={})
     ds_repo.rows[row.id] = row
@@ -554,8 +696,8 @@ async def test_process_sync_rejects_unconfigured_source(
 
 async def test_process_sync_without_ingestor_counts_skipped(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
-    sync_log_repo: FakeSyncLogRepo,
+    ds_repo: AsyncMock,
+    sync_log_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     # The knowledge stack is a later stage; items are counted, not lost.
@@ -575,7 +717,7 @@ async def test_process_sync_without_ingestor_counts_skipped(
 
 async def test_validate_connection_clears_prior_error(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row(status=DATA_SOURCE_STATUS_ERROR).model_copy(update={"error_message": "auth failed"})
     ds_repo.rows[row.id] = row
@@ -588,7 +730,7 @@ async def test_validate_connection_clears_prior_error(
 
 async def test_validate_connection_records_failure_then_reraises(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row()
@@ -605,7 +747,7 @@ async def test_validate_connection_records_failure_then_reraises(
 
 async def test_validate_connection_leaves_healthy_source_untouched(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row()
     ds_repo.rows[row.id] = row
@@ -618,7 +760,7 @@ async def test_validate_connection_leaves_healthy_source_untouched(
 
 async def test_validate_connection_rejects_unconfigured_source(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row(config={})
     ds_repo.rows[row.id] = row
@@ -633,7 +775,7 @@ async def test_validate_connection_rejects_unconfigured_source(
 
 async def test_validate_credentials_persists_nothing(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     await service.validate_credentials(type="notion", credentials={"api_key": "k"})
@@ -663,7 +805,7 @@ async def test_validate_credentials_propagates_connector_error(
 
 async def test_list_available_resources_passes_parent_id(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row()
@@ -684,7 +826,7 @@ async def test_list_available_resources_passes_parent_id(
 
 async def test_list_available_resources_on_foreign_source_raises_not_found(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
 ) -> None:
     row = _row()
     ds_repo.rows[row.id] = row
@@ -695,7 +837,7 @@ async def test_list_available_resources_on_foreign_source_raises_not_found(
 
 async def test_resolve_resource_ancestors_returns_connector_result(
     service: DataSourceService,
-    ds_repo: FakeDataSourceRepo,
+    ds_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row()

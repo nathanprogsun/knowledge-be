@@ -1,7 +1,7 @@
 """Unit tests for ``WebSearchProviderService``.
 
 Mirrors ``tests/core/system/test_service.py`` style: Protocol-based
-fakes for the repository and the client registry. Covers CRUD main
+mocks for the repository and a stub client registry. Covers CRUD main
 paths, validation errors, the default-promotion flip, and the
 connectivity-test entry point.
 """
@@ -9,6 +9,7 @@ connectivity-test entry point.
 from __future__ import annotations
 
 from typing import cast
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -24,114 +25,28 @@ from src.core.infra.web_search.types import (
     PROVIDER_TYPES,
     SUPPORTED_PROVIDER_TYPES,
 )
+from src.db.dao.web_search_provider_repository import WebSearchProviderRepository
 from src.db.models.infra.web_search_provider import WebSearchProvider
 
 _NOT_FOUND_CODE = "web_search_provider.not_found"
 
 
-# ── Fakes ──────────────────────────────────────────────────────────
-
-
-class FakeWebSearchProviderRepository:
-    """In-memory replacement for ``WebSearchProviderRepository``."""
-
-    def __init__(self) -> None:
-        self.rows: dict[tuple[int, str], WebSearchProvider] = {}
-        self._next_id = 1
-
-    def _key(self, tenant_id: int, provider_id: str) -> tuple[int, str]:
-        return (tenant_id, provider_id)
-
-    async def insert(self, row: WebSearchProvider) -> WebSearchProvider:
-        persisted = row.model_copy()
-        self.rows[self._key(persisted.tenant_id, persisted.id)] = persisted
-        self._next_id += 1
-        return persisted
-
-    async def get_by_id(
-        self,
-        tenant_id: int,
-        provider_id: str,
-    ) -> WebSearchProvider | None:
-        return await self.find_unique_by_column_values(
-            {"id": provider_id, "tenant_id": tenant_id},
-        )
-
-    async def find_unique_by_column_values(
-        self,
-        column_to_query: dict[str, object],
-        *,
-        exclude_deleted_or_archived: bool = True,
-    ) -> WebSearchProvider | None:
-        tenant_id = cast(int, column_to_query.get("tenant_id"))
-        provider_id = cast(str, column_to_query.get("id") or column_to_query.get("provider_id"))
-        is_default = column_to_query.get("is_default")
-        if provider_id is not None:
-            row = self.rows.get(self._key(tenant_id, provider_id))
-        elif is_default is True:
-            matches = [
-                r
-                for r in self.rows.values()
-                if r.tenant_id == tenant_id and r.is_default and not r.deleted_at
-            ]
-            row = matches[0] if matches else None
-        else:  # pragma: no cover — guarded by callers
-            return None
-        if row is None:
-            return None
-        if exclude_deleted_or_archived and row.deleted_at is not None:
-            return None
-        return row
-
-    async def list_for_tenant(self, tenant_id: int) -> list[WebSearchProvider]:
-        return [r for r in self.rows.values() if r.tenant_id == tenant_id and r.deleted_at is None]
-
-    async def update_by_primary_key(
-        self,
-        primary_key_to_value: dict[str, object],
-        column_to_update: dict[str, object],
-        *,
-        exclude_deleted_or_archived: bool = True,
-    ) -> WebSearchProvider | None:
-        provider_id = str(primary_key_to_value["id"])
-        row = next(
-            (r for r in self.rows.values() if r.id == provider_id),
-            None,
-        )
-        if row is None:
-            return None
-        if exclude_deleted_or_archived and row.deleted_at is not None:
-            return None
-        persisted = row.model_copy(update=dict(column_to_update))
-        self.rows[self._key(persisted.tenant_id, persisted.id)] = persisted
-        return persisted
-
-    async def clear_default(
-        self,
-        tenant_id: int,
-        exclude_id: str = "",
-    ) -> int:
-        cleared = 0
-        for (tid, _), row in list(self.rows.items()):
-            if tid != tenant_id:
-                continue
-            if row.deleted_at is not None:
-                continue
-            if not row.is_default:
-                continue
-            if exclude_id and row.id == exclude_id:
-                continue
-            self.rows[(tid, row.id)] = row.model_copy(update={"is_default": False})
-            cleared += 1
-        return cleared
+# ── Protocol doubles (non-repository collaborators) ──────────────────
 
 
 class FakeSearchClient:
     """In-memory ``WebSearchClient`` used by the test path."""
 
-    def __init__(self, provider_type: str, *, results: list[dict[str, str]] | None = None) -> None:
+    def __init__(
+        self,
+        provider_type: str,
+        *,
+        results: list[dict[str, str]] | None = None,
+    ) -> None:
         self.provider_type = provider_type
-        self._results = results if results is not None else [{"url": "https://example.com"}]
+        self._results = (
+            results if results is not None else [{"url": "https://example.com"}]
+        )
         self.calls: list[tuple[str, int, bool]] = []
 
     def search(
@@ -150,7 +65,12 @@ class FakeRegistry:
     def __init__(self) -> None:
         self.clients: dict[str, FakeSearchClient] = {}
 
-    def add(self, provider_type: str, *, results: list[dict[str, str]] | None = None) -> None:
+    def add(
+        self,
+        provider_type: str,
+        *,
+        results: list[dict[str, str]] | None = None,
+    ) -> None:
         self.clients[provider_type] = FakeSearchClient(provider_type, results=results)
 
     def create_provider(
@@ -163,18 +83,103 @@ class FakeRegistry:
         return self.clients[provider_type]
 
 
-# ── Helpers ────────────────────────────────────────────────────────
+# ── Repository mock ─────────────────────────────────────────────────
 
 
-def _make_svc(
-    *,
-    repo: FakeWebSearchProviderRepository | None = None,
-) -> tuple[WebSearchProviderService, FakeWebSearchProviderRepository]:
-    r = repo or FakeWebSearchProviderRepository()
-    return (
-        WebSearchProviderService(provider_repo=r),  # type: ignore[arg-type]
-        r,
-    )
+def _make_repo() -> tuple[AsyncMock, dict[tuple[int, str], WebSearchProvider]]:
+    """WebSearch-provider repo mock with closure-captured state."""
+    repo = AsyncMock(spec=WebSearchProviderRepository)
+    rows: dict[tuple[int, str], WebSearchProvider] = {}
+
+    def _key(tenant_id: int, provider_id: str) -> tuple[int, str]:
+        return (tenant_id, provider_id)
+
+    async def _insert(row: WebSearchProvider) -> WebSearchProvider:
+        rows[_key(row.tenant_id, row.id)] = row
+        return row
+
+    async def _get_by_id(
+        tenant_id: int, provider_id: str
+    ) -> WebSearchProvider | None:
+        row = rows.get(_key(tenant_id, provider_id))
+        if row is None or row.deleted_at is not None:
+            return None
+        return row
+
+    async def _find_unique_by_column_values(
+        column_to_query: dict[str, object],
+        *,
+        exclude_deleted_or_archived: bool = True,
+    ) -> WebSearchProvider | None:
+        tenant_id = cast(int, column_to_query.get("tenant_id"))
+        provider_id_obj = column_to_query.get("id") or column_to_query.get("provider_id")
+        is_default = column_to_query.get("is_default")
+        if provider_id_obj is not None:
+            provider_id = cast(str, provider_id_obj)
+            row = rows.get(_key(tenant_id, provider_id))
+        elif is_default is True:
+            matches = [
+                r
+                for r in rows.values()
+                if r.tenant_id == tenant_id and r.is_default and not r.deleted_at
+            ]
+            row = matches[0] if matches else None
+        else:  # pragma: no cover — guarded by callers
+            return None
+        if row is None:
+            return None
+        if exclude_deleted_or_archived and row.deleted_at is not None:
+            return None
+        return row
+
+    async def _list_for_tenant(tenant_id: int) -> list[WebSearchProvider]:
+        return [
+            r for r in rows.values() if r.tenant_id == tenant_id and r.deleted_at is None
+        ]
+
+    async def _update_by_primary_key(
+        primary_key_to_value: dict[str, object],
+        column_to_update: dict[str, object],
+        *,
+        exclude_deleted_or_archived: bool = True,
+    ) -> WebSearchProvider | None:
+        provider_id = str(primary_key_to_value["id"])
+        row = next((r for r in rows.values() if r.id == provider_id), None)
+        if row is None:
+            return None
+        if exclude_deleted_or_archived and row.deleted_at is not None:
+            return None
+        persisted = row.model_copy(update=dict(column_to_update))
+        rows[_key(persisted.tenant_id, persisted.id)] = persisted
+        return persisted
+
+    async def _clear_default(tenant_id: int, exclude_id: str = "") -> int:
+        cleared = 0
+        for (tid, _), row in list(rows.items()):
+            if tid != tenant_id:
+                continue
+            if row.deleted_at is not None:
+                continue
+            if not row.is_default:
+                continue
+            if exclude_id and row.id == exclude_id:
+                continue
+            rows[(tid, row.id)] = row.model_copy(update={"is_default": False})
+            cleared += 1
+        return cleared
+
+    repo.insert.side_effect = _insert
+    repo.get_by_id.side_effect = _get_by_id
+    repo.find_unique_by_column_values.side_effect = _find_unique_by_column_values
+    repo.list_for_tenant.side_effect = _list_for_tenant
+    repo.update_by_primary_key.side_effect = _update_by_primary_key
+    repo.clear_default.side_effect = _clear_default
+    return repo, rows
+
+
+def _make_svc() -> tuple[WebSearchProviderService, AsyncMock]:
+    repo, _ = _make_repo()
+    return WebSearchProviderService(provider_repo=repo), repo
 
 
 # ── Registry metadata sanity ───────────────────────────────────────

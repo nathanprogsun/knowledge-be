@@ -1,7 +1,7 @@
 """Unit tests for ``WebSearchSearchService``.
 
 Mirrors ``tests/core/system/test_service.py`` style: Protocol-based
-fakes for the repository and the client registry. Covers the search
+mocks for the repository and a stub client registry. Covers the search
 main path (by-id resolution, blacklist filtering, source labelling),
 the legacy fallback, and the missing-query / missing-provider
 validation errors.
@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import cast
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -21,29 +22,13 @@ from src.core.infra.web_search.provider_service import (
     WebSearchClientRegistry,
 )
 from src.core.infra.web_search.search_service import WebSearchSearchService
+from src.db.dao.web_search_provider_repository import WebSearchProviderRepository
 from src.db.models.infra.web_search_provider import WebSearchProvider
 
 _NOT_FOUND_CODE = "web_search_provider.not_found"
 
 
-# ── Fakes ──────────────────────────────────────────────────────────
-
-
-class FakeRepo:
-    """In-memory replacement for ``WebSearchProviderRepository``."""
-
-    def __init__(self) -> None:
-        self.rows: dict[tuple[int, str], WebSearchProvider] = {}
-
-    def add(self, row: WebSearchProvider) -> None:
-        self.rows[(row.tenant_id, row.id)] = row
-
-    async def get_by_id(
-        self,
-        tenant_id: int,
-        provider_id: str,
-    ) -> WebSearchProvider | None:
-        return self.rows.get((tenant_id, provider_id))
+# ── Protocol doubles (non-repository collaborators) ──────────────────
 
 
 class FakeClient:
@@ -70,7 +55,11 @@ class FakeRegistry:
     def __init__(self) -> None:
         self.clients: dict[str, FakeClient] = {}
 
-    def add(self, provider_type: str, results: list[dict[str, str]]) -> None:
+    def add(
+        self,
+        provider_type: str,
+        results: list[dict[str, str]],
+    ) -> None:
         self.clients[provider_type] = FakeClient(provider_type, results)
 
     def create_provider(
@@ -81,26 +70,61 @@ class FakeRegistry:
         return self.clients[provider_type]
 
 
-def _make_svc(
-    *,
-    repo: FakeRepo | None = None,
-    registry: FakeRegistry | None = None,
-) -> tuple[WebSearchSearchService, FakeRepo, FakeRegistry]:
-    r = repo or FakeRepo()
-    reg = registry or FakeRegistry()
+# ── Repository mock ─────────────────────────────────────────────────
+
+
+def _get_by_id_for(
+    rows: dict[tuple[int, str], WebSearchProvider],
+):
+    """Return a side_effect that resolves ``(tenant_id, provider_id)``."""
+
+    async def _get_by_id(
+        tenant_id: int, provider_id: str
+    ) -> WebSearchProvider | None:
+        row = rows.get((tenant_id, provider_id))
+        if row is None or row.deleted_at is not None:
+            return None
+        return row
+
+    return _get_by_id
+
+
+def _make_repo() -> tuple[AsyncMock, dict[tuple[int, str], WebSearchProvider]]:
+    """WebSearch-provider repo mock with closure-captured state.
+
+    ``get_by_id`` is driven by a side_effect so a test that pre-loads a
+    row into ``rows`` gets that row back, and a missing key yields
+    ``None`` (the missing-provider error path).
+    """
+    repo = AsyncMock(spec=WebSearchProviderRepository)
+    rows: dict[tuple[int, str], WebSearchProvider] = {}
+    repo.get_by_id.side_effect = _get_by_id_for(rows)
+    return repo, rows
+
+
+def _make_svc() -> tuple[
+    WebSearchSearchService, AsyncMock, dict[tuple[int, str], WebSearchProvider], FakeRegistry
+]:
+    repo, rows = _make_repo()
+    reg = FakeRegistry()
     return (
         WebSearchSearchService(
-            provider_repo=r,  # type: ignore[arg-type]
+            provider_repo=repo,
             registry=cast("WebSearchClientRegistry", reg),
             timeout_seconds=2,
         ),
-        r,
+        repo,
+        rows,
         reg,
     )
 
 
 def _row(
-    tenant_id: int, provider_id: str, provider: str, *, api_key: str = "k"
+    tenant_id: int,
+    provider_id: str,
+    provider: str,
+    *,
+    api_key: str = "k",
 ) -> WebSearchProvider:
     now = datetime.now(UTC)
     return WebSearchProvider(
@@ -126,8 +150,8 @@ def _row(
 
 
 async def test_search_resolves_by_id_and_returns_results() -> None:
-    svc, repo, reg = _make_svc()
-    repo.add(_row(tenant_id=1, provider_id="wsp-1", provider="bing"))
+    svc, _, rows, reg = _make_svc()
+    rows[(1, "wsp-1")] = _row(tenant_id=1, provider_id="wsp-1", provider="bing")
     reg.add(
         "bing",
         [
@@ -148,21 +172,21 @@ async def test_search_resolves_by_id_and_returns_results() -> None:
 
 
 async def test_search_missing_query_raises() -> None:
-    svc, _, _ = _make_svc()
+    svc, _, _, _ = _make_svc()
     with pytest.raises(ValidationError) as exc:
         await svc.search(tenant_id=1, provider_id="wsp-1", query="")
     assert exc.value.code == "web_search_provider.query_required"
 
 
 async def test_search_missing_provider_id_raises() -> None:
-    svc, _, _ = _make_svc()
+    svc, _, _, _ = _make_svc()
     with pytest.raises(ValidationError) as exc:
         await svc.search(tenant_id=1, provider_id="wsp-missing", query="hi")
     assert exc.value.code == _NOT_FOUND_CODE
 
 
 async def test_search_no_provider_and_no_legacy_raises() -> None:
-    svc, _, _ = _make_svc()
+    svc, _, _, _ = _make_svc()
     with pytest.raises(ValidationError) as exc:
         await svc.search(tenant_id=1, provider_id="", query="hi")
     assert exc.value.code == "web_search_provider.no_provider_configured"
@@ -172,7 +196,7 @@ async def test_search_no_provider_and_no_legacy_raises() -> None:
 
 
 async def test_search_legacy_provider_path() -> None:
-    svc, _, reg = _make_svc()
+    svc, _, _, reg = _make_svc()
     reg.add(
         "duckduckgo",
         [
@@ -198,8 +222,8 @@ async def test_search_legacy_provider_path() -> None:
 
 
 async def test_search_blacklist_filters_matches() -> None:
-    svc, repo, reg = _make_svc()
-    repo.add(_row(tenant_id=1, provider_id="wsp-1", provider="bing"))
+    svc, _, rows, reg = _make_svc()
+    rows[(1, "wsp-1")] = _row(tenant_id=1, provider_id="wsp-1", provider="bing")
     reg.add(
         "bing",
         [
@@ -221,8 +245,8 @@ async def test_search_blacklist_filters_matches() -> None:
 
 
 async def test_search_blacklist_regex_syntax() -> None:
-    svc, repo, reg = _make_svc()
-    repo.add(_row(tenant_id=1, provider_id="wsp-1", provider="bing"))
+    svc, _, rows, reg = _make_svc()
+    rows[(1, "wsp-1")] = _row(tenant_id=1, provider_id="wsp-1", provider="bing")
     reg.add(
         "bing",
         [
@@ -243,8 +267,8 @@ async def test_search_blacklist_regex_syntax() -> None:
 
 
 async def test_search_wraps_provider_failure() -> None:
-    svc, repo, reg = _make_svc()
-    repo.add(_row(tenant_id=1, provider_id="wsp-1", provider="bing"))
+    svc, _, rows, reg = _make_svc()
+    rows[(1, "wsp-1")] = _row(tenant_id=1, provider_id="wsp-1", provider="bing")
 
     class _RaisingClient(WebSearchClient):
         provider_type = "bing"
@@ -268,8 +292,8 @@ async def test_search_wraps_provider_failure() -> None:
 
 
 async def test_search_includes_date_flag_is_propagated() -> None:
-    svc, repo, reg = _make_svc()
-    repo.add(_row(tenant_id=1, provider_id="wsp-1", provider="bing"))
+    svc, _, rows, reg = _make_svc()
+    rows[(1, "wsp-1")] = _row(tenant_id=1, provider_id="wsp-1", provider="bing")
     reg.add("bing", [{"title": "x", "url": "https://example.com/a", "snippet": ""}])
     await svc.search(
         tenant_id=1,

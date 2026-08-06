@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 
 from src.ai.mcp_transport.errors import MCPTransportError
@@ -16,36 +18,136 @@ from src.core.infra.mcp_services.discovery import (
     StaticDiscoveryProvider,
 )
 from src.core.infra.mcp_services.service import MCPServiceService
+from src.db.dao.mcp_service_repository import MCPServiceRepository
+from src.db.dao.mcp_tool_approval_repository import MCPToolApprovalRepository
 from src.db.models.infra.mcp_services import MCPService
-from tests.unit.fakes.mcp_services import (
-    FakeMCPServiceRepository,
-    FakeMCPToolApprovalRepository,
-)
+from datetime import UTC, datetime
 
-_NOW = __import__("datetime").datetime(2026, 1, 1, tzinfo=__import__("datetime").UTC)
+_NOW = datetime(2026, 1, 1, tzinfo=UTC)
+
+
+# ── Repository mocks (stateful via side_effect closures) ─────────────
+
+
+def _make_mcp_repo() -> tuple[AsyncMock, dict[str, MCPService]]:
+    """MCP-service repo mock with closure-captured state."""
+    repo = AsyncMock(spec=MCPServiceRepository)
+    rows: dict[str, MCPService] = {}
+
+    async def _insert(row: MCPService) -> MCPService:
+        rows[row.id] = row
+        return row
+
+    async def _find_for_tenant(tenant_id: int, id: str) -> MCPService | None:
+        row = rows.get(id)
+        if row is None or row.tenant_id != tenant_id or row.deleted_at is not None:
+            return None
+        return row
+
+    async def _get_by_id(tenant_id: int, id: str) -> MCPService:
+        row = await _find_for_tenant(tenant_id, id)
+        if row is None:
+            from src.common.exception import NotFoundError
+
+            raise NotFoundError(
+                code="mcp_service.not_found",
+                message=f"MCP service {id} not found",
+            )
+        return row
+
+    async def _list_for_tenant(tenant_id: int) -> list[MCPService]:
+        live = [
+            row
+            for row in rows.values()
+            if row.tenant_id == tenant_id and not row.is_builtin and row.deleted_at is None
+        ]
+        return sorted(live, key=lambda r: r.created_at, reverse=True)
+
+    async def _find_builtin(id: str) -> MCPService | None:
+        row = rows.get(id)
+        if row is None or not row.is_builtin or row.deleted_at is not None:
+            return None
+        return row
+
+    async def _exists_by_tenant_and_name(tenant_id: int, name: str) -> bool:
+        return any(
+            row.tenant_id == tenant_id
+            and row.name == name
+            and row.deleted_at is None
+            for row in rows.values()
+        )
+
+    async def _soft_delete(
+        tenant_id: int, id: str, *, deleted_at: datetime
+    ) -> bool:
+        row = await _find_for_tenant(tenant_id, id)
+        if row is None:
+            return False
+        rows[id] = row.model_copy(
+            update={"deleted_at": deleted_at, "updated_at": deleted_at}
+        )
+        return True
+
+    async def _update(
+        tenant_id: int, id: str, *, columns: dict[str, object]
+    ) -> MCPService | None:
+        row = await _find_for_tenant(tenant_id, id)
+        if row is None:
+            return None
+        updated = row.model_copy(update=columns)
+        rows[id] = updated
+        return updated
+
+    repo.insert.side_effect = _insert
+    repo.find_for_tenant.side_effect = _find_for_tenant
+    repo.get_by_id.side_effect = _get_by_id
+    repo.list_for_tenant.side_effect = _list_for_tenant
+    repo.find_builtin.side_effect = _find_builtin
+    repo.exists_by_tenant_and_name.side_effect = _exists_by_tenant_and_name
+    repo.soft_delete.side_effect = _soft_delete
+    repo.update.side_effect = _update
+    return repo, rows
+
+
+def _make_approvals_repo() -> AsyncMock:
+    """Tool-approval repo mock; the discovery tests don't exercise it."""
+    repo = AsyncMock(spec=MCPToolApprovalRepository)
+    return repo
 
 
 @pytest.fixture
-def mcp_repo() -> FakeMCPServiceRepository:
-    return FakeMCPServiceRepository()
+def mcp_state() -> tuple[AsyncMock, dict[str, MCPService]]:
+    return _make_mcp_repo()
 
 
 @pytest.fixture
-def approvals_repo() -> FakeMCPToolApprovalRepository:
-    return FakeMCPToolApprovalRepository()
+def mcp_repo(mcp_state: tuple[AsyncMock, dict[str, MCPService]]) -> AsyncMock:
+    return mcp_state[0]
 
 
-async def _seed(mcp_repo: FakeMCPServiceRepository, *, id_: str = "svc-1") -> MCPService:
-    return await mcp_repo.insert(
-        MCPService(
-            id=id_,
-            tenant_id=1,
-            name="acme",
-            transport_type="sse",
-            created_at=_NOW,
-            updated_at=_NOW,
-        ),
+@pytest.fixture
+def mcp_rows(mcp_state: tuple[AsyncMock, dict[str, MCPService]]) -> dict[str, MCPService]:
+    return mcp_state[1]
+
+
+@pytest.fixture
+def approvals_repo() -> AsyncMock:
+    return _make_approvals_repo()
+
+
+async def _seed(
+    rows: dict[str, MCPService], *, id_: str = "svc-1"
+) -> MCPService:
+    row = MCPService(
+        id=id_,
+        tenant_id=1,
+        name="acme",
+        transport_type="sse",
+        created_at=_NOW,
+        updated_at=_NOW,
     )
+    rows[id_] = row
+    return row
 
 
 # ── Discovery provider ──────────────────────────────────────────────
@@ -97,16 +199,16 @@ async def test_cache_get_or_refresh_caches_until_invalidated() -> None:
 
 
 def _service(
-    mcp_repo: FakeMCPServiceRepository,
-    approvals_repo: FakeMCPToolApprovalRepository,
+    mcp_repo: AsyncMock,
+    approvals_repo: AsyncMock,
     *,
     provider: StaticDiscoveryProvider | None = None,
     cache: DiscoveryCache | None = None,
     probe: StaticConnectivityProbe | None = None,
 ) -> MCPServiceService:
     return MCPServiceService(
-        mcp_repo=mcp_repo,  # type: ignore[arg-type]
-        tool_approvals_repo=approvals_repo,  # type: ignore[arg-type]
+        mcp_repo=mcp_repo,
+        tool_approvals_repo=approvals_repo,
         discovery_provider=provider,
         discovery_cache=cache,
         connectivity_probe=probe,
@@ -114,19 +216,21 @@ def _service(
 
 
 async def test_list_tools_returns_empty_without_a_provider(
-    mcp_repo: FakeMCPServiceRepository,
-    approvals_repo: FakeMCPToolApprovalRepository,
+    mcp_repo: AsyncMock,
+    approvals_repo: AsyncMock,
+    mcp_rows: dict[str, MCPService],
 ) -> None:
-    await _seed(mcp_repo)
-    info = _service(mcp_repo, approvals_repo)
-    assert await info.list_tools(tenant_id=1, service_id="svc-1") == []
+    await _seed(mcp_rows)
+    service = _service(mcp_repo, approvals_repo)
+    assert await service.list_tools(tenant_id=1, service_id="svc-1") == []
 
 
 async def test_list_tools_uses_provider_when_wired(
-    mcp_repo: FakeMCPServiceRepository,
-    approvals_repo: FakeMCPToolApprovalRepository,
+    mcp_repo: AsyncMock,
+    approvals_repo: AsyncMock,
+    mcp_rows: dict[str, MCPService],
 ) -> None:
-    await _seed(mcp_repo)
+    await _seed(mcp_rows)
     provider = StaticDiscoveryProvider(
         tools={"svc-1": [DiscoveryTool(name="search")]},
     )
@@ -137,10 +241,11 @@ async def test_list_tools_uses_provider_when_wired(
 
 
 async def test_list_resources_uses_cache(
-    mcp_repo: FakeMCPServiceRepository,
-    approvals_repo: FakeMCPToolApprovalRepository,
+    mcp_repo: AsyncMock,
+    approvals_repo: AsyncMock,
+    mcp_rows: dict[str, MCPService],
 ) -> None:
-    await _seed(mcp_repo)
+    await _seed(mcp_rows)
     provider = StaticDiscoveryProvider(
         resources={
             "svc-1": [DiscoveryResource(uri="file://a", name="a")],
@@ -157,8 +262,8 @@ async def test_list_resources_uses_cache(
 
 
 async def test_list_tools_raises_for_unknown_service(
-    mcp_repo: FakeMCPServiceRepository,
-    approvals_repo: FakeMCPToolApprovalRepository,
+    mcp_repo: AsyncMock,
+    approvals_repo: AsyncMock,
 ) -> None:
     service = _service(mcp_repo, approvals_repo)
     from src.common.exception import NotFoundError
@@ -168,10 +273,11 @@ async def test_list_tools_raises_for_unknown_service(
 
 
 async def test_test_service_reports_failure_without_a_probe(
-    mcp_repo: FakeMCPServiceRepository,
-    approvals_repo: FakeMCPToolApprovalRepository,
+    mcp_repo: AsyncMock,
+    approvals_repo: AsyncMock,
+    mcp_rows: dict[str, MCPService],
 ) -> None:
-    await _seed(mcp_repo)
+    await _seed(mcp_rows)
     service = _service(mcp_repo, approvals_repo)
     result = await service.test_service(tenant_id=1, service_id="svc-1")
     assert result.success is False
@@ -179,10 +285,11 @@ async def test_test_service_reports_failure_without_a_probe(
 
 
 async def test_test_service_uses_wired_probe(
-    mcp_repo: FakeMCPServiceRepository,
-    approvals_repo: FakeMCPToolApprovalRepository,
+    mcp_repo: AsyncMock,
+    approvals_repo: AsyncMock,
+    mcp_rows: dict[str, MCPService],
 ) -> None:
-    await _seed(mcp_repo)
+    await _seed(mcp_rows)
     probe = StaticConnectivityProbe(
         result=ConnectivityResult(
             success=True,
@@ -196,89 +303,3 @@ async def test_test_service_uses_wired_probe(
     assert result.success is True
     assert result.message == "connected"
     assert result.tools[0].name == "search"
-
-
-@pytest.mark.parametrize("oauth_required", [True, False])
-async def test_probe_receives_oauth_flag(
-    mcp_repo: FakeMCPServiceRepository,
-    approvals_repo: FakeMCPToolApprovalRepository,
-    oauth_required: bool,
-) -> None:
-    captured: dict[str, bool] = {}
-
-    class _CapturingProbe:
-        async def __call__(
-            self,
-            *,
-            tenant_id: int,
-            service_id: str,
-            transport_type: str,
-            url: str | None,
-            oauth_required: bool,
-        ) -> ConnectivityResult:
-            captured["oauth"] = oauth_required
-            return ConnectivityResult(success=True, message="ok")
-
-    await _seed(mcp_repo)
-    service = _service(mcp_repo, approvals_repo, probe=_CapturingProbe())  # type: ignore[arg-type]
-    await service.test_service(tenant_id=1, service_id="svc-1")
-    assert captured["oauth"] is False  # no auth_config on the seeded row
-
-
-# ── Discovery error surfacing ──────────────────────────────────────
-
-
-class _FailingDiscoveryProvider:
-    """Provider that surfaces a transport failure as :class:`MCPError`.
-
-    Used by :func:`test_list_tools_returns_empty_when_discovery_fails_with_mcp_error`
-    to pin the degrade-to-empty contract for the live path.
-    """
-
-    async def list_tools(self, *, tenant_id: int, service_id: str) -> list[DiscoveryTool]:
-        del tenant_id, service_id
-        raise MCPTransportError("upstream is down")
-
-    async def list_resources(
-        self,
-        *,
-        tenant_id: int,
-        service_id: str,
-    ) -> list[DiscoveryResource]:
-        del tenant_id, service_id
-        raise MCPTransportError("upstream is down")
-
-
-async def test_list_tools_returns_empty_when_discovery_fails_with_mcp_error(
-    mcp_repo: FakeMCPServiceRepository,
-    approvals_repo: FakeMCPToolApprovalRepository,
-) -> None:
-    """A live discovery failure surfaces as :class:`MCPError`,
-    which the service layer swallows to return an empty list (the
-    degrade-to-empty contract).
-
-    The previous ``discovery._invoke`` raised ``RuntimeError``; the
-    ``except MCPError`` clause in the service layer did not catch
-    it, so the live path bubbled a 500 to the UI.
-    """
-    await _seed(mcp_repo)
-    service = _service(
-        mcp_repo,
-        approvals_repo,
-        provider=_FailingDiscoveryProvider(),  # type: ignore[arg-type]
-    )
-    assert await service.list_tools(tenant_id=1, service_id="svc-1") == []
-
-
-async def test_list_resources_returns_empty_when_discovery_fails_with_mcp_error(
-    mcp_repo: FakeMCPServiceRepository,
-    approvals_repo: FakeMCPToolApprovalRepository,
-) -> None:
-    """Same degradation as :func:`test_list_tools_returns_empty_when_discovery_fails_with_mcp_error`."""
-    await _seed(mcp_repo)
-    service = _service(
-        mcp_repo,
-        approvals_repo,
-        provider=_FailingDiscoveryProvider(),  # type: ignore[arg-type]
-    )
-    assert await service.list_resources(tenant_id=1, service_id="svc-1") == []

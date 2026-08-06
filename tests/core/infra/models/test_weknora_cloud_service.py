@@ -10,6 +10,7 @@ the signing path real while no network call happens.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -22,8 +23,51 @@ from src.core.infra.models.service.provider_service import (
     is_weknora_cloud_doc_reader_addr,
     sign_request_headers,
 )
+from src.db.dao.tenants_repository import TenantRepository
 from src.db.models.tenants.tenants import Tenant
-from tests.unit.fakes.tenants import FakeTenantRepository
+
+
+def _make_repo() -> tuple[AsyncMock, dict[int, Tenant]]:
+    """``AsyncMock(spec=TenantRepository)`` with closure-captured state.
+
+    Only the small surface exercised by the credential merge
+    (insert / find_by_id / update_by_primary_key) is implemented.
+    """
+    repo = AsyncMock(spec=TenantRepository)
+    rows: dict[int, Tenant] = {}
+    _next_id = {"value": 0}
+    repo.rows = rows  # type: ignore[attr-defined]
+
+    async def _insert(row: Tenant) -> Tenant:
+        _next_id["value"] += 1
+        stored = row.model_copy(update={"id": _next_id["value"]})
+        rows[stored.id] = stored
+        return stored
+
+    async def _find_by_id(id_: str | int) -> Tenant:
+        row = rows.get(int(str(id_)))
+        if row is None or row.deleted_at is not None:
+            from src.common.exception import NotFoundError
+
+            raise NotFoundError(code="tenant.not_found", message=f"Tenant {id_} not found")
+        return row
+
+    async def _update_by_primary_key(
+        primary_key_to_value: dict[str, object],
+        column_to_update: dict[str, object],
+    ) -> Tenant | None:
+        tenant_id = int(str(primary_key_to_value["id"]))
+        row = rows.get(tenant_id)
+        if row is None or row.deleted_at is not None:
+            return None
+        updated = row.model_copy(update=column_to_update)
+        rows[tenant_id] = updated
+        return updated
+
+    repo.insert.side_effect = _insert
+    repo.find_by_id.side_effect = _find_by_id
+    repo.update_by_primary_key.side_effect = _update_by_primary_key
+    return repo, rows
 
 _HEALTH_URL = f"{WEKNORA_CLOUD_BASE_URL}/api/v1/health"
 
@@ -47,15 +91,18 @@ def _raising_client(exc: httpx.HTTPError) -> httpx.AsyncClient:
     return httpx.AsyncClient(transport=httpx.MockTransport(handler))
 
 
-async def _seed_tenant(repo: FakeTenantRepository, **overrides: object) -> Tenant:
+async def _seed_tenant(repo: AsyncMock, **overrides: object) -> Tenant:
     now = datetime.now(UTC)
-    return await repo.insert(
-        Tenant(name="acme", created_at=now, updated_at=now, **overrides)  # type: ignore[arg-type]
-    )
+    return await repo.insert(Tenant(name="acme", created_at=now, updated_at=now, **overrides))
 
 
-def _service(repo: FakeTenantRepository, client: httpx.AsyncClient) -> WeKnoraCloudService:
-    return WeKnoraCloudService(tenants_repo=repo, http_client=client)  # type: ignore[arg-type]
+def _service(repo: AsyncMock, client: httpx.AsyncClient) -> WeKnoraCloudService:
+    return WeKnoraCloudService(tenants_repo=repo, http_client=client)
+
+
+def _make() -> tuple[AsyncMock, dict[int, Tenant]]:
+    """Fixture-style helper for tests that want to share a single repo."""
+    return _make_repo()
 
 
 # ── Signing ─────────────────────────────────────────────────────────
@@ -105,7 +152,7 @@ def test_is_weknora_cloud_doc_reader_addr_ignores_trailing_slash() -> None:
 
 async def test_save_credentials_persists_the_pair_under_weknoracloud() -> None:
     # Arrange
-    repo = FakeTenantRepository()
+    repo, _ = _make()
     tenant = await _seed_tenant(repo)
     async with _client() as client:
         service = _service(repo, client)
@@ -121,7 +168,7 @@ async def test_save_credentials_persists_the_pair_under_weknoracloud() -> None:
 
 async def test_save_credentials_preserves_other_credential_providers() -> None:
     # Arrange
-    repo = FakeTenantRepository()
+    repo, _ = _make()
     tenant = await _seed_tenant(repo, credentials={"other": {"token": "keep-me"}})
     async with _client() as client:
         service = _service(repo, client)
@@ -149,7 +196,7 @@ async def test_save_credentials_rejects_blank_fields(
     code: str,
 ) -> None:
     # Arrange
-    repo = FakeTenantRepository()
+    repo, _ = _make()
     tenant = await _seed_tenant(repo)
     async with _client() as client:
         service = _service(repo, client)
@@ -168,7 +215,7 @@ async def test_save_credentials_rejects_blank_fields(
 @pytest.mark.parametrize("status_code", [401, 403])
 async def test_save_credentials_rejects_unauthorized_upstream(status_code: int) -> None:
     # Arrange
-    repo = FakeTenantRepository()
+    repo, _ = _make()
     tenant = await _seed_tenant(repo)
     async with _client(status_code) as client:
         service = _service(repo, client)
@@ -186,7 +233,7 @@ async def test_save_credentials_rejects_unauthorized_upstream(status_code: int) 
 
 async def test_save_credentials_rejects_unexpected_upstream_status() -> None:
     # Arrange
-    repo = FakeTenantRepository()
+    repo, _ = _make()
     tenant = await _seed_tenant(repo)
     async with _client(503) as client:
         service = _service(repo, client)
@@ -203,7 +250,7 @@ async def test_save_credentials_rejects_unexpected_upstream_status() -> None:
 
 async def test_save_credentials_reports_an_unreachable_service() -> None:
     # Arrange
-    repo = FakeTenantRepository()
+    repo, _ = _make()
     tenant = await _seed_tenant(repo)
     async with _raising_client(httpx.ConnectError("refused")) as client:
         service = _service(repo, client)
@@ -224,7 +271,7 @@ async def test_save_credentials_reports_an_unreachable_service() -> None:
 
 async def test_check_status_reports_no_models_without_credentials() -> None:
     # Arrange
-    repo = FakeTenantRepository()
+    repo, _ = _make()
     tenant = await _seed_tenant(repo)
     async with _client() as client:
         service = _service(repo, client)
@@ -240,7 +287,7 @@ async def test_check_status_reports_no_models_without_credentials() -> None:
 
 async def test_check_status_reports_no_models_for_an_unknown_tenant() -> None:
     # Arrange
-    repo = FakeTenantRepository()
+    repo, _ = _make()
     async with _client() as client:
         service = _service(repo, client)
 
@@ -254,7 +301,7 @@ async def test_check_status_reports_no_models_for_an_unknown_tenant() -> None:
 
 async def test_check_status_reports_no_models_when_a_field_is_blank() -> None:
     # Arrange
-    repo = FakeTenantRepository()
+    repo, _ = _make()
     tenant = await _seed_tenant(
         repo,
         credentials={"weknoracloud": {"app_id": "app", "app_secret": ""}},
@@ -272,7 +319,7 @@ async def test_check_status_reports_no_models_when_a_field_is_blank() -> None:
 
 async def test_check_status_is_healthy_with_a_decrypted_secret() -> None:
     # Arrange
-    repo = FakeTenantRepository()
+    repo, _ = _make()
     tenant = await _seed_tenant(
         repo,
         credentials={"weknoracloud": {"app_id": "app", "app_secret": "plaintext"}},
@@ -291,7 +338,7 @@ async def test_check_status_is_healthy_with_a_decrypted_secret() -> None:
 
 async def test_check_status_requests_reinit_for_an_undecrypted_secret() -> None:
     # Arrange
-    repo = FakeTenantRepository()
+    repo, _ = _make()
     tenant = await _seed_tenant(
         repo,
         credentials={"weknoracloud": {"app_id": "app", "app_secret": f"{ENC_PREFIX}blob"}},
