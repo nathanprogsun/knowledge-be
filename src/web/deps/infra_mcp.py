@@ -62,14 +62,13 @@ def _resolve_lifespan_service(request: Request) -> LifeSpanService | None:
     return cast("LifeSpanService | None", getattr(request.app.state, "lifespan_service", None))
 
 
-ConnectionManagerLike = _ConnManagerLikeDisc
-
-
 # Live discovery/connectivity provider construction has been moved to
 # ``core.infra.mcp_services.factory.build_mcp_resolvers`` /
 # ``build_live_discovery_provider`` / ``build_live_connectivity_probe``
 # so the ``MCPServiceRepository`` import lives in the core layer where
-# repositories are allowed. The web layer is now a thin forwarder.
+# repositories are allowed. The web layer keeps these names available
+# as re-exports so the lifespan-side forwarder (and any tests that
+# patched the symbol) keep working.
 build_live_resolvers = build_mcp_resolvers
 build_live_discovery_provider = build_live_discovery_provider
 build_live_connectivity_probe = build_live_connectivity_probe
