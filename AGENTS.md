@@ -56,6 +56,12 @@ DI follows **scope layering**, not blanket singletons:
   with APP-scope singletons pulled from the lifespan registry.
 - Request-scoped services MUST NOT be registered on `LifeSpanService`
   (enforced by `scripts/check_service_singleton.py`).
+- Test-time conftests under `tests/integration/` are exempt from the
+  REQUEST-scope rule: they may hold session-scoped real services and
+  repositories on the test fixture graph because each test owns its
+  own request lifetime via the test app's lifespan. This exemption
+  is the only sanctioned path for session-scoped real services
+  outside `src/`.
 - Never use class-level Singleton bases/metaclasses: they break test
   transport injection, bind to the wrong event loop, and hide
   dependencies. "One instance per app" is achieved by constructing once

@@ -16,6 +16,18 @@ Rules:
    from a ``web.deps`` factory (which assembles repos + APP-scope
    singletons), never by registering the class on the app.
 
+Test-time exemption
+-------------------
+
+Conftests under ``tests/integration/`` are exempt from the
+REQUEST-scope rule (AGENTS.md §3). They may declare session-scoped
+real services and repositories on the test fixture graph because
+each test owns its own request lifetime via the test app's lifespan.
+The scan root in this script is restricted to ``src/`` so files
+under ``tests/`` are never inspected by either rule; the constant
+below documents that restriction and is the single source of truth
+for future maintainers.
+
 Usage::
 
     python check_service_singleton.py [--src-root PATH]
@@ -33,6 +45,11 @@ import ast
 import os
 import sys
 from pathlib import Path
+
+# Path prefixes that are exempt from the scope scan. The default scan is
+# rooted on ``src/`` so the constant is currently documentation-only; it
+# pins the policy for future maintainers who may extend the scan.
+EXEMPT_PATH_PREFIXES: tuple[str, ...] = ("tests/integration/",)
 
 # ─────────────────────────────────────────────────────────────────────────
 # src/ resolution
