@@ -14,6 +14,7 @@ instead, mirroring ``dto.ModelResponse`` on the Go side.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Self
 
@@ -32,6 +33,12 @@ from src.db.models.infra.model import Model
 # documented ``"sk-***"`` redaction placeholder on the response.
 # Built-in / cross-tenant masking for builtins lives at the wire
 # boundary (not in this module).
+
+# PR-30.6c H2: storage columns that must not cross into the
+# service-output projection per AGENTS.md §9. ``deleted_at`` is the
+# soft-delete tombstone; the service layer treats a missing row as the
+# only delete signal.
+MODEL_EXCLUDE_COLUMNS: frozenset[str] = frozenset({"deleted_at"})
 
 
 class ModelInfo(BaseModel):
@@ -62,26 +69,26 @@ class ModelInfo(BaseModel):
         Hydrates ``parameters`` from the JSON column, redacting
         ``api_key`` / ``app_secret`` so they never cross the service
         boundary in plaintext.
+
+        PR-30.6c H2 / H3:
+
+        - ``MODEL_EXCLUDE_COLUMNS`` (frozen per §9) drops
+          ``deleted_at`` before ``model_validate``.
+        - ``parameters`` is decoded from a raw JSON string when the
+          storage layer persists it as text (SQLite path) so the
+          downstream layer never has to handle the unparsed blob.
         """
-        return cls.model_validate(
-            {
-                "id": db.id,
-                "tenant_id": db.tenant_id,
-                "name": db.name,
-                "display_name": db.display_name,
-                "type": db.type,
-                "source": db.source,
-                "description": db.description,
-                "parameters": dict(db.parameters),
-                "is_default": db.is_default,
-                "is_builtin": db.is_builtin,
-                "managed_by": db.managed_by,
-                "status": db.status,
-                "created_at": db.created_at,
-                "updated_at": db.updated_at,
-                "deleted_at": db.deleted_at,
-            }
-        )
+        record = db.model_dump(exclude=MODEL_EXCLUDE_COLUMNS)
+        parameters = record.get("parameters")
+        if isinstance(parameters, str):
+            try:
+                parameters = json.loads(parameters)
+            except json.JSONDecodeError:
+                parameters = {}
+        if not isinstance(parameters, dict):
+            parameters = {}
+        record["parameters"] = parameters
+        return cls.model_validate(record)
 
 
-__all__ = ["ModelInfo"]
+__all__ = ["MODEL_EXCLUDE_COLUMNS", "ModelInfo"]

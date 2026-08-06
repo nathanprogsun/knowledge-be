@@ -16,6 +16,12 @@ Operations:
 The service depends **only** on its repository — it does not hold an
 ``AsyncSession``. The web layer constructs a fresh repo + service per
 request.
+
+PR-30.6c H1: ``list_entries`` now projects each ``AuditLog`` row
+through :meth:`AuditLogInfo.map_from_db` before returning so the web
+layer never sees a storage ``TableModel``. The previous contract had
+the router calling ``map_from_db`` per entry — a §9 violation (web
+performing the projection onto the service-output DTO).
 """
 
 from __future__ import annotations
@@ -23,15 +29,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from src.core.system.types import AuditLogInfo
 from src.db.dao.audit_log_repository import AuditLogRepository
 from src.db.models.system.audit_log import AuditLog
 
 
 @dataclass(frozen=True, slots=True)
 class AuditLogListResult:
-    """Returned by :meth:`AuditLogService.list`."""
+    """Returned by :meth:`AuditLogService.list`.
 
-    entries: list[AuditLog]
+    PR-30.6c H1: ``entries`` now carries service-output
+    :class:`AuditLogInfo` DTOs (not raw ``AuditLog`` ``TableModel``s).
+    The web router renders these to the wire shape directly.
+    """
+
+    entries: list[AuditLogInfo]
     next_cursor: int
 
 
@@ -104,8 +116,13 @@ class AuditLogService:
         scope_id: str | None = None,
         unscoped_only: bool = False,
     ) -> AuditLogListResult:
-        """Cursor-paginated newest-first read for one tenant."""
-        entries = await self._audit_repo.list_for_tenant(
+        """Cursor-paginated newest-first read for one tenant.
+
+        PR-30.6c H1: returns ``AuditLogInfo`` projections (not the raw
+        storage ``TableModel``) so the web layer only does the wire-
+        shape render — it no longer performs ``map_from_db`` itself.
+        """
+        rows = await self._audit_repo.list_for_tenant(
             tenant_id=tenant_id,
             after_id=after_id,
             limit=limit,
@@ -116,7 +133,8 @@ class AuditLogService:
             scope_id=scope_id,
             unscoped_only=unscoped_only,
         )
-        next_cursor = entries[-1].id if entries else 0
+        entries = [AuditLogInfo.map_from_db(row) for row in rows]
+        next_cursor = rows[-1].id if rows else 0
         return AuditLogListResult(entries=entries, next_cursor=next_cursor)
 
     async def purge(self, retention_days: int) -> int:

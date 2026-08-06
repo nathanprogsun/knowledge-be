@@ -474,6 +474,12 @@ REDACTED_SECRET_PLACEHOLDER: str = "***"
 # placeholder above before the service layer projects the row.
 _SENSITIVE_KEYS: frozenset[str] = frozenset({"password", "api_key"})
 
+# PR-30.6c H2: storage columns that must not cross into the
+# service-output projection per AGENTS.md §9. ``deleted_at`` is the
+# soft-delete tombstone; the service layer treats a missing row as the
+# only delete signal.
+VECTOR_STORE_EXCLUDE_COLUMNS: frozenset[str] = frozenset({"deleted_at"})
+
 
 class VectorStoreInfo(BaseModel):
     """Service-side projection of a `vector_stores` row.
@@ -502,20 +508,16 @@ class VectorStoreInfo(BaseModel):
 
     @classmethod
     def map_from_db(cls, db: VectorStore) -> Self:
-        """Build a projection from the raw storage row."""
-        return cls(
-            id=db.id,
-            tenant_id=db.tenant_id,
-            name=db.name,
-            engine_type=db.engine_type,
-            connection_config=db.connection_config,
-            index_config=db.index_config,
-            source=db.source,
-            readonly=db.readonly,
-            created_at=db.created_at,
-            updated_at=db.updated_at,
-            deleted_at=db.deleted_at,
-        )
+        """Build a projection from the raw storage row.
+
+        PR-30.6c H2: ``VECTOR_STORE_EXCLUDE_COLUMNS`` (frozen per §9)
+        declares the storage-only columns that must not cross into the
+        service boundary. ``deleted_at`` is the soft-delete tombstone;
+        the service layer treats a missing row as the only delete
+        signal so the DTO deliberately drops it.
+        """
+        record = db.model_dump(exclude=VECTOR_STORE_EXCLUDE_COLUMNS)
+        return cls.model_validate(record)
 
 
 def mask_sensitive_fields(
@@ -541,6 +543,7 @@ def mask_sensitive_fields(
 __all__ = [
     "REDACTED_SECRET_PLACEHOLDER",
     "SUPPORTED_ENGINE_TYPES",
+    "VECTOR_STORE_EXCLUDE_COLUMNS",
     "VectorStoreInfo",
     "mask_sensitive_fields",
     "vector_store_types",

@@ -97,6 +97,12 @@ PROVIDER_TYPES: tuple[WebSearchProviderTypeInfo, ...] = (
 
 SUPPORTED_PROVIDER_TYPES: frozenset[str] = frozenset(info.provider for info in PROVIDER_TYPES)
 
+# PR-30.6c H2: storage columns that must not cross into the
+# service-output projection per AGENTS.md §9. ``deleted_at`` is the
+# soft-delete tombstone; the service layer treats a missing row as the
+# only delete signal.
+WEB_SEARCH_PROVIDER_EXCLUDE_COLUMNS: frozenset[str] = frozenset({"deleted_at"})
+
 
 # ── Builtin providers (system-level capability list) ─────────────────
 
@@ -184,7 +190,17 @@ class WebSearchProviderInfo(BaseModel):
 
     @classmethod
     def map_from_db(cls, db: WebSearchProvider) -> Self:
-        """Build a projection from the raw storage row."""
+        """Build a projection from the raw storage row.
+
+        PR-30.6c H2 / H3:
+
+        - ``WEB_SEARCH_PROVIDER_EXCLUDE_COLUMNS`` (frozen per §9)
+          drops the soft-delete tombstone (``deleted_at``) before the
+          Pydantic model is built.
+        - ``_parameters_from_raw`` now accepts a JSON string (not just
+          a dict) so a SQLite-stored JSON column round-trips correctly
+          without the caller having to decode it.
+        """
         record = db.model_dump()
         params = record.get("parameters")
         if isinstance(params, str):
@@ -193,13 +209,29 @@ class WebSearchProviderInfo(BaseModel):
             except json.JSONDecodeError:
                 params = None
         record["parameters"] = _parameters_from_raw(params)
+        record = {
+            key: value
+            for key, value in record.items()
+            if key not in WEB_SEARCH_PROVIDER_EXCLUDE_COLUMNS
+        }
         return cls.model_validate(record)
 
 
-def _parameters_from_raw(raw: JsonObject | None) -> WebSearchProviderParameters | None:
-    """Coerce the stored JSONB blob to the typed parameters DTO."""
+def _parameters_from_raw(raw: JsonObject | None | str) -> WebSearchProviderParameters | None:
+    """Coerce the stored JSONB blob to the typed parameters DTO.
+
+    PR-30.6c H3: accept a JSON string in addition to a dict so the
+    helper works without the caller having to ``json.loads`` first.
+    """
     if raw is None:
         return None
+    # PR-30.6c H3: SQLite sometimes persists JSON columns as text;
+    # decode here so the rest of the helper can stay dict-shaped.
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
     if not isinstance(raw, dict):
         return None
     extra = raw.get("extra_config")
@@ -234,5 +266,6 @@ __all__ = [
     "BUILTIN_PROVIDERS",
     "PROVIDER_TYPES",
     "SUPPORTED_PROVIDER_TYPES",
+    "WEB_SEARCH_PROVIDER_EXCLUDE_COLUMNS",
     "WebSearchProviderInfo",
 ]

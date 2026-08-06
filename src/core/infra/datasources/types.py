@@ -22,6 +22,7 @@ Field and JSON names match ``internal/types/datasource.go`` exactly.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Self, cast
 
@@ -196,7 +197,7 @@ class DataSourceInfo(BaseModel):
         return cls.model_validate(record)
 
 
-def parse_config(raw: JsonObject | None) -> DataSourceConfig | None:
+def parse_config(raw: JsonObject | None | str) -> DataSourceConfig | None:
     """Decode a stored ``config`` blob — ``DataSource.ParseConfig``.
 
     Returns ``None`` for an absent/empty blob so callers can distinguish
@@ -209,8 +210,22 @@ def parse_config(raw: JsonObject | None) -> DataSourceConfig | None:
     legacy plaintext passes through, ``enc:v1:`` blobs are decrypted
     with ``SYSTEM_AES_KEY``, and a decrypt failure blanks the field so
     the row stays visible.
+
+    PR-30.6c H3: accept a raw JSON string in addition to a dict so the
+    helper works on the SQLite path without the caller having to
+    ``json.loads`` first.
     """
-    if not raw:
+    if raw is None:
+        return None
+    # PR-30.6c H3: SQLite sometimes persists JSON columns as text.
+    if isinstance(raw, str):
+        if not raw:
+            return None
+        try:
+            raw = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+    if not isinstance(raw, dict) or not raw:
         return None
     known = set(DataSourceConfig.model_fields)
     parsed = DataSourceConfig.model_validate({k: v for k, v in raw.items() if k in known})
