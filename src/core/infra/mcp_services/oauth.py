@@ -145,13 +145,16 @@ class OAuthStateStore:
         self._store[state] = entry
 
     def take(self, *, state: str) -> StateEntry:
-        """Consume a state entry; raises :class:`ValueError` if missing / expired."""
+        """Consume a state entry; raises :class:`ValidationError` if missing / expired."""
         self._purge_expired()
         entry = self._store.pop(state, None)
         if entry is None:
-            raise ValueError(
-                f"OAuth state {state!r} is unknown or has expired; "
-                "the authorization round-trip likely timed out",
+            raise ValidationError(
+                code="mcp_service.oauth_state_invalid",
+                message=(
+                    f"OAuth state {state!r} is unknown or has expired; "
+                    "the authorization round-trip likely timed out"
+                ),
             )
         return entry
 
@@ -559,13 +562,7 @@ class OAuthManager:
                 code="mcp_service.oauth_not_configured",
                 message="OAuth live lifecycle needs an http_client",
             )
-        try:
-            entry = self._state_store.take(state=state)
-        except ValueError as exc:
-            raise ValidationError(
-                code="mcp_service.oauth_state_invalid",
-                message=str(exc),
-            ) from exc
+        entry = self._state_store.take(state=state)
         if entry.user_id != user_id or entry.service_id != self._service.id:
             raise ValidationError(
                 code="mcp_service.oauth_state_mismatch",

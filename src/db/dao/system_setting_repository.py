@@ -13,13 +13,14 @@ precedence without a separate read-then-write cycle.
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import cast
 
 from sqlalchemy import JSON, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.engine import CursorResult
 
 from src.common.exception import DataError
+from src.common.json import SqlValue
 from src.db.dao.generic_repository import GenericRepository
 from src.db.models.system.system_setting import SystemSetting
 
@@ -82,7 +83,7 @@ class SystemSettingRepository(GenericRepository[SystemSetting]):
         """
         stmt = text('delete from system_settings where "key" = :key').bindparams(key=key)
         result = cast(
-            CursorResult[Any],
+            CursorResult[SqlValue],
             await self._session.execute(stmt),
         )
         return result.rowcount or 0

@@ -129,9 +129,9 @@ def test_state_store_records_returns_and_consumes_entries() -> None:
 
 
 def test_state_store_take_raises_for_unknown_or_expired_entries() -> None:
-    """Taking an unknown / expired state surfaces :class:`ValueError`."""
+    """Taking an unknown / expired state surfaces :class:`ValidationError`."""
     store = OAuthStateStore()
-    with pytest.raises(ValueError):
+    with pytest.raises(ValidationError):
         store.take(state="missing")
 
 

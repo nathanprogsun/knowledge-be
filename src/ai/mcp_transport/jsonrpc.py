@@ -19,9 +19,11 @@ with the exact JSON field names from JSON-RPC 2.0:
 from __future__ import annotations
 
 import uuid
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from src.common.exception import ValidationError
+from src.common.json import JsonValue
 
 # JSON-RPC 2.0 reserved error codes (RFC 7464 §7.1). The MCP spec
 # reuses the standard codes and adds a small extension namespace
@@ -71,7 +73,7 @@ class JSONRPCError(BaseModel):
 
     code: int
     message: str
-    data: dict[str, Any] | None = Field(default=None)
+    data: dict[str, JsonValue] | None = Field(default=None)
 
 
 class JSONRPCRequest(BaseModel):
@@ -82,7 +84,7 @@ class JSONRPCRequest(BaseModel):
     jsonrpc: str = Field(default="2.0")
     id: str = Field(default_factory=lambda: uuid.uuid4().hex)
     method: str
-    params: dict[str, Any] | None = Field(default=None)
+    params: dict[str, JsonValue] | None = Field(default=None)
 
 
 class JSONRPCNotification(BaseModel):
@@ -92,7 +94,7 @@ class JSONRPCNotification(BaseModel):
 
     jsonrpc: str = Field(default="2.0")
     method: str
-    params: dict[str, Any] | None = Field(default=None)
+    params: dict[str, JsonValue] | None = Field(default=None)
 
 
 class JSONRPCResponse(BaseModel):
@@ -102,14 +104,14 @@ class JSONRPCResponse(BaseModel):
 
     jsonrpc: str = Field(default="2.0")
     id: str
-    result: dict[str, Any] | None = Field(default=None)
+    result: dict[str, JsonValue] | None = Field(default=None)
     error: JSONRPCError | None = Field(default=None)
 
 
 def build_request(
     *,
     method: str,
-    params: dict[str, Any] | None,
+    params: dict[str, JsonValue] | None,
     request_id: str | None = None,
 ) -> JSONRPCRequest:
     """Build a JSON-RPC 2.0 request envelope.
@@ -120,7 +122,10 @@ def build_request(
     with a notification that cancels the same call).
     """
     if not method:
-        raise ValueError("JSON-RPC method name must be non-empty")
+        raise ValidationError(
+            code="mcp.jsonrpc.method_required",
+            message="JSON-RPC method name must be non-empty",
+        )
     return JSONRPCRequest(
         id=request_id or uuid.uuid4().hex,
         method=method,
@@ -133,7 +138,7 @@ def build_error_response(
     request_id: str,
     code: int,
     message: str,
-    data: dict[str, Any] | None = None,
+    data: dict[str, JsonValue] | None = None,
 ) -> JSONRPCResponse:
     """Build a JSON-RPC 2.0 error response envelope.
 
@@ -143,7 +148,10 @@ def build_error_response(
     exception.
     """
     if not request_id:
-        raise ValueError("JSON-RPC error response requires a request id")
+        raise ValidationError(
+            code="mcp.jsonrpc.request_id_required",
+            message="JSON-RPC error response requires a request id",
+        )
     return JSONRPCResponse(
         id=request_id,
         error=JSONRPCError(code=code, message=message, data=data),

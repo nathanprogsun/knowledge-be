@@ -14,6 +14,7 @@ from typing import Self, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.common.exception import ValidationError
 from src.common.json import JsonObject, JsonValue
 from src.db.models.infra.mcp_services import MCPService, MCPToolApproval
 
@@ -88,7 +89,10 @@ def _parse_json_blob(raw: JsonValue, column: str) -> JsonValue:
         try:
             decoded = json.loads(raw)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"mcp_services.{column} is not valid JSON: {exc}") from exc
+            raise ValidationError(
+                code="mcp_service.json_column_invalid",
+                message=f"mcp_services.{column} is not valid JSON: {exc}",
+            ) from exc
         return cast("JsonValue", decoded)
     return None
 

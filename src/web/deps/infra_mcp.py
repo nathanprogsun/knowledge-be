@@ -65,7 +65,15 @@ def _resolve_lifespan_service(request: Request) -> LifeSpanService | None:
     return cast("LifeSpanService | None", getattr(request.app.state, "lifespan_service", None))
 
 
-ConnectionManagerLike = object
+# ``ConnectionManagerLike`` is the static-type face of the AI-layer
+# ``MCPConnectionManager``. The web layer cannot import that class
+# directly (layer directionality — web must not reach into ai), so we
+# re-export the Protocol defined in ``core.infra.mcp_services.discovery``
+# under its public name. The two core protocols (``_ConnManagerLikeDisc``
+# and ``_ConnManagerLikeProbe``) are the same shape; aliasing keeps the
+# public ``ConnectionManagerLike`` as the canonical type for downstream
+# annotations.
+ConnectionManagerLike = _ConnManagerLikeDisc
 
 
 def build_live_resolvers(

@@ -26,6 +26,7 @@ from typing import cast
 from sqlalchemy import CursorResult, text
 
 from src.common.exception import DataError
+from src.common.json import SqlValue
 from src.db.dao.generic_repository import GenericRepository
 from src.db.models.datasource import DataSource, SyncLog
 
@@ -83,7 +84,7 @@ class DataSourceRepository(GenericRepository[DataSource]):
             "where id = :id and deleted_at is null"
         ).bindparams(id=id, now=now)
         result = await self._session.execute(stmt)
-        return (cast("CursorResult[object]", result).rowcount or 0) > 0
+        return (cast("CursorResult[SqlValue]", result).rowcount or 0) > 0
 
     async def count_items_synced(self, data_source_id: str) -> int:
         """Sum created+updated items across the source's successful syncs.
@@ -172,7 +173,7 @@ class SyncLogRepository(GenericRepository[SyncLog]):
             f"where data_source_id = :ds_id and status in ({placeholders})"
         ).bindparams(**params)
         result = await self._session.execute(stmt)
-        return cast("CursorResult[object]", result).rowcount or 0
+        return cast("CursorResult[SqlValue]", result).rowcount or 0
 
 
 __all__ = ["DataSourceRepository", "SyncLogRepository"]
