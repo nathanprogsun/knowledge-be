@@ -1,9 +1,8 @@
 """Huawei OBS storage adapter.
 
-Mirrors ``internal/application/service/file/obs.go`` +
-``CheckObsConnectivity``: OBS speaks the S3 API through a custom endpoint
-resolver and is probed path-style (Go passes ``UsePathStyle: true``), so
-the adapter fixes that flag rather than reading it from the row.
+OBS speaks the S3 API through a custom endpoint resolver and is probed
+path-style (the upstream passes ``UsePathStyle: true``), so the adapter
+fixes that flag rather than reading it from the row.
 """
 
 from __future__ import annotations

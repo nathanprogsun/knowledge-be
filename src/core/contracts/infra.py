@@ -48,7 +48,7 @@ class Model(BaseModel):
     status: str | None = Field(default="active")
     created_at: datetime
     updated_at: datetime
-    # Per-field "configured?" map mirroring Go's
+    # Per-field "configured?" map mirroring the wire contract's
     # ``dto.ModelResponse.Credentials``; the values never carry the
     # secret itself.
     credentials: dict[str, CredentialFieldMetadata] | None = Field(default=None)
@@ -140,7 +140,7 @@ class MCPService(BaseModel):
     is_builtin: bool | None = Field(default=False)
     created_at: datetime
     updated_at: datetime
-    # Per-field "configured?" map mirroring Go's
+    # Per-field "configured?" map mirroring the wire contract's
     # ``dto.MCPServiceResponse.Credentials``.
     credentials: dict[str, CredentialFieldMetadata] | None = Field(default=None)
 
@@ -396,7 +396,7 @@ class WebSearchProvider(BaseModel):
     parameters: JsonObject | None = Field(default=None)
     created_at: datetime | None = Field(default=None)
     updated_at: datetime | None = Field(default=None)
-    # Per-field "configured?" map mirroring Go's
+    # Per-field "configured?" map mirroring the wire contract's
     # ``dto.WebSearchProviderResponse.Credentials``.
     credentials: dict[str, CredentialFieldMetadata] | None = Field(default=None)
 

@@ -1,7 +1,6 @@
 """Connection pool for MCP transport clients.
 
-Mirrors ``internal/mcp/manager.go``. The manager owns one
-:class:`MCPSession` per remote service, reuses the live session while
+The manager owns one :class:`MCPSession` per remote service, reuses the live session while
 it is connected, runs a periodic sweep that drops sessions whose
 underlying transport is no longer connected, and exposes the
 high-level JSON-RPC operations (``initialize``, ``tools/list``,
@@ -128,12 +127,11 @@ def _default_transport_factory(
 ) -> TransportClient:
     """Build a transport client by inspecting ``transport_type``.
 
-    Mirrors the Go switch in ``NewMCPClient`` — ``sse`` gets an
+    Selects by ``transport_type`` — ``sse`` gets an
     :class:`src.ai.mcp_transport.sse_client.SSEClient`,
-    ``http-streamable`` (PR-17.5b) gets an
+    ``http-streamable`` gets an
     :class:`src.ai.mcp_transport.http_streamable_client.HTTPStreamableClient`;
-    ``stdio`` is intentionally rejected (disabled for security, same as
-    the Go side).
+    ``stdio`` is intentionally rejected (disabled for security).
     """
     if transport_type == "sse":
         return SSEClient(

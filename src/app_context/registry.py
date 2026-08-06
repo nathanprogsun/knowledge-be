@@ -14,8 +14,8 @@ Scope rule (see AGENTS.md §3):
   an ``AsyncSession`` — repositories and the services binding them.
   Request-scoped services MUST NOT be registered here.
 
-PR-17.5b adds the live MCP singletons that the lifespan wires during
-startup: the connection pool, the OAuth state + secret stores, and a
+The live MCP singletons the lifespan wires during startup are also
+registered here: the connection pool, the OAuth state + secret stores, and a
 factory that produces per-service :class:`OAuthManager` instances on
 demand. All new fields default to ``None`` so legacy callers and tests
 keep working.
@@ -55,7 +55,7 @@ class LifeSpanService:
 
     db_engine: DatabaseEngine | None = None
     oidc_client: OidcClient | None = None
-    # PR-17.5b: live MCP singletons. Each entry is optional so a slim
+    # Live MCP transport singletons. Each entry is optional so a slim
     # deployment can ship without the live MCP transport layer.
     mcp_connection_manager: MCPConnectionManager | None = None
     mcp_oauth_state_store: OAuthStateStore | None = None

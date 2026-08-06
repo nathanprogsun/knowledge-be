@@ -1,7 +1,7 @@
 """Global authentication dependency — resolve JWT / API-key principals.
 
 Populates ``request.state`` with the authenticated principal so the RBAC
-guards and API-key gate can read it. Mirrors WeKnora's ``middleware.Auth``:
+guards and API-key gate can read it:
 
 - OPTIONS / whitelisted paths pass through without auth.
 - A valid ``Authorization: Bearer <jwt>`` resolves the user + active

@@ -1,9 +1,9 @@
 """Local-filesystem storage adapter.
 
-Mirrors ``internal/application/service/file/local.go``: the probe stats
-the base directory and requires it to be an existing directory. The
-service creates the directory (under a base-dir guard) before probing, so
-a first-time local backend passes without a manual mkdir.
+The probe stats the base directory and requires it to be an existing
+directory. The service creates the directory (under a base-dir guard)
+before probing, so a first-time local backend passes without a manual
+mkdir.
 
 Blocking ``os`` calls run on a worker thread — the ``ai`` layer obeys the
 same async-purity rule as the rest of the codebase.

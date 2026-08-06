@@ -1,6 +1,6 @@
 """MCP live transport layer — JSON-RPC 2.0 over SSE / HTTP-streamable.
 
-PR-17.5 scope (17.5a + 17.5b):
+Modules:
 
 - :mod:`src.ai.mcp_transport.jsonrpc` — JSON-RPC 2.0 envelope types
   (``JSONRPCRequest`` / ``JSONRPCResponse`` / ``JSONRPCError`` /

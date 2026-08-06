@@ -87,10 +87,7 @@ class _NotImplementedClient(WebSearchClient):
 
 @dataclass(slots=True)
 class WebSearchClientRegistry:
-    """Map ``provider_type`` → factory that builds a :class:`WebSearchClient`.
-
-    Mirrors ``internal/infrastructure/web_search/registry.go::Registry``.
-    """
+    """Map ``provider_type`` → factory that builds a :class:`WebSearchClient`."""
 
     _factories: dict[str, WebSearchClientFactory] = field(default_factory=dict)
 

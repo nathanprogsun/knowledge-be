@@ -1,9 +1,8 @@
 """S3 storage adapter.
 
-Mirrors ``internal/application/service/file/s3.go`` +
-``CheckS3ConnectivityWithOptions``: a signed ``HeadBucket`` against the
-configured endpoint, honouring the row's ``force_path_style`` flag. The
-same code path serves the S3-compatible providers that need nothing beyond
+A signed ``HeadBucket`` against the configured endpoint, honouring the
+row's ``force_path_style`` flag. The same code path serves the
+S3-compatible providers that need nothing beyond
 endpoint + region + path-style selection (``tos``, ``oss``, ``ks3``), so
 they are constructed from this adapter with a different label.
 """

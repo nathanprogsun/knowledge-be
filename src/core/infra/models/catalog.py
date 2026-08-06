@@ -1,7 +1,6 @@
 """Static provider catalog for ``GET /models/providers``.
 
-Mirrors ``internal/models/provider/provider.go::AllProviders`` and the
-per-provider ``Info()`` methods on the Go side. Each entry exposes the
+The static catalog and per-provider ``Info()`` data. Each entry exposes the
 ``ProviderTypeMeta`` contract fields the UI uses to render the
 create-model form: a value identifier, a human-readable label, a
 one-line description, the default per-model-type endpoint URLs, the

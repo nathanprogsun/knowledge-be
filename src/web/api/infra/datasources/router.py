@@ -1,7 +1,6 @@
 """Data-source HTTP endpoints — external connector configuration + sync.
 
-Maps ``internal/handler/datasource.go``, registered in Go by
-``RegisterDataSourceRoutes`` (``internal/router/routes_infra.go``).
+Registered by ``RegisterDataSourceRoutes``.
 
 Data sources hold external-service credentials and trigger syncs that
 mutate knowledge-base content workspace-wide, so the permission split

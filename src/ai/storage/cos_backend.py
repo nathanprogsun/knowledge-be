@@ -1,8 +1,7 @@
 """Tencent COS storage adapter.
 
-Mirrors ``internal/application/service/file/cos.go`` +
-``CheckCosConnectivity``: COS is addressed by region rather than by a
-user-supplied endpoint, so the host is derived as
+COS is addressed by region rather than by a user-supplied endpoint, so
+the host is derived as
 ``{bucket}[-{app_id}].cos.{region}.myqcloud.com`` and probed with a signed
 ``HEAD``. ``access_key_id`` / ``secret_access_key`` carry the COS
 ``SecretID`` / ``SecretKey`` pair (the normalized config union renames

@@ -4,14 +4,13 @@ Mirrors ``src.core.tenants.factory`` / ``src.core.auth.factory`` —
 repositories are constructed per request on the shared
 ``AsyncSession``; ``web`` never imports ``db``.
 
-PR-17.5b: the factory forwards the APP-scope singletons the
-lifespan registered (discovery provider, connectivity probe, OAuth
-factory). All three are optional: tests pass static fakes and the
-legacy dependency-overrides flow skips them.
+The factory forwards the APP-scope singletons the lifespan
+registered (discovery provider, connectivity probe, OAuth factory).
+All three are optional: tests pass static fakes and the legacy
+dependency-overrides flow skips them.
 
-PR-30.6c C7: :func:`build_mcp_resolvers` moved here from
-:mod:`src.web.deps.infra_mcp` so ``web`` no longer imports
-``db.dao.mcp_service_repository``. The factory now owns the
+:func:`build_mcp_resolvers` lives here in core so ``web`` no longer
+imports ``db.dao.mcp_service_repository``. The factory owns the
 ``(service_resolver, connectivity_resolver)`` construction; the web
 layer just forwards the live ``connection_manager`` and calls
 :func:`build_mcp_service`.
@@ -56,14 +55,14 @@ def build_mcp_resolvers(
 ) -> tuple[ServiceResolver, ConnectivityResolver]:
     """Return ``(discovery_resolver, connectivity_resolver)`` for one request.
 
-    PR-17.5c C2: takes the active ``tenant_id`` so the resolver
-    lookup is tenant-scoped (the previous ``tenant_id=0`` hard-coding
-    would have leaked cross-tenant OAuth tokens / URLs).
+    Takes the active ``tenant_id`` so the resolver lookup is
+    tenant-scoped (a ``tenant_id=0`` hard-coding would have leaked
+    cross-tenant OAuth tokens / URLs).
 
-    PR-30.6c C7: moved here from ``src.web.deps.infra_mcp`` so ``web``
-    no longer reaches into ``db.dao.mcp_service_repository``. The
-    resolver returns the projected :class:`MCPServiceInfo` (or an
-    empty dict for a missing row) directly.
+    Lives here in core so ``web`` no longer reaches into
+    ``db.dao.mcp_service_repository``. The resolver returns the
+    projected :class:`MCPServiceInfo` (or an empty dict for a missing
+    row) directly.
     """
     repo = MCPServiceRepository(session)
 
@@ -100,8 +99,8 @@ def build_live_discovery_provider(
 ) -> HTTPMCPDiscoveryProvider:
     """Construct an :class:`HTTPMCPDiscoveryProvider` for one request.
 
-    PR-30.6c C7: lives here in core so the ``MCPServiceRepository``
-    import stays out of the ``web`` layer's responsibility surface.
+    Lives here in core so the ``MCPServiceRepository`` import stays out
+    of the ``web`` layer's responsibility surface.
     """
     service_resolver, _ = build_mcp_resolvers(
         session=session,
@@ -121,8 +120,8 @@ def build_live_connectivity_probe(
 ) -> HTTPMCPConnectivityProbe:
     """Construct an :class:`HTTPMCPConnectivityProbe` for one request.
 
-    PR-30.6c C7: lives here in core so the ``MCPServiceRepository``
-    import stays out of the ``web`` layer's responsibility surface.
+    Lives here in core so the ``MCPServiceRepository`` import stays out
+    of the ``web`` layer's responsibility surface.
     """
     _, connectivity_resolver = build_mcp_resolvers(
         session=session,

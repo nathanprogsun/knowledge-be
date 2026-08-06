@@ -15,11 +15,11 @@ without function-level imports. The routers themselves only reference
 `web.deps`, which imports the DI accessors from `registry` — breaking the
 former `lifespan` <-> `web.deps` cycle.
 
-PR-17.5b also wires the live MCP transport layer (connection pool,
-discovery + connectivity probes, OAuth state + secret stores) into
-``app.state.lifespan_service`` during startup; the matching teardown
-in the ``finally`` block releases the connection pool's cleanup loop
-and closes the OAuth HTTP client.
+The lifespan also wires the live MCP transport layer (connection
+pool, discovery + connectivity probes, OAuth state + secret stores)
+into ``app.state.lifespan_service`` during startup; the matching
+teardown in the ``finally`` block releases the connection pool's
+cleanup loop and closes the OAuth HTTP client.
 """
 
 from __future__ import annotations
@@ -79,7 +79,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # across requests so TCP/TLS connections to the IdP are reused.
     oidc_client = OidcClient()
 
-    # PR-17.5b: live MCP singletons. The connection pool runs the
+    # Live MCP singletons. The connection pool runs the
     # background sweep; the discovery + connectivity probes borrow it
     # per-request via ``infra_mcp`` (their DB-session-bound resolver
     # is request-scoped); the OAuth state + secret stores back the

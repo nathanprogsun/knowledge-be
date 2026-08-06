@@ -1,6 +1,5 @@
 """Storage-backend persistence — raw SQL only, no ORM.
 
-Mirrors ``internal/types/interfaces/storagebackend.go::StorageBackendRepository``:
 ``Create`` / ``GetByID`` / ``List`` / ``Update`` / ``Delete`` /
 ``FindLegacyAlias``. Every read is tenant-scoped and filters soft-deleted
 rows; the workspace-default pointer lives on the ``tenants`` row

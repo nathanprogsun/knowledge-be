@@ -1,11 +1,10 @@
 """Internal DTOs for the `infra.storage_backends` domain.
 
 Service-side projections of a `storage_backends` row plus the typed view
-of its JSON ``config`` column. Mirrors
-``internal/types/storagebackend.go``: the field names, the provider
-allow-list, the per-provider required-field validation, the secret
-masking / merge rules, and the location key that decides which physical
-destination a row points at.
+of its JSON ``config`` column: the field names, the provider allow-list,
+the per-provider required-field validation, the secret masking / merge
+rules, and the location key that decides which physical destination a
+row points at.
 """
 
 from __future__ import annotations

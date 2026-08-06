@@ -1,7 +1,6 @@
 """Web-search system-level routes (the builtin-provider catalog).
 
-Maps ``internal/router/routes_infra.go::RegisterWebSearchRoutes`` — a
-singleton ``GET /web-search/providers`` that returns the system-level
+A singleton ``GET /web-search/providers`` that returns the system-level
 catalog of enabled providers.
 
 This router is mounted under ``/web-search`` (NOT ``/web-search-providers``

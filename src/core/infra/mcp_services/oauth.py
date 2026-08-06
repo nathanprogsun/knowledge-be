@@ -19,13 +19,13 @@ This module mirrors the same surface on Python. Two layers ship here:
   PR).
 - :class:`OAuthManager` — the per-request facade that the web router
   calls today (``start_authorization`` / ``authorization_status`` /
-  ``revoke``) and the fuller lifecycle methods needed by PR-17.5b
-  (``ensure_authorized`` / ``authorize_url`` / ``exchange_code`` /
+  ``revoke``) and the fuller lifecycle methods exposed by the live
+  flow (``ensure_authorized`` / ``authorize_url`` / ``exchange_code`` /
   ``refresh`` / ``revoke_token``).
 
 The OAuth lifecycle is opt-in: when no ``transport`` /
 ``http_client`` / ``secret_store`` are supplied the manager keeps the
-PR-17 placeholder behaviour so the legacy endpoints keep returning the
+initial placeholder behaviour so the legacy endpoints keep returning the
 same shapes.
 """
 
@@ -116,7 +116,7 @@ class StateEntry:
 
 
 # Backward alias — the entry used to be private and the previous name
-# still appears in callers that imported it before PR-17.5b.
+# still appears in callers that imported it before the rename.
 _StateEntry = StateEntry
 
 
@@ -306,7 +306,7 @@ def _scopes(auth_config: JsonObject | None) -> list[str]:
     return []
 
 
-# ── Public DTOs (PR-17 surface kept) ─────────────────────────────────
+# ── Public DTOs (initial wire surface kept) ─────────────────────────
 
 
 @dataclass(frozen=True)
@@ -337,7 +337,7 @@ class OAuthManager:
     The constructor is dual-mode:
 
     - **Legacy mode** (only ``service`` supplied): the manager behaves
-      exactly like the PR-17 placeholder so the existing router keeps
+      exactly like the plain placeholder so the existing router keeps
       working.
     - **Full lifecycle mode** (also ``transport`` / ``http_client`` /
       ``secret_store`` supplied): the new ``ensure_authorized`` /
@@ -361,8 +361,8 @@ class OAuthManager:
         # ``authorization_endpoint`` / ``token_endpoint`` via the
         # provided ``http_client``.
         self._transport = transport
-        # PR-17.5c: do NOT auto-create an ``httpx.AsyncClient`` here.
-        # The legacy PR-17 path constructed one per request and
+        # Do NOT auto-create an ``httpx.AsyncClient`` here.
+        # The legacy path constructed one per request and
         # never closed it, leaking one TCP/TLS connection per call.
         # Callers that need the live lifecycle (the lifespan-wired
         # factory and tests) MUST inject ``http_client`` explicitly;
@@ -386,7 +386,7 @@ class OAuthManager:
         """Return the OAuth CSRF state store. Exposed for tests."""
         return self._state_store
 
-    # ── Legacy PR-17 surface (router still uses these) ──────────────
+    # ── Legacy surface (router still uses these) ────────────────────
 
     def start_authorization(
         self,
@@ -400,7 +400,7 @@ class OAuthManager:
         When full-mode dependencies are wired in, this delegates to
         :meth:`build_authorization_url` so the legacy router endpoint
         benefits from PKCE and the real ``authorization_endpoint``.
-        Otherwise the PR-17 placeholder shape is preserved so the
+        Otherwise the placeholder shape is preserved so the
         routes keep working.
         """
         if not _is_oauth(self._service.auth_config):
@@ -430,7 +430,7 @@ class OAuthManager:
                 authorization_url=url,
                 authorization_attempt=attempt,
             )
-        # Placeholder URL: kept identical to PR-17 so existing UI tests
+        # Placeholder URL: kept identical to the original so existing UI tests
         # continue to pass when the service is configured for OAuth but
         # the lifespan has not wired the live dependencies.
         del frontend_redirect  # accepted for API stability
@@ -467,7 +467,7 @@ class OAuthManager:
         # legacy path is intentionally a no-op so an accidental wire
         # attempt doesn't drop tokens during a fresh start-up.
 
-    # ── PR-17.5b lifecycle surface ──────────────────────────────────
+    # ── Full lifecycle surface ──────────────────────────────────────
 
     def _lifecycle_ready(self) -> bool:
         """True when ``authorize_url`` / ``exchange_code`` / ``refresh`` are usable."""
@@ -602,10 +602,9 @@ class OAuthManager:
     ) -> TokenSet:
         """Rotate ``token`` via refresh_token_grant and persist the result.
 
-        Mirrors Go's ``oauthRuntime.refreshWithLease`` (without the
-        distributed-lease layer; the Python side keeps refreshes
-        single-flight within one process — concurrent refresh is
-        coalesced in PR-17.7+ once we persist tokens in Redis).
+        The refresh is single-flight within one process; concurrent
+        refresh is coalesced once token persistence moves to a shared
+        store.
 
         The rotated pair is persisted to :attr:`_secret_store` before
         being returned so the next refresh uses the new refresh token
@@ -643,7 +642,7 @@ class OAuthManager:
         )
         # Persist before returning so callers see the rotated pair on
         # the next ``get`` and the next ``refresh`` uses the new
-        # ``refresh_token`` (PR-17.5c H2).
+        # ``refresh_token`` (key rotation).
         await self._secret_store.put(
             tenant_id=tenant_id,
             user_id=user_id,
@@ -686,7 +685,7 @@ class OAuthManager:
         if not existing.is_expired():
             return existing
         if not existing.refresh_token:
-            # PR-17.5c H3: drop the unrecoverable token so the next
+            # Drop the unrecoverable token so the next
             # caller sees a clean "unauthorized" state instead of a
             # ghost token that can never be refreshed.
             await self._secret_store.delete(
@@ -721,10 +720,9 @@ class OAuthManager:
         ``find_by_access_token`` lookup.
 
         Passing ``None`` for both forms is a no-op so legacy callers do
-        not silently delete state. PR-17.5c C1: the ``token=`` form
-        now actually deletes the matching entry; the previous
-        implementation passed ``token.access_token`` as a user_id and
-        silently dropped nothing.
+        not silently delete state. The ``token=`` form now actually
+        deletes the matching entry; the previous implementation passed
+        ``token.access_token`` as a user_id and silently dropped nothing.
         """
         if tenant_id is not None and user_id is not None and service_id is not None:
             await self._secret_store.delete(

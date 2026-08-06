@@ -101,8 +101,8 @@ def _to_auth_config(info: MCPServiceInfo) -> MCPMcpServiceAuthConfig | None:
     """Project the service's auth_config to the wire DTO.
 
     Credentials are kept verbatim on user-created services, mirroring
-    Go's ``dto.NewMCPServiceResponse`` (which round-trips the
-    ``api_key`` / ``token`` fields on user rows; built-in rows are not
+    the wire response DTO (which round-trips the ``api_key`` / ``token``
+    fields on user rows; built-in rows are not
     exposed via the public API).
     """
     raw = info.auth_config

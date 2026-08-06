@@ -1,7 +1,6 @@
 """Connectivity probe for vector store engines.
 
-Mirrors ``internal/application/service/vectorstore_healthcheck.go``. The
-real-Go path issues driver-specific probes (qdrant-go, tcvectordb SDK,
+The upstream path issues driver-specific probes (qdrant-go, tcvectordb SDK,
 Weaviate client, MySQL-stream for Doris, plain HTTP for ES /
 OpenSearch); for the Python rewrite the probes are intentionally
 lightweight stubs that exercise the same set of engines without

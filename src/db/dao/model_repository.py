@@ -1,9 +1,8 @@
 """Model persistence — raw SQL only, no ORM.
 
-Mirrors ``internal/application/repository/model.go`` on the Go side
-(same method set: ``Create``, ``GetByID(tenantID, id)``,
+Same method set: ``Create``, ``GetByID(tenantID, id)``,
 ``List(tenantID, type, source)``, ``Update``, ``Delete``,
-``ClearDefaultByType``).
+``ClearDefaultByType``.
 
 The repository only knows about the ``models`` table; the soft-delete
 filter lives in :meth:`GenericRepository._soft_delete_where_fragment`

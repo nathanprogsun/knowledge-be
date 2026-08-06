@@ -1,13 +1,13 @@
 """MCP service — registration, lookup, update, soft-delete.
 
-Mirrors ``internal/application/service/mcp_service.go`` (the Go
-"service" half, not the HTTP handler). Builtin rows cannot be updated
-or deleted; the Go repo enforces this in the service and so do we.
+This is the service layer (not the HTTP handler). Builtin rows cannot
+be updated or deleted; the repository enforces this in the service and
+so do we.
 
 Credentials (the secret fields inside ``auth_config``) deliberately do
 NOT flow through this service — the dedicated credentials subresource
 in ``src/core/infra/mcp_services/credentials.py`` is the only writer,
-mirroring Go's ``MCPCredentialsHandler``.
+mirroring the ``MCPCredentialsHandler`` boundary.
 """
 
 from __future__ import annotations
@@ -428,11 +428,10 @@ class MCPServiceService:
 
         Fetches the live row eagerly so the standard
         ``mcp_service.not_found`` 404 fires before any OAuth work is
-        done. PR-17.5b: when the lifespan registered an
-        ``oauth_manager_factory``, that factory binds the per-request
-        manager to the APP-scope state (HTTP client, CSRF store, token
-        store) and is preferred over the legacy
-        :class:`OAuthManager(service=info)` constructor.
+        done. When the lifespan registered an ``oauth_manager_factory``,
+        that factory binds the per-request manager to the APP-scope
+        state (HTTP client, CSRF store, token store) and is preferred
+        over the legacy :class:`OAuthManager(service=info)` constructor.
         """
         info = await self.get_service(tenant_id=tenant_id, id=service_id)
         if self._oauth_manager_factory is not None:

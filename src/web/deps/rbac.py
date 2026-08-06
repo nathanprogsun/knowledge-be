@@ -82,7 +82,7 @@ async def require_cross_tenant_dep(request: Request) -> None:
 
     Requires BOTH the cluster-wide ``cross_tenant_access_enabled`` flag
     and the caller's ``can_access_all_tenants``. Platform-scope API keys
-    pass. Mirrors WeKnora's ``RequireCrossTenantAccess``.
+    pass.
     """
     scope = get_api_key_scope(request)
     if scope is not None and scope.is_platform():
@@ -107,7 +107,7 @@ async def require_path_tenant_match_dep(request: Request) -> None:
     """Gate: URL ``tenant_id`` must equal the caller's active tenant.
 
     Cross-tenant superusers bypass. Reads ``tenant_id`` from the request
-    path params. Mirrors WeKnora's ``RequirePathTenantMatch``.
+    path params.
     """
     raw = request.path_params.get("tenant_id")
     if raw is None or raw == "":

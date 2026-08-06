@@ -97,8 +97,8 @@ PROVIDER_TYPES: tuple[WebSearchProviderTypeInfo, ...] = (
 
 SUPPORTED_PROVIDER_TYPES: frozenset[str] = frozenset(info.provider for info in PROVIDER_TYPES)
 
-# PR-30.6c H2: storage columns that must not cross into the
-# service-output projection per AGENTS.md §9. ``deleted_at`` is the
+# Storage columns that must not cross into the
+# service-output projection per §9. ``deleted_at`` is the
 # soft-delete tombstone; the service layer treats a missing row as the
 # only delete signal.
 WEB_SEARCH_PROVIDER_EXCLUDE_COLUMNS: frozenset[str] = frozenset({"deleted_at"})
@@ -170,7 +170,6 @@ BUILTIN_PROVIDERS: tuple[WebSearchBuiltinProvider, ...] = (
 class WebSearchProviderInfo(BaseModel):
     """Service-side projection of a `web_search_providers` row.
 
-    Mirrors ``internal/types/web_search_provider.go::WebSearchProviderEntity``.
     The wire contract (``WebSearchProvider``) is a subset of these
     fields; secret-bearing fields (api_key) are masked at the web layer.
     """
@@ -191,8 +190,6 @@ class WebSearchProviderInfo(BaseModel):
     @classmethod
     def map_from_db(cls, db: WebSearchProvider) -> Self:
         """Build a projection from the raw storage row.
-
-        PR-30.6c H2 / H3:
 
         - ``WEB_SEARCH_PROVIDER_EXCLUDE_COLUMNS`` (frozen per §9)
           drops the soft-delete tombstone (``deleted_at``) before the

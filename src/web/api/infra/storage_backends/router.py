@@ -1,9 +1,7 @@
 """Storage-backend HTTP endpoints — registry CRUD, probes, default binding.
 
-Mirrors ``internal/handler/storagebackend.go`` and the route table in
-``internal/router/routes_infra.go::RegisterStorageBackendRoutes``: reads are
-Viewer+, everything that mutates the registry or dials an external service
-is Admin+. Every endpoint carries the global ``AuthDep`` in addition to its
+Reads are Viewer+, everything that mutates the registry or dials an
+external service is Admin+. Every endpoint carries the global ``AuthDep`` in addition to its
 role gate.
 
 Route order matters — ``/types`` and ``/test`` are declared before

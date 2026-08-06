@@ -56,9 +56,9 @@ class ConnectivityResolver(Protocol):
 
     The factory passes a callable that returns the live ``MCPServiceInfo``
     (or a pre-baked dict in tests) so this module does not import the
-    repository layer. PR-17.5c C2: the resolver takes the active
-    ``tenant_id`` so cross-tenant OAuth tokens / URLs do not leak
-    through a hard-coded ``tenant_id=0`` lookup.
+    repository layer. The resolver takes the active ``tenant_id`` so
+    cross-tenant OAuth tokens / URLs do not leak through a hard-coded
+    ``tenant_id=0`` lookup.
     """
 
     def __call__(
@@ -124,9 +124,9 @@ class ConnectionManagerLike(Protocol):
     ``get_or_create`` / ``list_tools`` / ``list_resources`` without
     forcing this module to import the AI layer.
 
-    PR-30.6c C7: promoted from ``_ConnectionManagerLike`` to a public
-    name so the web-layer forwarder can import a typed alias without
-    re-introducing a bare ``object`` annotation.
+    Promoted from ``_ConnectionManagerLike`` to a public name so the
+    web-layer forwarder can import a typed alias without re-introducing
+    a bare ``object`` annotation.
     """
 
     async def get_or_create(  # type: ignore[no-untyped-def]

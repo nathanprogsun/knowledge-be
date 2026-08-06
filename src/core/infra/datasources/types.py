@@ -250,13 +250,12 @@ def parse_config(raw: JsonObject | None | str) -> DataSourceConfig | None:
     with ``SYSTEM_AES_KEY``, and a decrypt failure blanks the field so
     the row stays visible.
 
-    PR-30.6c H3: accept a raw JSON string in addition to a dict so the
-    helper works on the SQLite path without the caller having to
-    ``json.loads`` first.
+    Accepts a raw JSON string in addition to a dict so the helper works
+    on the SQLite path without the caller having to ``json.loads`` first.
     """
     if raw is None:
         return None
-    # PR-30.6c H3: SQLite sometimes persists JSON columns as text.
+    # SQLite sometimes persists JSON columns as text.
     if isinstance(raw, str):
         if not raw:
             return None

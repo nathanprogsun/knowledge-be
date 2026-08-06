@@ -3,9 +3,8 @@
 Standalone module so the connection manager and individual transport
 clients can share exception types without risking a circular import.
 
-Mirrors ``internal/mcp`` in the upstream Go project: the same three
-exception families (transport-level failure, OAuth-required, session
-no-longer-connected) surface on the Python side.
+The same three exception families (transport-level failure,
+OAuth-required, session no-longer-connected) surface on the Python side.
 
 Hierarchy: ``MCPError`` inherits :class:`src.common.exception.ExternalServiceError`
 so the web layer's exception handler maps it to HTTP 502 — the right

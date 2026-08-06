@@ -1,9 +1,8 @@
 """Model HTTP endpoints - provider catalog, CRUD, debug probe.
 
-Mirrors ``internal/router/routes_infra.go`` (``RegisterModelRoutes``)
-on the Go side. The seven endpoints here cover the basic CRUD +
-provider-list + debug-probe surface; the per-field credentials
-subresource is not yet implemented.
+The seven endpoints here cover the basic CRUD + provider-list +
+debug-probe surface; the per-field credentials subresource is not yet
+implemented.
 """
 
 from __future__ import annotations
@@ -42,7 +41,7 @@ from src.web.middleware.context import get_is_system_admin
 
 router = APIRouter(prefix="/models", tags=["models"])
 
-# Mirrors WeKnora's ``modelDebugMaxInputBytes`` constant. The hard cap
+# The ``modelDebugMaxInputBytes`` hard cap
 # protects the debug probe from runaway input sizes.
 _DEBUG_MAX_INPUT_BYTES = 64 * 1024
 

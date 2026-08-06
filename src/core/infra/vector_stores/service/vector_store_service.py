@@ -1,9 +1,8 @@
 """VectorStoreService — CRUD + connectivity probe for tenant-scoped stores.
 
-Mirrors ``internal/application/service/vectorstore.go::vectorStoreService``
-on the Go side, scoped to the parts that do not require the engine
-factory / KB binding guard (those land in later PRs once the engine
-registry and the knowledge-base domain are in scope).
+Scoped to the parts that do not require the engine factory / KB
+binding guard (those land later once the engine registry and the
+knowledge-base domain are in scope).
 
 The service depends only on the vector-store repository. The web layer
 constructs a fresh repo + service per request (via

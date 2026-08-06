@@ -1,7 +1,6 @@
 """Storage-backend registry service — CRUD + connectivity + resolution.
 
-Mirrors ``internal/application/service/service/storagebackend.go::StorageBackendService``.
-The Go methods map one-for-one:
+The methods map one-for-one to the upstream service surface:
 
 - ``create`` — validate, SSRF-check the endpoint, probe connectivity, insert.
 - ``update`` — env rows are read-only, provider and physical location are

@@ -235,7 +235,7 @@ class DataSourceService(ConnectivityMixin, ResourceListingMixin, SyncMixin):
         a change outright). Credentials NEVER flow through this path:
         whatever the incoming ``config`` says, the stored credential map
         is force-preserved and only ``type`` / ``resource_ids`` /
-        ``settings`` are taken from the body — mirroring Go's merge, where
+        ``settings`` are taken from the body — mirroring the merge where
         credential writes belong to the ``/credentials`` subresource.
         """
         existing = await self._require_owned(id=id, tenant_id=tenant_id)

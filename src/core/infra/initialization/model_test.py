@@ -324,9 +324,9 @@ class MultimodalTestConfig(BaseModel):
     """Form fields of Go's ``testMultimodalForm`` used by the probe.
 
     The chunking fields (``chunk_size``, ``chunk_overlap``,
-    ``separators``) only matter for the DocReader path, which is a stage-3
-    dependency; they are accepted and validated so the wire contract does
-    not change when DocReader lands.
+    ``separators``) only matter for the DocReader path, which is an
+    optional external dependency; they are accepted and validated so the
+    wire contract does not change when DocReader lands.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -431,8 +431,9 @@ async def test_multimodal_function(
 ) -> MultimodalProbeResult:
     """Go ``TestMultimodalFunction`` — validate inputs, then run DocReader.
 
-    DocReader is a stage-3 dependency (``docreader_addr`` is configured but
-    no client exists yet). Go's own handler has the identical branch —
+    DocReader is an optional external dependency (``docreader_addr`` is
+    configured but no client exists yet). The upstream handler has the
+    identical branch —
     ``if h.documentReader == nil { return ..., "DocReader service not
     configured" }`` — which surfaces as ``data.success = false`` inside a
     200 response. That path is what this implementation takes, so the wire

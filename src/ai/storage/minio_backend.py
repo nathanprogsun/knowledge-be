@@ -1,9 +1,9 @@
 """MinIO storage adapter.
 
-Mirrors ``internal/application/service/file/minio.go``: the probe checks
-the configured bucket exists (``BucketExists``) via a signed ``HEAD``, and
-falls back to listing buckets when no bucket is configured. MinIO is
-always path-style — a self-hosted deployment has no virtual-host DNS.
+The probe checks the configured bucket exists (``BucketExists``) via a
+signed ``HEAD``, and falls back to listing buckets when no bucket is
+configured. MinIO is always path-style — a self-hosted deployment has
+no virtual-host DNS.
 
 ``docker`` mode reads endpoint and credentials from the process
 environment instead of the row, matching the Go ``Test`` branch that

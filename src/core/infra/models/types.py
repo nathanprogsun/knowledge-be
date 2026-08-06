@@ -38,8 +38,8 @@ REDACTED_SECRET_PLACEHOLDER: str = "***"
 # ``AppSecret``).
 _SENSITIVE_PARAMETER_FIELDS: frozenset[str] = frozenset({"api_key", "app_secret"})
 
-# PR-30.6c H2: storage columns that must not cross into the
-# service-output projection per AGENTS.md §9. ``deleted_at`` is the
+# Storage columns that must not cross into the
+# service-output projection per §9. ``deleted_at`` is the
 # soft-delete tombstone; the service layer treats a missing row as the
 # only delete signal.
 MODEL_EXCLUDE_COLUMNS: frozenset[str] = frozenset({"deleted_at"})
