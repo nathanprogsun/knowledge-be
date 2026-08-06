@@ -24,6 +24,10 @@ PLACEHOLDER_KEY_HASH_PREFIX = "migrated-tenant-"
 
 _NOT_FOUND_CODE = "tenant_api_key.not_found"
 
+# Module-level alias for the table name — used in every ``text(f"...")``
+# in this file; user input is bound via ``:key_hash`` / ``:tenant_id``.
+_TABLE_NAME = "tenant_api_keys"
+
 
 class TenantAPIKeyRepository(GenericRepository[TenantAPIKey]):
     """`tenant_api_keys`-table SQL."""
@@ -63,7 +67,7 @@ class TenantAPIKeyRepository(GenericRepository[TenantAPIKey]):
     async def has_placeholder_hash(self) -> bool:
         """Whether any live key still carries the placeholder hash."""
         stmt = text(
-            f"select 1 from {self._table} "
+            f"select 1 from {_TABLE_NAME} "
             "where key_hash like :prefix and revoked_at is null limit 1"
         ).bindparams(prefix=f"{PLACEHOLDER_KEY_HASH_PREFIX}%")
         result = await self._session.execute(stmt)
@@ -111,7 +115,7 @@ class TenantAPIKeyRepository(GenericRepository[TenantAPIKey]):
         params: BindParams,
     ) -> list[TenantAPIKey]:
         stmt = text(
-            f"select * from {self._table} "
+            f"select * from {_TABLE_NAME} "
             f"where {conditions} and revoked_at is null order by created_at desc"
         ).bindparams(**params)
         result = await self._session.execute(stmt)
@@ -124,7 +128,7 @@ class TenantAPIKeyRepository(GenericRepository[TenantAPIKey]):
         params: BindParams,
     ) -> int:
         stmt = text(
-            f"update {self._table} set {set_clause} where {conditions} and revoked_at is null"
+            f"update {_TABLE_NAME} set {set_clause} where {conditions} and revoked_at is null"
         ).bindparams(**params)
         result = await self._session.execute(stmt)
         return cast("CursorResult[SqlValue]", result).rowcount

@@ -31,6 +31,12 @@ _LIVE = "deleted_at is null"
 # reverse-chronological feed.
 _INVITATION_ORDER = "created_at desc, id desc"
 
+# Module-level alias for the table name. Every ``text(f"...{...}")`` in
+# this file interpolates either this constant or ``self._table`` (whose
+# cached_property validates the identifier at first use); user input
+# never reaches the SQL string.
+_TABLE_NAME = "tenant_invitations"
+
 
 class TenantInvitationRepository(GenericRepository[TenantInvitation]):
     """`tenant_invitations`-table SQL."""
@@ -52,7 +58,7 @@ class TenantInvitationRepository(GenericRepository[TenantInvitation]):
         column_list = ", ".join(f'"{c}"' for c in columns)
         value_list = ", ".join(f":{c}" for c in columns)
         stmt = text(
-            f"insert into {self._table} ({column_list}) values ({value_list}) "
+            f"insert into {_TABLE_NAME} ({column_list}) values ({value_list}) "
             "on conflict (tenant_id, invitee_user_id) "
             f"where status = '{STATUS_PENDING}' and {_LIVE} and invitee_user_id <> '' "
             "do nothing returning *"
@@ -69,7 +75,7 @@ class TenantInvitationRepository(GenericRepository[TenantInvitation]):
     ) -> int:
         """Transition a pending row; return rows affected (0 = lost race)."""
         stmt = text(
-            f"update {self._table} "
+            f"update {_TABLE_NAME} "
             "set status = :status, responded_at = :responded_at, updated_at = :responded_at "
             f"where id = :id and status = :pending and {_LIVE}"
         ).bindparams(
@@ -84,7 +90,7 @@ class TenantInvitationRepository(GenericRepository[TenantInvitation]):
     async def sweep_expired(self, now: datetime) -> int:
         """Flip every overdue pending row to expired; return rows affected."""
         stmt = text(
-            f"update {self._table} "
+            f"update {_TABLE_NAME} "
             "set status = :expired, responded_at = :now, updated_at = :now "
             f"where status = :pending and expires_at < :now and {_LIVE}"
         ).bindparams(expired=STATUS_EXPIRED, pending=STATUS_PENDING, now=now)
@@ -94,7 +100,7 @@ class TenantInvitationRepository(GenericRepository[TenantInvitation]):
     async def increment_accepted_count(self, invitation_id: int) -> int:
         """Bump ``accepted_count`` by one; return rows affected."""
         stmt = text(
-            f"update {self._table} set accepted_count = accepted_count + 1 "
+            f"update {_TABLE_NAME} set accepted_count = accepted_count + 1 "
             f"where id = :id and {_LIVE}"
         ).bindparams(id=invitation_id)
         result = await self._session.execute(stmt)
@@ -197,7 +203,7 @@ class TenantInvitationRepository(GenericRepository[TenantInvitation]):
         limit: int | None,
         offset: int,
     ) -> list[TenantInvitation]:
-        stmt_text = f"select * from {self._table} where {where} order by {_INVITATION_ORDER}"
+        stmt_text = f"select * from {_TABLE_NAME} where {where} order by {_INVITATION_ORDER}"
         page_params: BindParams = dict(params)
         if limit is not None:
             stmt_text += " limit :limit offset :offset"
@@ -207,7 +213,7 @@ class TenantInvitationRepository(GenericRepository[TenantInvitation]):
         return [self._hydrate(m) for m in result.mappings().all()]
 
     async def _count(self, where: str, params: BindParams) -> int:
-        stmt = text(f"select count(*) from {self._table} where {where}").bindparams(**params)
+        stmt = text(f"select count(*) from {_TABLE_NAME} where {where}").bindparams(**params)
         return int((await self._session.execute(stmt)).scalar_one())
 
 

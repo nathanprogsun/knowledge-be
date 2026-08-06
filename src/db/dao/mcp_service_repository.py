@@ -24,6 +24,10 @@ from src.db.models.infra.mcp_services import MCPService
 # web layer as a 404 by the standard exception handler.
 _NOT_FOUND_CODE = "mcp_service.not_found"
 
+# Module-level alias for the table name — used in every ``text(f"...")``
+# in this file; user input is bound via ``:tenant_id`` / ``:id`` / etc.
+_TABLE_NAME = "mcp_services"
+
 
 class MCPServiceRepository(GenericRepository[MCPService]):
     """``mcp_services``-table SQL."""
@@ -59,7 +63,7 @@ class MCPServiceRepository(GenericRepository[MCPService]):
     async def list_for_tenant(self, tenant_id: int) -> list[MCPService]:
         """Live tenant-scoped rows (excludes builtin), newest first."""
         stmt = text(
-            f"select * from {self._table} "
+            f"select * from {_TABLE_NAME} "
             "where tenant_id = :tenant_id and is_builtin = false "
             "and deleted_at is null "
             "order by created_at desc"
@@ -137,7 +141,7 @@ class MCPServiceRepository(GenericRepository[MCPService]):
         set_clause = ", ".join(f'"{c}" = :u_{c}' for c in columns)
         update_params: BindParams = {f"u_{k}": v for k, v in columns.items()}
         stmt_text = (
-            f"update {self._table} set {set_clause} where {where_sql} and deleted_at is null"
+            f"update {_TABLE_NAME} set {set_clause} where {where_sql} and deleted_at is null"
         )
         # JSONB columns must be bound with the JSON type so asyncpg
         # serialises dict values; without it the driver rejects the
