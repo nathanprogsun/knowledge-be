@@ -196,11 +196,23 @@ class WebSearchProviderInfo(BaseModel):
         return cls.model_validate(record)
 
 
-def _parameters_from_raw(raw: JsonObject | None) -> WebSearchProviderParameters | None:
-    """Coerce the stored JSONB blob to the typed parameters DTO."""
-    if raw is None:
-        return None
-    if not isinstance(raw, dict):
+def _parameters_from_raw(
+    raw: JsonObject | None,
+) -> WebSearchProviderParameters | None:
+    """Coerce the stored JSONB blob to the typed parameters DTO.
+
+    Returns ``None`` when the row carries no parameters blob (matches the
+    pre-existing ``WebSearchProviderInfo.map_from_db`` contract). When
+    ``api_key`` is stored as an ``enc:v1:`` blob it is decrypted here —
+    legacy plaintext passes through; a decrypt failure blanks the field
+    (Go ``WebSearchProviderParameters.Scan`` semantics).
+
+    The decryption helper is the single source of truth for clearing the
+    field on success or failure; ``provider_service`` delegates here too
+    so a drift between the storage-read and request-validate paths can
+    no longer silently leak the ciphertext back to the caller.
+    """
+    if raw is None or not isinstance(raw, dict):
         return None
     extra = raw.get("extra_config")
     extra_dict = extra if isinstance(extra, dict) else None
@@ -215,7 +227,6 @@ def _parameters_from_raw(raw: JsonObject | None) -> WebSearchProviderParameters 
         # A decrypt failure blanks the field (Go ``Scan`` semantics).
         plain, ok = decrypt_stored_secret_lenient(api_key)
         api_key = plain if ok else ""
-    api_key = raw.get("api_key")
     # ``cx`` is the Go-spec field name; ``engine_id`` / ``engineId`` are
     # accepted as legacy aliases.
     cx_raw = raw.get("cx") or raw.get("engine_id") or raw.get("engineId")
@@ -228,6 +239,18 @@ def _parameters_from_raw(raw: JsonObject | None) -> WebSearchProviderParameters 
         proxy_url=str(proxy_url) if isinstance(proxy_url, (str, int, float, bool)) else None,
         extra_config=typed_extra,
     )
+
+
+def _parameters_from_json(raw: JsonObject | None) -> WebSearchProviderParameters:
+    """Validate-path counterpart to ``_parameters_from_raw``.
+
+    Same coercion contract but always returns a populated
+    ``WebSearchProviderParameters`` instance (an unset blob becomes the
+    zero-value DTO), matching the request-validation call site in
+    ``provider_service``. Delegates to ``_parameters_from_raw`` so the
+    decryption / alias-resolution rules live in one place.
+    """
+    return _parameters_from_raw(raw) or WebSearchProviderParameters()
 
 
 __all__ = [

@@ -7,9 +7,11 @@ typed DTO.
 
 The DTO keeps every column that the service layer needs. Sensitive
 credential fields (``parameters.api_key``, ``parameters.app_secret``)
-are redacted at this boundary so they never cross into the wire
-contract — the wire contract carries a credential-presence map
-instead, mirroring ``dto.ModelResponse`` on the Go side.
+are redacted at this boundary so they never cross out of the service
+layer in plaintext -- mirroring ``dto.NewModelResponse`` on the Go
+side, which omits the secret fields altogether. The wire layer
+(``views.py``) then translates the placeholder into the visible
+``"sk-***"`` form the UI already expects.
 """
 
 from __future__ import annotations
@@ -22,16 +24,18 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.core.contracts.infra import ModelParameters
 from src.db.models.infra.model import Model
 
-# Columns on the storage ``Model`` row that map straight through. The
-# service never redacts them; the wire layer (``views.py``) drops the
-# secret-bearing parameter fields instead.
-#
-# ``parameters`` carries ``api_key`` / ``app_secret`` (encrypted at
-# rest on the Go side, plain on the Python scaffold). The service
-# DTO keeps the values verbatim so the wire layer can emit the
-# documented ``"sk-***"`` redaction placeholder on the response.
-# Built-in / cross-tenant masking for builtins lives at the wire
-# boundary (not in this module).
+# Placeholder substituted for any stored credential at the service
+# boundary. Kept identical to
+# ``src/core/infra/storage_backends/types.REDACTED_SECRET_PLACEHOLDER``
+# and the Go ``internal/types/secret.go::RedactedSecretPlaceholder`` so
+# a UI that already special-cases the value stays compatible.
+REDACTED_SECRET_PLACEHOLDER: str = "***"
+
+# Credential-bearing fields on ``parameters`` that must never leak past
+# the service boundary. ``api_key`` / ``app_secret`` are the two
+# provider-supplied secrets (Go ``ModelParameters.APIKey`` /
+# ``AppSecret``).
+_SENSITIVE_PARAMETER_FIELDS: frozenset[str] = frozenset({"api_key", "app_secret"})
 
 
 class ModelInfo(BaseModel):
@@ -59,10 +63,22 @@ class ModelInfo(BaseModel):
     def map_from_db(cls, db: Model) -> Self:
         """Project a storage ``Model`` row to the service DTO.
 
-        Hydrates ``parameters`` from the JSON column, redacting
-        ``api_key`` / ``app_secret`` so they never cross the service
-        boundary in plaintext.
+        Hydrates ``parameters`` from the JSON column, deep-copying the
+        blob so the credential-bearing fields (``api_key``,
+        ``app_secret``) can be substituted with
+        ``REDACTED_SECRET_PLACEHOLDER`` before the row leaves the
+        service boundary. Empty credentials stay empty so the wire
+        layer's ``credentials`` map can distinguish "set (hidden)"
+        from "not set" without an extra flag -- mirroring Go's
+        ``dto.NewModelResponse``, which omits the secret fields
+        entirely; here a placeholder string is returned so a buggy
+        caller that bypasses ``views.py`` still cannot leak the raw
+        value.
         """
+        parameters = dict(db.parameters)
+        for field_name in _SENSITIVE_PARAMETER_FIELDS:
+            if parameters.get(field_name):
+                parameters[field_name] = REDACTED_SECRET_PLACEHOLDER
         return cls.model_validate(
             {
                 "id": db.id,
@@ -72,7 +88,7 @@ class ModelInfo(BaseModel):
                 "type": db.type,
                 "source": db.source,
                 "description": db.description,
-                "parameters": dict(db.parameters),
+                "parameters": parameters,
                 "is_default": db.is_default,
                 "is_builtin": db.is_builtin,
                 "managed_by": db.managed_by,
@@ -84,4 +100,4 @@ class ModelInfo(BaseModel):
         )
 
 
-__all__ = ["ModelInfo"]
+__all__ = ["ModelInfo", "REDACTED_SECRET_PLACEHOLDER"]

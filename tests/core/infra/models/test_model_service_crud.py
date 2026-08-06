@@ -466,24 +466,25 @@ async def test_delete_model_rejects_non_positive_tenant_id(
 # ── ModelInfo DTO ────────────────────────────────────────────────────
 
 
-async def test_model_info_keeps_credential_fields_in_service_dto(
+async def test_model_info_redacts_credential_fields_at_dto_boundary(
     service: ModelService,
 ) -> None:
-    """Service DTO preserves credentials; the wire view masks them.
+    """Service DTO redacts ``api_key`` / ``app_secret`` at the boundary.
 
-    Mirrors Go: the row stores the raw value; the wire DTO
-    (``dto.ModelParametersDTO``) emits ``"sk-***"`` placeholders. We
-    keep the same split — credentials live in ``ModelInfo`` and are
-    replaced with the wire placeholder at the ``ModelEnvelope``
-    boundary.
+    Mirrors Go ``dto.NewModelResponse``, which omits the secret fields
+    altogether. The Python service DTO substitutes
+    ``REDACTED_SECRET_PLACEHOLDER`` (``"***"``) so a buggy caller that
+    bypasses ``views.py`` still cannot leak the raw value. The wire
+    layer then translates the placeholder into the visible ``"sk-***"``
+    form the UI expects.
     """
     body = _make_create_request(
         parameters=_make_parameters(api_key="sk-secret", app_secret="app-secret"),
     )
     info = await service.create_model(tenant_id=1, body=body)
 
-    assert info.parameters.api_key == "sk-secret"
-    assert info.parameters.app_secret == "app-secret"
+    assert info.parameters.api_key == "***"
+    assert info.parameters.app_secret == "***"
 
 
 async def test_model_info_preserves_other_parameter_fields(
