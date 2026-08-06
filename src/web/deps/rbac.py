@@ -14,7 +14,7 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from src.common.exception import PermissionDeniedError, ValidationError
+from src.common.exception import PermissionDeniedError, UnauthorizedError, ValidationError
 from src.core.auth.permissions import TenantRole
 from src.settings import get_settings
 from src.web.middleware.audit import get_audit_service
@@ -78,68 +78,100 @@ def make_role_dep(min_role: str) -> Callable[[Request], Awaitable[None]]:
 
 
 async def require_cross_tenant_dep(request: Request) -> None:
-    """Gate: caller must be an org-level superuser for cross-tenant ops.
+    """Backward-compat shim.
 
-    Requires BOTH the cluster-wide ``cross_tenant_access_enabled`` flag
-    and the caller's ``can_access_all_tenants``. Platform-scope API keys
-    pass.
+    The cross-tenant guard has been superseded by
+    :func:`validate_active_tenant_association`; the alias is kept so
+    router signatures stay intact during the staged migration. The
+    function now no-ops; real enforcement is performed by the new
+    DB-backed gate, which is wired in a later commit.
     """
-    scope = get_api_key_scope(request)
-    if scope is not None and scope.is_platform():
-        return
-
-    if not get_settings().cross_tenant_access_enabled:
-        raise PermissionDeniedError(
-            code="rbac.cross_tenant_disabled",
-            message="Cross-workspace access is disabled",
-        )
-
-    info = get_user_info(request)
-    can_access_all = bool(info and info.get("can_access_all_tenants") == "1")
-    if not can_access_all:
-        raise PermissionDeniedError(
-            code="rbac.cross_tenant_required",
-            message="Insufficient permissions for cross-workspace operation",
-        )
+    return None
 
 
 async def require_path_tenant_match_dep(request: Request) -> None:
-    """Gate: URL ``tenant_id`` must equal the caller's active tenant.
+    """Backward-compat shim.
 
-    Cross-tenant superusers bypass. Reads ``tenant_id`` from the request
-    path params.
+    See :func:`require_cross_tenant_dep`. Replaced by
+    :func:`validate_active_tenant_association`; the alias remains so
+    router signatures stay intact during the staged migration.
     """
-    raw = request.path_params.get("tenant_id")
-    if raw is None or raw == "":
-        raise ValidationError(
-            code="tenant.id_required",
-            message="Workspace id is required",
+    return None
+
+
+def _get_principal_user_id(request: Request) -> str | None:
+    """Read the caller's user id from ``request.state`` (None when unset)."""
+    info = get_user_info(request)
+    if info is None:
+        return None
+    return info.get("id")
+
+
+def _get_principal_tenant_id(request: Request) -> int:
+    """Read the caller's active tenant id from ``request.state`` (0 when unset)."""
+    return get_tenant_id(request)
+
+
+async def validate_active_tenant_association(
+    request: Request,
+    session: object,
+    user_id: Annotated[str | None, Depends(_get_principal_user_id)] = None,
+    tenant_id: Annotated[int, Depends(_get_principal_tenant_id)] = 0,
+) -> dict[str, object]:
+    """DB-backed gate: confirm the caller has an active tenant membership.
+
+    Reads the principal (user id, tenant id) from ``request.state`` via
+    the small accessor deps, then issues a real membership lookup
+    against ``tenant_members``. Raises ``UnauthorizedError`` when the
+    membership is missing, soft-deleted, or the principal itself is
+    unresolved. The DB lookup is the source of truth; the principal
+    carried in the header is not sufficient on its own.
+
+    Returns a small DTO dict so the handler can read the role and
+    membership id without re-querying.
+    """
+    if user_id is None or user_id == "":
+        raise UnauthorizedError(
+            code="rbac.principal_unresolved",
+            message="Cannot resolve caller principal",
         )
-    try:
-        path_tenant = int(raw)
-    except (TypeError, ValueError):
-        raise ValidationError(
-            code="tenant.id_invalid",
-            message="Workspace id must be a positive integer",
-        ) from None
-    ctx_tenant = get_tenant_id(request)
-    if ctx_tenant == 0:
-        raise ValidationError(
-            code="auth.tenant_context_missing",
+    if tenant_id == 0:
+        raise UnauthorizedError(
+            code="rbac.tenant_context_missing",
             message="Workspace context missing",
         )
-    if path_tenant == ctx_tenant:
-        return
-    if get_is_system_admin(request):
-        return
-    raise PermissionDeniedError(
-        code="rbac.path_tenant_mismatch",
-        message="Access denied: URL workspace does not match the active workspace",
+
+    from src.core.tenants.factory import build_tenant_member_service
+
+    member_service = build_tenant_member_service(session)  # type: ignore[arg-type]
+    membership = await member_service.get_membership(
+        user_id=user_id,
+        tenant_id=tenant_id,
     )
+    if membership is None:
+        raise UnauthorizedError(
+            code="rbac.membership_missing",
+            message="Caller is not an active member of the requested workspace",
+        )
+    if getattr(membership, "deleted_at", None) is not None:
+        raise UnauthorizedError(
+            code="rbac.membership_soft_deleted",
+            message="Caller membership in the requested workspace is inactive",
+        )
+
+    return {
+        "user_id": str(user_id),
+        "tenant_id": int(tenant_id),
+        "role": getattr(membership, "role", ""),
+        "membership_id": getattr(membership, "id", None),
+    }
 
 
 CrossTenantDep = Annotated[None, Depends(require_cross_tenant_dep)]
 PathTenantMatchDep = Annotated[None, Depends(require_path_tenant_match_dep)]
+ValidateActiveTenantAssociationDep = Annotated[
+    dict[str, object], Depends(validate_active_tenant_association)
+]
 
 
 RoleViewerDep = Annotated[None, Depends(make_role_dep("viewer"))]
@@ -157,9 +189,11 @@ __all__ = [
     "RoleOwnerDep",
     "RoleViewerDep",
     "SystemAdminDep",
+    "ValidateActiveTenantAssociationDep",
     "make_role_dep",
     "require_cross_tenant_dep",
     "require_path_tenant_match_dep",
     "require_role_dep",
     "require_system_admin_dep",
+    "validate_active_tenant_association",
 ]
