@@ -65,9 +65,9 @@ class Settings(BaseSettings):
     system_aes_key: str = ""
 
     # ── Tenant RBAC ────────────────────────────────────────────────────
-    # Mirrors WeKnora's rollout switches. When ``rbac_enforced`` is false
-    # the role guards log but do not reject (preserves today's behaviour
-    # during rollout); ``cross_tenant_access_enabled`` gates the
+    # Rollout switches. When ``rbac_enforced`` is false the role guards
+    # log but do not reject (preserves today's behaviour during
+    # rollout); ``cross_tenant_access_enabled`` gates the
     # cross-workspace superuser endpoints (/tenants/all, /search).
     rbac_enforced: bool = True
     cross_tenant_access_enabled: bool = False

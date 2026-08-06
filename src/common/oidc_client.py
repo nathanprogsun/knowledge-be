@@ -69,8 +69,8 @@ _RESTRICTED_HOSTNAMES: frozenset[str] = frozenset(
     }
 )
 
-# HTTP headers stripped on cross-host redirects, mirroring Go's
-# `stripRedirectSensitiveHeaders` (WeKnora internal/utils/security.go).
+# HTTP headers stripped on cross-host redirects (the standard
+# `stripRedirectSensitiveHeaders` set in the OIDC security helper).
 # Connector tokens must not leak to a third party because the IdP (or
 # any intermediary) can return a redirect to attacker-controlled host.
 _REDIRECT_STRIPPED_HEADERS: frozenset[str] = frozenset(
@@ -193,9 +193,9 @@ def _is_ip_like_hostname(hostname: str) -> bool:
 async def validate_ssrf_safe_url(raw_url: str) -> None:
     """Raise ``ValidationError`` if ``raw_url`` is not SSRF-safe.
 
-    Mirrors WeKnora's Go ``isSSRFSafeURL`` (internal/utils/security.go):
-    empty URL is rejected, DNS resolution is fail-closed (unknown host
-    cannot be proven safe), and every redirect target is re-validated
+    Mirrors the upstream ``isSSRFSafeURL`` contract: empty URL is
+    rejected, DNS resolution is fail-closed (unknown host cannot be
+    proven safe), and every redirect target is re-validated
     separately by the HTTP client.
     """
     if not raw_url:
@@ -309,8 +309,7 @@ def _default_client(
     """Construct the underlying httpx client (no redirect following).
 
     Redirects are intentionally disabled at the client level: every hop
-    is re-validated manually by :meth:`OidcClient._send`, mirroring Go's
-    ``newSSRFCheckRedirect`` in WeKnora's ``internal/utils/security.go``.
+    is re-validated manually by :meth:`OidcClient._send`.
     """
     if transport is not None:
         return httpx.AsyncClient(transport=transport, timeout=timeout, follow_redirects=False)

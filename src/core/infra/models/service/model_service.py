@@ -1,10 +1,8 @@
 """ModelService — CRUD for tenant-scoped AI model configurations.
 
-Mirrors ``internal/application/service/model.go`` on the Go side for
-the basic CRUD surface. Inference / debug paths (the
-``GetEmbeddingModel`` / ``GetChatModel`` / ``DebugModel`` family)
-are deferred until the inference providers land; the service stays
-focused on persistence + tenant scoping.
+Inference / debug paths (the ``GetEmbeddingModel`` / ``GetChatModel``
+/ ``DebugModel`` family) are deferred until the inference providers
+land; the service stays focused on persistence + tenant scoping.
 
 Constructed per request; the repository owns the per-request session.
 """
@@ -27,7 +25,7 @@ from src.core.infra.models.types import ModelInfo
 from src.db.dao.model_repository import ModelRepository
 from src.db.models.infra.model import Model
 
-# Mirrors WeKnora's ``types.ModelStatusActive`` constant.
+# Active-status literal used in the row's status column.
 _STATUS_ACTIVE = "active"
 
 

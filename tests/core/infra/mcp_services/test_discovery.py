@@ -225,14 +225,14 @@ async def test_probe_receives_oauth_flag(
     assert captured["oauth"] is False  # no auth_config on the seeded row
 
 
-# ── PR-17.5c review follow-ups ─────────────────────────────────────
+# ── Discovery error surfacing ──────────────────────────────────────
 
 
 class _FailingDiscoveryProvider:
     """Provider that surfaces a transport failure as :class:`MCPError`.
 
     Used by :func:`test_list_tools_returns_empty_when_discovery_fails_with_mcp_error`
-    to pin the PR-17.5a degrade-to-empty contract for the live path.
+    to pin the degrade-to-empty contract for the live path.
     """
 
     async def list_tools(self, *, tenant_id: int, service_id: str) -> list[DiscoveryTool]:
@@ -253,9 +253,9 @@ async def test_list_tools_returns_empty_when_discovery_fails_with_mcp_error(
     mcp_repo: FakeMCPServiceRepository,
     approvals_repo: FakeMCPToolApprovalRepository,
 ) -> None:
-    """PR-17.5c C3: a live discovery failure surfaces as :class:`MCPError`,
+    """A live discovery failure surfaces as :class:`MCPError`,
     which the service layer swallows to return an empty list (the
-    PR-17.5a degrade-to-empty contract).
+    degrade-to-empty contract).
 
     The previous ``discovery._invoke`` raised ``RuntimeError``; the
     ``except MCPError`` clause in the service layer did not catch

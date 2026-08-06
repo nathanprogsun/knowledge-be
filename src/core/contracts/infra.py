@@ -79,10 +79,9 @@ class UpdateModelRequest(BaseModel):
 class ProviderTypeMeta(BaseModel):
     """Catalog metadata for one model provider.
 
-    Mirrors ``internal/models/provider/provider.go::ProviderInfo`` on
-    the Go side; the wire JSON keeps camelCase (``defaultUrls``,
-    ``modelTypes``, ``requiresAuth``, ``extraFields``) so a Go UI
-    consumer can drop in unchanged.
+    The wire JSON keeps camelCase (``defaultUrls``, ``modelTypes``,
+    ``requiresAuth``, ``extraFields``) so a UI consumer can drop in
+    unchanged.
     """
 
     model_config = ConfigDict(frozen=True, populate_by_name=True)
@@ -665,7 +664,7 @@ class StorageProviderStatus(BaseModel):
     description: str
 
 
-# ── WeKnoraCloud ──────────────────────────────────────────────────────
+# ── Provider credentials (WeKnoraCloud wire shape) ────────────────────
 
 
 class SaveWeKnoraCloudCredentialsRequest(BaseModel):

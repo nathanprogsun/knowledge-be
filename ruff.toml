@@ -1,8 +1,8 @@
 line-length = 100
 target-version = "py311"
 src = ["src", "tests"]
-# `scripts/` holds standalone anti-drift tooling copied from the WeKnora
-# source repo; it is not application code and is not linted.
+# `scripts/` holds standalone anti-drift tooling; it is not
+# application code and is not linted.
 extend-exclude = ["scripts"]
 
 [lint]

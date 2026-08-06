@@ -1,6 +1,5 @@
 """Audit-log service — append-only writes + dedup + retention.
 
-Maps ``internal/application/service/audit_log.go::auditLogService``.
 Operations:
 
 - ``log`` — write a single audit entry (timestamp defaulting applied

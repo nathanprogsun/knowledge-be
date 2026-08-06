@@ -101,7 +101,7 @@ def test_manager_revoke_is_a_noop_for_valid_user() -> None:
 
 
 def test_legacy_oauth_manager_uses_injected_http_client_not_creates_new_one() -> None:
-    """PR-17.5c C5: when ``http_client`` is injected the manager does NOT
+    """When ``http_client`` is injected the manager does NOT
     create a fresh ``httpx.AsyncClient`` (one per request leak).
 
     The legacy router path used to construct ``OAuthManager(service=info)``

@@ -4,10 +4,9 @@ One row is a concrete file/object storage instance. A workspace may
 register several instances of the same provider and bind each knowledge
 base to a different one.
 
-Mirrors ``internal/types/storagebackend.go::StorageBackend`` — column
-names match the Go ``json``/``gorm`` tags one-for-one. ``config`` is the
-JSON-backed normalized union of provider settings; the typed view lives
-on ``src.core.infra.storage_backends.types.StorageBackendConfigInfo``.
+Column names match the wire shape one-for-one. ``config`` is the
+JSON-backed normalized union of provider settings; the typed view
+lives on ``src.core.infra.storage_backends.types.StorageBackendConfigInfo``.
 
 Column notes
 ------------

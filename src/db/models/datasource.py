@@ -1,12 +1,9 @@
 """Storage rows for the `data_sources` and `sync_logs` tables.
 
-Mirrors ``internal/types/datasource.go::DataSource`` and
-``internal/types/datasource.go::SyncLog``. The SQL shape is
-``migrations/versioned/000029_datasource_tables.up.sql``.
-
-Column names (and therefore the JSON names produced by the wire
-projections in ``src/core/infra/datasources/types.py``) match the Go
-structs exactly.
+The SQL shape is captured from the upstream migrations during the
+initial contract freeze. Column names (and therefore the JSON names
+produced by the wire projections in
+``src/core/infra/datasources/types.py``) match the wire shape.
 
 Two Go fields are NOT columns and are absent here:
 

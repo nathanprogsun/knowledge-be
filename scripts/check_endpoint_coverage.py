@@ -63,7 +63,8 @@ def resolve_src_root(explicit: str | None) -> Path | None:
     return None
 
 
-# Default docs root — the WeKnora Go repo (source of the frozen API docs).
+# Default docs root — the upstream source repo (location of the
+# frozen API markdown used by the coverage check).
 DEFAULT_DOCS_ROOT = Path("/Users/jung/pro/WeKnora/docs")
 
 
@@ -225,9 +226,9 @@ def parse_fastapi_routes(
 
     The path includes any prefix declared via ``APIRouter(prefix="...")`` on
     the same module. When ``domains`` is given, only routes under
-    ``web/api/<domain>/`` are returned. Stage-2 infra routes live one level
-    deeper (``web/api/infra/<domain>/``) and are matched on that second
-    segment.
+    ``web/api/<domain>/`` are returned. Infrastructure-domain routes
+    live one level deeper (``web/api/infra/<domain>/``) and are matched
+    on that second segment.
     """
     out: list[tuple[str, str, Path, int]] = []
     web_api_root = src_root / "web" / "api"
@@ -296,7 +297,7 @@ def main() -> int:
     parser.add_argument(
         "--docs-root",
         default=None,
-        help="Root containing api/*.md (defaults to the WeKnora Go project docs/).",
+        help="Root containing api/*.md (defaults to the bundled upstream docs/).",
     )
     args = parser.parse_args()
 

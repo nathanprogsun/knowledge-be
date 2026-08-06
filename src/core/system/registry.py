@@ -1,6 +1,5 @@
 """In-code registry of legal system-setting keys.
 
-Mirrors ``internal/application/service/system_setting.go::registry``.
 The registry is the **only** authority on which keys are legal, what
 type they hold, what their ENV-fallback name is, and what the built-in
 default is. Adding a new tunable is a matter of:

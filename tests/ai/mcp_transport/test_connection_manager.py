@@ -208,7 +208,7 @@ async def test_get_or_create_rejects_unsupported_transport() -> None:
 
 
 async def test_get_or_create_returns_http_streamable_client_for_http_streamable() -> None:
-    """PR-17.5b: ``http-streamable`` now builds an :class:`HTTPStreamableClient`.
+    """``http-streamable`` now builds an :class:`HTTPStreamableClient`.
 
     The factory no longer rejects the transport type — it builds the
     client and the network call is what surfaces a transport error.
@@ -619,7 +619,7 @@ async def test_list_tools_on_dead_session_raises_session_not_connected() -> None
 
 
 async def test_invoke_evict_on_session_invalid_returns_fresh_session() -> None:
-    """PR-17.5c H1: ``evict_on_session_invalid=True`` drops the stale
+    """``evict_on_session_invalid=True`` drops the stale
     session on a session-invalid hint, and the next ``get_or_create``
     rebuilds it.
 
@@ -727,7 +727,7 @@ def test_default_transport_factory_builds_sse_client() -> None:
 
 
 def test_default_transport_factory_returns_http_streamable_client() -> None:
-    """PR-17.5b: the default factory now returns an :class:`HTTPStreamableClient`."""
+    """The default factory now returns an :class:`HTTPStreamableClient`."""
     from src.ai.mcp_transport.http_streamable_client import HTTPStreamableClient
 
     client = _default_transport_factory(

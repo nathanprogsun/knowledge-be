@@ -183,7 +183,7 @@ def _check_import_policy(
 
     Exemptions:
     - ``web/deps/**`` may import ``db.dao.*`` (per-domain forwarders
-      that construct repositories on the request-scoped session — PR-17.5c C4).
+      that construct repositories on the request-scoped session).
 
     ``common``, ``app_context``, ``util``, and ``unknown`` are not gated here.
     """
@@ -202,7 +202,7 @@ def _check_import_policy(
         return
     # Per-domain forwarders under ``web/deps/**`` are allowed to import
     # ``db.dao.*`` so they can construct repositories on the request-
-    # scoped ``AsyncSession``. PR-17.5c C4.
+    # scoped ``AsyncSession``.
     if (
         layer in {"web", "web_api"}
         and file
@@ -338,7 +338,7 @@ ALWAYS_INCLUDE_PREFIXES: tuple[tuple[str, ...], ...] = (
 )
 
 
-# Stage-2 infra domains keep the domain name in the second segment
+# Infrastructure domains keep the domain name in the second segment
 # (``core/infra/<domain>/``, ``web/api/infra/<domain>/``,
 # ``db/models/infra/<domain>/``), and their DAOs use a singular / shortened
 # stem (``mcp_service_repository`` for domain ``mcp_services``). Map domain

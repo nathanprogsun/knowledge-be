@@ -26,7 +26,7 @@ def test_mcp_error_is_a_plain_exception() -> None:
 
 
 def test_oauth_required_error_is_application_error_with_401() -> None:
-    """PR-17.5c H5: ``OAuthRequiredError`` inherits ``ApplicationError``
+    """``OAuthRequiredError`` inherits ``ApplicationError``
     and the exception handler resolves it to HTTP 401.
 
     Without this the route layer would surface a 500 when an MCP
