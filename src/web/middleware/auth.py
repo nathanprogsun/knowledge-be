@@ -8,6 +8,11 @@ guards and API-key gate can read it:
   tenant + tenant role and stashes them on ``request.state``.
 - A valid ``X-API-Key`` resolves the API-key scope and stashes it on
   ``request.state`` (the API Key Gate authorizes the route afterwards).
+- Knowledge-prefixed headers (``x-knowledge-user-id`` /
+  ``x-knowledge-tenant-id`` / ``x-knowledge-roles``) resolve the
+  principal directly when no bearer or API key is present. This
+  channel is used by the integration-test rig; it must not be
+  reachable from a public gateway without a strict deploy-time gate.
 - No successful channel → HTTP 401.
 
 This is a FastAPI dependency (not ASGI middleware) so it runs per request
@@ -21,11 +26,13 @@ from typing import Annotated
 from fastapi import Depends, Header, Request
 
 from src.app_context import request_context
-from src.common.exception import UnauthorizedError, ValidationError
+from src.common.exception import NotFoundError, UnauthorizedError, ValidationError
 from src.core.auth.factory import build_auth_service
 from src.core.auth.permissions import APIKeyScopeType, TenantAPIKeyScope
 from src.core.auth.types import UserInfo
 from src.core.tenants.factory import build_tenant_api_key_service, build_tenant_member_service
+from src.db.dao.users_repository import UserRepository
+from src.settings import get_settings
 from src.web.deps.session import SessionDep
 from src.web.middleware.context import (
     set_api_key_scope,
@@ -158,6 +165,82 @@ async def _resolve_api_key(
     return True
 
 
+async def _resolve_header_auth(
+    *,
+    request: Request,
+    session: SessionDep,
+) -> bool:
+    """Authenticate via knowledge-prefixed headers; return True on success.
+
+    Headers (all configurable via ``Settings``):
+
+    - ``x-knowledge-user-id`` — required, the user id
+    - ``x-knowledge-tenant-id`` — required, the active tenant id (int)
+    - ``x-knowledge-roles`` — optional, comma-separated role list; the
+      first role wins as the tenant role. Presence of ``system_admin``
+      in the list grants platform-admin powers.
+
+    A real ``User`` row must exist and be active; the header alone is
+    not sufficient. Failure to resolve raises ``UnauthorizedError``
+    (the caller in :func:`require_auth` returns ``False`` only when the
+    header is **not present** — header-present-but-invalid fails closed).
+    """
+    settings = get_settings()
+    user_id = request.headers.get(settings.auth_header_user_id)
+    tenant_id_raw = request.headers.get(settings.auth_header_tenant_id)
+    if user_id is None or tenant_id_raw is None:
+        return False
+
+    try:
+        tenant_id = int(tenant_id_raw)
+    except (TypeError, ValueError) as exc:
+        raise UnauthorizedError(
+            code="auth.invalid_tenant_header",
+            message=f"Invalid {settings.auth_header_tenant_id} header",
+        ) from exc
+
+    user_repo = UserRepository(session)
+    try:
+        user = await user_repo.find_by_id(
+            user_id,
+            not_found_code="auth.user_not_found",
+            not_found_message="User for header-auth not found",
+        )
+    except NotFoundError as exc:
+        raise UnauthorizedError(
+            code="auth.user_not_found",
+            message="Unauthorized: user for header-auth not found",
+        ) from exc
+
+    if not user.is_active:
+        raise UnauthorizedError(
+            code="auth.user_inactive",
+            message="Unauthorized: user is inactive",
+        )
+
+    roles_header = request.headers.get(settings.auth_header_roles, "")
+    roles = [r.strip() for r in roles_header.split(",") if r.strip()]
+    role = roles[0] if roles else ""
+    is_system_admin = "system_admin" in roles
+
+    user_info: dict[str, str] = {
+        "id": str(user.id),
+        "username": user.username,
+        "email": user.email,
+        "is_active": "1" if user.is_active else "0",
+        "can_access_all_tenants": "1" if is_system_admin else "0",
+        "is_system_admin": "1" if is_system_admin else "0",
+    }
+    set_user_info(request, user_info)
+    set_tenant_id(request, tenant_id)
+    set_tenant_role(request, role)
+    set_is_system_admin(request, is_system_admin)
+    set_api_key_scope(request, None)
+    request_context.set_tenant_id(str(tenant_id))
+    request_context.set_user_id(str(user.id))
+    return True
+
+
 async def require_auth(
     request: Request,
     session: SessionDep,
@@ -166,10 +249,14 @@ async def require_auth(
 ) -> None:
     """Authenticate the request and populate ``request.state``.
 
-    Whitelisted paths pass through. Otherwise a valid JWT Bearer or
-    X-API-Key is required; failure yields HTTP 401.
+    Whitelisted paths pass through. Otherwise a valid JWT Bearer, a
+    valid X-API-Key, or the knowledge-prefixed header trio is required;
+    failure yields HTTP 401.
     """
     if request.method == "OPTIONS" or is_public_path(request.method, request.url.path):
+        return
+
+    if await _resolve_header_auth(request=request, session=session):
         return
 
     if authorization:
