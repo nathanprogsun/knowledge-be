@@ -2,25 +2,27 @@
 
 Uses in-memory fake repos and a real JWT minted via the login flow, so
 token-bearing endpoints exercise the actual decode + user lookup path.
+
+Uses the shared ``web_app`` fixture (header-based auth) and applies
+the service dep override on it; the real ``require_auth`` dep resolves
+the principal via the ``x-knowledge-*`` header trio.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 
-from src.app_context.lifespan import create_app
 from src.common.exception import NotFoundError
 from src.core.auth.service import AuthService
 from src.db.models.auth.auth_tokens import AuthToken
 from src.db.models.auth.users import User
 from src.util.security import hash_password, verify_password
 from src.web.deps import get_auth_service
-from tests.unit.fakes.auth_gates import override_auth_gates
+from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 
 
 class _FakeUserRepo:
@@ -108,22 +110,18 @@ def fake_tokens() -> _FakeTokenRepo:
     return _FakeTokenRepo()
 
 
-@pytest.fixture
-def app(fake_users: _FakeUserRepo, fake_tokens: _FakeTokenRepo) -> FastAPI:
-    application = create_app()
-    override_auth_gates(application)
-    application.dependency_overrides[get_auth_service] = lambda: AuthService(
+@pytest.fixture(autouse=True)
+def _override_services(
+    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
+    fake_users: _FakeUserRepo,
+    fake_tokens: _FakeTokenRepo,
+) -> FastAPI:
+    """Override the auth service dep on the shared web app (autouse)."""
+    web_app.dependency_overrides[get_auth_service] = lambda: AuthService(
         users_repo=fake_users,  # type: ignore[arg-type]
         tokens_repo=fake_tokens,  # type: ignore[arg-type]
     )
-    return application
-
-
-@pytest.fixture
-async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
+    return web_app
 
 
 def _seed_user(
@@ -154,9 +152,13 @@ def _seed_user(
 
 
 async def _login(
-    client: AsyncClient, email: str = "alice@example.com", password: str = "correct-horse"
+    web_authed_client: AsyncClient,
+    email: str = "alice@example.com",
+    password: str = "correct-horse",
 ) -> str:
-    resp = await client.post("/auth/login", json={"email": email, "password": password})
+    resp = await web_authed_client.post(
+        "/auth/login", json={"email": email, "password": password}
+    )
     assert resp.status_code == 200
     return str(resp.json()["token"])
 
@@ -164,8 +166,10 @@ async def _login(
 # ── POST /auth/register ───────────────────────────────────────────────
 
 
-async def test_register_success(client: AsyncClient, fake_users: _FakeUserRepo) -> None:
-    resp = await client.post(
+async def test_register_success(
+    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+) -> None:
+    resp = await web_authed_client.post(
         "/auth/register",
         json={"username": "bob", "email": "bob@example.com", "password": "secret1"},
     )
@@ -177,9 +181,11 @@ async def test_register_success(client: AsyncClient, fake_users: _FakeUserRepo) 
     assert body["active_tenant"] is None
 
 
-async def test_register_duplicate_email(client: AsyncClient, fake_users: _FakeUserRepo) -> None:
+async def test_register_duplicate_email(
+    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+) -> None:
     _seed_user(fake_users)
-    resp = await client.post(
+    resp = await web_authed_client.post(
         "/auth/register",
         json={"username": "alice2", "email": "alice@example.com", "password": "secret1"},
     )
@@ -187,8 +193,8 @@ async def test_register_duplicate_email(client: AsyncClient, fake_users: _FakeUs
     assert resp.json()["error"]["code"] == "user.exists"
 
 
-async def test_register_empty_username(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_register_empty_username(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.post(
         "/auth/register",
         json={"username": "  ", "email": "x@example.com", "password": "secret1"},
     )
@@ -198,18 +204,20 @@ async def test_register_empty_username(client: AsyncClient) -> None:
 # ── GET /auth/me ──────────────────────────────────────────────────────
 
 
-async def test_me_success(client: AsyncClient, fake_users: _FakeUserRepo) -> None:
+async def test_me_success(
+    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+) -> None:
     _seed_user(fake_users)
-    token = await _login(client)
-    resp = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    token = await _login(web_authed_client)
+    resp = await web_authed_client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
     assert body["user"]["email"] == "alice@example.com"
 
 
-async def test_me_missing_header(client: AsyncClient) -> None:
-    resp = await client.get("/auth/me")
+async def test_me_missing_header(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.get("/auth/me")
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "auth.missing_authorization"
 
@@ -217,18 +225,24 @@ async def test_me_missing_header(client: AsyncClient) -> None:
 # ── GET /auth/validate ────────────────────────────────────────────────
 
 
-async def test_validate_valid_token(client: AsyncClient, fake_users: _FakeUserRepo) -> None:
+async def test_validate_valid_token(
+    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+) -> None:
     _seed_user(fake_users)
-    token = await _login(client)
-    resp = await client.get("/auth/validate", headers={"Authorization": f"Bearer {token}"})
+    token = await _login(web_authed_client)
+    resp = await web_authed_client.get(
+        "/auth/validate", headers={"Authorization": f"Bearer {token}"}
+    )
     assert resp.status_code == 200
     body = resp.json()
     assert body["valid"] is True
     assert body["user_id"] == "usr-1"
 
 
-async def test_validate_invalid_token(client: AsyncClient) -> None:
-    resp = await client.get("/auth/validate", headers={"Authorization": "Bearer not-a-jwt"})
+async def test_validate_invalid_token(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.get(
+        "/auth/validate", headers={"Authorization": "Bearer not-a-jwt"}
+    )
     assert resp.status_code == 200
     assert resp.json()["valid"] is False
 
@@ -236,10 +250,12 @@ async def test_validate_invalid_token(client: AsyncClient) -> None:
 # ── POST /auth/change-password ────────────────────────────────────────
 
 
-async def test_change_password_success(client: AsyncClient, fake_users: _FakeUserRepo) -> None:
+async def test_change_password_success(
+    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+) -> None:
     _seed_user(fake_users)
-    token = await _login(client)
-    resp = await client.post(
+    token = await _login(web_authed_client)
+    resp = await web_authed_client.post(
         "/auth/change-password",
         headers={"Authorization": f"Bearer {token}"},
         json={"old_password": "correct-horse", "new_password": "new-secret"},
@@ -250,10 +266,12 @@ async def test_change_password_success(client: AsyncClient, fake_users: _FakeUse
     assert verify_password("new-secret", stored.password_hash)
 
 
-async def test_change_password_wrong_old(client: AsyncClient, fake_users: _FakeUserRepo) -> None:
+async def test_change_password_wrong_old(
+    web_authed_client: AsyncClient, fake_users: _FakeUserRepo
+) -> None:
     _seed_user(fake_users)
-    token = await _login(client)
-    resp = await client.post(
+    token = await _login(web_authed_client)
+    resp = await web_authed_client.post(
         "/auth/change-password",
         headers={"Authorization": f"Bearer {token}"},
         json={"old_password": "wrong", "new_password": "new-secret"},

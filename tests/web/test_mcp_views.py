@@ -4,17 +4,20 @@ Exercises the 13 endpoints over HTTP via ``httpx.AsyncClient`` with
 ``get_mcp_service`` overridden to a real ``MCPServiceService`` backed
 by the shared in-memory fake repository. The discovery + connectivity
 fakes are also injected so the routes reach a known state.
+
+Uses the shared ``web_app`` fixture (header-based auth) and applies
+the service dep override on it; the real ``require_auth`` dep resolves
+the principal via the ``x-knowledge-*`` header trio.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 
-from src.app_context.lifespan import create_app
 from src.core.infra.mcp_services.connectivity import (
     ConnectivityResult,
     StaticConnectivityProbe,
@@ -25,9 +28,8 @@ from src.core.infra.mcp_services.discovery import (
     StaticDiscoveryProvider,
 )
 from src.core.infra.mcp_services.service import MCPServiceService
-from src.web.api.infra.mcp_services.router import router as mcp_router
 from src.web.deps.infra_mcp import get_mcp_service
-from tests.unit.fakes.auth_gates import override_auth_gates
+from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 from tests.unit.fakes.mcp_services import (
     FakeMCPServiceRepository,
     FakeMCPToolApprovalRepository,
@@ -44,46 +46,34 @@ def approvals_repo() -> FakeMCPToolApprovalRepository:
     return FakeMCPToolApprovalRepository()
 
 
-@pytest.fixture
-def app(
+@pytest.fixture(autouse=True)
+def _override_services(
+    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
     mcp_repo: FakeMCPServiceRepository,
     approvals_repo: FakeMCPToolApprovalRepository,
 ) -> FastAPI:
-    application = create_app()
-    application.include_router(mcp_router)
-
-    def _override_service() -> MCPServiceService:
-        return MCPServiceService(
-            mcp_repo=mcp_repo,  # type: ignore[arg-type]
-            tool_approvals_repo=approvals_repo,  # type: ignore[arg-type]
-            discovery_provider=StaticDiscoveryProvider(
-                tools={"seed-alpha": [DiscoveryTool(name="search")]},
-                resources={
-                    "seed-alpha": [
-                        DiscoveryResource(uri="file://docs", name="docs"),
-                    ],
-                },
+    """Override ``get_mcp_service`` on the shared web app (autouse)."""
+    web_app.dependency_overrides[get_mcp_service] = lambda: MCPServiceService(
+        mcp_repo=mcp_repo,  # type: ignore[arg-type]
+        tool_approvals_repo=approvals_repo,  # type: ignore[arg-type]
+        discovery_provider=StaticDiscoveryProvider(
+            tools={"seed-alpha": [DiscoveryTool(name="search")]},
+            resources={
+                "seed-alpha": [
+                    DiscoveryResource(uri="file://docs", name="docs"),
+                ],
+            },
+        ),
+        connectivity_probe=StaticConnectivityProbe(
+            result=ConnectivityResult(
+                success=True,
+                message="connected",
+                description="test server",
+                tools=(DiscoveryTool(name="search"),),
             ),
-            connectivity_probe=StaticConnectivityProbe(
-                result=ConnectivityResult(
-                    success=True,
-                    message="connected",
-                    description="test server",
-                    tools=(DiscoveryTool(name="search"),),
-                ),
-            ),
-        )
-
-    application.dependency_overrides[get_mcp_service] = _override_service
-    override_auth_gates(application)
-    return application
-
-
-@pytest.fixture
-async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
+        ),
+    )
+    return web_app
 
 
 async def _seed(mcp_repo: FakeMCPServiceRepository, *, name: str = "alpha") -> str:
@@ -108,8 +98,8 @@ async def _seed(mcp_repo: FakeMCPServiceRepository, *, name: str = "alpha") -> s
 # ── POST /mcp-services ──────────────────────────────────────────────
 
 
-async def test_create_service_returns_201_envelope(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_create_service_returns_201_envelope(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.post(
         "/mcp-services",
         json={"name": "alpha", "transport_type": "sse", "url": "https://example.com/mcp"},
     )
@@ -121,7 +111,7 @@ async def test_create_service_returns_201_envelope(client: AsyncClient) -> None:
     assert body["data"]["id"]
 
 
-async def test_create_service_duplicate_name_returns_409(client: AsyncClient) -> None:
+async def test_create_service_duplicate_name_returns_409(web_authed_client: AsyncClient) -> None:
     """Two creates with the same (tenant, name) → second returns 409.
 
     Mirrors Go's ErrConflict (code 1005); the Python wire code is
@@ -129,36 +119,40 @@ async def test_create_service_duplicate_name_returns_409(client: AsyncClient) ->
     message.
     """
     payload = {"name": "alpha", "transport_type": "sse", "url": "https://example.com/mcp"}
-    first = await client.post("/mcp-services", json=payload)
+    first = await web_authed_client.post("/mcp-services", json=payload)
     assert first.status_code == 201
 
-    second = await client.post("/mcp-services", json=payload)
+    second = await web_authed_client.post("/mcp-services", json=payload)
     assert second.status_code == 409
     body = second.json()
     assert body["success"] is False
     assert body["error"]["code"] == "mcp_service.duplicate_name"
 
 
-async def test_create_service_rejects_blank_name(client: AsyncClient) -> None:
-    resp = await client.post("/mcp-services", json={"name": "  ", "transport_type": "sse"})
+async def test_create_service_rejects_blank_name(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.post(
+        "/mcp-services", json={"name": "  ", "transport_type": "sse"}
+    )
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "mcp_service.name_required"
 
 
-async def test_create_service_rejects_stdio(client: AsyncClient) -> None:
-    resp = await client.post("/mcp-services", json={"name": "alpha", "transport_type": "stdio"})
+async def test_create_service_rejects_stdio(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.post(
+        "/mcp-services", json={"name": "alpha", "transport_type": "stdio"}
+    )
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "mcp_service.stdio_disabled"
 
 
-async def test_create_service_never_echoes_secrets(client: AsyncClient) -> None:
+async def test_create_service_never_echoes_secrets(web_authed_client: AsyncClient) -> None:
     """``api_key`` / ``token`` are never echoed on the wire.
 
     Mirrors Go's ``dto.MCPAuthConfigResponse`` — the response DTO has no
     APIKey/Token fields; presence is signalled via the ``credentials``
     metadata map.
     """
-    resp = await client.post(
+    resp = await web_authed_client.post(
         "/mcp-services",
         json={
             "name": "alpha",
@@ -187,10 +181,10 @@ async def test_create_service_never_echoes_secrets(client: AsyncClient) -> None:
 
 
 async def test_list_services_returns_envelope(
-    client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
 ) -> None:
     await _seed(mcp_repo, name="alpha")
-    resp = await client.get("/mcp-services")
+    resp = await web_authed_client.get("/mcp-services")
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert len(data) == 1
@@ -201,16 +195,16 @@ async def test_list_services_returns_envelope(
 
 
 async def test_get_service_returns_envelope(
-    client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
 ) -> None:
     await _seed(mcp_repo, name="alpha")
-    resp = await client.get("/mcp-services/seed-alpha")
+    resp = await web_authed_client.get("/mcp-services/seed-alpha")
     assert resp.status_code == 200
     assert resp.json()["data"]["id"] == "seed-alpha"
 
 
-async def test_get_service_missing_returns_404(client: AsyncClient) -> None:
-    resp = await client.get("/mcp-services/does-not-exist")
+async def test_get_service_missing_returns_404(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.get("/mcp-services/does-not-exist")
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "mcp_service.not_found"
 
@@ -219,19 +213,21 @@ async def test_get_service_missing_returns_404(client: AsyncClient) -> None:
 
 
 async def test_update_service_patches_columns(
-    client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
 ) -> None:
     await _seed(mcp_repo, name="alpha")
-    resp = await client.put("/mcp-services/seed-alpha", json={"description": "new"})
+    resp = await web_authed_client.put(
+        "/mcp-services/seed-alpha", json={"description": "new"}
+    )
     assert resp.status_code == 200
     assert resp.json()["data"]["description"] == "new"
 
 
 async def test_update_service_preserves_secret_auth(
-    client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
 ) -> None:
     await _seed(mcp_repo, name="alpha")
-    resp = await client.put(
+    resp = await web_authed_client.put(
         "/mcp-services/seed-alpha",
         json={
             "auth_config": {
@@ -252,10 +248,10 @@ async def test_update_service_preserves_secret_auth(
 
 
 async def test_delete_service_returns_ack(
-    client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
 ) -> None:
     await _seed(mcp_repo, name="alpha")
-    resp = await client.delete("/mcp-services/seed-alpha")
+    resp = await web_authed_client.delete("/mcp-services/seed-alpha")
     assert resp.status_code == 200
     assert resp.json() == {
         "success": True,
@@ -263,13 +259,13 @@ async def test_delete_service_returns_ack(
     }
 
 
-async def test_delete_missing_service_returns_404(client: AsyncClient) -> None:
-    resp = await client.delete("/mcp-services/missing")
+async def test_delete_missing_service_returns_404(web_authed_client: AsyncClient) -> None:
+    resp = await web_authed_client.delete("/mcp-services/missing")
     assert resp.status_code == 404
 
 
 async def test_delete_rejects_builtin(
-    client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
 ) -> None:
     from datetime import UTC, datetime
 
@@ -286,7 +282,7 @@ async def test_delete_rejects_builtin(
             is_builtin=True,
         ),
     )
-    resp = await client.delete("/mcp-services/seed-built")
+    resp = await web_authed_client.delete("/mcp-services/seed-built")
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "mcp_service.builtin_immutable"
 
@@ -295,10 +291,10 @@ async def test_delete_rejects_builtin(
 
 
 async def test_test_runs_connectivity_probe(
-    client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
 ) -> None:
     await _seed(mcp_repo, name="alpha")
-    resp = await client.post("/mcp-services/seed-alpha/test")
+    resp = await web_authed_client.post("/mcp-services/seed-alpha/test")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -310,10 +306,10 @@ async def test_test_runs_connectivity_probe(
 
 
 async def test_list_tools_returns_baked_results(
-    client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
 ) -> None:
     await _seed(mcp_repo, name="alpha")
-    resp = await client.get("/mcp-services/seed-alpha/tools")
+    resp = await web_authed_client.get("/mcp-services/seed-alpha/tools")
     assert resp.status_code == 200
     tools = resp.json()["data"]
     assert len(tools) == 1
@@ -324,10 +320,10 @@ async def test_list_tools_returns_baked_results(
 
 
 async def test_list_resources_returns_baked_results(
-    client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
 ) -> None:
     await _seed(mcp_repo, name="alpha")
-    resp = await client.get("/mcp-services/seed-alpha/resources")
+    resp = await web_authed_client.get("/mcp-services/seed-alpha/resources")
     assert resp.status_code == 200
     resources = resp.json()["data"]
     assert resources[0]["uri"] == "file://docs"
@@ -337,17 +333,17 @@ async def test_list_resources_returns_baked_results(
 
 
 async def test_tool_approval_round_trip(
-    client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
 ) -> None:
     await _seed(mcp_repo, name="alpha")
-    put = await client.put(
+    put = await web_authed_client.put(
         "/mcp-services/seed-alpha/tool-approvals/search",
         json={"require_approval": True},
     )
     assert put.status_code == 200
     assert put.json() == {"success": True}
 
-    listed = await client.get("/mcp-services/seed-alpha/tool-approvals")
+    listed = await web_authed_client.get("/mcp-services/seed-alpha/tool-approvals")
     assert listed.status_code == 200
     rows = listed.json()["data"]
     assert len(rows) == 1
@@ -358,9 +354,11 @@ async def test_tool_approval_round_trip(
 # ── OAuth endpoints ─────────────────────────────────────────────────
 
 
-async def test_oauth_authorize_url(client: AsyncClient, mcp_repo: FakeMCPServiceRepository) -> None:
+async def test_oauth_authorize_url(
+    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+) -> None:
     await _seed(mcp_repo, name="alpha")
-    resp = await client.post(
+    resp = await web_authed_client.post(
         "/mcp-services/seed-alpha/oauth/authorize-url",
         json={
             "redirect_uri": "https://example.com/oauth/callback",
@@ -373,25 +371,32 @@ async def test_oauth_authorize_url(client: AsyncClient, mcp_repo: FakeMCPService
 
 
 async def test_oauth_authorize_url_requires_redirect(
-    client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
 ) -> None:
     await _seed(mcp_repo, name="alpha")
-    resp = await client.post("/mcp-services/seed-alpha/oauth/authorize-url", json={})
+    resp = await web_authed_client.post(
+        "/mcp-services/seed-alpha/oauth/authorize-url", json={}
+    )
     assert resp.status_code == 422
 
 
 async def test_oauth_status_for_seeded_service(
-    client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
 ) -> None:
     await _seed(mcp_repo, name="alpha")
-    resp = await client.get("/mcp-services/seed-alpha/oauth/status")
+    resp = await web_authed_client.get("/mcp-services/seed-alpha/oauth/status")
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["authorized"] is False
     assert data["state"] == "pending"
 
 
-async def test_oauth_revoke(client: AsyncClient, mcp_repo: FakeMCPServiceRepository) -> None:
+async def test_oauth_revoke(
+    web_authed_client: AsyncClient, mcp_repo: FakeMCPServiceRepository
+) -> None:
     await _seed(mcp_repo, name="alpha")
-    resp = await client.delete("/mcp-services/seed-alpha/oauth/token")
+    resp = await web_authed_client.delete("/mcp-services/seed-alpha/oauth/token")
     assert resp.status_code == 204
+
+
+__all__ = []
