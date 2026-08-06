@@ -90,6 +90,15 @@ class Settings(BaseSettings):
     oidc_user_info_mapping_username: str = "name"
     oidc_user_info_mapping_email: str = "email"
 
+    # ── Auth header names ─────────────────────────────────────────────
+    # HTTP header names used by the auth layer when a request does not
+    # carry a JWT or API key (for example, internal service-to-service
+    # calls that authenticate via headers rather than bearer tokens).
+    # Default values follow the "x-knowledge-*" naming convention.
+    auth_header_user_id: str = "x-knowledge-user-id"
+    auth_header_tenant_id: str = "x-knowledge-tenant-id"
+    auth_header_roles: str = "x-knowledge-roles"
+
     @computed_field  # type: ignore[prop-decorator]
     @property
     def database_url(self) -> str:
