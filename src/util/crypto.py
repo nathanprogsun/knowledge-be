@@ -1,6 +1,6 @@
-"""AES-256-GCM credential encryption, wire-compatible with WeKnora Go.
+"""AES-256-GCM credential encryption.
 
-Mirrors ``internal/utils/crypto.go``:
+Format:
 
 - ``enc:v1:`` prefix + ``base64.RawURLEncoding(nonce || ciphertext)``.
 - ``SYSTEM_AES_KEY`` is a raw 32-byte key (not hex); a key of any other
@@ -10,7 +10,7 @@ Mirrors ``internal/utils/crypto.go``:
   migration step.
 - Decryption failures (rotated/missing key) surface as ``(value, False)``
   via :func:`decrypt_stored_secret_lenient` so callers can blank the
-  field and stay visible, exactly like Go's ``DecryptStoredSecretLenient``.
+  field and stay visible.
 """
 
 from __future__ import annotations

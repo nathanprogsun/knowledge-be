@@ -458,7 +458,7 @@ async def test_redirect_preserves_headers_on_same_host() -> None:
 
 @pytest.mark.anyio
 async def test_redirect_caps_at_max() -> None:
-    """Beyond _MAX_REDIRECTS hops the request fails, mirroring Go's redirect cap."""
+    """Beyond _MAX_REDIRECTS hops the request fails (matches the upstream redirect cap)."""
     seen = 0
 
     def bounce(request: httpx.Request) -> httpx.Response:

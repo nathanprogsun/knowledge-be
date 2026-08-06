@@ -13,7 +13,7 @@ help:
 	@echo "  migrate     alembic upgrade head"
 	@echo "  clean       remove caches"
 
-STAGE1_DOMAINS := auth,tenants,system
+AUTH_TENANT_DOMAINS := auth,tenants,system
 
 install:
 	uv venv
@@ -43,18 +43,18 @@ migrate:
 clean:
 	rm -rf .mypy_cache .ruff_cache .pytest_cache htmlcov .coverage
 
-# ── Anti-drift checks (checkpoint) ──────────────────────────────────────
+# ── Anti-drift checks ───────────────────────────────────────────────────
 
-STAGE2_INFRA_DOMAINS := datasources,initialization,mcp_services,models,storage_backends,vector_stores,web_search
+INFRA_DOMAINS := datasources,initialization,mcp_services,models,storage_backends,vector_stores,web_search
 
 check: check-layer check-singleton check-endpoint check-schema check-contract check-imports check-sql check-pr-leak check-map-from-db check-exception-types
 	@echo "All anti-drift checks passed"
 
 # Layer check covers every shipped domain. Endpoint coverage can only
 # verify domains whose upstream docs/api/*.md table is fully aligned;
-# the residual stage-2 gaps are tracked in the checkpoint-2 report.
+# the residual gaps are tracked in the v0.2 release notes.
 check-layer:
-	python scripts/check_layer_violation.py --src-root src/ --domains $(STAGE1_DOMAINS),$(STAGE2_INFRA_DOMAINS)
+	python scripts/check_layer_violation.py --src-root src/ --domains $(AUTH_TENANT_DOMAINS),$(INFRA_DOMAINS)
 
 check-singleton:
 	bash scripts/run_check_service_singleton.sh --src-root src/

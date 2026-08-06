@@ -11,7 +11,7 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.infra.models.service.model_service import ModelService
-from src.core.infra.models.service.weknora_cloud_service import WeKnoraCloudService
+from src.core.infra.models.service.provider_service import WeKnoraCloudService
 from src.db.dao.model_repository import ModelRepository
 from src.db.dao.tenants_repository import TenantRepository
 
@@ -30,8 +30,7 @@ def build_weknora_cloud_service(
 
     ``http_client`` may be an APP-scope pooled client from the lifespan
     registry; when omitted the service opens a short-lived client for
-    the single credential-verification call (Go builds a per-call
-    ``http.Client`` too).
+    the single credential-verification call.
     """
     return WeKnoraCloudService(
         tenants_repo=TenantRepository(session),

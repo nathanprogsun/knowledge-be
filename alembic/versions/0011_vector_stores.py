@@ -1,27 +1,24 @@
 """Create the `vector_stores` table.
 
-Mirrors ``internal/types/vectorstore.go::VectorStore`` (Go GORM tag
-analysis fetches the same column set). Each row is a tenant-scoped
-configuration of a vector database (Elasticsearch, Qdrant, Milvus,
-Tencent VectorDB, Weaviate, Doris, OpenSearch). Agents reference
-vector stores by UUID ``id``.
+Each row is a tenant-scoped configuration of a vector database
+(Elasticsearch, Qdrant, Milvus, Tencent VectorDB, Weaviate, Doris,
+OpenSearch). Agents reference vector stores by UUID ``id``.
 
 Connection parameters and index settings are stored as JSONB blobs
 (`connection_config` and `index_config`). The wire layer masks
 sensitive fields (`password`, `api_key`) before the row crosses the
 service boundary.
 
-`source` is the classifier from the Go contract: ``"user"`` for
-DB-managed rows; the ``"env"`` value is set by the service when it
-synthesises virtual entries from ``RETRIEVE_DRIVER`` and never
-persisted. `readonly` mirrors the wire contract for parity.
+`source` is the wire classifier: ``"user"`` for DB-managed rows;
+the ``"env"`` value is set by the service when it synthesises
+virtual entries from ``RETRIEVE_DRIVER`` and never persisted.
+`readonly` mirrors the wire contract for parity.
 
-`deleted_at` is the soft-delete marker. Mirrors the Go entity's
-``gorm.DeletedAt``; a partial unique index on `(tenant_id, name)` keeps
-live names unique per workspace.
+`deleted_at` is the soft-delete marker. A partial unique index on
+`(tenant_id, name)` keeps live names unique per workspace.
 
 The migration places itself at the head of the chain (down_revision
-points to the latest existing migration) so the checkpoint-2 re-number
+points to the latest existing migration) so any future re-number
 step only has to renumber the file, not its content.
 """
 

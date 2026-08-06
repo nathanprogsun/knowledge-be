@@ -1,4 +1,4 @@
-"""Tests for the HTTP-streamable MCP transport (PR-17.5b).
+"""Tests for the HTTP-streamable MCP transport.
 
 Mirrors ``tests/ai/mcp_transport/test_sse_client.py`` — ``respx``
 mocks the ``httpx`` transport layer so the synchronous POST + JSON
@@ -280,7 +280,7 @@ async def test_request_accepts_injected_httpx_client() -> None:
 
 
 async def test_post_sends_content_type_application_json() -> None:
-    """PR-17.5c H4: the POST carries ``Content-Type: application/json``.
+    """The POST carries ``Content-Type: application/json``.
 
     Without this header some MCP servers reject the request with a
     415 because ``httpx.post(content=...)`` does not set the type
@@ -301,7 +301,7 @@ async def test_post_sends_content_type_application_json() -> None:
 
 
 async def test_request_wraps_httpx_connect_error_as_transport_error() -> None:
-    """PR-17.5c: an ``httpx.ConnectError`` becomes ``MCPTransportError``."""
+    """An ``httpx.ConnectError`` becomes ``MCPTransportError``."""
     import httpx as _httpx
 
     with respx.mock(base_url="https://mcp.example.com") as router:
@@ -317,7 +317,7 @@ async def test_request_wraps_httpx_connect_error_as_transport_error() -> None:
 
 
 async def test_request_wraps_httpx_timeout_exception_as_transport_error() -> None:
-    """PR-17.5c: an ``httpx.TimeoutException`` becomes ``MCPTransportError``."""
+    """An ``httpx.TimeoutException`` becomes ``MCPTransportError``."""
     import httpx as _httpx
 
     with respx.mock(base_url="https://mcp.example.com") as router:
@@ -333,7 +333,7 @@ async def test_request_wraps_httpx_timeout_exception_as_transport_error() -> Non
 
 
 async def test_403_with_resource_metadata_becomes_oauth_required() -> None:
-    """PR-17.5c: a 403 carrying ``WWW-Authenticate: resource_metadata``
+    """A 403 carrying ``WWW-Authenticate: resource_metadata``
     becomes :class:`OAuthRequiredError` (same path as 401)."""
     with respx.mock(base_url="https://mcp.example.com") as router:
         router.post("/mcp").respond(

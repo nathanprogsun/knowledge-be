@@ -1,7 +1,5 @@
 """Storage row for the `models` table.
 
-Mirrors ``internal/types/model.go`` (``Model`` struct) on the Go side.
-
 Column notes
 ------------
 

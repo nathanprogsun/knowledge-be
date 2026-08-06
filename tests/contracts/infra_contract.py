@@ -1,20 +1,11 @@
-"""Stage-2 frozen contract surface: the infrastructure domains.
+"""Infrastructure-domain frozen contract surface.
 
-Re-exported for the stage-2 contract tests and for downstream Stage 3
-PRs. Each entry names the frozen Pydantic model, its wire endpoint, and
-the fixture key it is compared against.
+Re-exported for the infra contract tests and for downstream
+data/ingestion PRs. Each entry names the frozen Pydantic model, its
+wire endpoint, and the fixture key it is compared against.
 
-The fixture field sets are captured from the Go side:
-
-- ``internal/handler/dto/*.go`` — Model, MCPService, WebSearchProvider,
-  DataSource response shapes (the response DTOs that strip secret
-  fields by construction);
-- ``internal/types/*.go`` — VectorStore, StorageBackend, SyncLog and
-  the request parameter models;
-- ``docs/api/*.md`` — the vector-store response shape (``source`` /
-  ``readonly`` are documented even though the storage type omits them);
-- ``docs/swagger.json`` — the handler request shapes (``display_name``
-  on the model requests, camelCase ``ModelTestRequest`` fields).
+The fixture field sets were captured during the initial contract
+freeze to lock the public wire shape.
 """
 
 from __future__ import annotations
@@ -151,8 +142,8 @@ INITIALIZATION_CONTRACTS: tuple[tuple[str, type[BaseModel], str], ...] = (
     ("ModelTestRequest", infra.ModelTestRequest, "POST /initialization/embedding/test"),
 )
 
-# Every stage-2 wire contract, flattened for uniform iteration.
-ALL_STAGE2_CONTRACTS: tuple[tuple[str, type[BaseModel], str], ...] = (
+# Every infrastructure wire contract, flattened for uniform iteration.
+ALL_INFRA_CONTRACTS: tuple[tuple[str, type[BaseModel], str], ...] = (
     MODEL_CONTRACTS
     + MCP_CONTRACTS
     + VECTOR_STORE_CONTRACTS
@@ -178,10 +169,10 @@ def load_fixture_fields() -> dict[str, list[str]]:
 def model_wire_fields(model: type[BaseModel]) -> list[str]:
     """Return the wire (serialization) field names of a frozen contract.
 
-    Re-exported from the stage-1 module so both contract surfaces share
-    the alias-aware projection.
+    Re-exported from the auth+tenant module so both contract surfaces
+    share the alias-aware projection.
     """
-    from tests.contracts.stage1_contract import model_wire_fields as _project
+    from tests.contracts.auth_tenant_contract import model_wire_fields as _project
 
     return _project(model)
 
@@ -189,7 +180,7 @@ def model_wire_fields(model: type[BaseModel]) -> list[str]:
 JsonFixture: TypeAlias = dict[str, object]
 
 __all__ = [
-    "ALL_STAGE2_CONTRACTS",
+    "ALL_INFRA_CONTRACTS",
     "DATASOURCE_CONTRACTS",
     "FIXTURE_PATH",
     "INITIALIZATION_CONTRACTS",

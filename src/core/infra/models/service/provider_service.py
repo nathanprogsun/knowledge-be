@@ -1,24 +1,22 @@
 """WeKnoraCloud credential service — save + status.
 
-Maps ``internal/application/service/weknoracloud.go::weKnoraCloudService``.
-
 Two operations:
 
 - ``save_credentials`` — validate that both ``app_id`` and
   ``app_secret`` are present, probe the upstream ``/api/v1/health``
   endpoint with signed headers, then persist the pair into the
   workspace's ``credentials`` JSONB column under ``weknoracloud``.
-  No model rows are created (Go's comment: "仅保存 APPID/APPSECRET
-  凭证, 不自动创建模型").
+  No model rows are created (the upstream contract: "仅保存
+  APPID/APPSECRET 凭证, 不自动创建模型").
 - ``check_status`` — report whether the workspace has usable
   credentials and whether they need re-entering because the stored
   ``app_secret`` is still an ``enc:v1:`` blob (the AES key rotated, so
   the row-load decryption silently kept the ciphertext).
 
-Go's ``verifyCredentials`` carries an explicit caveat: ``/api/v1/health``
-is a liveness probe, so a 200 only proves reachability. We keep the same
-semantics (401/403 → invalid credentials, other non-200 → bad status,
-transport failure → unreachable) rather than inventing a stricter check.
+The upstream ``/api/v1/health`` is a liveness probe, so a 200 only
+proves reachability. We keep the same semantics (401/403 → invalid
+credentials, other non-200 → bad status, transport failure →
+unreachable) rather than inventing a stricter check.
 """
 
 from __future__ import annotations
@@ -37,24 +35,23 @@ from src.common.json import JsonObject
 from src.core.contracts.infra import WeKnoraCloudStatusResponse
 from src.db.dao.tenants_repository import TenantRepository
 
-# Hard-coded upstream entry point — ``internal/models/provider/weknoracloud.go``
-# ``WeKnoraCloudBaseURL``. Path segments are appended by each caller.
+# Hard-coded upstream entry point. Path segments are appended by each caller.
 WEKNORA_CLOUD_BASE_URL: Final = "https://weknora.weixin.qq.com"
 
-# ``verifyCredentials`` probes this path.
+# The credential probe path on the upstream service.
 _HEALTH_PATH: Final = "/api/v1/health"
 
-# ``&http.Client{Timeout: 10 * time.Second}``.
+# Per-call HTTP timeout for the verification request.
 _VERIFY_TIMEOUT_SECONDS: Final = 10.0
 
-# ``internal/utils/crypto.go::EncPrefix`` — marks an AES-256-GCM blob.
+# Prefix that marks an AES-256-GCM-encrypted secret blob at rest.
 ENC_PREFIX: Final = "enc:v1:"
 
 # Key of the provider object inside the ``credentials`` JSONB column
-# (``CredentialsConfig.WeKnoraCloud`` json tag).
+# (the public wire tag for this provider slot).
 _CREDENTIALS_KEY: Final = "weknoracloud"
 
-# ``internal/models/utils/signer.go`` nonce alphabet + length.
+# Nonce alphabet + length used by the upstream signing scheme.
 _NONCE_CHARS: Final = string.ascii_lowercase + string.ascii_uppercase + string.digits
 _NONCE_LENGTH: Final = 16
 
@@ -65,15 +62,14 @@ _EMPTY_BODY_JSON: Final = "{}"
 _RFC3986_SAFE: Final = "-_.~"
 
 # Reason string surfaced when the stored secret could not be decrypted.
-# Verbatim from Go so the frontend copy does not have to branch; the
-# fullwidth punctuation is part of that copy.
+# The fullwidth punctuation is part of the user-facing copy.
 _REINIT_REASON: Final = (
     "WeKnoraCloud 凭证解密失败（服务重启后加密密钥已变更），请重新填写 APPID 和 APPSECRET"  # noqa: RUF001
 )
 
 
 def _md5_hex(value: str) -> str:
-    """Hex MD5 of ``value`` — mirrors ``signer.go::md5Hex``.
+    """Hex MD5 of ``value`` (required by the upstream signing scheme).
 
     MD5 here is a protocol requirement of the upstream signing scheme,
     not a security primitive of ours.
@@ -82,12 +78,12 @@ def _md5_hex(value: str) -> str:
 
 
 def _generate_nonce(length: int = _NONCE_LENGTH) -> str:
-    """Random alphanumeric nonce — mirrors ``signer.go::generateNonce``."""
+    """Random alphanumeric nonce in the upstream signing scheme."""
     return "".join(secrets.choice(_NONCE_CHARS) for _ in range(length))
 
 
 def _rfc3986_encode(value: str) -> str:
-    """Percent-encode all but ``A-Za-z0-9-_.~`` (``signer.go::rfc3986Encode``)."""
+    """Percent-encode all but ``A-Za-z0-9-_.~`` (RFC3986 unreserved set)."""
     return quote(value, safe=_RFC3986_SAFE)
 
 
@@ -100,10 +96,9 @@ def sign_request_headers(
 ) -> dict[str, str]:
     """Build the signed WeKnoraCloud request headers.
 
-    Mirrors ``internal/models/utils/signer.go::Sign``: sort the six
-    signing params by key, join as ``rfc3986(k)=rfc3986(v)`` with ``&``,
-    MD5 the result. ``app_secret`` carries the upstream API key (Go's
-    ``apiKey`` parameter is fed from ``AppSecret``).
+    Sorts the six signing params by key, joins as
+    ``rfc3986(k)=rfc3986(v)`` with ``&``, then MD5s the result.
+    ``app_secret`` carries the upstream API key.
     """
     timestamp = str(int(time.time()))
     nonce = _generate_nonce()
@@ -132,8 +127,7 @@ def sign_request_headers(
 def is_weknora_cloud_doc_reader_addr(addr: str) -> bool:
     """True when ``addr`` is the WeKnoraCloud docreader endpoint.
 
-    Mirrors ``weknoracloud.go::IsWeKnoraCloudDocReaderAddr`` — trailing
-    slashes are ignored on both sides of the comparison.
+    Trailing slashes are ignored on both sides of the comparison.
     """
     normalized = addr.strip().rstrip("/")
     expected = WEKNORA_CLOUD_BASE_URL.rstrip("/") + "/api/v1/doc/reader"
@@ -152,9 +146,8 @@ class WeKnoraCloudService:
         """Bind the request-scoped tenant repository.
 
         ``http_client`` is optional: when omitted, ``save_credentials``
-        opens a short-lived client for the single verification call,
-        matching Go's per-call ``&http.Client{...}``. Tests inject a
-        client with a mock transport.
+        opens a short-lived client for the single verification call.
+        Tests inject a client with a mock transport.
         """
         self._tenants_repo = tenants_repo
         self._http_client = http_client
@@ -197,8 +190,8 @@ class WeKnoraCloudService:
 
         401/403 means the pair is rejected; any other non-200 is an
         unexpected upstream status; a transport error means the service
-        is unreachable. All three raise ``ExternalServiceError`` — Go
-        wraps them as ``credential verification failed: ...``.
+        is unreachable. All three raise ``ExternalServiceError`` with a
+        ``credential verification failed: ...`` message.
         """
         health_url = WEKNORA_CLOUD_BASE_URL.rstrip("/") + _HEALTH_PATH
         request_id = f"verify-{time.time_ns()}"
@@ -250,7 +243,7 @@ class WeKnoraCloudService:
         """Merge the provider object into the workspace ``credentials`` column.
 
         Other providers already present in the JSONB object are
-        preserved — Go mutates only ``Credentials.WeKnoraCloud``.
+        preserved — only the WeKnoraCloud provider slot is replaced.
         """
         tenant = await self._tenants_repo.find_by_id(tenant_id)
         credentials: JsonObject = dict(tenant.credentials or {})
@@ -270,9 +263,9 @@ class WeKnoraCloudService:
     async def check_status(self, *, tenant_id: int) -> WeKnoraCloudStatusResponse:
         """Report whether the workspace's credentials are usable.
 
-        Go swallows a missing workspace and a missing credential block
-        alike into ``{has_models: false, needs_reinit: false}``; we keep
-        that shape so the status endpoint never 404s a fresh workspace.
+        A missing workspace and a missing credential block both
+        resolve to ``{has_models: false, needs_reinit: false}`` so the
+        status endpoint never 404s a fresh workspace.
         """
         try:
             tenant = await self._tenants_repo.find_by_id(tenant_id)
@@ -297,8 +290,8 @@ class WeKnoraCloudService:
 def _read_credentials(raw: JsonObject | None) -> tuple[str, str] | None:
     """Extract ``(app_id, app_secret)`` from the ``credentials`` column.
 
-    Mirrors ``CredentialsConfig.GetWeKnoraCloud``: an absent block, or
-    one with either field empty, counts as "not configured" (``None``).
+    An absent block, or one with either field empty, counts as
+    "not configured" (``None``).
     """
     if not raw:
         return None

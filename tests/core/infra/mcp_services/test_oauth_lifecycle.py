@@ -1,6 +1,6 @@
-"""Tests for the OAuth lifecycle helpers (PR-17.5b).
+"""Tests for the OAuth lifecycle helpers.
 
-Covers the additions on top of the PR-17 placeholder surface:
+Covers the additions on top of the legacy placeholder surface:
 
 - :class:`TokenSet` round-trips ``is_expired`` /
   :meth:`as_authorization_header` correctly.
@@ -162,7 +162,7 @@ def test_state_store_default_ttl_matches_go_layout_constant() -> None:
 
 
 def test_state_store_purge_expired_keeps_fresh_drops_stale() -> None:
-    """PR-17.5c coverage: ``_purge_expired`` removes only stale entries.
+    """Coverage: ``_purge_expired`` removes only stale entries.
 
     With ``ttl=1.0`` we can construct a mixed-bag scenario:
     one entry recorded ``now`` (still fresh), one recorded well in
@@ -612,14 +612,14 @@ async def test_revoke_token_drops_token_from_store() -> None:
     )
 
 
-# ── PR-17.5c review follow-ups ─────────────────────────────────────
+# ── Review follow-ups ──────────────────────────────────────────────
 
 
 async def test_revoke_token_with_token_kwarg_drops_entry() -> None:
     """``revoke_token(token=...)`` actually removes the matching entry.
 
-    PR-17.5c C1: the previous implementation passed
-    ``token.access_token`` as a user_id and silently dropped nothing.
+    The previous implementation passed ``token.access_token`` as a
+    user_id and silently dropped nothing.
     """
     secret_store = InMemorySecretStore()
     token = TokenSet(access_token="doomed", refresh_token="rt")
@@ -656,7 +656,7 @@ async def test_revoke_token_with_token_kwarg_is_noop_when_no_match() -> None:
 
 
 async def test_refresh_persists_rotated_pair_so_next_refresh_uses_new_refresh_token() -> None:
-    """PR-17.5c H2: ``refresh`` persists the rotated pair.
+    """``refresh`` persists the rotated pair.
 
     The first refresh returns and persists a new access+refresh pair.
     A second refresh must use the NEW refresh token, not the old one
@@ -734,7 +734,7 @@ async def test_refresh_persists_rotated_pair_so_next_refresh_uses_new_refresh_to
 
 
 async def test_ensure_authorized_deletes_stale_token_on_permanent_refresh_failure() -> None:
-    """PR-17.5c H3: stale tokens are dropped on unrecoverable refresh failure.
+    """Stale tokens are dropped on unrecoverable refresh failure.
 
     An expired token with no ``refresh_token`` cannot be rotated, so
     the entry must be deleted (otherwise the next caller would see a

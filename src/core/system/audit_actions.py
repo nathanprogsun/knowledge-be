@@ -1,10 +1,10 @@
 """Audit action constants — dot-namespaced string literals.
 
-Mirrors ``internal/types/audit_log.go::AuditAction``. Actions are
-grouped by area (``rbac.*``, ``vector_store.*``, ``system.*``,
-``kb.*``, ``knowledge.*``, ``tag.*``, ``datasource.*``, ``kb.share_*``,
-``wiki.*``, ``faq.*``, ``opensearch.*``) so each area can be extended
-without colliding with existing events.
+Actions are grouped by area (``rbac.*``, ``vector_store.*``,
+``system.*``, ``kb.*``, ``knowledge.*``, ``tag.*``,
+``datasource.*``, ``kb.share_*``, ``wiki.*``, ``faq.*``,
+``opensearch.*``) so each area can be extended without colliding
+with existing events.
 
 Only ``system.setting_changed`` is emitted today (via
 ``SystemSettingService.Update``); the full set is defined here so

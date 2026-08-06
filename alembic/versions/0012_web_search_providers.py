@@ -1,25 +1,21 @@
 """Create the `web_search_providers` table.
 
-Mirrors ``migrations/versioned/000030_web_search_providers.up.sql``.
-
 Each row is a tenant-scoped configuration of an upstream web-search
-provider (Bing, Google CSE, DuckDuckGo, Tavily, Ollama, Baidu, SearXNG,
-Keenable, Zhipu). The primary key is a UUID string (Go uses
-``uuid.New().String()``); callers (the service layer) generate it
-client-side before INSERT so the row carries the id from the start.
+provider (Bing, Google CSE, DuckDuckGo, Tavily, Ollama, Baidu,
+SearXNG, Keenable, Zhipu). The primary key is a UUID string;
+callers (the service layer) generate it client-side before INSERT
+so the row carries the id from the start.
 
 `parameters` is JSONB so the schema can flex per provider type
-(api_key, engine_id, base_url, proxy_url, extra_config) without ALTER
-TABLE churn.
+(api_key, engine_id, base_url, proxy_url, extra_config) without
+ALTER TABLE churn.
 
 `is_default` is a workspace-level flag — at most one live row per
 tenant may hold it; the service flips it atomically via a dedicated
-``clear_default`` SQL helper, so a unique partial index is intentionally
-NOT created here (that would couple the guarantee to a DB constraint
-without giving us anything we don't already enforce).
-
-Placeholder migration number — checkpoint-2 promotes it to a final
-revision id.
+``clear_default`` SQL helper, so a unique partial index is
+intentionally NOT created here (that would couple the guarantee to
+a DB constraint without giving us anything we don't already
+enforce).
 """
 
 from __future__ import annotations

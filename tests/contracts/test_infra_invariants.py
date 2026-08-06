@@ -1,6 +1,6 @@
-"""Stage-2 infrastructure contract invariants.
+"""Infrastructure-domain contract invariants.
 
-Asserts the frozen Pydantic contracts match the Go wire schema captured
+Asserts the frozen Pydantic contracts match the wire schema captured
 in ``fixtures/infra_responses.json``:
 
 - every contract model is frozen (immutable wire shape);
@@ -16,15 +16,15 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel
 
-from tests.contracts.stage2_contract import (
-    ALL_STAGE2_CONTRACTS,
+from tests.contracts.infra_contract import (
+    ALL_INFRA_CONTRACTS,
     load_fixture_fields,
     model_wire_fields,
 )
 
 _SRC_ROOT = Path(__file__).parents[2] / "src"
 
-_NAMES = {name for name, _, _ in ALL_STAGE2_CONTRACTS}
+_NAMES = {name for name, _, _ in ALL_INFRA_CONTRACTS}
 
 
 def _fixture() -> dict[str, list[str]]:
@@ -32,14 +32,14 @@ def _fixture() -> dict[str, list[str]]:
 
 
 def test_every_contract_is_frozen() -> None:
-    for name, model, _endpoint in ALL_STAGE2_CONTRACTS:
+    for name, model, _endpoint in ALL_INFRA_CONTRACTS:
         assert issubclass(model, BaseModel), name
         assert model.model_config.get("frozen") is True, f"{name} is not frozen"
 
 
 @pytest.mark.parametrize(
     ("name", "model", "endpoint"),
-    ALL_STAGE2_CONTRACTS,
+    ALL_INFRA_CONTRACTS,
     ids=lambda v: v if isinstance(v, str) else "",
 )
 def test_wire_fields_match_fixture(name: str, model: type, endpoint: str) -> None:
@@ -48,7 +48,7 @@ def test_wire_fields_match_fixture(name: str, model: type, endpoint: str) -> Non
     expected = set(fixture[name])
     actual = set(model_wire_fields(model))
     assert actual == expected, (
-        f"{name}: wire fields diverge from Go fixture.\n"
+        f"{name}: wire fields diverge from captured fixture.\n"
         f"  missing from contract: {sorted(expected - actual)}\n"
         f"  extra in contract:     {sorted(actual - expected)}"
     )
@@ -60,21 +60,22 @@ def test_no_orphaned_fixture_entries() -> None:
     assert not orphaned, f"fixture keys without a contract model: {orphaned}"
 
 
-def test_fixture_covers_all_stage2_contracts() -> None:
+def test_fixture_covers_all_infra_contracts() -> None:
     fixture = _fixture()
     uncovered = sorted(_NAMES - set(fixture))
     assert not uncovered, f"contracts without a fixture entry: {uncovered}"
 
 
 def test_placeholder_sweep() -> None:
-    """Stage-2 placeholder audit (migration-plan placeholder sweep).
+    """Infrastructure placeholder audit.
 
-    - The MCP live transport (PR-17.5) must be what production wiring
-      installs; ``StaticConnectivityProbe`` / ``StaticDiscoveryProvider``
-      are test doubles only and must not be referenced from the wiring.
-    - The WebSearch HTTP clients are tracked as PR-44.6; until they land,
-      the ``_NotImplementedClient`` marker must stay confined to its
-      owning module (``src/ai/web_search_clients.py``).
+    - The MCP live transport must be what production wiring installs;
+      ``StaticConnectivityProbe`` / ``StaticDiscoveryProvider`` are
+      test doubles only and must not be referenced from the wiring.
+    - The WebSearch HTTP clients are pending their own rollout; until
+      they land, the ``_NotImplementedClient`` marker must stay
+      confined to its owning module
+      (``src/ai/web_search_clients.py``).
 
     Mixin ``NotImplementedError`` bodies (``datasources`` mixins) and
     the explicit ``embed_auth`` stub are intentional and exempt.

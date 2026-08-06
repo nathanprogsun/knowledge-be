@@ -1,11 +1,9 @@
 """Create the `models` table.
 
-Mirrors the WeKnora DDL assembled from
-``migrations/versioned/000000_init.up.sql`` (initial CREATE TABLE),
-``000001_agent.up.sql`` (ADD COLUMN is_builtin + index),
-``000052_models_managed_by.up.sql`` (ADD COLUMN managed_by + partial
-index), and ``000057_models_display_name.up.sql``
-(ADD COLUMN display_name).
+Assembled from the upstream DDL captured during the initial
+migration freeze: initial CREATE TABLE, ``is_builtin`` column +
+index, ``managed_by`` column + partial index, and ``display_name``
+column.
 
 `id` is application-assigned (UUID); the Go ``BeforeCreate`` hook
 fills it when empty, and the Python service stamps one explicitly.

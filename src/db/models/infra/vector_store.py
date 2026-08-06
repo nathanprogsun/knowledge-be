@@ -1,9 +1,8 @@
 """Storage row for the `vector_stores` table.
 
-Mirrors ``internal/types/vectorstore.go::VectorStore``. Each row is a
-tenant-scoped configuration of a vector database (Elasticsearch, Qdrant,
-Milvus, Tencent VectorDB, Weaviate, Doris, OpenSearch). Agents reference
-vector stores by UUID ``id``.
+Each row is a tenant-scoped configuration of a vector database
+(Elasticsearch, Qdrant, Milvus, Tencent VectorDB, Weaviate, Doris,
+OpenSearch). Agents reference vector stores by UUID ``id``.
 
 ``connection_config`` and ``index_config`` are JSONB blobs carrying
 engine-specific credentials and index settings. The service layer
