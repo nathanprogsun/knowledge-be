@@ -5,28 +5,24 @@ Exercises the router over HTTP via ``httpx.AsyncClient`` with
 by the shared in-memory fake repository, so the full web -> service
 path runs without a database.
 
-The router itself is included via a one-off ``FastAPI`` instance
-rather than the project's ``create_app()`` so the test never touches
-the no-touch lifespan / registry files.
+Uses the shared ``web_app`` fixture (header-based auth) and applies
+the service dep override on it; the real ``require_auth`` dep resolves
+the principal via the ``x-knowledge-*`` header trio.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 
-from src.app_context import request_context
 from src.core.infra.models.service.model_service import ModelService
-from src.web.api.infra.models.router import router as models_router
 from src.web.deps.infra_models import get_model_service
-from src.web.exception_handler import register_exception_handlers
+from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 from tests.unit.fakes.models import FakeModelRepository
-from tests.unit.fakes.auth_gates import override_auth_gates
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -37,28 +33,25 @@ def repo() -> FakeModelRepository:
 
 
 @pytest.fixture
-def app(repo: FakeModelRepository) -> FastAPI:
-    application = FastAPI()
-    application.include_router(models_router)
-    register_exception_handlers(application)
+def app(
+    request: pytest.FixtureRequest,
+    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
+    repo: FakeModelRepository,
+) -> FastAPI:
+    """Override ``get_model_service`` on the shared web app."""
 
     def _override_service() -> ModelService:
         return ModelService(models_repo=repo)  # type: ignore[arg-type]
 
-    application.dependency_overrides[get_model_service] = _override_service
-    override_auth_gates(application)
-    return application
+    web_app.dependency_overrides[get_model_service] = _override_service
+    return web_app
 
 
 @pytest.fixture
-async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app)
-    request_context.set_tenant_id("1")
-    request_context.set_user_id("test-user")
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
-    request_context.set_tenant_id("")
-    request_context.set_user_id("")
+def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa: ARG001
+    """Alias ``web_authed_client``; depending on ``app`` forces the
+    dep-override fixture to run before the test executes."""
+    return web_authed_client
 
 
 def _create_body(**overrides: Any) -> dict[str, Any]:

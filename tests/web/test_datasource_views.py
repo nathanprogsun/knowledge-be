@@ -5,9 +5,9 @@ against the app: the full HTTP path (routing, serialization, exception
 mapping) with the service dependency overridden by a service-backed fake
 so no database is involved.
 
-The router is mounted on a purpose-built app rather than ``create_app()``
-because app assembly (``lifespan.py``) is wired in a later checkpoint;
-mounting it here keeps this suite honest about the routes themselves.
+Uses the shared ``web_app`` fixture (header-based auth) and applies
+the service dep override on it; the real ``require_auth`` dep resolves
+the principal via the ``x-knowledge-*`` header trio.
 
 The load-bearing checks:
 
@@ -21,12 +21,11 @@ The load-bearing checks:
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 
 from src.core.infra.datasources.connector_base import ConnectorRegistry
 from src.core.infra.datasources.service.datasource_service import DataSourceService
@@ -35,9 +34,8 @@ from src.db.models.datasource import DataSource, SyncLog
 from src.web.api.infra.datasources.router import router
 from src.web.deps.infra_datasources import get_datasource_service
 from src.web.deps.rbac import make_role_dep, require_role_dep
-from src.web.exception_handler import register_exception_handlers
 from src.web.middleware.auth import require_auth
-from tests.unit.fakes.auth_gates import override_auth_gates
+from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 from tests.unit.fakes.datasources import (
     FakeAuditRepo,
     FakeDataSourceRepo,
@@ -87,20 +85,21 @@ def service(
 
 
 @pytest.fixture
-def app(service: DataSourceService) -> FastAPI:
-    application = FastAPI()
-    register_exception_handlers(application)
-    application.include_router(router)
-    override_auth_gates(application)
-    application.dependency_overrides[get_datasource_service] = lambda: service
-    return application
+def app(
+    request: pytest.FixtureRequest,  # noqa: ARG001 - explicit fixture-param
+    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
+    service: DataSourceService,
+) -> FastAPI:
+    """Override ``get_datasource_service`` on the shared web app."""
+    web_app.dependency_overrides[get_datasource_service] = lambda: service
+    return web_app
 
 
 @pytest.fixture
-async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
+def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa: ARG001
+    """Alias ``web_authed_client``; depending on ``app`` forces the
+    dep-override fixture to run before the test executes."""
+    return web_authed_client
 
 
 def _row(

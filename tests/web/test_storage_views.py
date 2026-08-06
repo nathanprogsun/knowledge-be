@@ -5,20 +5,19 @@ the app. The service dependency is overridden with a service backed by an
 in-memory repository, so the tests exercise the full HTTP path (routing,
 role gates, serialization, exception handling) without a database.
 
-The router is not registered in ``create_app`` yet — the app wiring lands
-in the infra checkpoint — so each test app includes it explicitly.
+Uses the shared ``web_app`` fixture (header-based auth) and applies
+the service dep override on it; the real ``require_auth`` dep resolves
+the principal via the ``x-knowledge-*`` header trio.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 
-from src.app_context.lifespan import create_app
 from src.common.exception import StorageBackendError
 from src.core.infra.storage_backends.service.storage_backend_service import (
     StorageBackendService,
@@ -34,12 +33,11 @@ from src.db.models.storage_backend import (
     STORAGE_BACKEND_STATUS_DISABLED,
     StorageBackend,
 )
-from src.web.api.infra.storage_backends.router import router as storage_backends_router
 from src.web.deps.infra_storage_backends import get_storage_backend_service
-from tests.unit.fakes.auth_gates import override_auth_gates
+from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 from tests.unit.fakes.storage_backends import FakeStorageBackendRepository
 
-# ``override_auth_gates`` sets the active workspace to 1.
+# The header auth channel pins the active workspace to 1.
 _TENANT_ID = 1
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -92,21 +90,23 @@ def repo() -> FakeStorageBackendRepository:
 
 
 @pytest.fixture
-def app(repo: FakeStorageBackendRepository) -> FastAPI:
-    application = create_app()
-    application.include_router(storage_backends_router)
-    override_auth_gates(application)
-    application.dependency_overrides[get_storage_backend_service] = (
+def app(
+    request: pytest.FixtureRequest,  # noqa: ARG001 - explicit fixture-param
+    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
+    repo: FakeStorageBackendRepository,
+) -> FastAPI:
+    """Override ``get_storage_backend_service`` on the shared web app."""
+    web_app.dependency_overrides[get_storage_backend_service] = (
         lambda: StorageBackendService(backend_repo=repo)  # type: ignore[arg-type]
     )
-    return application
+    return web_app
 
 
 @pytest.fixture
-async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
+def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa: ARG001
+    """Alias ``web_authed_client``; depending on ``app`` forces the
+    dep-override fixture to run before the test executes."""
+    return web_authed_client
 
 
 def _seed(
