@@ -1,6 +1,6 @@
 """Initialization service — startup bootstrap + Ollama/remote detection.
 
-WeKnora has no standalone ``initialization_service.go``: the logic lives
+There is no standalone ``initialization_service.go``: the logic lives
 inline in ``internal/handler/initialization.go``. This service extracts
 the non-HTTP parts of those handlers so the web layer stays declarative:
 

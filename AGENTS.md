@@ -96,7 +96,9 @@ Hierarchy: `ApplicationError → NotFoundError | ConflictError | ValidationError
 Pre-merge gates:
 - `make lint` — ruff check
 - `make format` — ruff format --check
-- `make typecheck` — mypy --strict
+- `make typecheck` — `uv run mypy` (strict from mypy.ini). Always run
+  through the project venv via `uv run` — a bare `mypy` on PATH may
+  resolve to a global install and produce false failures.
 - `make test` — pytest
 - `make check` — anti-drift scripts (layer directionality, DI scope,
   endpoint coverage, contract invariants, top-level imports)

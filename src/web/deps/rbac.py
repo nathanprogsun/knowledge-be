@@ -34,7 +34,7 @@ async def require_role_dep(
     """Gate: caller's tenant role must be at least ``min_role``.
 
     Honours ``settings.rbac_enforced``; when false the guard logs but
-    does not reject (rollout behaviour, mirroring WeKnora).
+    does not reject (rollout behaviour, mirroring the upstream).
     """
     audit_svc = get_audit_service(request)
     if get_api_key_scope(request) is not None:

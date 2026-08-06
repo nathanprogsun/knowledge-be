@@ -1,6 +1,6 @@
 """Ollama probing + remote provider connectivity detection.
 
-Mirrors the Ollama helpers inlined in WeKnora's
+Mirrors the Ollama helpers inlined in the upstream
 ``internal/handler/initialization.go`` (``CheckOllamaStatus``,
 ``ListOllamaModels``, ``CheckOllamaModels``, ``DownloadOllamaModel``,
 ``GetDownloadProgress``, ``ListDownloadTasks``) plus

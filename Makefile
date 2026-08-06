@@ -7,7 +7,7 @@ help:
 	@echo "  lint        ruff check ."
 	@echo "  format      ruff format --check .  (CI gate — fails if unformatted)"
 	@echo "  format-fix  ruff format .          (rewrites files in place)"
-	@echo "  typecheck   mypy --strict (uses mypy.ini)"
+	@echo "  typecheck   uv run mypy (strict from mypy.ini; project venv only)"
 	@echo "  test        pytest tests/"
 	@echo "  check       run all anti-drift checks"
 	@echo "  migrate     alembic upgrade head"

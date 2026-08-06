@@ -1,6 +1,6 @@
 """HTTP endpoints for the MCP service domain.
 
-Maps the 13 endpoints from WeKnora ``routes_infra.go``:
+Maps the 13 endpoints from ``routes_infra.go``:
 
     POST   /mcp-services                       Admin+   create
     GET    /mcp-services                       Viewer+  list
@@ -361,7 +361,7 @@ def _dict_or_none(model: BaseModel | JsonObject | None) -> JsonObject | None:
     """
     if model is None:
         return None
-    if hasattr(model, "model_dump"):
+    if isinstance(model, BaseModel):
         dumped = model.model_dump(mode="json", exclude_none=True)
         if isinstance(dumped, dict):
             return JsonObject(dumped)
