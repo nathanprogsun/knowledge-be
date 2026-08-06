@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.app_context.request_context import get_tenant_id, get_user_id
-from src.common.exception import NotFoundError, ValidationError
+from src.common.exception import ValidationError
 from src.common.json import JsonObject
 from src.core.contracts.tenants import (
     APIPrincipalConfig,

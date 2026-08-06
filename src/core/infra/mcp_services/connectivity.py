@@ -328,10 +328,10 @@ def to_wire(result: ConnectivityResult) -> MCPTestResultWire:
 
 
 __all__ = [
+    "ConnectionManagerLike",
     "ConnectivityProbe",
     "ConnectivityResolver",
     "ConnectivityResult",
-    "ConnectionManagerLike",
     "HTTPMCPConnectivityProbe",
     "MCPTestResultWire",
     "StaticConnectivityProbe",

@@ -38,7 +38,7 @@ from src.core.infra.web_search.types import (
 )
 from src.db.dao.web_search_provider_repository import WebSearchProviderRepository
 from src.db.models.infra.web_search_provider import WebSearchProvider
-from src.util.crypto import decrypt_stored_secret_lenient, encrypt_aesgcm, get_aes_key
+from src.util.crypto import encrypt_aesgcm, get_aes_key
 
 _NOT_FOUND_CODE = "web_search_provider.not_found"
 

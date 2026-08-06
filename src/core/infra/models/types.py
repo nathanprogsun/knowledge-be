@@ -100,4 +100,4 @@ class ModelInfo(BaseModel):
         return cls.model_validate(record)
 
 
-__all__ = ["MODEL_EXCLUDE_COLUMNS", "ModelInfo", "REDACTED_SECRET_PLACEHOLDER"]
+__all__ = ["MODEL_EXCLUDE_COLUMNS", "REDACTED_SECRET_PLACEHOLDER", "ModelInfo"]

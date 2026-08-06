@@ -228,7 +228,7 @@ class MCPServiceService:
         )
         # SSRF validation for a supplied URL — mirrors Go
         # mcp_service.go ``ValidateURLForSSRF`` on update.
-        if "url" in columns and columns["url"]:
+        if columns.get("url"):
             await _validate_url_ssrf(str(columns["url"]))
         if "transport_type" in columns:
             self._validate_transport(str(columns["transport_type"]))

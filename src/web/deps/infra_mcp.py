@@ -36,14 +36,12 @@ from src.app_context.registry import LifeSpanService
 from src.common.exception import ValidationError
 from src.core.infra.mcp_services.connectivity import (
     ConnectionManagerLike,
+    ConnectivityResolver,
     HTTPMCPConnectivityProbe,
 )
 from src.core.infra.mcp_services.discovery import (
     HTTPMCPDiscoveryProvider,
     ServiceResolver,
-)
-from src.core.infra.mcp_services.connectivity import (
-    ConnectivityResolver,
 )
 from src.core.infra.mcp_services.factory import (
     build_live_connectivity_probe,

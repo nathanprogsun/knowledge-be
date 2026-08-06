@@ -14,7 +14,6 @@ hit a real network in unit tests).
 
 from __future__ import annotations
 
-import os
 from collections.abc import Iterator
 from datetime import UTC, datetime
 

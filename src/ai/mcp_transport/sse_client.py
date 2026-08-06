@@ -305,7 +305,6 @@ class SSEClient:
 class _StreamClosed:
     """Marker instance pushed onto the SSE event queue at stream end."""
 
-    pass
 
 
 _STREAM_CLOSED = _StreamClosed()
