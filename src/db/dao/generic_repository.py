@@ -7,10 +7,19 @@ concrete subclasses.
 
 Every query is raw ``sqlalchemy.text()`` with named ``bindparams`` —
 no ORM. Soft-delete and archived filters are applied at every read.
+
+SQL is built from ``text(f"...")`` whose only interpolated values are
+class-level constants: ``self._table`` (the model's fully-qualified
+table name, a ``ClassVar[str]``) and column / fragment names taken
+from :meth:`TableModel.column_fields` / :meth:`ordered_primary_keys`.
+User input never reaches the SQL string — only ``bindparams`` slots —
+and dynamic identifiers (e.g. ``order_by`` columns on
+:meth:`find_all`) are validated against an allow-list before use.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from datetime import datetime
 from functools import cached_property
@@ -34,6 +43,30 @@ BindValue: TypeAlias = str | int | float | bool | datetime | None
 # JSONB on Postgres, JSON on other dialects (e.g. SQLite in tests).
 _JSON_BIND_TYPE = JSON().with_variant(JSONB(), "postgresql")
 
+# Allow-list of column names :meth:`find_all` will accept on ``order_by``.
+# Any column referenced in this set is considered a safe, read-only sort
+# key; callers may still append ``asc`` / ``desc`` (the validator only
+# checks the leading identifier). Expanding the set requires an explicit
+# PR so the safe-by-default posture is preserved.
+_ALLOWED_ORDER_COLUMNS: frozenset[str] = frozenset(
+    {
+        "id",
+        "created_at",
+        "updated_at",
+        "name",
+        "joined_at",
+        "responded_at",
+        "expires_at",
+        "started_at",
+        "last_used_at",
+    },
+)
+
+# SQL identifier regex (Postgres-style: letter / underscore start, then
+# letters / digits / underscores). The set is the gate; this regex is the
+# final structural check before a value is interpolated into SQL.
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
 
 class GenericRepository(Generic[ModelType]):
     """Raw-SQL CRUD for ``TableModel`` rows. Subclasses set
@@ -49,7 +82,30 @@ class GenericRepository(Generic[ModelType]):
 
     @cached_property
     def _table(self) -> str:
-        return self.model_class.fq_table_name()
+        # ``fq_table_name`` returns the model's ``ClassVar[str] table``
+        # attribute — a fixed compile-time literal. Validate the shape
+        # once so a misconfigured model surfaces at first use rather
+        # than as opaque SQL at execution time.
+        name = self.model_class.fq_table_name()
+        self._assert_safe_identifier(name, kind="table")
+        return name
+
+    @staticmethod
+    def _assert_safe_identifier(value: str, *, kind: str) -> None:
+        """Reject identifiers that don't match the SQL identifier shape.
+
+        Called for any value that is about to be interpolated into the
+        SQL string (table / column names from model metadata). User
+        input is NEVER routed through this check — it is bound via
+        ``bindparams`` instead. The check exists so that a typo on a
+        ``ClassVar`` or a hand-edited row cannot smuggle arbitrary SQL
+        through the f-string interpolation point.
+        """
+        if not _IDENTIFIER_RE.fullmatch(value):
+            raise DataError(
+                code="db.invalid_identifier",
+                message=f"unsafe {kind} identifier rejected: {value!r}",
+            )
 
     @cached_property
     def _pk_columns(self) -> tuple[str, ...]:
@@ -110,6 +166,11 @@ class GenericRepository(Generic[ModelType]):
             return ""
         if "deleted_at" not in model.column_fields():
             return ""
+        # ``deleted_at`` is a literal column name declared in this
+        # module — not user input — but it is interpolated into the
+        # SQL string, so route it through the identifier guard for the
+        # same audit posture as every other f-string interpolation.
+        GenericRepository._assert_safe_identifier("deleted_at", kind="column")
         return f"{prefix} deleted_at is null"
 
     @staticmethod
@@ -124,6 +185,7 @@ class GenericRepository(Generic[ModelType]):
             return ""
         if "archived_at" not in model.column_fields():
             return ""
+        GenericRepository._assert_safe_identifier("archived_at", kind="column")
         return f"{prefix} archived_at is null"
 
     # ── Bind-param helpers ──────────────────────────────────────────
@@ -141,9 +203,17 @@ class GenericRepository(Generic[ModelType]):
     def _insert_stmt_text(model: type[ModelType]) -> str:
         """Plain ``INSERT ... VALUES (...) RETURNING *`` — no conflict clause."""
         columns = model.insert_sql_column_list()
+        # Validate every identifier that will be interpolated into the
+        # SQL string. ``insert_sql_column_list`` returns field names
+        # from the model, which are class-level constants, but the
+        # guard catches a misconfigured model early.
+        table = model.fq_table_name()
+        GenericRepository._assert_safe_identifier(table, kind="table")
+        for col in columns:
+            GenericRepository._assert_safe_identifier(col, kind="column")
         col_list = ", ".join(f'"{c}"' for c in columns)
         param_list = ", ".join(f":{c}" for c in columns)
-        return f"insert into {model.fq_table_name()} ({col_list}) values ({param_list}) returning *"
+        return f"insert into {table} ({col_list}) values ({param_list}) returning *"
 
     @staticmethod
     def _insert_on_conflict_do_nothing_stmt_text(
@@ -156,16 +226,21 @@ class GenericRepository(Generic[ModelType]):
         target (Postgres: suppresses conflicts on every unique
         constraint). A non-empty list targets a specific constraint.
         """
+        table = model.fq_table_name()
+        GenericRepository._assert_safe_identifier(table, kind="table")
+        columns = model.insert_sql_column_list()
+        for col in columns:
+            GenericRepository._assert_safe_identifier(col, kind="column")
         base = (
-            "insert into "
-            + model.fq_table_name()
-            + " ("
-            + ", ".join(f'"{c}"' for c in model.insert_sql_column_list())
+            f"insert into {table} ("
+            + ", ".join(f'"{c}"' for c in columns)
             + ") values ("
-            + ", ".join(f":{c}" for c in model.insert_sql_column_list())
+            + ", ".join(f":{c}" for c in columns)
             + ")"
         )
         if target_columns:
+            for col in target_columns:
+                GenericRepository._assert_safe_identifier(col, kind="column")
             targets = ", ".join(f'"{c}"' for c in target_columns)
             conflict = f"on conflict ({targets}) do nothing"
         else:
@@ -482,10 +557,46 @@ class GenericRepository(Generic[ModelType]):
     ) -> list[ModelType]:
         """Return rows with pagination.
 
-        ``order_by`` is a raw SQL fragment (e.g. ``"created_at desc"``)
-        so callers retain control of ordering — the base class does not
-        validate it. Pass ``None`` for unspecified order.
+        ``order_by`` is the leading identifier of an ``ORDER BY``
+        expression (e.g. ``"created_at"`` or ``"created_at desc"``).
+        The identifier must be present in :data:`_ALLOWED_ORDER_COLUMNS`;
+        the optional ``asc`` / ``desc`` token, if supplied, is passed
+        through unchanged. Pass ``None`` for unspecified order.
         """
+        order_clause = ""
+        if order_by is not None:
+            # ``order_by`` is caller-controlled text interpolated into
+            # the SQL string; validate the leading identifier so a
+            # crafted value cannot smuggle a sub-query or extra clause.
+            tokens = order_by.split()
+            if not tokens:
+                raise ValidationError(
+                    code="db.invalid_order_by",
+                    message="order_by must contain at least one identifier",
+                )
+            column = tokens[0]
+            if column not in _ALLOWED_ORDER_COLUMNS:
+                raise ValidationError(
+                    code="db.invalid_order_by",
+                    message=(
+                        f"order_by column {column!r} is not in the allow-list "
+                        f"({sorted(_ALLOWED_ORDER_COLUMNS)})"
+                    ),
+                )
+            self._assert_safe_identifier(column, kind="order_by_column")
+            for token in tokens[1:]:
+                # Acceptable direction tokens are literal SQL keywords,
+                # not identifiers — keep the allow-list strict so any
+                # future caller mistake fails closed.
+                if token.lower() not in {"asc", "desc"}:
+                    raise ValidationError(
+                        code="db.invalid_order_by",
+                        message=(
+                            f"order_by modifier {token!r} is not allowed; "
+                            "expected 'asc' or 'desc'"
+                        ),
+                    )
+            order_clause = f"order by {order_by}"
         # Build the WHERE clause from the soft-delete/archived fragments.
         # The first present fragment leads with ``where``; the second (if
         # any) prefixes with ``and``.
@@ -500,7 +611,6 @@ class GenericRepository(Generic[ModelType]):
             prefix="and" if soft else "where",
         )
         where_clause = f"{soft} {archived}".strip()
-        order_clause = f"order by {order_by}" if order_by else ""
         stmt_text = (
             f"select * from {self._table} {where_clause} {order_clause} limit :limit offset :offset"
         )

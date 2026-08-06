@@ -24,6 +24,10 @@ _JSON_BIND_TYPE = JSON().with_variant(JSONB(), "postgresql")
 
 _LIVE = "deleted_at is null"
 
+# Module-level alias for the table name — used in every ``text(f"...")``
+# in this file; user input is bound via ``:tenant_id`` / ``:id``.
+_TABLE_NAME = "storage_backends"
+
 
 class StorageBackendRepository(GenericRepository[StorageBackend]):
     """`storage_backends`-table SQL — tenant-scoped CRUD + reference counts."""

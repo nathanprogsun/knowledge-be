@@ -15,6 +15,10 @@ from src.common.exception import DataError
 from src.db.dao.generic_repository import GenericRepository
 from src.db.models.infra.mcp_services import MCPToolApproval
 
+# Module-level alias for the table name — used in the upsert below; user
+# input is bound via ``:tenant_id`` / ``:service_id`` / etc.
+_TABLE_NAME = "mcp_tool_approvals"
+
 
 class MCPToolApprovalRepository(GenericRepository[MCPToolApproval]):
     """``mcp_tool_approvals``-table SQL."""
@@ -28,7 +32,7 @@ class MCPToolApprovalRepository(GenericRepository[MCPToolApproval]):
     ) -> list[MCPToolApproval]:
         """Return every persisted approval override for the (tenant, service)."""
         stmt = text(
-            f"select * from {self._table} "
+            f"select * from {_TABLE_NAME} "
             "where tenant_id = :tenant_id and service_id = :service_id "
             "order by tool_name"
         ).bindparams(tenant_id=tenant_id, service_id=service_id)
@@ -48,7 +52,7 @@ class MCPToolApprovalRepository(GenericRepository[MCPToolApproval]):
         """
         now = datetime.now(UTC)
         stmt = text(
-            "insert into mcp_tool_approvals ("
+            f"insert into {_TABLE_NAME} ("
             "id, tenant_id, service_id, tool_name, require_approval, "
             "created_at, updated_at"
             ") values ("

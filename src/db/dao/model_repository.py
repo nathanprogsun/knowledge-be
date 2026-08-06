@@ -26,6 +26,10 @@ from src.db.models.infra.model import Model
 # JSONB on Postgres, JSON on other dialects (e.g. SQLite in tests).
 _JSON = JSON().with_variant(JSONB(), "postgresql")
 
+# Module-level alias for the table name — used in every ``text(f"...")``
+# in this file; user input is bound via ``:tenant_id`` / ``:id`` / etc.
+_TABLE_NAME = "models"
+
 
 class ModelRepository(GenericRepository[Model]):
     """`models`-table SQL — domain wrappers on the generic CRUD base."""
@@ -59,7 +63,7 @@ class ModelRepository(GenericRepository[Model]):
             where = "(tenant_id = :tenant_id OR is_builtin = true) and id = :id"
         else:
             where = "tenant_id = :tenant_id and id = :id"
-        stmt = text(f"select * from {self._table} where {where} and deleted_at is null").bindparams(
+        stmt = text(f"select * from {_TABLE_NAME} where {where} and deleted_at is null").bindparams(
             tenant_id=tenant_id, id=id
         )
         result = await self._session.execute(stmt)
@@ -115,7 +119,7 @@ class ModelRepository(GenericRepository[Model]):
             params["source"] = source
         where_parts.append("deleted_at is null")
         where = " and ".join(where_parts)
-        stmt = text(f"select * from {self._table} where {where}").bindparams(**params)
+        stmt = text(f"select * from {_TABLE_NAME} where {where}").bindparams(**params)
         result = await self._session.execute(stmt)
         return [self._hydrate(m) for m in result.mappings().all()]
 
@@ -144,7 +148,7 @@ class ModelRepository(GenericRepository[Model]):
         }
         bps = [bindparam(f"u_{c}", type_=_JSON) for c in update_cols if c in self._json_columns]
         stmt_text = (
-            f"update {self._table} set {set_clause} "
+            f"update {_TABLE_NAME} set {set_clause} "
             "where id = :id and tenant_id = :tenant_id returning *"
         )
         stmt = text(stmt_text).bindparams(*bps, **params)
@@ -165,7 +169,7 @@ class ModelRepository(GenericRepository[Model]):
         repository does not enforce it so the same method can clean
         up rows from any tenant scope.
         """
-        stmt_text = f"delete from {self._table} where id = :id and tenant_id = :tenant_id"
+        stmt_text = f"delete from {_TABLE_NAME} where id = :id and tenant_id = :tenant_id"
         stmt = text(stmt_text).bindparams(id=id, tenant_id=tenant_id)
         result = cast(
             "CursorResult[RowMapping]",
@@ -197,7 +201,7 @@ class ModelRepository(GenericRepository[Model]):
             where_parts.append("id != :exclude_id")
             params["exclude_id"] = exclude_id
         where = " and ".join(where_parts)
-        stmt = text(f"update {self._table} set is_default = false where {where}").bindparams(
+        stmt = text(f"update {_TABLE_NAME} set is_default = false where {where}").bindparams(
             **params
         )
         result = cast(

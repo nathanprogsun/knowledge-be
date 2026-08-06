@@ -25,6 +25,11 @@ from src.db.models.tenants.tenants import Tenant
 _LIKE_ESCAPE_CHAR = "\\"
 _LIKE_SPECIAL_CHARS = ("\\", "%", "_")
 
+# Module-level alias for the table name — used in every ``text(f"...")``
+# in this file; user input is bound via ``:keyword`` / ``:tenant_id`` /
+# ``:ids`` / etc.
+_TABLE_NAME = "tenants"
+
 
 def escape_like_keyword(keyword: str) -> str:
     """Escape LIKE wildcards so the keyword matches literally."""
@@ -73,7 +78,7 @@ class TenantRepository(GenericRepository[Tenant]):
             exclude_deleted_or_archived=True,
         )
         stmt = text(
-            f"select * from {self._table} where id = any(:ids) {soft} order by created_at desc"
+            f"select * from {_TABLE_NAME} where id = any(:ids) {soft} order by created_at desc"
         ).bindparams(ids=ids)
         result = await self._session.execute(stmt)
         return [self._hydrate(m) for m in result.mappings().all()]
@@ -105,7 +110,7 @@ class TenantRepository(GenericRepository[Tenant]):
         conditions, params = self._build_search_conditions(keyword, tenant_id)
         where_sql = self._where_sql(conditions)
 
-        count_stmt = text(f"select count(*) from {self._table} {where_sql}").bindparams(**params)
+        count_stmt = text(f"select count(*) from {_TABLE_NAME} {where_sql}").bindparams(**params)
         total = (await self._session.execute(count_stmt)).scalar_one()
 
         rows = await self._select_page(where_sql, params, limit=limit, offset=offset)
@@ -131,7 +136,7 @@ class TenantRepository(GenericRepository[Tenant]):
         offset: int,
     ) -> list[Tenant]:
         """Run ``select * ... order by created_at desc`` with optional paging."""
-        stmt_text = f"select * from {self._table} {where_sql} order by created_at desc"
+        stmt_text = f"select * from {_TABLE_NAME} {where_sql} order by created_at desc"
         page_params: BindParams = dict(params)
         if limit is not None:
             stmt_text += " limit :limit offset :offset"
@@ -184,7 +189,7 @@ class TenantRepository(GenericRepository[Tenant]):
             exclude_deleted_or_archived=True,
         )
         stmt = text(
-            f"update {self._table} "
+            f"update {_TABLE_NAME} "
             "set storage_used = greatest(storage_used + :delta, 0), updated_at = :updated_at "
             f"where id = :id {soft} returning storage_used"
         ).bindparams(id=tenant_id, delta=delta, updated_at=updated_at)
@@ -210,7 +215,7 @@ class TenantRepository(GenericRepository[Tenant]):
             prefix="where",
         )
         stmt = text(
-            f"update {self._table} "
+            f"update {_TABLE_NAME} "
             f"set storage_quota = :quota_bytes, updated_at = :updated_at {soft}"
         ).bindparams(quota_bytes=quota_bytes, updated_at=updated_at)
         result = await self._session.execute(stmt)
