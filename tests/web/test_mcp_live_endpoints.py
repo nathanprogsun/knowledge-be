@@ -343,7 +343,7 @@ async def test_resolver_uses_request_tenant_id_not_zero() -> None:
     not be returned to a tenant=1 caller just because the resolver
     fallback used to look up ``find_for_tenant(0, id)``.
 
-    PR-30.6c C7: the resolver builder was moved into
+    The resolver builder was moved into
     ``src.core.infra.mcp_services.factory`` so the web layer no longer
     reaches into ``db.dao``. The test patches the symbol on the core
     factory module instead.

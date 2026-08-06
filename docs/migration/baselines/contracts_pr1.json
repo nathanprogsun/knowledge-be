@@ -1,0 +1,1888 @@
+{
+  "APIPrincipalConfig": {
+    "direct_header_name": "str | None",
+    "has_hmac_secret": "bool",
+    "mode": "str",
+    "require_direct_header": "bool",
+    "signed_token_header_name": "str | None"
+  },
+  "ASRConfig": {
+    "enabled": "bool",
+    "language": "str | None",
+    "model_id": "str | None"
+  },
+  "Agent": {
+    "avatar": "str | None",
+    "config": "AgentConfig | None",
+    "created_at": "datetime",
+    "created_by": "str | None",
+    "deleted_at": "datetime | None",
+    "description": "str | None",
+    "id": "str",
+    "is_builtin": "bool",
+    "name": "str | None",
+    "tenant_id": "int",
+    "updated_at": "datetime"
+  },
+  "AgentChatRequest": {
+    "agent_enabled": "bool",
+    "agent_id": "str | None",
+    "channel": "str | None",
+    "disable_title": "bool",
+    "images": "list[ChatImage] | None",
+    "knowledge_base_ids": "list[str] | None",
+    "knowledge_ids": "list[str] | None",
+    "mentioned_items": "list[MentionedItem] | None",
+    "query": "str",
+    "suggestion_attribution": "dict[str, str] | None",
+    "summary_model_id": "str | None",
+    "web_search_enabled": "bool"
+  },
+  "AgentConfig": {
+    "agent_mode": "str | None",
+    "agent_type": "str | None",
+    "allowed_tools": "list[str] | None",
+    "asr_model_id": "str | None",
+    "attachment_image_understanding": "bool",
+    "attachment_ocr_max_pages": "int | None",
+    "attachment_parse_wait_timeout_sec": "int | None",
+    "audio_upload_enabled": "bool",
+    "chat_parser_engine_rules": "list[ParserEngineRule] | None",
+    "citation_enabled": "bool | None",
+    "context_template": "str | None",
+    "context_template_id": "str | None",
+    "data_analysis_enabled": "bool",
+    "embedding_top_k": "int | None",
+    "enable_query_expansion": "bool",
+    "enable_rewrite": "bool",
+    "fallback_prompt": "str | None",
+    "fallback_response": "str | None",
+    "fallback_strategy": "str | None",
+    "faq_direct_answer_threshold": "float | None",
+    "faq_priority_enabled": "bool",
+    "faq_score_boost": "float | None",
+    "history_turns": "int | None",
+    "image_storage_provider": "str | None",
+    "image_upload_enabled": "bool",
+    "intent_prompts": "dict[str, str] | None",
+    "kb_selection_mode": "str | None",
+    "keyword_threshold": "float | None",
+    "knowledge_bases": "list[str] | None",
+    "llm_call_timeout": "int | None",
+    "max_completion_tokens": "int | None",
+    "max_context_tokens": "int | None",
+    "max_iterations": "int | None",
+    "max_tool_output_chars": "int | None",
+    "mcp_auth_wait_timeout": "int | None",
+    "mcp_selection_mode": "str | None",
+    "mcp_services": "list[str] | None",
+    "model_id": "str | None",
+    "multi_turn_enabled": "bool",
+    "parallel_tool_calls": "bool",
+    "query_understand_model_id": "str | None",
+    "question_suggestions": "AgentQuestionSuggestions | None",
+    "rerank_model_id": "str | None",
+    "rerank_threshold": "float | None",
+    "rerank_top_k": "int | None",
+    "retain_retrieval_history": "bool",
+    "retrieve_kb_only_when_mentioned": "bool",
+    "rewrite_prompt_system": "str | None",
+    "rewrite_prompt_user": "str | None",
+    "selected_skills": "list[str] | None",
+    "skills_selection_mode": "str | None",
+    "supported_file_types": "list[str] | None",
+    "system_prompt": "str | None",
+    "system_prompt_id": "str | None",
+    "temperature": "float | None",
+    "thinking": "bool | None",
+    "vector_threshold": "float | None",
+    "vlm_model_id": "str | None",
+    "web_fetch_enabled": "bool",
+    "web_fetch_top_n": "int | None",
+    "web_search_enabled": "bool",
+    "web_search_max_results": "int | None",
+    "web_search_provider_id": "str | None"
+  },
+  "AgentPlaceholderGroup": {
+    "agent_system_prompt": "list[JsonObject]",
+    "all": "list[JsonObject]",
+    "context_template": "list[JsonObject]",
+    "fallback_prompt": "list[JsonObject]",
+    "rewrite_prompt": "list[JsonObject]",
+    "rewrite_system_prompt": "list[JsonObject]",
+    "system_prompt": "list[JsonObject]"
+  },
+  "AgentQuestionSuggestions": {
+    "follow_ups": "AgentQuestionSuggestionsFollowUps | None",
+    "starters": "AgentQuestionSuggestionsStarters | None"
+  },
+  "AgentQuestionSuggestionsFollowUps": {
+    "additional_instruction": "str | None",
+    "allow_regenerate": "bool",
+    "categories": "list[str]",
+    "count": "int",
+    "enabled": "bool",
+    "knowledge_fallback": "bool",
+    "max_context_turns": "int",
+    "mode": "str | None",
+    "model_id": "str | None",
+    "suppress_on_fallback": "bool",
+    "suppress_when_answer_asks_question": "bool"
+  },
+  "AgentQuestionSuggestionsStarters": {
+    "count": "int",
+    "enabled": "bool",
+    "items": "list[str]",
+    "mode": "str | None"
+  },
+  "AgentShare": {
+    "agent_avatar": "str | None",
+    "agent_id": "str",
+    "agent_name": "str | None",
+    "created_at": "datetime",
+    "id": "str",
+    "my_permission": "str | None",
+    "my_role_in_org": "str | None",
+    "organization_id": "str",
+    "organization_name": "str | None",
+    "permission": "str",
+    "scope_kb": "str | None",
+    "scope_kb_count": "int | None",
+    "scope_mcp": "str | None",
+    "scope_web_search": "bool | None",
+    "shared_by_user_id": "str | None",
+    "shared_by_username": "str | None",
+    "source_tenant_id": "int"
+  },
+  "AgentShareListResponse": {
+    "shares": "list[AgentShare]",
+    "total": "int"
+  },
+  "AsyncTaskResponse": {
+    "message": "str | None",
+    "status": "str",
+    "task_id": "str"
+  },
+  "AuthUser": {
+    "avatar": "str | None",
+    "can_access_all_tenants": "bool",
+    "created_at": "datetime",
+    "deleted_at": "datetime | None",
+    "email": "str",
+    "id": "str",
+    "is_active": "bool",
+    "is_system_admin": "bool",
+    "preferences": "JsonObject",
+    "tenant_id": "int | None",
+    "updated_at": "datetime",
+    "username": "str"
+  },
+  "BatchDeleteSessionsRequest": {
+    "delete_all": "bool",
+    "ids": "list[str] | None"
+  },
+  "BatchOperationResult": {
+    "failed": "int",
+    "message": "str | None",
+    "processed": "int",
+    "skipped": "int",
+    "success": "bool",
+    "total": "int"
+  },
+  "BatchUpdateKnowledgeTagsRequest": {
+    "kb_id": "str | None",
+    "updates": "JsonObject"
+  },
+  "ChangePasswordRequest": {
+    "new_password": "str",
+    "old_password": "str"
+  },
+  "ChatHistoryStats": {
+    "embedding_model_id": "str | None",
+    "enabled": "bool",
+    "has_indexed_messages": "bool | None",
+    "indexed_message_count": "int | None",
+    "knowledge_base_id": "str | None",
+    "knowledge_base_name": "str | None"
+  },
+  "ChatImage": {
+    "data": "str"
+  },
+  "ChatRequestBase": {
+    "agent_id": "str | None",
+    "channel": "str | None",
+    "disable_title": "bool",
+    "images": "list[ChatImage] | None",
+    "knowledge_base_ids": "list[str] | None",
+    "knowledge_ids": "list[str] | None",
+    "mentioned_items": "list[MentionedItem] | None",
+    "query": "str",
+    "suggestion_attribution": "dict[str, str] | None",
+    "summary_model_id": "str | None"
+  },
+  "CheckOllamaModelsRequest": {
+    "models": "list[str]"
+  },
+  "CheckParserEnginesRequest": {
+    "addr": "str"
+  },
+  "Chunk": {
+    "chunk_index": "int",
+    "chunk_type": "str",
+    "content": "str",
+    "content_hash": "str | None",
+    "created_at": "datetime",
+    "deleted_at": "datetime | None",
+    "end_at": "int | None",
+    "id": "str",
+    "image_info": "str | None",
+    "indirect_relation_chunks": "list[str] | None",
+    "is_enabled": "bool",
+    "knowledge_base_id": "str",
+    "knowledge_id": "str",
+    "metadata": "JsonObject | None",
+    "next_chunk_id": "str | None",
+    "parent_chunk_id": "str | None",
+    "pre_chunk_id": "str | None",
+    "relation_chunks": "list[str] | None",
+    "start_at": "int | None",
+    "status": "int",
+    "tag_id": "str | None",
+    "tenant_id": "int",
+    "updated_at": "datetime"
+  },
+  "ChunkingConfig": {
+    "child_chunk_size": "int | None",
+    "chunk_overlap": "int",
+    "chunk_size": "int",
+    "enable_multimodal": "bool",
+    "enable_parent_child": "bool",
+    "parent_chunk_size": "int | None",
+    "parser_engine_rules": "list[ChunkingParserEngineRule] | None",
+    "separators": "list[str] | None"
+  },
+  "ChunkingParserEngineRule": {
+    "engine": "str",
+    "file_types": "list[str]"
+  },
+  "ContinueStreamQuery": {
+    "message_id": "str"
+  },
+  "CreateAPIKeyRequest": {
+    "capabilities": "list[str] | None",
+    "expires_at_unix": "int | None",
+    "full_access": "bool",
+    "knowledge_base_ids": "list[str] | None",
+    "name": "str"
+  },
+  "CreateAgentRequest": {
+    "avatar": "str | None",
+    "config": "AgentConfig | None",
+    "description": "str | None",
+    "name": "str"
+  },
+  "CreateAgentShareRequest": {
+    "organization_id": "str",
+    "permission": "str"
+  },
+  "CreateDataSourceRequest": {
+    "config": "JsonObject | None",
+    "conflict_strategy": "str | None",
+    "knowledge_base_id": "str",
+    "name": "str",
+    "sync_deletions": "bool | None",
+    "sync_log_retention_days": "int | None",
+    "sync_mode": "str | None",
+    "sync_schedule": "str | None",
+    "type": "str"
+  },
+  "CreateKnowledgeBaseRequest": {
+    "asr_config": "ASRConfig | None",
+    "chunking_config": "ChunkingConfig | None",
+    "description": "str | None",
+    "embedding_model_id": "str | None",
+    "extract_config": "ExtractConfig | None",
+    "faq_config": "FAQConfig | None",
+    "image_processing_config": "ImageProcessingConfig | None",
+    "is_temporary": "bool",
+    "name": "str",
+    "question_generation_config": "QuestionGenerationConfig | None",
+    "storage_config": "LegacyStorageConfig | None",
+    "storage_provider_config": "StorageProviderConfig | None",
+    "summary_model_id": "str | None",
+    "type": "str | None",
+    "vector_store_id": "str | None",
+    "vlm_config": "VLMConfig | None"
+  },
+  "CreateKnowledgeBaseShareRequest": {
+    "organization_id": "str",
+    "permission": "str"
+  },
+  "CreateKnowledgeFromURLRequest": {
+    "channel": "str | None",
+    "enable_multimodel": "bool",
+    "file_name": "str | None",
+    "file_type": "str | None",
+    "tag_id": "str | None",
+    "title": "str | None",
+    "url": "str"
+  },
+  "CreateMCPServiceRequest": {
+    "advanced_config": "MCPServiceAdvancedConfig | None",
+    "auth_config": "MCPMcpServiceAuthConfig | None",
+    "description": "str | None",
+    "enabled": "bool | None",
+    "env_vars": "dict[str, str] | None",
+    "headers": "dict[str, str] | None",
+    "name": "str",
+    "stdio_config": "MCPStdioConfig | None",
+    "transport_type": "str",
+    "url": "str | None"
+  },
+  "CreateManualKnowledgeRequest": {
+    "channel": "str | None",
+    "content": "str",
+    "status": "str | None",
+    "tag_id": "str | None",
+    "title": "str"
+  },
+  "CreateModelRequest": {
+    "description": "str | None",
+    "display_name": "str | None",
+    "name": "str",
+    "parameters": "ModelParameters",
+    "source": "str",
+    "type": "str"
+  },
+  "CreateOrganizationRequest": {
+    "avatar": "str | None",
+    "description": "str | None",
+    "invite_code_validity_days": "int | None",
+    "member_limit": "int | None",
+    "name": "str"
+  },
+  "CreateSessionRequest": {
+    "description": "str | None",
+    "title": "str | None"
+  },
+  "CreateStorageBackendRequest": {
+    "config": "StorageBackendConfig | None",
+    "name": "str",
+    "provider": "str",
+    "status": "str | None"
+  },
+  "CreateTagRequest": {
+    "color": "str | None",
+    "name": "str",
+    "sort_order": "int | None"
+  },
+  "CreateTenantRequest": {
+    "business": "str | None",
+    "description": "str | None",
+    "name": "str",
+    "retriever_engines": "RetrieverEnginesConfig | None",
+    "storage_quota": "int | None"
+  },
+  "CreateVectorStoreRequest": {
+    "connection_config": "JsonObject",
+    "engine_type": "str",
+    "index_config": "JsonObject | None",
+    "name": "str"
+  },
+  "CreateWebSearchProviderRequest": {
+    "description": "str | None",
+    "is_default": "bool | None",
+    "name": "str",
+    "parameters": "JsonObject | None",
+    "provider": "str"
+  },
+  "CredentialFieldMetadata": {
+    "configured": "bool"
+  },
+  "DataSource": {
+    "config": "DataSourceConfig | None",
+    "conflict_strategy": "str | None",
+    "created_at": "datetime",
+    "credentials": "dict[str, CredentialFieldMetadata] | None",
+    "error_message": "str | None",
+    "id": "str",
+    "knowledge_base_id": "str",
+    "last_sync_at": "datetime | None",
+    "last_sync_cursor": "JsonObject | None",
+    "last_sync_result": "JsonObject | None",
+    "latest_sync_log": "SyncLog | None",
+    "name": "str",
+    "status": "str | None",
+    "sync_deletions": "bool | None",
+    "sync_log_retention_days": "int | None",
+    "sync_mode": "str | None",
+    "sync_schedule": "str | None",
+    "tenant_id": "int",
+    "total_items_synced": "int | None",
+    "type": "str",
+    "updated_at": "datetime"
+  },
+  "DataSourceConfig": {
+    "resource_ids": "list[str] | None",
+    "settings": "JsonObject | None",
+    "type": "str | None"
+  },
+  "DataSourceConnectorMetadata": {
+    "auth_type": "str | None",
+    "capabilities": "list[str]",
+    "description": "str | None",
+    "icon": "str | None",
+    "name": "str",
+    "priority": "int",
+    "type": "str"
+  },
+  "DeleteChunkQuestionRequest": {
+    "question_id": "str"
+  },
+  "DocreaderReconnectRequest": {
+    "addr": "str"
+  },
+  "DownloadOllamaModelRequest": {
+    "model_name": "str"
+  },
+  "EmbeddingParameters": {
+    "dimension": "int | None",
+    "supports_dimension_override": "bool | None",
+    "truncate_prompt_tokens": "int | None"
+  },
+  "EnsureSuggestionsRequest": {
+    "regenerate": "bool"
+  },
+  "ErrorDetail": {
+    "code": "str | None",
+    "details": "str | None",
+    "message": "str"
+  },
+  "ErrorResponse": {
+    "error": "ErrorDetail | None",
+    "success": "bool"
+  },
+  "EvalGenerationMetrics": {
+    "bleu1": "float",
+    "bleu2": "float",
+    "bleu4": "float",
+    "rouge1": "float",
+    "rouge2": "float",
+    "rougel": "float"
+  },
+  "EvalMetric": {
+    "generation_metrics": "EvalGenerationMetrics | None",
+    "retrieval_metrics": "EvalRetrievalMetrics | None"
+  },
+  "EvalRetrievalMetrics": {
+    "map": "float",
+    "mrr": "float",
+    "ndcg10": "float",
+    "ndcg3": "float",
+    "precision": "float",
+    "recall": "float"
+  },
+  "EvalSummaryConfig": {
+    "context_template": "str | None",
+    "frequency_penalty": "float | None",
+    "max_completion_tokens": "int | None",
+    "max_tokens": "int | None",
+    "no_match_prefix": "str | None",
+    "presence_penalty": "float | None",
+    "prompt": "str | None",
+    "repeat_penalty": "float | None",
+    "seed": "int | None",
+    "temperature": "float | None",
+    "thinking": "bool | None",
+    "top_k": "int | None",
+    "top_p": "float | None"
+  },
+  "EvalTask": {
+    "dataset_id": "str",
+    "finished": "int | None",
+    "id": "str",
+    "start_time": "datetime",
+    "status": "int",
+    "tenant_id": "int",
+    "total": "int | None"
+  },
+  "EvalTaskParams": {
+    "chat_model_id": "str",
+    "embedding_top_k": "int | None",
+    "fallback_response": "str | None",
+    "fallback_strategy": "str | None",
+    "keyword_threshold": "float | None",
+    "knowledge_base_id": "str",
+    "rerank_model_id": "str | None",
+    "rerank_threshold": "float | None",
+    "rerank_top_k": "int | None",
+    "session_id": "str | None",
+    "summary_config": "EvalSummaryConfig | None",
+    "vector_database": "str | None",
+    "vector_threshold": "float | None"
+  },
+  "EvaluationCreateRequest": {
+    "chat_id": "str",
+    "dataset_id": "str",
+    "knowledge_base_id": "str",
+    "rerank_id": "str"
+  },
+  "EvaluationGetQuery": {
+    "task_id": "str"
+  },
+  "EvaluationGetResponseData": {
+    "metric": "EvalMetric | None",
+    "params": "EvalTaskParams",
+    "task": "EvalTask"
+  },
+  "ExtractConfig": {
+    "enabled": "bool",
+    "nodes": "list[str] | None",
+    "relations": "list[str] | None",
+    "tags": "list[str] | None",
+    "text": "str | None"
+  },
+  "FAQBatchDeleteRequest": {
+    "ids": "list[int]"
+  },
+  "FAQBatchUpsertPayload": {
+    "dry_run": "bool",
+    "entries": "list[FAQEntryPayload]",
+    "knowledge_id": "str | None",
+    "mode": "str",
+    "task_id": "str | None"
+  },
+  "FAQConfig": {
+    "default_question_count": "int | None"
+  },
+  "FAQEntry": {
+    "answer_strategy": "str",
+    "answers": "list[str]",
+    "chunk_id": "str",
+    "chunk_type": "str",
+    "created_at": "datetime",
+    "id": "int",
+    "index_mode": "str | None",
+    "is_enabled": "bool",
+    "is_recommended": "bool",
+    "knowledge_base_id": "str",
+    "knowledge_id": "str",
+    "match_type": "str | None",
+    "matched_question": "str | None",
+    "negative_questions": "list[str]",
+    "score": "float | None",
+    "similar_questions": "list[str]",
+    "standard_question": "str",
+    "tag_id": "int | None",
+    "tag_name": "str | None",
+    "updated_at": "datetime"
+  },
+  "FAQEntryFieldsBatchUpdate": {
+    "by_id": "dict[int, FAQEntryFieldsUpdate] | None",
+    "by_tag": "dict[int, FAQEntryFieldsUpdate] | None",
+    "exclude_ids": "list[int] | None"
+  },
+  "FAQEntryFieldsUpdate": {
+    "is_enabled": "bool | None",
+    "is_recommended": "bool | None",
+    "tag_id": "int | None"
+  },
+  "FAQEntryListResponse": {
+    "data": "list[FAQEntry]",
+    "page": "int",
+    "page_size": "int",
+    "total": "int"
+  },
+  "FAQEntryPayload": {
+    "answer_strategy": "str | None",
+    "answers": "list[str] | None",
+    "id": "int | None",
+    "is_enabled": "bool | None",
+    "is_recommended": "bool | None",
+    "negative_questions": "list[str] | None",
+    "similar_questions": "list[str] | None",
+    "standard_question": "str",
+    "tag_id": "int | None",
+    "tag_name": "str | None"
+  },
+  "FAQEntryTagsBatchUpdate": {
+    "updates": "dict[int, int]"
+  },
+  "FAQImportDisplayStatusRequest": {
+    "display_status": "str"
+  },
+  "FAQImportTaskProgress": {
+    "created_at": "int",
+    "display_status": "str | None",
+    "dry_run": "bool",
+    "error": "str | None",
+    "failed_count": "int | None",
+    "failed_entries": "list[JsonObject] | None",
+    "failed_entries_url": "str | None",
+    "import_mode": "str | None",
+    "imported_at": "datetime | None",
+    "kb_id": "str | None",
+    "knowledge_id": "str | None",
+    "message": "str | None",
+    "partial_failed_count": "int | None",
+    "processed": "int",
+    "processing_time": "int | None",
+    "progress": "int",
+    "skipped_count": "int | None",
+    "status": "str",
+    "success_count": "int | None",
+    "success_entries": "list[JsonObject] | None",
+    "task_id": "str",
+    "total": "int",
+    "updated_at": "int"
+  },
+  "FAQSearchRequest": {
+    "first_priority_tag_ids": "list[int] | None",
+    "match_count": "int | None",
+    "only_recommended": "bool",
+    "query_text": "str",
+    "second_priority_tag_ids": "list[int] | None",
+    "vector_threshold": "float | None"
+  },
+  "FAQSimilarQuestionsRequest": {
+    "similar_questions": "list[str]"
+  },
+  "FileInfo": {
+    "file_hash": "str",
+    "file_name": "str",
+    "file_path": "str",
+    "file_size": "int",
+    "file_type": "str"
+  },
+  "GenerateTitleRequest": {
+    "messages": "list[TitleGenMessage]"
+  },
+  "HybridSearchRequest": {
+    "disable_keywords_match": "bool",
+    "disable_vector_match": "bool",
+    "keyword_threshold": "float | None",
+    "knowledge_base_ids": "list[str] | None",
+    "knowledge_ids": "list[str] | None",
+    "match_count": "int | None",
+    "only_recommended": "bool",
+    "query_text": "str",
+    "skip_context_enrichment": "bool",
+    "tag_ids": "list[str] | None",
+    "vector_threshold": "float | None"
+  },
+  "ImageProcessingConfig": {
+    "model_id": "str | None"
+  },
+  "IndexingStrategy": {
+    "graph_enabled": "bool",
+    "keyword_enabled": "bool",
+    "vector_enabled": "bool",
+    "wiki_enabled": "bool"
+  },
+  "InviteUserRequest": {
+    "role": "str",
+    "user_id": "str"
+  },
+  "JoinOrganizationByCodeRequest": {
+    "invite_code": "str"
+  },
+  "JoinRequestByIDRequest": {
+    "message": "str | None",
+    "organization_id": "str",
+    "role": "str | None"
+  },
+  "JoinRequestListResponse": {
+    "requests": "list[JoinRequestRecord]",
+    "total": "int"
+  },
+  "JoinRequestRecord": {
+    "created_at": "datetime",
+    "email": "str | None",
+    "id": "str",
+    "message": "str | None",
+    "prev_role": "str | None",
+    "request_type": "str",
+    "requested_role": "str",
+    "status": "str",
+    "user_id": "str | None",
+    "username": "str | None"
+  },
+  "JoinRequestRequest": {
+    "invite_code": "str",
+    "message": "str | None",
+    "role": "str | None"
+  },
+  "Knowledge": {
+    "channel": "str | None",
+    "created_at": "datetime",
+    "deleted_at": "datetime | None",
+    "description": "str | None",
+    "embedding_model_id": "str | None",
+    "enable_status": "str",
+    "error_message": "str | None",
+    "file_hash": "str | None",
+    "file_name": "str | None",
+    "file_path": "str | None",
+    "file_size": "int | None",
+    "file_type": "str | None",
+    "id": "str",
+    "knowledge_base_id": "str",
+    "metadata": "JsonObject | None",
+    "parse_status": "str",
+    "processed_at": "datetime | None",
+    "source": "str | None",
+    "storage_size": "int | None",
+    "summary_status": "str | None",
+    "tag_id": "str | None",
+    "tenant_id": "int",
+    "title": "str | None",
+    "type": "str",
+    "updated_at": "datetime"
+  },
+  "KnowledgeBase": {
+    "asr_config": "ASRConfig | None",
+    "chunk_count": "int",
+    "chunking_config": "ChunkingConfig | None",
+    "created_at": "datetime",
+    "creator_id": "str | None",
+    "creator_name": "str | None",
+    "deleted_at": "datetime | None",
+    "description": "str | None",
+    "embedding_model_id": "str | None",
+    "extract_config": "ExtractConfig | None",
+    "faq_config": "FAQConfig | None",
+    "id": "str",
+    "image_processing_config": "ImageProcessingConfig | None",
+    "indexing_strategy": "IndexingStrategy | None",
+    "is_pinned": "bool",
+    "is_processing": "bool",
+    "is_temporary": "bool",
+    "knowledge_count": "int",
+    "my_permission": "str | None",
+    "name": "str",
+    "pinned_at": "datetime | None",
+    "processing_count": "int",
+    "question_generation_config": "QuestionGenerationConfig | None",
+    "share_count": "int",
+    "storage_backend_id": "str | None",
+    "storage_config": "LegacyStorageConfig | None",
+    "storage_provider_config": "StorageProviderConfig | None",
+    "summary_model_id": "str | None",
+    "tenant_id": "int",
+    "type": "str",
+    "updated_at": "datetime",
+    "vector_store_engine_type": "str | None",
+    "vector_store_id": "str | None",
+    "vector_store_name": "str | None",
+    "vector_store_source": "str | None",
+    "vector_store_status": "str | None",
+    "vlm_config": "VLMConfig | None",
+    "wiki_config": "WikiConfig | None"
+  },
+  "KnowledgeBaseShare": {
+    "chunk_count": "int | None",
+    "created_at": "datetime",
+    "id": "str",
+    "knowledge_base_id": "str | None",
+    "knowledge_base_name": "str | None",
+    "knowledge_base_type": "str | None",
+    "knowledge_count": "int | None",
+    "my_permission": "str | None",
+    "my_role_in_org": "str | None",
+    "organization_id": "str",
+    "organization_name": "str | None",
+    "permission": "str",
+    "shared_by_user_id": "str | None",
+    "shared_by_username": "str | None",
+    "source_tenant_id": "int"
+  },
+  "KnowledgeBaseShareListResponse": {
+    "shares": "list[KnowledgeBaseShare]",
+    "total": "int"
+  },
+  "KnowledgeBatchDeleteRequest": {
+    "ids": "list[str]",
+    "kb_id": "str"
+  },
+  "KnowledgeBatchDeleteResponse": {
+    "deleted_count": "int",
+    "task_id": "str"
+  },
+  "KnowledgeBatchReparseRequest": {
+    "ids": "list[str]",
+    "kb_id": "str",
+    "process_config": "JsonObject | None"
+  },
+  "KnowledgeBatchReparseResponse": {
+    "reparse_count": "int",
+    "task_id": "str"
+  },
+  "KnowledgeChatRequest": {
+    "agent_id": "str | None",
+    "channel": "str | None",
+    "disable_title": "bool",
+    "images": "list[ChatImage] | None",
+    "knowledge_base_ids": "list[str] | None",
+    "knowledge_ids": "list[str] | None",
+    "mentioned_items": "list[MentionedItem] | None",
+    "query": "str",
+    "suggestion_attribution": "dict[str, str] | None",
+    "summary_model_id": "str | None"
+  },
+  "KnowledgeClearResponse": {
+    "deleted_count": "int"
+  },
+  "KnowledgeCopyProgress": {
+    "created_at": "int",
+    "error": "str | None",
+    "message": "str | None",
+    "processed": "int",
+    "progress": "int",
+    "source_id": "str",
+    "status": "str",
+    "target_id": "str | None",
+    "task_id": "str",
+    "total": "int",
+    "updated_at": "int"
+  },
+  "KnowledgeCopyRequest": {
+    "source_id": "str",
+    "target_id": "str | None",
+    "task_id": "str | None"
+  },
+  "KnowledgeCopyResponse": {
+    "message": "str",
+    "source_id": "str",
+    "target_id": "str",
+    "task_id": "str"
+  },
+  "KnowledgeDuplicateResponse": {
+    "knowledge_base": "KnowledgeBase",
+    "message": "str",
+    "source_id": "str",
+    "target_id": "str"
+  },
+  "KnowledgeMoveProgress": {
+    "created_at": "int",
+    "error": "str | None",
+    "failed": "int",
+    "message": "str | None",
+    "processed": "int",
+    "progress": "int",
+    "source_kb_id": "str",
+    "status": "str",
+    "target_kb_id": "str",
+    "task_id": "str",
+    "total": "int",
+    "updated_at": "int"
+  },
+  "KnowledgeMoveRequest": {
+    "knowledge_ids": "list[str]",
+    "mode": "str",
+    "source_kb_id": "str",
+    "target_kb_id": "str"
+  },
+  "KnowledgeMoveResponse": {
+    "knowledge_count": "int",
+    "message": "str",
+    "source_kb_id": "str",
+    "target_kb_id": "str",
+    "task_id": "str"
+  },
+  "KnowledgeReference": {
+    "chunk_index": "int",
+    "chunk_type": "str | None",
+    "content": "str",
+    "end_at": "int | None",
+    "id": "str",
+    "image_info": "str | None",
+    "knowledge_filename": "str | None",
+    "knowledge_id": "str",
+    "knowledge_source": "str | None",
+    "knowledge_title": "str | None",
+    "match_type": "int | None",
+    "metadata": "JsonObject | None",
+    "parent_chunk_id": "str | None",
+    "score": "float | None",
+    "seq": "int | None",
+    "start_at": "int | None",
+    "sub_chunk_id": "list[str] | None"
+  },
+  "KnowledgeSearchHit": {
+    "chunk_index": "int",
+    "chunk_type": "str",
+    "content": "str",
+    "end_at": "int | None",
+    "id": "str",
+    "image_info": "str | None",
+    "knowledge_filename": "str | None",
+    "knowledge_id": "str",
+    "knowledge_source": "str | None",
+    "knowledge_title": "str",
+    "metadata": "JsonObject | None",
+    "score": "float",
+    "seq": "int",
+    "start_at": "int | None"
+  },
+  "KnowledgeSearchRequest": {
+    "knowledge_base_id": "str | None",
+    "knowledge_base_ids": "list[str] | None",
+    "knowledge_ids": "list[str] | None",
+    "query": "str"
+  },
+  "LegacyStorageConfig": {
+    "app_id": "str | None",
+    "bucket_name": "str | None",
+    "path_prefix": "str | None",
+    "region": "str | None",
+    "secret_id": "str | None",
+    "secret_key": "str | None"
+  },
+  "ListAgentsResponse": {
+    "agents": "list[Agent]",
+    "disabled_own_agent_ids": "list[str]"
+  },
+  "ListFAQEntriesQuery": {
+    "keyword": "str | None",
+    "page": "int",
+    "page_size": "int",
+    "search_field": "str | None",
+    "sort_order": "str | None",
+    "tag_id": "int | None"
+  },
+  "ListKnowledgeQuery": {
+    "end_time": "str | None",
+    "file_type": "str | None",
+    "keyword": "str | None",
+    "page": "int",
+    "page_size": "int",
+    "parse_status": "str | None",
+    "source": "str | None",
+    "start_time": "str | None",
+    "tag_id": "str | None"
+  },
+  "ListSessionsQuery": {
+    "agent_id": "str | None",
+    "keyword": "str | None",
+    "page": "int",
+    "page_size": "int",
+    "source": "str | None"
+  },
+  "ListTagsQuery": {
+    "keyword": "str | None",
+    "page": "int",
+    "page_size": "int"
+  },
+  "LoadMessagesQuery": {
+    "before_time": "str | None",
+    "limit": "int"
+  },
+  "LoginRequest": {
+    "email": "str",
+    "password": "str"
+  },
+  "LoginResponse": {
+    "active_tenant": "Tenant | None",
+    "memberships": "list[Membership]",
+    "message": "str",
+    "refresh_token": "str",
+    "success": "bool",
+    "token": "str",
+    "user": "AuthUser"
+  },
+  "MCPMcpServiceAuthConfig": {
+    "api_key": "str | None",
+    "api_key_header": "str | None",
+    "auth_server_metadata_url": "str | None",
+    "auth_type": "str | None",
+    "custom_headers": "dict[str, str] | None",
+    "scopes": "list[str] | None",
+    "token": "str | None"
+  },
+  "MCPResource": {
+    "description": "str | None",
+    "mime_type": "str | None",
+    "name": "str",
+    "uri": "str"
+  },
+  "MCPService": {
+    "advanced_config": "MCPServiceAdvancedConfig | None",
+    "auth_config": "MCPMcpServiceAuthConfig | None",
+    "created_at": "datetime",
+    "credentials": "dict[str, CredentialFieldMetadata] | None",
+    "description": "str | None",
+    "enabled": "bool | None",
+    "env_vars": "dict[str, str] | None",
+    "headers": "dict[str, str] | None",
+    "id": "str",
+    "is_builtin": "bool | None",
+    "name": "str",
+    "stdio_config": "MCPStdioConfig | None",
+    "tenant_id": "int",
+    "transport_type": "str",
+    "updated_at": "datetime",
+    "url": "str | None"
+  },
+  "MCPServiceAdvancedConfig": {
+    "retry_count": "int | None",
+    "retry_delay": "int | None",
+    "timeout": "int | None"
+  },
+  "MCPStdioConfig": {
+    "args": "list[str] | None",
+    "command": "str"
+  },
+  "MCPTestResult": {
+    "description": "str | None",
+    "message": "str",
+    "oauth_required": "bool | None",
+    "resources": "list[MCPResource]",
+    "success": "bool",
+    "tools": "list[MCPTool]"
+  },
+  "MCPTool": {
+    "description": "str | None",
+    "input_schema": "JsonObject | None",
+    "name": "str",
+    "require_approval": "bool | None"
+  },
+  "MCPToolApproval": {
+    "require_approval": "bool",
+    "tool_name": "str",
+    "updated_at": "datetime"
+  },
+  "MCPToolApprovalDecisionRequest": {
+    "decision": "str",
+    "modified_args": "JsonObject | None",
+    "reason": "str | None"
+  },
+  "MeResponse": {
+    "active_tenant": "Tenant | None",
+    "memberships": "list[Membership]",
+    "success": "bool",
+    "user": "AuthUser"
+  },
+  "Membership": {
+    "role": "TenantRole",
+    "tenant_id": "int",
+    "tenant_name": "str"
+  },
+  "MentionedItem": {
+    "id": "str",
+    "kb_type": "str | None",
+    "name": "str",
+    "type": "str"
+  },
+  "Message": {
+    "agent_duration_ms": "int | None",
+    "agent_steps": "list[JsonObject] | None",
+    "channel": "str | None",
+    "content": "str",
+    "created_at": "datetime",
+    "deleted_at": "datetime | None",
+    "id": "str",
+    "images": "list[JsonObject] | None",
+    "is_completed": "bool",
+    "is_fallback": "bool",
+    "knowledge_references": "list[KnowledgeReference] | None",
+    "mentioned_items": "list[JsonObject] | None",
+    "request_id": "str | None",
+    "role": "str",
+    "session_id": "str",
+    "updated_at": "datetime"
+  },
+  "MessageSearchHit": {
+    "answer_content": "str",
+    "created_at": "datetime",
+    "match_type": "str | None",
+    "query_content": "str",
+    "request_id": "str",
+    "score": "float",
+    "session_id": "str",
+    "session_title": "str | None"
+  },
+  "MessageSearchResponse": {
+    "items": "list[MessageSearchHit]",
+    "total": "int"
+  },
+  "Model": {
+    "created_at": "datetime",
+    "credentials": "dict[str, CredentialFieldMetadata] | None",
+    "description": "str | None",
+    "display_name": "str | None",
+    "id": "str",
+    "is_builtin": "bool | None",
+    "is_default": "bool | None",
+    "name": "str",
+    "parameters": "ModelParameters",
+    "source": "str",
+    "status": "str | None",
+    "tenant_id": "int",
+    "type": "str",
+    "updated_at": "datetime"
+  },
+  "ModelParameters": {
+    "api_key": "str | None",
+    "app_id": "str | None",
+    "app_secret": "str | None",
+    "base_url": "str | None",
+    "custom_headers": "dict[str, str] | None",
+    "embedding_parameters": "EmbeddingParameters | None",
+    "extra_config": "dict[str, str] | None",
+    "interface_type": "str | None",
+    "max_concurrency": "int | None",
+    "parameter_size": "str | None",
+    "provider": "str | None",
+    "supports_vision": "bool | None"
+  },
+  "ModelTestRequest": {
+    "api_key": "str | None",
+    "app_secret": "str | None",
+    "base_url": "str | None",
+    "custom_headers": "dict[str, str] | None",
+    "dimension": "int | None",
+    "extra_config": "dict[str, str] | None",
+    "interface_type": "str | None",
+    "model": "str",
+    "model_id": "str | None",
+    "provider": "str | None",
+    "source": "str | None",
+    "supports_dimension_override": "bool | None"
+  },
+  "OIDCAuthorizeURLResponse": {
+    "authorization_url": "str",
+    "provider_display_name": "str",
+    "state": "str",
+    "success": "bool"
+  },
+  "OIDCCallbackResponse": {
+    "active_tenant": "Tenant | None",
+    "memberships": "list[Membership]",
+    "message": "str",
+    "refresh_token": "str",
+    "success": "bool",
+    "token": "str",
+    "user": "AuthUser"
+  },
+  "OIDCMetaConfig": {
+    "enabled": "bool",
+    "provider_display_name": "str",
+    "success": "bool"
+  },
+  "OllamaModelInfo": {
+    "digest": "str | None",
+    "modified_at": "datetime | None",
+    "name": "str",
+    "size": "int | None"
+  },
+  "OllamaModelsData": {
+    "models": "list[OllamaModelInfo]"
+  },
+  "OllamaModelsListResponse": {
+    "data": "OllamaModelsData | None",
+    "success": "bool"
+  },
+  "OllamaStatusData": {
+    "available": "bool | None",
+    "base_url": "str | None",
+    "version": "str | None"
+  },
+  "OllamaStatusResponse": {
+    "data": "OllamaStatusData | None",
+    "success": "bool"
+  },
+  "OrgMember": {
+    "avatar": "str | None",
+    "email": "str | None",
+    "id": "str",
+    "joined_at": "datetime",
+    "role": "str",
+    "tenant_id": "int",
+    "user_id": "str",
+    "username": "str | None"
+  },
+  "OrgMemberListResponse": {
+    "members": "list[OrgMember]",
+    "total": "int"
+  },
+  "Organization": {
+    "agent_share_count": "int | None",
+    "avatar": "str | None",
+    "created_at": "datetime",
+    "description": "str | None",
+    "has_pending_upgrade": "bool | None",
+    "id": "str",
+    "invite_code": "str | None",
+    "invite_code_expires_at": "datetime | None",
+    "invite_code_validity_days": "int | None",
+    "is_owner": "bool | None",
+    "member_count": "int | None",
+    "member_limit": "int | None",
+    "my_role": "str | None",
+    "name": "str | None",
+    "owner_id": "str | None",
+    "pending_join_request_count": "int | None",
+    "require_approval": "bool | None",
+    "searchable": "bool | None",
+    "share_count": "int | None",
+    "updated_at": "datetime"
+  },
+  "OrganizationList": {
+    "items": "list[Organization]",
+    "resource_counts": "dict[str, JsonObject] | None",
+    "total": "int | None"
+  },
+  "OrganizationPreview": {
+    "agent_share_count": "int | None",
+    "avatar": "str | None",
+    "created_at": "datetime",
+    "description": "str | None",
+    "id": "str",
+    "is_already_member": "bool | None",
+    "member_count": "int | None",
+    "name": "str",
+    "require_approval": "bool | None",
+    "share_count": "int | None"
+  },
+  "ParserEngine": {
+    "available": "bool",
+    "description": "str",
+    "label": "str",
+    "name": "str"
+  },
+  "ParserEngineRule": {
+    "engine": "str",
+    "file_types": "list[str]"
+  },
+  "ParserEnginesList": {
+    "connected": "bool | None",
+    "engines": "list[ParserEngine]"
+  },
+  "PinSessionResponse": {
+    "is_pinned": "bool"
+  },
+  "ProviderTypeMeta": {
+    "default_urls": "dict[str, str] | None",
+    "description": "str | None",
+    "extra_fields": "list[JsonObject] | None",
+    "label": "str",
+    "model_types": "list[str] | None",
+    "requires_auth": "bool | None",
+    "value": "str"
+  },
+  "QuestionGenerationConfig": {
+    "enabled": "bool",
+    "question_count": "int | None"
+  },
+  "RefreshTokenRequest": {
+    "refresh_token": "str"
+  },
+  "RefreshTokenResponse": {
+    "access_token": "str",
+    "message": "str",
+    "refresh_token": "str",
+    "success": "bool"
+  },
+  "RegenerateInviteCodeResponse": {
+    "invite_code": "str"
+  },
+  "RegisterRequest": {
+    "email": "str",
+    "password": "str",
+    "username": "str"
+  },
+  "RegisterResponse": {
+    "active_tenant": "Tenant | None",
+    "memberships": "list[Membership]",
+    "message": "str",
+    "success": "bool",
+    "user": "AuthUser"
+  },
+  "RequestRoleUpgradeRequest": {
+    "message": "str | None",
+    "requested_role": "str"
+  },
+  "ResolveResourceAncestorsRequest": {
+    "resource_ids": "list[str]"
+  },
+  "RetrieverEngineEntry": {
+    "retriever_engine_type": "str",
+    "retriever_type": "str"
+  },
+  "RetrieverEnginesConfig": {
+    "engines": "list[RetrieverEngineEntry]"
+  },
+  "ReviewJoinRequestRequest": {
+    "approved": "bool",
+    "message": "str | None",
+    "role": "str | None"
+  },
+  "SSEResponseChunk": {
+    "content": "str | None",
+    "data": "JsonObject | None",
+    "done": "bool",
+    "id": "str",
+    "knowledge_references": "list[JsonObject] | None",
+    "response_type": "str"
+  },
+  "SaveWeKnoraCloudCredentialsRequest": {
+    "app_id": "str",
+    "app_secret": "str"
+  },
+  "SearchKnowledgeQuery": {
+    "agent_id": "str | None",
+    "file_types": "str | None",
+    "keyword": "str | None",
+    "limit": "int",
+    "offset": "int"
+  },
+  "SearchMessagesRequest": {
+    "limit": "int",
+    "mode": "str | None",
+    "query": "str",
+    "session_ids": "list[str] | None"
+  },
+  "SearchOrganizationsQuery": {
+    "limit": "int",
+    "q": "str | None"
+  },
+  "SearchOrganizationsResponse": {
+    "items": "list[OrganizationPreview]",
+    "total": "int"
+  },
+  "SearchTenantsQuery": {
+    "keyword": "str | None",
+    "page": "int",
+    "page_size": "int",
+    "tenant_id": "int | None"
+  },
+  "SearchUsersQuery": {
+    "limit": "int",
+    "q": "str"
+  },
+  "SearchUsersResponse": {
+    "data": "list[SearchUsersResponseItem]"
+  },
+  "SearchUsersResponseItem": {
+    "avatar": "str | None",
+    "email": "str",
+    "id": "str",
+    "username": "str"
+  },
+  "Session": {
+    "created_at": "datetime",
+    "deleted_at": "datetime | None",
+    "description": "str | None",
+    "id": "str",
+    "im_agent_id": "str | None",
+    "im_channel_id": "str | None",
+    "im_chat_id": "str | None",
+    "im_platform": "str | None",
+    "im_thread_id": "str | None",
+    "im_user_id": "str | None",
+    "is_pinned": "bool",
+    "pinned_at": "datetime | None",
+    "tenant_id": "int",
+    "title": "str | None",
+    "updated_at": "datetime",
+    "user_id": "str | None"
+  },
+  "SessionListResponse": {
+    "items": "list[Session]",
+    "page": "int",
+    "page_size": "int",
+    "total": "int"
+  },
+  "SetMCPToolApprovalRequest": {
+    "require_approval": "bool"
+  },
+  "SharedAgentListItem": {
+    "agent": "JsonObject",
+    "disabled_by_me": "bool | None",
+    "is_mine": "bool | None",
+    "org_name": "str | None",
+    "organization_id": "str",
+    "permission": "str",
+    "share_id": "str",
+    "shared_at": "datetime",
+    "shared_by_user_id": "str | None",
+    "shared_by_username": "str | None",
+    "source_tenant_id": "int"
+  },
+  "SharedAgentListResponse": {
+    "items": "list[SharedAgentListItem]",
+    "total": "int"
+  },
+  "SharedKnowledgeBaseListItem": {
+    "is_mine": "bool | None",
+    "knowledge_base": "JsonObject",
+    "org_name": "str | None",
+    "organization_id": "str",
+    "permission": "str",
+    "share_id": "str",
+    "shared_at": "datetime",
+    "shared_by_user_id": "str | None",
+    "shared_by_username": "str | None",
+    "source_from_agent": "JsonObject | None",
+    "source_tenant_id": "int"
+  },
+  "SharedKnowledgeBaseListResponse": {
+    "items": "list[SharedKnowledgeBaseListItem]",
+    "total": "int"
+  },
+  "Skill": {
+    "description": "str",
+    "name": "str"
+  },
+  "SkillsListResponse": {
+    "data": "list[Skill]",
+    "skills_available": "bool"
+  },
+  "StopGenerationRequest": {
+    "message_id": "str"
+  },
+  "StorageBackend": {
+    "config": "StorageBackendConfig | None",
+    "created_at": "datetime | None",
+    "deleted_at": "datetime | None",
+    "id": "str",
+    "legacy_alias": "bool | None",
+    "name": "str",
+    "provider": "str",
+    "source": "str | None",
+    "status": "str | None",
+    "tenant_id": "int",
+    "updated_at": "datetime | None"
+  },
+  "StorageBackendConfig": {
+    "access_key_id": "str | None",
+    "app_id": "str | None",
+    "bucket_name": "str | None",
+    "endpoint": "str | None",
+    "force_path_style": "bool | None",
+    "mode": "str | None",
+    "path_prefix": "str | None",
+    "region": "str | None",
+    "secret_access_key": "str | None",
+    "temp_bucket_name": "str | None",
+    "temp_region": "str | None",
+    "use_ssl": "bool | None",
+    "use_temp_bucket": "bool | None"
+  },
+  "StorageBackendListResponse": {
+    "data": "list[StorageBackend]",
+    "default_storage_backend_id": "str | None",
+    "success": "bool"
+  },
+  "StorageEngineCheckRequest": {
+    "minio": "JsonObject | None",
+    "provider": "str"
+  },
+  "StorageEngineCheckResult": {
+    "bucket_created": "bool",
+    "message": "str",
+    "ok": "bool"
+  },
+  "StorageEngineInfo": {
+    "available": "bool",
+    "description": "str",
+    "name": "str"
+  },
+  "StorageEngineStatus": {
+    "engines": "list[StorageEngineInfo]",
+    "minio_env_available": "bool"
+  },
+  "StorageProviderConfig": {
+    "provider": "str"
+  },
+  "StorageProviderStatus": {
+    "allowed": "bool",
+    "available": "bool",
+    "description": "str",
+    "name": "str"
+  },
+  "SuggestionAttribution": {
+    "question_id": "str",
+    "suggestion_set_id": "str"
+  },
+  "SuggestionEventRequest": {
+    "event_type": "str",
+    "question_id": "str",
+    "suggestion_set_id": "str"
+  },
+  "SuggestionQuestion": {
+    "category": "str | None",
+    "id": "str",
+    "text": "str"
+  },
+  "SuggestionSet": {
+    "assistant_message_id": "str",
+    "config_snapshot": "JsonObject | None",
+    "created_at": "datetime | None",
+    "id": "str",
+    "language": "str | None",
+    "position": "str",
+    "questions": "list[SuggestionQuestion] | None",
+    "session_id": "str",
+    "status": "str",
+    "updated_at": "datetime | None"
+  },
+  "SyncLog": {
+    "created_at": "datetime",
+    "data_source_id": "str",
+    "error_message": "str | None",
+    "finished_at": "datetime | None",
+    "id": "str",
+    "items_created": "int",
+    "items_deleted": "int",
+    "items_failed": "int",
+    "items_skipped": "int",
+    "items_total": "int",
+    "items_updated": "int",
+    "result": "JsonObject | None",
+    "started_at": "datetime",
+    "status": "str",
+    "tenant_id": "int",
+    "updated_at": "datetime"
+  },
+  "SystemInfo": {
+    "build_time": "datetime",
+    "commit_id": "str",
+    "db_version": "str",
+    "edition": "str",
+    "go_version": "str",
+    "graph_database_engine": "str",
+    "keyword_index_engine": "str",
+    "minio_enabled": "bool",
+    "vector_store_engine": "str",
+    "version": "str"
+  },
+  "Tag": {
+    "chunk_count": "int",
+    "color": "str | None",
+    "created_at": "datetime",
+    "id": "str",
+    "knowledge_base_id": "str",
+    "knowledge_count": "int",
+    "name": "str",
+    "sort_order": "int | None",
+    "tenant_id": "int",
+    "updated_at": "datetime"
+  },
+  "TagList": {
+    "data": "list[Tag]",
+    "page": "int",
+    "page_size": "int",
+    "total": "int"
+  },
+  "TaskProgressResponse": {
+    "created_at": "int | None",
+    "error": "str | None",
+    "failed": "int",
+    "message": "str | None",
+    "processed": "int",
+    "progress": "int",
+    "status": "str",
+    "task_id": "str",
+    "total": "int",
+    "updated_at": "int | None"
+  },
+  "Tenant": {
+    "business": "str | None",
+    "chat_history_config": "JsonObject | None",
+    "context_config": "JsonObject | None",
+    "created_at": "datetime",
+    "credentials": "JsonObject | None",
+    "deleted_at": "datetime | None",
+    "description": "str | None",
+    "id": "int",
+    "name": "str",
+    "parser_engine_config": "JsonObject | None",
+    "retrieval_config": "JsonObject | None",
+    "retriever_engines": "RetrieverEnginesConfig | None",
+    "status": "str",
+    "storage_engine_config": "JsonObject | None",
+    "storage_quota": "int | None",
+    "storage_used": "int | None",
+    "updated_at": "datetime",
+    "web_search_config": "JsonObject | None"
+  },
+  "TenantAPIKey": {
+    "capabilities": "list[str]",
+    "created_at": "datetime",
+    "expires_at": "datetime | None",
+    "full_access": "bool",
+    "id": "int",
+    "knowledge_base_ids": "list[str]",
+    "last_used_at": "datetime | None",
+    "name": "str",
+    "scope_type": "str"
+  },
+  "TenantKVAgentConfig": {
+    "allowed_tools": "list[str] | None",
+    "available_placeholders": "list[JsonObject] | None",
+    "available_tools": "list[JsonObject] | None",
+    "max_iterations": "int",
+    "system_prompt": "str",
+    "temperature": "float",
+    "use_custom_system_prompt": "bool"
+  },
+  "TenantKVChatHistoryConfig": {
+    "embedding_model_id": "str | None",
+    "enabled": "bool",
+    "knowledge_base_id": "str | None"
+  },
+  "TenantKVConversationConfig": {
+    "keyword_threshold": "float | None",
+    "max_completion_tokens": "int | None",
+    "rerank_threshold": "float | None",
+    "temperature": "float | None",
+    "vector_threshold": "float | None"
+  },
+  "TenantKVParserEngineConfig": {
+    "engines": "list[JsonObject] | None"
+  },
+  "TenantKVPromptTemplates": {
+    "templates": "list[JsonObject]"
+  },
+  "TenantKVRetrievalConfig": {
+    "embedding_top_k": "int | None",
+    "keyword_threshold": "float | None",
+    "rerank_threshold": "float | None",
+    "rerank_top_k": "int | None",
+    "vector_threshold": "float | None"
+  },
+  "TenantKVStorageEngineConfig": {
+    "default_provider": "str | None",
+    "providers": "list[JsonObject] | None"
+  },
+  "TenantKVWebSearchConfig": {
+    "max_results": "int | None"
+  },
+  "TenantList": {
+    "items": "list[Tenant]",
+    "page": "int | None",
+    "page_size": "int | None",
+    "total": "int | None"
+  },
+  "TestStorageBackendRequest": {
+    "config": "StorageBackendConfig | None",
+    "name": "str",
+    "provider": "str"
+  },
+  "TestVectorStoreRequest": {
+    "connection_config": "JsonObject",
+    "engine_type": "str"
+  },
+  "TestVectorStoreResponse": {
+    "error": "str | None",
+    "success": "bool",
+    "version": "str | None"
+  },
+  "TestWebSearchProviderRequest": {
+    "parameters": "JsonObject",
+    "provider": "str"
+  },
+  "TitleGenMessage": {
+    "content": "str",
+    "role": "str"
+  },
+  "UpdateAPIPrincipalConfigRequest": {
+    "direct_header_name": "str | None",
+    "hmac_secret": "str | None",
+    "mode": "str",
+    "require_direct_header": "bool | None",
+    "signed_token_header_name": "str | None"
+  },
+  "UpdateAgentRequest": {
+    "avatar": "str | None",
+    "config": "AgentConfig | None",
+    "description": "str | None",
+    "name": "str | None"
+  },
+  "UpdateChunkRequest": {
+    "chunk_index": "int | None",
+    "content": "str | None",
+    "end_at": "int | None",
+    "image_info": "str | None",
+    "is_enabled": "bool | None",
+    "start_at": "int | None"
+  },
+  "UpdateDataSourceRequest": {
+    "config": "JsonObject | None",
+    "conflict_strategy": "str | None",
+    "name": "str | None",
+    "sync_deletions": "bool | None",
+    "sync_log_retention_days": "int | None",
+    "sync_mode": "str | None",
+    "sync_schedule": "str | None"
+  },
+  "UpdateKnowledgeBaseRequest": {
+    "config": "JsonObject | None",
+    "description": "str | None",
+    "name": "str"
+  },
+  "UpdateKnowledgeBaseShareRequest": {
+    "permission": "str"
+  },
+  "UpdateKnowledgeImageRequest": {
+    "image_info": "str"
+  },
+  "UpdateKnowledgeRequest": {
+    "description": "str | None",
+    "enable_status": "str | None",
+    "tag_id": "str | None",
+    "title": "str | None"
+  },
+  "UpdateMCPServiceRequest": {
+    "advanced_config": "MCPServiceAdvancedConfig | None",
+    "auth_config": "MCPMcpServiceAuthConfig | None",
+    "description": "str | None",
+    "enabled": "bool | None",
+    "env_vars": "dict[str, str] | None",
+    "headers": "dict[str, str] | None",
+    "name": "str | None",
+    "stdio_config": "MCPStdioConfig | None",
+    "transport_type": "str | None",
+    "url": "str | None"
+  },
+  "UpdateMemberRoleRequest": {
+    "role": "str"
+  },
+  "UpdateModelRequest": {
+    "description": "str | None",
+    "display_name": "str | None",
+    "name": "str | None",
+    "parameters": "ModelParameters | None",
+    "source": "str | None",
+    "type": "str | None"
+  },
+  "UpdateOrganizationRequest": {
+    "avatar": "str | None",
+    "description": "str | None",
+    "invite_code_validity_days": "int | None",
+    "member_limit": "int | None",
+    "name": "str | None",
+    "require_approval": "bool | None",
+    "searchable": "bool | None"
+  },
+  "UpdateSessionRequest": {
+    "description": "str | None",
+    "title": "str | None"
+  },
+  "UpdateStorageBackendRequest": {
+    "config": "StorageBackendConfig | None",
+    "name": "str | None",
+    "provider": "str | None",
+    "status": "str | None"
+  },
+  "UpdateTagRequest": {
+    "color": "str | None",
+    "name": "str | None",
+    "sort_order": "int | None"
+  },
+  "UpdateTenantRequest": {
+    "business": "str | None",
+    "description": "str | None",
+    "name": "str | None",
+    "retriever_engines": "RetrieverEnginesConfig | None",
+    "status": "str | None",
+    "storage_quota": "int | None"
+  },
+  "UpdateVectorStoreRequest": {
+    "name": "str"
+  },
+  "UpdateWebSearchProviderRequest": {
+    "description": "str | None",
+    "is_default": "bool | None",
+    "name": "str | None",
+    "parameters": "JsonObject | None"
+  },
+  "VLMConfig": {
+    "enabled": "bool",
+    "model_id": "str | None"
+  },
+  "ValidateCredentialsRequest": {
+    "credentials": "JsonObject",
+    "type": "str"
+  },
+  "ValidateTokenResponse": {
+    "success": "bool",
+    "tenant_id": "int | None",
+    "user_id": "str | None",
+    "valid": "bool"
+  },
+  "ValidationError": {
+    "field": "str",
+    "message": "str"
+  },
+  "VectorStore": {
+    "connection_config": "JsonObject | None",
+    "created_at": "datetime | None",
+    "deleted_at": "datetime | None",
+    "engine_type": "str",
+    "id": "str",
+    "index_config": "JsonObject | None",
+    "name": "str",
+    "readonly": "bool | None",
+    "source": "str | None",
+    "tenant_id": "int",
+    "updated_at": "datetime | None"
+  },
+  "VectorStoreConnectionField": {
+    "default": "JsonValue | None",
+    "description": "str | None",
+    "name": "str",
+    "required": "bool | None",
+    "sensitive": "bool | None",
+    "type": "str"
+  },
+  "VectorStoreTypeInfo": {
+    "connection_fields": "list[VectorStoreConnectionField] | None",
+    "display_name": "str",
+    "index_fields": "list[VectorStoreConnectionField] | None",
+    "type": "str"
+  },
+  "WeKnoraCloudStatusResponse": {
+    "has_models": "bool",
+    "needs_reinit": "bool",
+    "reason": "str | None"
+  },
+  "WebSearchBuiltinProvider": {
+    "description": "str",
+    "enabled": "bool",
+    "label": "str",
+    "name": "str"
+  },
+  "WebSearchProvider": {
+    "created_at": "datetime | None",
+    "credentials": "dict[str, CredentialFieldMetadata] | None",
+    "description": "str | None",
+    "id": "str",
+    "is_default": "bool | None",
+    "name": "str",
+    "parameters": "JsonObject | None",
+    "provider": "str",
+    "tenant_id": "int | None",
+    "updated_at": "datetime | None"
+  },
+  "WebSearchProviderParameters": {
+    "api_key": "str | None",
+    "base_url": "str | None",
+    "cx": "str | None",
+    "extra_config": "dict[str, str] | None",
+    "proxy_url": "str | None"
+  },
+  "WebSearchProviderTypeInfo": {
+    "description": "str | None",
+    "label": "str",
+    "parameter_schema": "list[JsonObject] | None",
+    "provider": "str"
+  },
+  "WikiConfig": {
+    "content_instructions": "str | None",
+    "extraction_granularity": "str | None",
+    "max_pages_per_ingest": "int | None",
+    "synthesis_model_id": "str | None"
+  }
+}
