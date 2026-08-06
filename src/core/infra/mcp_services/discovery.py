@@ -128,12 +128,16 @@ class ServiceResolver(Protocol):
     ) -> Awaitable[MCPServiceInfo | JsonObject]: ...
 
 
-class _ConnectionManagerLike(Protocol):
+class ConnectionManagerLike(Protocol):
     """Minimal surface the discovery provider needs from the connection manager.
 
     Declared as a Protocol so callers can pass any object that exposes
     ``get_or_create`` / ``list_tools`` / ``list_resources`` without
     forcing this module to import the AI layer.
+
+    PR-30.6c C7: promoted from ``_ConnectionManagerLike`` to a public
+    name so web-layer forwarders can import a typed alias without
+    re-introducing a bare ``object`` annotation.
     """
 
     async def get_or_create(  # type: ignore[no-untyped-def]
@@ -151,6 +155,10 @@ class _ConnectionManagerLike(Protocol):
 
     async def list_resources(self, *, session: MCPSession) -> JSONRPCResponse: ...
 
+# Backwards-compatibility alias for code that still imports the
+# underscore-prefixed name from earlier PRs.
+_ConnectionManagerLike = ConnectionManagerLike
+
 
 class HTTPMCPDiscoveryProvider:
     """Live discovery through the MCP connection manager.
@@ -167,7 +175,7 @@ class HTTPMCPDiscoveryProvider:
     def __init__(
         self,
         *,
-        connection_manager: _ConnectionManagerLike,
+        connection_manager: ConnectionManagerLike,
         service_resolver: ServiceResolver,
     ) -> None:
         self._manager = connection_manager
@@ -369,6 +377,7 @@ def _info_to_resolver_payload(info: MCPServiceInfo) -> JsonObject:
 
 
 __all__ = [
+    "ConnectionManagerLike",
     "DiscoveryCache",
     "DiscoveryProvider",
     "DiscoveryResource",

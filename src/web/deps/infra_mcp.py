@@ -12,14 +12,13 @@ so the per-request service can drive the live transport layer when
 the lifespan was started, while keeping the dependency-overrides path
 green for tests that bypass lifespan.
 
-PR-17.5c C4: the per-request live ``HTTPMCPDiscoveryProvider`` /
-``HTTPMCPConnectivityProbe`` builders (:func:`build_live_*`) live here
-on the web side because they need to construct the
-``MCPServiceRepository`` on the request ``AsyncSession``. The
-previous implementation had them in ``core.infra.mcp_services.factory``,
-which made ``web`` indirectly import ``db.dao.mcp_service_repository``
-through the factory — the layer-violation hard rule requires ``web``
-to import ``db`` directly when it needs to.
+PR-30.6c C7: ``build_live_resolvers`` / ``build_live_discovery_provider``
+/ ``build_live_connectivity_probe`` moved into
+:mod:`src.core.infra.mcp_services.factory`. The web layer no longer
+imports ``db.dao.mcp_service_repository`` directly — the core factory
+owns repository construction on the request session. The web layer
+keeps these names available as re-exports so the lifespan-side
+forwarder (and any tests that patched the symbol) keep working.
 
 Adds two FastAPI dependency factories for ``tenant_id`` and ``user_id``
 so the router can read them from the per-request auth state without
@@ -31,30 +30,28 @@ from __future__ import annotations
 from typing import Annotated, cast
 
 from fastapi import Depends, Request
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.app_context import request_context
 from src.app_context.registry import LifeSpanService
 from src.common.exception import ValidationError
-from src.common.json import JsonObject
 from src.core.infra.mcp_services.connectivity import (
-    ConnectivityResolver,
+    ConnectionManagerLike,
     HTTPMCPConnectivityProbe,
-)
-from src.core.infra.mcp_services.connectivity import (
-    _ConnectionManagerLike as _ConnManagerLikeProbe,
 )
 from src.core.infra.mcp_services.discovery import (
     HTTPMCPDiscoveryProvider,
     ServiceResolver,
 )
-from src.core.infra.mcp_services.discovery import (
-    _ConnectionManagerLike as _ConnManagerLikeDisc,
+from src.core.infra.mcp_services.connectivity import (
+    ConnectivityResolver,
 )
-from src.core.infra.mcp_services.factory import build_mcp_service
+from src.core.infra.mcp_services.factory import (
+    build_live_connectivity_probe,
+    build_live_discovery_provider,
+    build_mcp_resolvers,
+    build_mcp_service,
+)
 from src.core.infra.mcp_services.service import MCPServiceService
-from src.core.infra.mcp_services.types import MCPServiceInfo
-from src.db.dao.mcp_service_repository import MCPServiceRepository
 from src.web.deps.session import SessionDep
 from src.web.middleware.context import get_tenant_id as _gtid
 from src.web.middleware.context import get_user_info as _gui
@@ -65,92 +62,17 @@ def _resolve_lifespan_service(request: Request) -> LifeSpanService | None:
     return cast("LifeSpanService | None", getattr(request.app.state, "lifespan_service", None))
 
 
-# ``ConnectionManagerLike`` is the static-type face of the AI-layer
-# ``MCPConnectionManager``. The web layer cannot import that class
-# directly (layer directionality — web must not reach into ai), so we
-# re-export the Protocol defined in ``core.infra.mcp_services.discovery``
-# under its public name. The two core protocols (``_ConnManagerLikeDisc``
-# and ``_ConnManagerLikeProbe``) are the same shape; aliasing keeps the
-# public ``ConnectionManagerLike`` as the canonical type for downstream
-# annotations.
 ConnectionManagerLike = _ConnManagerLikeDisc
 
 
-def build_live_resolvers(
-    *,
-    session: AsyncSession,
-    tenant_id: int,
-) -> tuple[ServiceResolver, ConnectivityResolver]:
-    """Return ``(discovery_resolver, connectivity_resolver)`` for one request.
-
-    PR-17.5c C2: takes the active ``tenant_id`` so the resolver lookup
-    is tenant-scoped (the previous ``tenant_id=0`` hard-coding would
-    have leaked cross-tenant OAuth tokens / URLs).
-    """
-    repo = MCPServiceRepository(session)
-
-    async def _discovery_resolver(
-        resolved_tenant_id: int,
-        service_id: str,
-    ) -> MCPServiceInfo | JsonObject:
-        row = await repo.find_for_tenant(resolved_tenant_id, service_id)
-        if row is None:
-            return cast(JsonObject, {})
-        return MCPServiceInfo.map_from_db(row)
-
-    async def _connectivity_resolver(
-        resolved_tenant_id: int,
-        service_id: str,
-    ) -> MCPServiceInfo | JsonObject:
-        row = await repo.find_for_tenant(resolved_tenant_id, service_id)
-        if row is None:
-            return cast(JsonObject, {})
-        return MCPServiceInfo.map_from_db(row)
-
-    del tenant_id  # captured by closure above; ``resolved_tenant_id`` per call
-    return (
-        cast(ServiceResolver, _discovery_resolver),
-        cast(ConnectivityResolver, _connectivity_resolver),
-    )
-
-
-def build_live_discovery_provider(
-    *,
-    session: AsyncSession,
-    tenant_id: int,
-    connection_manager: ConnectionManagerLike,
-) -> HTTPMCPDiscoveryProvider:
-    """Construct an :class:`HTTPMCPDiscoveryProvider` for one request.
-
-    PR-17.5c C4: lives on the ``web`` side so the ``MCPServiceRepository``
-    import stays local to the web layer's responsibility for
-    constructing repositories from the request ``AsyncSession``.
-    """
-    service_resolver, _ = build_live_resolvers(
-        session=session,
-        tenant_id=tenant_id,
-    )
-    return HTTPMCPDiscoveryProvider(
-        connection_manager=cast(_ConnManagerLikeDisc, connection_manager),
-        service_resolver=service_resolver,
-    )
-
-
-def build_live_connectivity_probe(
-    *,
-    session: AsyncSession,
-    tenant_id: int,
-    connection_manager: ConnectionManagerLike,
-) -> HTTPMCPConnectivityProbe:
-    """Construct an :class:`HTTPMCPConnectivityProbe` for one request."""
-    _, connectivity_resolver = build_live_resolvers(
-        session=session,
-        tenant_id=tenant_id,
-    )
-    return HTTPMCPConnectivityProbe(
-        connection_manager=cast(_ConnManagerLikeProbe, connection_manager),
-        resolver=connectivity_resolver,
-    )
+# Live discovery/connectivity provider construction has been moved to
+# ``core.infra.mcp_services.factory.build_mcp_resolvers`` /
+# ``build_live_discovery_provider`` / ``build_live_connectivity_probe``
+# so the ``MCPServiceRepository`` import lives in the core layer where
+# repositories are allowed. The web layer is now a thin forwarder.
+build_live_resolvers = build_mcp_resolvers
+build_live_discovery_provider = build_live_discovery_provider
+build_live_connectivity_probe = build_live_connectivity_probe
 
 
 def get_mcp_service(
@@ -169,6 +91,11 @@ def get_mcp_service(
     PR-17.5c C2: the live providers are constructed with the active
     ``tenant_id`` (not a hard-coded zero) so cross-tenant lookups
     cannot leak via the resolver.
+
+    PR-30.6c C7: the live discovery / connectivity builders were
+    moved into ``src.core.infra.mcp_services.factory`` so the web
+    layer no longer reaches into ``db.dao``. The factory constructs
+    the resolvers internally on the request ``AsyncSession``.
     """
     lifespan_service = _resolve_lifespan_service(request)
     discovery_provider = (
@@ -269,14 +196,18 @@ RequireUserIdDep = Annotated[str, Depends(require_user_id)]
 
 __all__ = [
     "ConnectionManagerLike",
+    "ConnectivityResolver",
+    "HTTPMCPConnectivityProbe",
+    "HTTPMCPDiscoveryProvider",
     "MCPServiceDep",
     "RequestTenantIdDep",
     "RequestUserIdDep",
     "RequireTenantIdDep",
     "RequireUserIdDep",
+    "ServiceResolver",
     "build_live_connectivity_probe",
     "build_live_discovery_provider",
-    "build_live_resolvers",
+    "build_mcp_resolvers",
     "get_mcp_service",
     "get_request_tenant_id",
     "get_request_user_id",

@@ -16,6 +16,7 @@ side, which omits the secret fields altogether. The wire layer
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from typing import Self
 
@@ -36,6 +37,12 @@ REDACTED_SECRET_PLACEHOLDER: str = "***"
 # provider-supplied secrets (Go ``ModelParameters.APIKey`` /
 # ``AppSecret``).
 _SENSITIVE_PARAMETER_FIELDS: frozenset[str] = frozenset({"api_key", "app_secret"})
+
+# PR-30.6c H2: storage columns that must not cross into the
+# service-output projection per AGENTS.md §9. ``deleted_at`` is the
+# soft-delete tombstone; the service layer treats a missing row as the
+# only delete signal.
+MODEL_EXCLUDE_COLUMNS: frozenset[str] = frozenset({"deleted_at"})
 
 
 class ModelInfo(BaseModel):
@@ -63,41 +70,34 @@ class ModelInfo(BaseModel):
     def map_from_db(cls, db: Model) -> Self:
         """Project a storage ``Model`` row to the service DTO.
 
-        Hydrates ``parameters`` from the JSON column, deep-copying the
-        blob so the credential-bearing fields (``api_key``,
-        ``app_secret``) can be substituted with
-        ``REDACTED_SECRET_PLACEHOLDER`` before the row leaves the
-        service boundary. Empty credentials stay empty so the wire
-        layer's ``credentials`` map can distinguish "set (hidden)"
-        from "not set" without an extra flag -- mirroring Go's
-        ``dto.NewModelResponse``, which omits the secret fields
-        entirely; here a placeholder string is returned so a buggy
-        caller that bypasses ``views.py`` still cannot leak the raw
-        value.
+        Hydrates ``parameters`` from the JSON column and redacts
+        ``api_key`` / ``app_secret`` so they never cross the service
+        boundary in plaintext.
+
+        - ``MODEL_EXCLUDE_COLUMNS`` (frozen per §9) drops
+          ``deleted_at`` before ``model_validate``.
+        - ``parameters`` is decoded from a raw JSON string when the
+          storage layer persists it as text (SQLite path) so the
+          downstream layer never has to handle the unparsed blob.
+        - Sensitive parameter values are substituted with
+          ``REDACTED_SECRET_PLACEHOLDER`` so a buggy caller that
+          bypasses the wire-layer masking still cannot leak the raw
+          credential.
         """
-        parameters = dict(db.parameters)
+        record = db.model_dump(exclude=MODEL_EXCLUDE_COLUMNS)
+        parameters = record.get("parameters")
+        if isinstance(parameters, str):
+            try:
+                parameters = json.loads(parameters)
+            except json.JSONDecodeError:
+                parameters = {}
+        if not isinstance(parameters, dict):
+            parameters = {}
         for field_name in _SENSITIVE_PARAMETER_FIELDS:
             if parameters.get(field_name):
                 parameters[field_name] = REDACTED_SECRET_PLACEHOLDER
-        return cls.model_validate(
-            {
-                "id": db.id,
-                "tenant_id": db.tenant_id,
-                "name": db.name,
-                "display_name": db.display_name,
-                "type": db.type,
-                "source": db.source,
-                "description": db.description,
-                "parameters": parameters,
-                "is_default": db.is_default,
-                "is_builtin": db.is_builtin,
-                "managed_by": db.managed_by,
-                "status": db.status,
-                "created_at": db.created_at,
-                "updated_at": db.updated_at,
-                "deleted_at": db.deleted_at,
-            }
-        )
+        record["parameters"] = parameters
+        return cls.model_validate(record)
 
 
-__all__ = ["ModelInfo", "REDACTED_SECRET_PLACEHOLDER"]
+__all__ = ["MODEL_EXCLUDE_COLUMNS", "ModelInfo", "REDACTED_SECRET_PLACEHOLDER"]
