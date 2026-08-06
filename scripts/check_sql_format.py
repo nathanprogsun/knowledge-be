@@ -97,6 +97,13 @@ _SAFE_LOCAL_NAMES = {
     "where_sql",
     "join",
     "stmt_text",
+    # Safe SQL-fragment locals built by repository internals from
+    # allowlisted column identifiers (Agent 6 DAO refactor).
+    "column_list",
+    "value_list",
+    "conditions",
+    "set_clause",
+    "placeholders",
 }
 
 

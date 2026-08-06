@@ -221,6 +221,16 @@ def _annotation_mentions_json(node: ast.AST | None) -> bool:
     return False
 
 
+def _class_has_map_from_db(cls: ast.ClassDef) -> bool:
+    """True if the class defines a ``map_from_db`` classmethod."""
+    for member in cls.body:
+        if not isinstance(member, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if member.name == "map_from_db":
+            return True
+    return False
+
+
 def _class_has_from_json(cls: ast.ClassDef) -> bool:
     for member in cls.body:
         if not isinstance(member, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -235,7 +245,14 @@ def _class_has_from_json(cls: ast.ClassDef) -> bool:
 
 
 def _scan_dto_json_fields(src_root: Path) -> list[_MapFromDbViolation]:
-    """Rule 3: every DTO with a JSON field needs ``from_json``."""
+    """Rule 3: every DTO with a JSON field needs ``from_json``.
+
+    Rule (c) only constrains classes that qualify as DTOs — i.e. classes that
+    define a ``map_from_db`` classmethod. Wire contracts (``core/contracts``),
+    table models (``db/models``) and web response envelopes (``web/api``) are
+    not projected DTOs, so JSON-shaped fields on them do not require
+    ``from_json``.
+    """
     out: list[_MapFromDbViolation] = []
     for file in sorted(src_root.rglob("*.py")):
         rel = str(file.relative_to(src_root))
@@ -244,6 +261,9 @@ def _scan_dto_json_fields(src_root: Path) -> list[_MapFromDbViolation]:
         except (OSError, SyntaxError):
             continue
         for cls in [n for n in tree.body if isinstance(n, ast.ClassDef)]:
+            if not _class_has_map_from_db(cls):
+                # Not a projected DTO — rule (c) does not apply.
+                continue
             has_json_field = False
             for member in cls.body:
                 if isinstance(member, ast.AnnAssign):

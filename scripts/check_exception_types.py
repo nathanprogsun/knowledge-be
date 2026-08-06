@@ -100,6 +100,15 @@ ALLOWED_APPLICATION_SUBCLASSES = {
     "OAuthRequiredError",
 }
 
+# Per-file allowlist of raise names that are deliberately sanctioned even
+# though they are not ApplicationError subclasses. Currently only the DI
+# sentinels in ``app_context/registry.py`` (lifespan not started) — these are
+# programming-error markers, not business-layer exceptions, and are an
+# intentional pre-existing design.
+ALLOWED_FILE_EXCEPTIONS: dict[str, set[str]] = {
+    "app_context/registry.py": {"RuntimeError"},
+}
+
 
 # ─────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -129,8 +138,92 @@ def _raised_exception_name(exc: ast.AST) -> str | None:
     return None
 
 
-def _scan_raises(rel: str, tree: ast.Module) -> list[_ExceptionViolation]:
+def _build_class_hierarchy(src_root: Path) -> dict[str, list[str]]:
+    """Map every class name in the scanned layers to its direct base names.
+
+    Used to resolve ``ApplicationError`` subclasses that are declared outside
+    ``src.common.exception`` (e.g. ``mcp_transport.errors.MCPError``) by
+    walking their inheritance chain back to a sanctioned base.
+    """
+    hierarchy: dict[str, list[str]] = {}
+    for file in sorted(src_root.rglob("*.py")):
+        rel = str(file.relative_to(src_root))
+        if not _is_scanned_file(Path(rel).parts):
+            continue
+        try:
+            tree = ast.parse(file.read_text(encoding="utf-8"), filename=str(file))
+        except (OSError, SyntaxError):
+            continue
+        for node in tree.body:
+            if not isinstance(node, ast.ClassDef):
+                continue
+            bases: list[str] = []
+            for base in node.bases:
+                if isinstance(base, ast.Name):
+                    bases.append(base.id)
+                elif isinstance(base, ast.Attribute):
+                    bases.append(base.attr)
+            hierarchy[node.name] = bases
+    return hierarchy
+
+
+def _is_application_subclass(name: str, hierarchy: dict[str, list[str]]) -> bool:
+    """True if ``name`` is ``ApplicationError`` or reaches a sanctioned base.
+
+    Walks the inheritance chain transitively (cycle-safe), so a class like
+    ``MCPTransportError(MCPError)`` → ``MCPError(ExternalServiceError)`` is
+    sanctioned because ``ExternalServiceError`` is in the allowlist. Multiple
+    inheritance is handled naturally: any base chain that hits an allowed
+    name passes.
+    """
+    if name in ALLOWED_APPLICATION_SUBCLASSES:
+        return True
+    seen: set[str] = set()
+    stack = list(hierarchy.get(name, []))
+    while stack:
+        base = stack.pop()
+        if base in seen:
+            continue
+        seen.add(base)
+        if base in ALLOWED_APPLICATION_SUBCLASSES:
+            return True
+        stack.extend(hierarchy.get(base, []))
+    return False
+
+
+def _collect_helper_returns(tree: ast.Module) -> set[str]:
+    """Names of functions/methods whose return annotation is a sanctioned error.
+
+    These are exception factories such as ``_not_found()`` / ``_already_exists()``
+    / ``_unimplemented()`` that construct and return an ``ApplicationError``
+    subclass. ``raise self.<helper>(...)`` against them is fine — the helper
+    already produces a sanctioned exception.
+    """
+    out: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        ret = node.returns
+        if ret is None:
+            continue
+        base: str | None = None
+        if isinstance(ret, ast.Name):
+            base = ret.id
+        elif isinstance(ret, ast.Attribute):
+            base = ret.attr
+        if base in ALLOWED_APPLICATION_SUBCLASSES:
+            out.add(node.name)
+    return out
+
+
+def _scan_raises(
+    rel: str,
+    tree: ast.Module,
+    hierarchy: dict[str, list[str]],
+    helper_names: set[str],
+) -> list[_ExceptionViolation]:
     out: list[_ExceptionViolation] = []
+    file_allowed = ALLOWED_FILE_EXCEPTIONS.get(rel, set())
     for node in ast.walk(tree):
         if not isinstance(node, ast.Raise):
             continue
@@ -144,7 +237,13 @@ def _scan_raises(rel: str, tree: ast.Module) -> list[_ExceptionViolation]:
             continue
         if name in ALLOWED_BUILTIN_RAISES:
             continue
-        if name in ALLOWED_APPLICATION_SUBCLASSES:
+        if name in file_allowed:
+            continue
+        if _is_application_subclass(name, hierarchy):
+            continue
+        if name in helper_names:
+            # ``raise self._not_found()`` — the helper returns a sanctioned
+            # ApplicationError subclass.
             continue
         # ``Exception`` itself is the platform base; only an
         # ApplicationError subclass is sanctioned.
@@ -231,6 +330,7 @@ def main() -> int:
         return 0
 
     violations: list[_ExceptionViolation] = []
+    hierarchy = _build_class_hierarchy(src)
     files = sorted(src.rglob("*.py"))
     for file in files:
         rel = str(file.relative_to(src))
@@ -241,7 +341,8 @@ def main() -> int:
             tree = ast.parse(file.read_text(encoding="utf-8"), filename=str(file))
         except (OSError, SyntaxError):
             continue
-        violations.extend(_scan_raises(rel, tree))
+        helper_names = _collect_helper_returns(tree)
+        violations.extend(_scan_raises(rel, tree, hierarchy, helper_names))
         violations.extend(_scan_custom_exception_declarations(rel, tree))
 
     if not violations:
