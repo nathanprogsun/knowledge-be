@@ -74,7 +74,9 @@ class SSEClient:
         # into this queue so :meth:`_wait_for_endpoint` and
         # :meth:`_await_message` can read sequentially without
         # exhausting the response.
-        self._event_queue: asyncio.Queue[ServerSentEvent | BaseException] | None = None
+        self._event_queue: (
+            asyncio.Queue[ServerSentEvent | BaseException | _StreamClosed] | None
+        ) = None
         self._drain_task: asyncio.Task[None] | None = None
 
     # ── Lifecycle ──────────────────────────────────────────────────
@@ -235,7 +237,7 @@ class SSEClient:
             await queue.put(exc)
             return
         # Sentinel: stream ended cleanly.
-        await queue.put(_STREAM_CLOSED)  # type: ignore[arg-type]
+        await queue.put(_STREAM_CLOSED)
 
     async def _wait_for_endpoint(self) -> None:
         """Wait for the ``endpoint`` SSE event from the server.
@@ -256,7 +258,7 @@ class SSEClient:
                 raise MCPTransportError(
                     f"SSE handshake failed: {type(event).__name__}: {event}",
                 ) from event
-            if event is _STREAM_CLOSED:
+            if isinstance(event, _StreamClosed):
                 raise MCPTransportError("SSE stream closed before endpoint event")
             if event.event == "endpoint":
                 post_url = (event.data or "").strip()
@@ -278,7 +280,7 @@ class SSEClient:
                 raise MCPTransportError(
                     f"SSE stream invalidated mid-call: {type(event).__name__}: {event}",
                 ) from event
-            if event is _STREAM_CLOSED:
+            if isinstance(event, _StreamClosed):
                 raise MCPTransportError(
                     f"SSE stream closed before response for id={request_id!r}",
                 )
