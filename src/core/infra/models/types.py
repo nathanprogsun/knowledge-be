@@ -84,7 +84,7 @@ class ModelInfo(BaseModel):
           bypasses the wire-layer masking still cannot leak the raw
           credential.
         """
-        record = db.model_dump(exclude=MODEL_EXCLUDE_COLUMNS)
+        record = db.model_dump(exclude=set(MODEL_EXCLUDE_COLUMNS))
         parameters = record.get("parameters")
         if isinstance(parameters, str):
             try:

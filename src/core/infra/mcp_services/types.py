@@ -85,7 +85,7 @@ class MCPServiceInfo(BaseModel):
           services carry credentials in the wire contract per Go
           ``dto.NewMCPServiceResponse``).
         """
-        record = db.model_dump(exclude=_MCP_SERVICE_EXCLUDE_COLUMNS)
+        record = db.model_dump(exclude=set(_MCP_SERVICE_EXCLUDE_COLUMNS))
         for column in ("headers", "auth_config", "advanced_config", "stdio_config", "env_vars"):
             record[column] = _parse_json_blob(record.get(column), column)
         record = _redact_mcp_secrets(record)
@@ -147,7 +147,7 @@ def _redact_mcp_secrets(record: JsonObject) -> JsonObject:
     out: JsonObject = dict(record)
     headers = out.get("headers")
     if isinstance(headers, dict):
-        redacted_headers: dict[str, str] = {}
+        redacted_headers: dict[str, JsonValue] = {}
         for header_name, header_value in headers.items():
             if (
                 isinstance(header_name, str)
@@ -160,14 +160,14 @@ def _redact_mcp_secrets(record: JsonObject) -> JsonObject:
                 redacted_headers[header_name] = header_value
             # Non-string header values are dropped (HTTP headers are
             # always string-shaped).
-        out["headers"] = cast("dict[str, str]", redacted_headers)
+        out["headers"] = redacted_headers
     env_vars = out.get("env_vars")
     if isinstance(env_vars, dict):
-        presence_map: dict[str, str] = {}
+        presence_map: dict[str, JsonValue] = {}
         for env_name in env_vars:
             if isinstance(env_name, str) and env_name:
                 presence_map[env_name] = _REDACTED_CREDENTIAL_PLACEHOLDER
-        out["env_vars"] = cast("dict[str, str]", presence_map)
+        out["env_vars"] = presence_map
     return out
 
 

@@ -282,7 +282,7 @@ def _as_tools(response: JSONRPCResponse) -> tuple[DiscoveryTool, ...]:
             DiscoveryTool(
                 name=name,
                 description=description if isinstance(description, str) else None,
-                input_schema=cast("JsonObject | None", input_schema),
+                input_schema=input_schema,
                 require_approval=False,
             ),
         )

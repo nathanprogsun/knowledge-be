@@ -14,13 +14,14 @@ plumbing is covered in ``test_sse_client.py``. Here we focus on:
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 from src.ai.mcp_transport.connection_manager import (
     MCPConnectionManager,
     MCPSession,
+    TransportClient,
     _default_transport_factory,
 )
 from src.ai.mcp_transport.errors import (
@@ -92,8 +93,8 @@ def _build_manager(*, fake: _FakeTransportClient) -> MCPConnectionManager:
         url: str,
         headers: dict[str, str] | None,
         timeout_seconds: float,
-    ) -> _FakeTransportClient:
-        return fake
+    ) -> TransportClient:
+        return cast(TransportClient, fake)
 
     return MCPConnectionManager(
         transport_factory=_factory,
@@ -237,7 +238,7 @@ async def test_get_or_create_wraps_unexpected_exceptions_as_transport_error() ->
             raise RuntimeError("boom")
 
     manager = MCPConnectionManager(
-        transport_factory=lambda **_kwargs: _BoomClient(),
+        transport_factory=lambda **_kwargs: cast(TransportClient, _BoomClient()),
         default_timeout_seconds=5.0,
     )
     try:
@@ -680,7 +681,7 @@ async def test_cleanup_loop_drops_dead_sessions() -> None:
     session = MCPSession(
         service_id="svc-ghost",
         transport_type="sse",
-        client=fake,
+        client=cast(TransportClient, fake),
     )
     session.initialized = True
     session.connected = False

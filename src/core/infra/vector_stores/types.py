@@ -516,7 +516,7 @@ class VectorStoreInfo(BaseModel):
         the service layer treats a missing row as the only delete
         signal so the DTO deliberately drops it.
         """
-        record = db.model_dump(exclude=VECTOR_STORE_EXCLUDE_COLUMNS)
+        record = db.model_dump(exclude=set(VECTOR_STORE_EXCLUDE_COLUMNS))
         return cls.model_validate(record)
 
 

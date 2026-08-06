@@ -34,7 +34,7 @@ import asyncio
 import contextlib
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Protocol, cast
+from typing import Protocol
 
 from src.ai.mcp_transport.errors import (
     MCPError,
@@ -337,8 +337,7 @@ class MCPConnectionManager:
                 f"session for {session.service_id!r} is not connected",
             )
         try:
-            response = await session.client.request(method=method, params=params)
-            return cast("JSONRPCResponse", response)
+            return await session.client.request(method=method, params=params)
         except MCPTransportError as exc:
             if evict_on_session_invalid and _looks_like_session_invalid(exc):
                 await self._evict(session.service_id)
@@ -347,7 +346,7 @@ class MCPConnectionManager:
 
     async def _initialize(self, session: MCPSession) -> None:
         """Send the MCP ``initialize`` handshake."""
-        params = {
+        params: dict[str, JsonValue] = {
             "protocolVersion": "2024-11-05",
             "capabilities": {},
             "clientInfo": {"name": "knowledge-be", "version": "0.1.0"},
