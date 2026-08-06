@@ -7,18 +7,20 @@ serialization, exception handling) without touching a real database.
 
 The env-store synthesis lives inside the router; the tests assert
 on its presence by setting ``RETRIEVE_DRIVER`` in the env map.
+
+Uses the shared ``web_app`` fixture (header-based auth) and applies
+the service dep override on it; the real ``require_auth`` dep resolves
+the principal via the ``x-knowledge-*`` header trio.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 
-from src.app_context.lifespan import create_app
 from src.core.contracts.infra import (
     CreateVectorStoreRequest,
     UpdateVectorStoreRequest,
@@ -29,7 +31,7 @@ from src.core.contracts.infra import (
 from src.core.infra.vector_stores.types import VectorStoreInfo
 from src.db.models.infra.vector_store import VectorStore
 from src.web.deps.infra_vector_stores import get_vector_store_service
-from tests.unit.fakes.auth_gates import override_auth_gates
+from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 
 # ── In-memory fake service ──────────────────────────────────────────
 
@@ -144,24 +146,21 @@ def fake_service() -> _FakeService:
 
 
 @pytest.fixture
-def app(fake_service: _FakeService) -> FastAPI:
-    application = create_app()
-    override_auth_gates(application)
-    application.dependency_overrides[get_vector_store_service] = lambda: fake_service
-    # Mount the vector-store router in this isolated app instance so the
-    # test exercises the full HTTP path without registering it in the
-    # global lifespan.
-    from src.web.api.infra.vector_stores.router import router as vs_router
-
-    application.include_router(vs_router)
-    return application
+def app(
+    request: pytest.FixtureRequest,  # noqa: ARG001 - explicit fixture-param
+    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
+    fake_service: _FakeService,
+) -> FastAPI:
+    """Override ``get_vector_store_service`` on the shared web app."""
+    web_app.dependency_overrides[get_vector_store_service] = lambda: fake_service
+    return web_app
 
 
 @pytest.fixture
-async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
+def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa: ARG001
+    """Alias ``web_authed_client``; depending on ``app`` forces the
+    dep-override fixture to run before the test executes."""
+    return web_authed_client
 
 
 # ── GET /vector-stores/types ─────────────────────────────────────────

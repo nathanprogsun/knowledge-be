@@ -6,29 +6,33 @@ this file covers the live path - when the lifespan wires the
 /mcp-services/{id}/tools`` endpoint must return the upstream tools
 mocked at the ``httpx`` layer with ``respx``.
 
-The fixture seeds a real ``MCPServiceRepository`` row, installs a
-hand-rolled ``LifeSpanService`` (mirroring what ``lifespan`` does in
-production) directly on ``app.state``, and overrides
-``get_mcp_service`` so the per-request handler threads the fake DB
-session into the live discovery + connectivity probes.
+The fixture seeds a real ``MCPServiceRepository`` row, attaches the
+live MCP singletons (connection pool + OAuth factory) to the shared
+``web_app`` lifespan service, and overrides ``get_mcp_service`` so
+the per-request handler threads the fake DB session into the live
+discovery + connectivity probes.
+
+Uses the shared ``web_app`` fixture (header-based auth) and applies
+the service dep override on it; the real ``require_auth`` dep resolves
+the principal via the ``x-knowledge-*`` header trio.
 """
 
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 from typing import cast as _cast
 
 import httpx
 import pytest
+import pytest_asyncio
 import respx
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 
 from src.ai.mcp_transport import MCPConnectionManager
-from src.app_context.lifespan import create_app
 from src.app_context.registry import LifeSpanService
 from src.common.json import JsonObject
 from src.core.infra.mcp_services.connectivity import (
@@ -55,9 +59,8 @@ from src.db.dao.mcp_tool_approval_repository import (
     MCPToolApprovalRepository as _MCPToolApprovalRepository,
 )
 from src.db.models.infra.mcp_services import MCPService
-from src.web.api.infra.mcp_services.router import router as mcp_router
 from src.web.deps.infra_mcp import get_mcp_service
-from tests.unit.fakes.auth_gates import override_auth_gates
+from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 from tests.unit.fakes.mcp_services import (
     FakeMCPServiceRepository,
     FakeMCPToolApprovalRepository,
@@ -82,30 +85,21 @@ def approvals_repo() -> FakeMCPToolApprovalRepository:
     return FakeMCPToolApprovalRepository()
 
 
-@pytest.fixture
-async def connection_manager() -> AsyncGenerator[MCPConnectionManager]:
-    manager = MCPConnectionManager()
-    manager.start_cleanup()
-    yield manager
-    await manager.shutdown()
-
-
-@pytest.fixture
-def app(
+@pytest_asyncio.fixture
+async def app(
     mcp_repo: FakeMCPServiceRepository,
     approvals_repo: FakeMCPToolApprovalRepository,
-    connection_manager: MCPConnectionManager,
-) -> FastAPI:
-    """Build a test FastAPI app with a lifespan service on ``app.state``.
+    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
+) -> AsyncIterator[FastAPI]:
+    """Configure the shared ``web_app`` with live MCP singletons + dep overrides.
 
     Mirrors what ``src.app_context.lifespan`` does in production: the
     per-request ``MCPServiceService`` factory is rebuilt to bridge the
     fake DB repos with the live connection pool so ``GET
-    /mcp-services/{id}/tools`` reaches the upstream MCP server.
+    /mcp-services/{id}/tools`` reaches the upstream MCP server. The
+    shared ``web_app`` already carries the test ``db_engine`` on its
+    ``LifeSpanService``; we attach the live MCP fields on top of it.
     """
-    application = create_app()
-    application.include_router(mcp_router)
-
     state_store = OAuthStateStore()
     secret_store = InMemorySecretStore()
 
@@ -116,13 +110,15 @@ def app(
             state_store=state_store,
         )
 
-    lifespan_service = LifeSpanService(
-        mcp_connection_manager=connection_manager,
-        mcp_oauth_state_store=state_store,
-        mcp_oauth_secret_store=secret_store,
-        mcp_oauth_manager_factory=_oauth_factory,
-    )
-    application.state.lifespan_service = lifespan_service
+    connection_manager = MCPConnectionManager()
+    connection_manager.start_cleanup()
+
+    lifespan_service = web_app.state.lifespan_service
+    assert isinstance(lifespan_service, LifeSpanService)
+    lifespan_service.mcp_connection_manager = connection_manager
+    lifespan_service.mcp_oauth_state_store = state_store
+    lifespan_service.mcp_oauth_secret_store = secret_store
+    lifespan_service.mcp_oauth_manager_factory = _oauth_factory
 
     async def _resolver(
         resolved_tenant_id: int,
@@ -165,19 +161,22 @@ def app(
             ),
         )
 
-    application.dependency_overrides[get_mcp_service] = _override_service
-    override_auth_gates(application)
-    return application
+    web_app.dependency_overrides[get_mcp_service] = _override_service
+    try:
+        yield web_app
+    finally:
+        await connection_manager.shutdown()
+        lifespan_service.mcp_connection_manager = None
+        lifespan_service.mcp_oauth_state_store = None
+        lifespan_service.mcp_oauth_secret_store = None
+        lifespan_service.mcp_oauth_manager_factory = None
 
 
 @pytest.fixture
-async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    # ``raise_app_exceptions=False`` keeps transport-level errors inside
-    # the response body instead of bubbling into the test as
-    # ``PytestUnraisableExceptionWarning`` during fixture teardown.
-    transport = ASGITransport(app=app, raise_app_exceptions=False)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
+def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa: ARG001
+    """Alias ``web_authed_client``; depending on ``app`` forces the
+    dep-override fixture to run before the test executes."""
+    return web_authed_client
 
 
 async def _seed(
