@@ -40,6 +40,11 @@ from src.ai.retrieval.elasticsearch_v8 import (
     new_elasticsearch_v8_client,
     new_elasticsearch_v8_repository,
 )
+from src.ai.retrieval.doris import (
+    DorisRepository,
+    new_doris_retrieve_engine_repository,
+)
+)
 from src.ai.retrieval.env_registry import (
     StoreLoaderFn,
     init_retrieve_engine_registry,
@@ -77,6 +82,14 @@ from src.ai.retrieval.registry import (
     VectorStoreUnavailableError,
     new_retrieve_engine_registry,
 )
+from src.ai.retrieval.sqlite_vec import (
+    SQLiteRepository,
+    new_sqlite_retrieve_engine_repository,
+)
+from src.ai.retrieval.tencent_vectordb import (
+    TencentVectorDBRepository,
+    new_tencent_vectordb_retrieve_engine_repository,
+)
 from src.ai.retrieval.types import (
     ENV_STORE_ID_PREFIX,
     ConnectionConfig,
@@ -105,8 +118,10 @@ __all__ = [
     "ConnectionConfig",
     "Context",
     "Database",
+<<<<<<< HEAD
     "ElasticsearchV7Repository",
     "ElasticsearchV8Repository",
+    "DorisRepository",
     "Embedder",
     "EngineFactory",
     "IndexConfig",
@@ -129,9 +144,11 @@ __all__ = [
     "RetrieverEngineParams",
     "RetrieverEngineType",
     "RetrieverType",
+    "SQLiteRepository",
     "SourceType",
     "StoreLoaderFn",
     "StoreRegistry",
+    "TencentVectorDBRepository",
     "VectorStore",
     "VectorStoreLike",
     "VectorStoreNotFoundError",
@@ -145,10 +162,12 @@ __all__ = [
     "is_env_store_id",
     "is_es_v7",
     "load_db_stores_into_registry",
+<<<<<<< HEAD
     "new_elasticsearch_v7_client",
     "new_elasticsearch_v7_repository",
     "new_elasticsearch_v8_client",
     "new_elasticsearch_v8_repository",
+    "new_doris_retrieve_engine_repository",
     "new_engine_factory",
     "new_kv_hybrid_retrieve_engine",
     "new_opensearch_client",
@@ -156,6 +175,8 @@ __all__ = [
     "new_qdrant_retrieve_engine_repository",
 
     "new_retrieve_engine_registry",
+    "new_sqlite_retrieve_engine_repository",
+    "new_tencent_vectordb_retrieve_engine_repository",
     "parse_retrieve_driver",
     "sanitize_for_embedding",
 ]

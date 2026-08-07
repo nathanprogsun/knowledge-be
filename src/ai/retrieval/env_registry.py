@@ -31,7 +31,7 @@ from src.ai.retrieval.base import (
 )
 from src.ai.retrieval.elasticsearch_v7 import new_elasticsearch_v7_repository
 from src.ai.retrieval.elasticsearch_v8 import new_elasticsearch_v8_repository
-from src.ai.retrieval.factory import create_engine_service_from_store
+from src.ai.retrieval.factory import create_engine_service_from_store, host_from_addr
 from src.ai.retrieval.kv_hybrid import new_kv_hybrid_retrieve_engine
 from src.ai.retrieval.milvus import new_milvus_retrieve_engine_repository
 from src.ai.retrieval.opensearch import new_opensearch_repository
@@ -126,8 +126,10 @@ async def _new_postgres_repository(db: Database) -> RetrieveEngineRepository:
     return new_postgres_retrieve_engine_repository(db)
 
 
-async def _new_sqlite_repository(_db: Database) -> RetrieveEngineRepository:
-    raise NotImplementedError("sqlite engine repository lands with the sqlite-vec engine")
+async def _new_sqlite_repository(db: Database) -> RetrieveEngineRepository:
+    from src.ai.retrieval.sqlite_vec import new_sqlite_retrieve_engine_repository
+
+    return new_sqlite_retrieve_engine_repository(db)
 
 
 async def _new_elasticsearch_v8_repository(cfg: AppConfig) -> RetrieveEngineRepository:
@@ -181,9 +183,13 @@ async def _new_milvus_repository(
 
 
 async def _new_doris_repository(
-    _addr: str, _http_port: int, _database: str, _username: str, _password: str
+    addr: str, http_port: int, database: str, username: str, password: str
 ) -> RetrieveEngineRepository:
-    raise NotImplementedError("doris repository lands with the doris engine")
+    from src.ai.retrieval.doris import _connect_doris, new_doris_retrieve_engine_repository
+
+    http_base = f"http://{host_from_addr(addr)}:{http_port}"
+    db = _connect_doris(addr, username, password, database)
+    return new_doris_retrieve_engine_repository(db, http_base, username, password, database, None)
 
 
 async def _build_driver_repository(

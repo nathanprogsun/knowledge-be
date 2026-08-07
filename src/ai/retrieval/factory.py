@@ -77,11 +77,10 @@ def host_from_addr(addr: str) -> str:
     return addr
 
 
-# ── Engine repository placeholders ───────────────────────────────────
+# ── Engine repository constructors ───────────────────────────────────
 #
-# Each placeholder mirrors the signature the concrete engine PR will fill
-# in. They raise ``NotImplementedError`` so the factory fails loudly until
-# the engine repository module lands.
+# Doris, SQLite, and Tencent are wired here; the remaining engines are
+# placeholders that raise ``NotImplementedError`` until their engine PRs land.
 
 
 async def _new_postgres_retrieve_engine_repository(db: Database) -> RetrieveEngineRepository:
@@ -89,7 +88,9 @@ async def _new_postgres_retrieve_engine_repository(db: Database) -> RetrieveEngi
 
 
 async def _new_sqlite_retrieve_engine_repository(db: Database) -> RetrieveEngineRepository:
-    raise NotImplementedError("sqlite retrieval repository lands with the sqlite-vec engine")
+    from src.ai.retrieval.sqlite_vec import new_sqlite_retrieve_engine_repository
+
+    return new_sqlite_retrieve_engine_repository(db)
 
 
 async def _new_elasticsearch_v8_retrieve_engine_repository(
@@ -155,13 +156,17 @@ async def _new_weaviate_retrieve_engine_repository(
 
 
 async def _new_doris_retrieve_engine_repository(
+    addr: str,
     http_base: str,
     username: str,
     password: str,
     database: str,
     index_config: IndexConfig,
 ) -> RetrieveEngineRepository:
-    raise NotImplementedError("doris repository lands with the doris engine")
+    from src.ai.retrieval.doris import _connect_doris, new_doris_retrieve_engine_repository
+
+    db = _connect_doris(addr, username, password, database)
+    return new_doris_retrieve_engine_repository(db, http_base, username, password, database, index_config)
 
 
 async def _new_tencent_vectordb_retrieve_engine_repository(
@@ -171,7 +176,14 @@ async def _new_tencent_vectordb_retrieve_engine_repository(
     database: str,
     index_config: IndexConfig,
 ) -> RetrieveEngineRepository:
-    raise NotImplementedError("tencent_vectordb repository lands with the tencent vectordb engine")
+    import tcvectordb
+
+    from src.ai.retrieval.tencent_vectordb import new_tencent_vectordb_retrieve_engine_repository
+
+    client = tcvectordb.RPCVectorDBClient(
+        addr, username=username, key=api_key, timeout=10
+    )
+    return new_tencent_vectordb_retrieve_engine_repository(client, database, index_config)
 
 
 # ── Per-engine builders ──────────────────────────────────────────────
@@ -270,7 +282,7 @@ async def _create_doris_engine(store: VectorStoreLike) -> RetrieveEngineService:
         http_port = 8030
     http_base = f"http://{host_from_addr(cc.addr)}:{http_port}"
     repo = await _new_doris_retrieve_engine_repository(
-        http_base, cc.username, cc.password, cc.database, store.index_config
+        cc.addr, http_base, cc.username, cc.password, cc.database, store.index_config
     )
     return new_kv_hybrid_retrieve_engine(repo, RetrieverEngineType.DORIS)
 

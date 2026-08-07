@@ -316,8 +316,9 @@ async def test_create_doris_engine_computes_http_base(
     captured: dict[str, object] = {}
 
     async def _fake_repo_ctor(
-        http_base: str, username: str, password: str, database: str, index_config: IndexConfig
+        addr: str, http_base: str, username: str, password: str, database: str, index_config: IndexConfig
     ) -> RetrieveEngineRepository:
+        captured["addr"] = addr
         captured["http_base"] = http_base
         return _fake_repo()
 
@@ -327,6 +328,7 @@ async def test_create_doris_engine_computes_http_base(
         cc=ConnectionConfig(addr="doris-fe:9030", database="weknora", username="root"),
     )
     engine = await factory_module._create_doris_engine(store)
+    assert captured["addr"] == "doris-fe:9030"
     assert captured["http_base"] == "http://doris-fe:8030"
     assert engine.engine_type() == RetrieverEngineType.DORIS
 
