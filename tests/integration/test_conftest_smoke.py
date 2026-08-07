@@ -9,12 +9,12 @@ authenticated endpoint returns 200.
 from __future__ import annotations
 
 import pytest
-from httpx import AsyncClient
+from fastapi.testclient import TestClient
 
 
 @pytest.mark.asyncio
 async def test_authed_client_reaches_an_authenticated_endpoint(
-    authed_client: AsyncClient,
+    authed_client: TestClient,
 ) -> None:
     """The header-auth channel resolves the seeded user and returns 2xx.
 
@@ -22,7 +22,7 @@ async def test_authed_client_reaches_an_authenticated_endpoint(
     which only reads the principal from ``request.state`` populated by
     the header-trust branch - no Bearer token required.
     """
-    resp = await authed_client.get("/storage-backends/types")
+    resp = authed_client.get("/storage-backends/types")
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["success"] is True
