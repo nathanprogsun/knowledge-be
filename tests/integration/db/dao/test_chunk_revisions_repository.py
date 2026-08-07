@@ -8,6 +8,7 @@ these tests run once the full migration chain is applied.
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 
 import pytest
@@ -46,6 +47,11 @@ def _revision(
     return ChunkRevision.model_validate(values)
 
 
+def _chunk() -> str:
+    """Return a run-unique chunk id so the (chunk_id, revision) pair is isolated per run."""
+    return f"chunk-{uuid.uuid4().hex[:8]}"
+
+
 # ── create ─────────────────────────────────────────────────────────
 
 
@@ -54,7 +60,7 @@ async def test_create_persists_every_column(session: AsyncSession) -> None:
     tenant_id = make_test_tenant_id()
     row = _revision(
         tenant_id=tenant_id,
-        chunk_id="chunk-1",
+        chunk_id=_chunk(),
         revision=1,
         content="edited body",
         is_enabled=False,
@@ -77,7 +83,13 @@ async def test_create_persists_every_column(session: AsyncSession) -> None:
 async def test_create_applies_model_defaults(session: AsyncSession) -> None:
     repo = ChunkRevisionRepository(session)
     tenant_id = make_test_tenant_id()
-    row = _revision(tenant_id=tenant_id, chunk_id="chunk-d", revision=0)
+    row = _revision(
+        tenant_id=tenant_id,
+        chunk_id=_chunk(),
+        revision=0,
+        content="",
+        editor_id="",
+    )
 
     stored = await repo.create(row)
     await session.commit()
@@ -94,11 +106,12 @@ async def test_create_applies_model_defaults(session: AsyncSession) -> None:
 async def test_list_chunk_revisions_orders_newest_first(session: AsyncSession) -> None:
     repo = ChunkRevisionRepository(session)
     tenant_id = make_test_tenant_id()
+    chunk = _chunk()
     for revision in (1, 2, 3):
-        await repo.create(_revision(tenant_id=tenant_id, chunk_id="chunk-1", revision=revision))
+        await repo.create(_revision(tenant_id=tenant_id, chunk_id=chunk, revision=revision))
     await session.commit()
 
-    rows = await repo.list_chunk_revisions(tenant_id=tenant_id, chunk_id="chunk-1")
+    rows = await repo.list_chunk_revisions(tenant_id=tenant_id, chunk_id=chunk)
 
     assert [r.revision for r in rows] == [3, 2, 1]
 
@@ -107,26 +120,30 @@ async def test_list_chunk_revisions_isolated_by_tenant(session: AsyncSession) ->
     repo = ChunkRevisionRepository(session)
     tenant_a = make_test_tenant_id()
     tenant_b = make_test_tenant_id()
-    await repo.create(_revision(tenant_id=tenant_a, chunk_id="chunk-1", revision=1))
-    await repo.create(_revision(tenant_id=tenant_b, chunk_id="chunk-1", revision=1))
+    chunk_a = _chunk()
+    chunk_b = _chunk()
+    await repo.create(_revision(tenant_id=tenant_a, chunk_id=chunk_a, revision=1))
+    await repo.create(_revision(tenant_id=tenant_b, chunk_id=chunk_b, revision=1))
     await session.commit()
 
-    rows = await repo.list_chunk_revisions(tenant_id=tenant_a, chunk_id="chunk-1")
+    rows = await repo.list_chunk_revisions(tenant_id=tenant_a, chunk_id=chunk_a)
 
-    assert [r.id for r in rows] == ["chunk-1-rev-1"]
+    assert [r.id for r in rows] == [f"{chunk_a}-rev-1"]
     assert rows[0].tenant_id == tenant_a
 
 
 async def test_list_chunk_revisions_isolated_by_chunk(session: AsyncSession) -> None:
     repo = ChunkRevisionRepository(session)
     tenant_id = make_test_tenant_id()
-    await repo.create(_revision(tenant_id=tenant_id, chunk_id="chunk-a", revision=1))
-    await repo.create(_revision(tenant_id=tenant_id, chunk_id="chunk-b", revision=1))
+    chunk_a = _chunk()
+    chunk_b = _chunk()
+    await repo.create(_revision(tenant_id=tenant_id, chunk_id=chunk_a, revision=1))
+    await repo.create(_revision(tenant_id=tenant_id, chunk_id=chunk_b, revision=1))
     await session.commit()
 
-    rows = await repo.list_chunk_revisions(tenant_id=tenant_id, chunk_id="chunk-a")
+    rows = await repo.list_chunk_revisions(tenant_id=tenant_id, chunk_id=chunk_a)
 
-    assert [r.chunk_id for r in rows] == ["chunk-a"]
+    assert [r.chunk_id for r in rows] == [chunk_a]
 
 
 # ── get ────────────────────────────────────────────────────────────
@@ -135,13 +152,14 @@ async def test_list_chunk_revisions_isolated_by_chunk(session: AsyncSession) -> 
 async def test_get_chunk_revision_returns_snapshot(session: AsyncSession) -> None:
     repo = ChunkRevisionRepository(session)
     tenant_id = make_test_tenant_id()
-    await repo.create(_revision(tenant_id=tenant_id, chunk_id="chunk-1", revision=1))
-    await repo.create(_revision(tenant_id=tenant_id, chunk_id="chunk-1", revision=2))
+    chunk = _chunk()
+    await repo.create(_revision(tenant_id=tenant_id, chunk_id=chunk, revision=1))
+    await repo.create(_revision(tenant_id=tenant_id, chunk_id=chunk, revision=2))
     await session.commit()
 
     row = await repo.get_chunk_revision(
         tenant_id=tenant_id,
-        chunk_id="chunk-1",
+        chunk_id=chunk,
         revision=2,
     )
 
@@ -171,14 +189,15 @@ async def test_duplicate_chunk_revision_raises_integrity_error(
 ) -> None:
     repo = ChunkRevisionRepository(session)
     tenant_id = make_test_tenant_id()
-    await repo.create(_revision(tenant_id=tenant_id, chunk_id="chunk-1", revision=1))
+    chunk = _chunk()
+    await repo.create(_revision(tenant_id=tenant_id, chunk_id=chunk, revision=1))
     await session.commit()
 
     duplicate = _revision(
         tenant_id=tenant_id,
-        chunk_id="chunk-1",
+        chunk_id=chunk,
         revision=1,
-        id="chunk-1-rev-1-copy",
+        id=f"{chunk}-rev-1-copy",
     )
 
     with pytest.raises(IntegrityError):
@@ -189,11 +208,13 @@ async def test_duplicate_chunk_revision_raises_integrity_error(
 async def test_same_revision_allowed_across_chunks(session: AsyncSession) -> None:
     repo = ChunkRevisionRepository(session)
     tenant_id = make_test_tenant_id()
-    await repo.create(_revision(tenant_id=tenant_id, chunk_id="chunk-a", revision=1))
-    await repo.create(_revision(tenant_id=tenant_id, chunk_id="chunk-b", revision=1))
+    chunk_a = _chunk()
+    chunk_b = _chunk()
+    await repo.create(_revision(tenant_id=tenant_id, chunk_id=chunk_a, revision=1))
+    await repo.create(_revision(tenant_id=tenant_id, chunk_id=chunk_b, revision=1))
     await session.commit()
 
-    rows = await repo.list_chunk_revisions(tenant_id=tenant_id, chunk_id="chunk-b")
+    rows = await repo.list_chunk_revisions(tenant_id=tenant_id, chunk_id=chunk_b)
 
     assert [r.revision for r in rows] == [1]
 
@@ -205,10 +226,11 @@ async def test_primary_key_is_the_revision_row_id(session: AsyncSession) -> None
     """The unique pair is (chunk_id, revision); id stays the primary key."""
     repo = ChunkRevisionRepository(session)
     tenant_id = make_test_tenant_id()
-    await repo.create(_revision(tenant_id=tenant_id, chunk_id="chunk-1", revision=1))
+    chunk = _chunk()
+    await repo.create(_revision(tenant_id=tenant_id, chunk_id=chunk, revision=1))
     await session.commit()
 
-    fetched = await repo.find_by_primary_key({"id": "chunk-1-rev-1"})
+    fetched = await repo.find_by_primary_key({"id": f"{chunk}-rev-1"})
 
     assert fetched is not None
     assert fetched.tenant_id == tenant_id

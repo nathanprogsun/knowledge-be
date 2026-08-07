@@ -84,7 +84,7 @@ async def test_find_by_id_isolated_by_tenant(session: AsyncSession) -> None:
 async def test_find_by_ids_returns_matching_and_omits_others(session: AsyncSession) -> None:
     repo = TagRepository(session)
     tag_a = await _store_tag(session, _tag())
-    tag_b = await _store_tag(session, _tag())
+    tag_b = await _store_tag(session, _tag(tenant_id=tag_a.tenant_id))
 
     rows = await repo.get_by_ids(tag_a.tenant_id, [tag_a.id, tag_b.id, _tid()])
 
@@ -119,7 +119,7 @@ async def test_find_by_seq_id(session: AsyncSession) -> None:
 async def test_find_by_seq_ids(session: AsyncSession) -> None:
     repo = TagRepository(session)
     tag_a = await _store_tag(session, _tag())
-    tag_b = await _store_tag(session, _tag())
+    tag_b = await _store_tag(session, _tag(tenant_id=tag_a.tenant_id))
 
     rows = await repo.get_by_seq_ids(tag_a.tenant_id, [tag_a.seq_id, tag_b.seq_id])
 
