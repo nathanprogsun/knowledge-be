@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import Pool
 
 
 class DatabaseEngine:
@@ -30,13 +31,21 @@ class DatabaseEngine:
         echo: bool = False,
         pool_size: int = 10,
         max_overflow: int = 20,
+        poolclass: type[Pool] | None = None,
     ) -> None:
-        self._engine: AsyncEngine = create_async_engine(
-            url,
-            echo=echo,
-            pool_size=pool_size,
-            max_overflow=max_overflow,
-        )
+        # ``NullPool`` (no connection reuse) is used by the test suite so a
+        # connection checked out in one event loop is never handed back in
+        # another (asyncpg binds connections to the loop they were created
+        # in). Production keeps the default ``QueuePool`` sizing below.
+        if poolclass is not None:
+            self._engine = create_async_engine(url, echo=echo, poolclass=poolclass)
+        else:
+            self._engine: AsyncEngine = create_async_engine(
+                url,
+                echo=echo,
+                pool_size=pool_size,
+                max_overflow=max_overflow,
+            )
         self._session_factory: async_sessionmaker[AsyncSession] = async_sessionmaker(
             self._engine,
             expire_on_commit=False,

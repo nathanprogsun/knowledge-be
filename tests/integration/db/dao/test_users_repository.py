@@ -1,87 +1,48 @@
-"""Integration tests for `UserRepository` against a real Postgres.
+"""Integration tests for ``UserRepository`` against the real applied schema.
 
-The session-scoped `pg_url` fixture (tests/conftest.py) provides the
-container; each test gets a fresh `users` schema on top of it so writes
-are hermetic. The DDL mirrors `alembic/versions/0001_users.py`.
-
-The fixture skips the suite when no Docker daemon is available (CI
-runners without Docker, sandboxes) — the repository code itself is
-exercised by the integration tests once Docker is present, and the
-schema/DAO correctness is enforced statically by mypy + ruff.
+Tests insert unique rows per run; isolation relies on unique ids and
+emails, not per-test DDL or cleanup. Tests commit explicitly.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from datetime import UTC, datetime
+import uuid
+from datetime import UTC, datetime, timedelta
 
 import pytest
-import sqlalchemy
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.common.exception import ConflictError, NotFoundError
 from src.common.json import JsonObject
 from src.db.dao.users_repository import UserRepository
 from src.db.models.auth.users import User
 
-_DROP_USERS_SQL = sqlalchemy.text("DROP TABLE IF EXISTS users")
-
-_CREATE_USERS_SQL = sqlalchemy.text(
-    """
-    CREATE TABLE users (
-        id VARCHAR(36) PRIMARY KEY,
-        username VARCHAR(100) NOT NULL UNIQUE,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        avatar VARCHAR(500),
-        tenant_id INTEGER,
-        is_active BOOLEAN NOT NULL DEFAULT TRUE,
-        can_access_all_tenants BOOLEAN NOT NULL DEFAULT FALSE,
-        is_system_admin BOOLEAN NOT NULL DEFAULT FALSE,
-        preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        deleted_at TIMESTAMP WITH TIME ZONE
-    )
-    """
-)
+_NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
 
-@pytest.fixture
-async def session(pg_url: str) -> AsyncIterator[AsyncSession]:
-    engine: AsyncEngine = create_async_engine(pg_url)
-    factory = async_sessionmaker(engine, expire_on_commit=False)
-    async with engine.begin() as conn:
-        await conn.execute(_DROP_USERS_SQL)
-        await conn.execute(_CREATE_USERS_SQL)
-    async with factory() as s:
-        yield s
-    async with engine.begin() as conn:
-        await conn.execute(_DROP_USERS_SQL)
-    await engine.dispose()
+def _uid() -> str:
+    return f"usr-{uuid.uuid4().hex[:12]}"
 
 
 def _sample_row(
     *,
-    id: str = "usr-1",
-    username: str = "alice",
-    email: str = "alice@example.com",
+    id: str | None = None,
+    username: str | None = None,
+    email: str | None = None,
     password_hash: str = "bcrypt-digest",
     tenant_id: int | None = None,
     is_active: bool = True,
     is_system_admin: bool = False,
     preferences: JsonObject | None = None,
+    created_at: datetime = _NOW,
 ) -> User:
-    now = datetime(2026, 1, 1, tzinfo=UTC)
+    uid = id or _uid()
+    uname = username or f"user-{uid}"
+    addr = email or f"{uid}@example.com"
     return User(
-        id=id,
-        username=username,
-        email=email,
+        id=uid,
+        username=uname,
+        email=addr,
         password_hash=password_hash,
         avatar=None,
         tenant_id=tenant_id,
@@ -89,8 +50,8 @@ def _sample_row(
         can_access_all_tenants=False,
         is_system_admin=is_system_admin,
         preferences=preferences if preferences is not None else {},
-        created_at=now,
-        updated_at=now,
+        created_at=created_at,
+        updated_at=created_at,
     )
 
 
@@ -132,20 +93,21 @@ async def test_find_by_username(session: AsyncSession) -> None:
 async def test_find_missing_raises_not_found(session: AsyncSession) -> None:
     repo = UserRepository(session)
     with pytest.raises(NotFoundError):
-        await repo.find_by_id("nope")
+        await repo.find_by_id(_uid())
     with pytest.raises(NotFoundError):
-        await repo.find_by_email("nope@example.com")
+        await repo.find_by_email(f"{_uid()}@example.com")
     with pytest.raises(NotFoundError):
-        await repo.find_by_username("nope")
+        await repo.find_by_username(_uid())
 
 
 async def test_duplicate_insert_raises_conflict(session: AsyncSession) -> None:
     repo = UserRepository(session)
-    row = _sample_row(id="usr-1", email="dup@example.com")
+    shared_email = f"{_uid()}@example.com"
+    row = _sample_row(email=shared_email)
     await repo.insert(row)
     await session.commit()
 
-    duplicate = _sample_row(id="usr-2", email="dup@example.com")
+    duplicate = _sample_row(email=shared_email)
     with pytest.raises(ConflictError):
         await repo.insert(duplicate)
 
@@ -160,8 +122,8 @@ async def test_update_by_primary_key_replaces_fields(session: AsyncSession) -> N
     updated = await repo.update_by_primary_key_or_fail(
         {"id": row.id},
         {
-            "username": "alice2",
-            "email": "alice2@example.com",
+            "username": f"updated-{row.id}",
+            "email": f"updated-{row.id}@example.com",
             "avatar": "https://example.com/a.png",
             "can_access_all_tenants": True,
             "is_system_admin": True,
@@ -173,8 +135,8 @@ async def test_update_by_primary_key_replaces_fields(session: AsyncSession) -> N
 
     found = await repo.find_by_id(row.id)
     assert found is not None
-    assert found.username == "alice2"
-    assert found.email == "alice2@example.com"
+    assert found.username == f"updated-{row.id}"
+    assert found.email == f"updated-{row.id}@example.com"
     assert found.avatar == "https://example.com/a.png"
     assert found.can_access_all_tenants is True
     assert found.is_system_admin is True
@@ -186,7 +148,7 @@ async def test_update_by_primary_key_missing_returns_none(session: AsyncSession)
     repo = UserRepository(session)
     now = datetime.now(UTC)
     result = await repo.update_by_primary_key(
-        {"id": "missing"},
+        {"id": _uid()},
         {"username": "x", "updated_at": now},
     )
     assert result is None
@@ -199,7 +161,7 @@ async def test_update_by_primary_key_or_fail_missing_raises(
     now = datetime.now(UTC)
     with pytest.raises(NotFoundError):
         await repo.update_by_primary_key_or_fail(
-            {"id": "missing"},
+            {"id": _uid()},
             {"username": "x", "updated_at": now},
         )
 
@@ -227,11 +189,7 @@ async def test_soft_delete_excludes_from_reads(session: AsyncSession) -> None:
     await repo.insert(row)
     await session.commit()
 
-    # A fixed past timestamp, not the host clock: the soft-delete filter
-    # compares `deleted_at` against the DB's clock, and the testcontainer
-    # clock lags the host, so a now()-derived value can read as a
-    # future-dated delete and the row survives.
-    now = datetime(2026, 1, 1, tzinfo=UTC)
+    now = datetime.now(UTC)
     await repo.update_by_primary_key_or_fail(
         {"id": row.id},
         {"deleted_at": now, "updated_at": now},
@@ -248,7 +206,7 @@ async def test_soft_delete_missing_returns_none(session: AsyncSession) -> None:
     repo = UserRepository(session)
     now = datetime.now(UTC)
     result = await repo.update_by_primary_key(
-        {"id": "missing"},
+        {"id": _uid()},
         {"deleted_at": now, "updated_at": now},
     )
     assert result is None
@@ -256,84 +214,97 @@ async def test_soft_delete_missing_returns_none(session: AsyncSession) -> None:
 
 async def test_list_paginates(session: AsyncSession) -> None:
     repo = UserRepository(session)
-    for i in range(5):
+    ids = [_uid() for _ in range(5)]
+    base = datetime.now(UTC)
+    for i, uid in enumerate(ids):
         await repo.insert(
             _sample_row(
-                id=f"usr-{i}",
-                username=f"u{i}",
-                email=f"u{i}@example.com",
+                id=uid,
+                username=f"u-{uid}",
+                email=f"{uid}@example.com",
+                created_at=base + timedelta(milliseconds=i),
             ),
         )
     await session.commit()
 
+    # Fetch all users and verify our 5 are present and ordered newest-first.
+    all_users = await repo.list(limit=1_000_000, offset=0)
+    mine = [u for u in all_users if u.id in set(ids)]
+    assert len(mine) == 5
+    assert [u.id for u in mine] == list(reversed(ids))
+
+    # Verify limit/offset: a small limit returns a non-overlapping page.
     page1 = await repo.list(limit=2, offset=0)
     page2 = await repo.list(limit=2, offset=2)
-    page3 = await repo.list(limit=2, offset=4)
-
     assert len(page1) == 2
     assert len(page2) == 2
-    assert len(page3) == 1
-
-    ids = {u.id for u in (*page1, *page2, *page3)}
-    assert ids == {f"usr-{i}" for i in range(5)}
+    assert {u.id for u in page1}.isdisjoint({u.id for u in page2})
 
 
 async def test_list_excludes_soft_deleted(session: AsyncSession) -> None:
     repo = UserRepository(session)
-    await repo.insert(_sample_row(id="usr-keep"))
+    keep_id = _uid()
+    drop_id = _uid()
+    base = datetime.now(UTC)
     await repo.insert(
         _sample_row(
-            id="usr-drop",
-            username="bob",
-            email="drop@example.com",
+            id=keep_id,
+            username=f"keep-{keep_id}",
+            email=f"{keep_id}@example.com",
+            created_at=base,
+        ),
+    )
+    await repo.insert(
+        _sample_row(
+            id=drop_id,
+            username=f"drop-{drop_id}",
+            email=f"{drop_id}@example.com",
+            created_at=base + timedelta(milliseconds=1),
         ),
     )
     await session.commit()
 
-    # Fixed past timestamp — see the note in
-    # test_soft_delete_excludes_from_reads about container clock skew.
-    now = datetime(2026, 1, 1, tzinfo=UTC)
+    now = datetime.now(UTC)
     await repo.update_by_primary_key_or_fail(
-        {"id": "usr-drop"},
+        {"id": drop_id},
         {"deleted_at": now, "updated_at": now},
     )
     await session.commit()
 
-    listed = await repo.list(limit=10, offset=0)
+    listed = await repo.list(limit=1_000_000, offset=0)
     ids = {u.id for u in listed}
-    assert ids == {"usr-keep"}
+    assert keep_id in ids
+    assert drop_id not in ids
 
 
 async def test_is_system_admin_round_trips(session: AsyncSession) -> None:
     repo = UserRepository(session)
-    await repo.insert(_sample_row(is_system_admin=True))
+    row = _sample_row(is_system_admin=True)
+    await repo.insert(row)
     await session.commit()
 
-    found = await repo.find_by_id("usr-1")
+    found = await repo.find_by_id(row.id)
     assert found is not None
     assert found.is_system_admin is True
 
 
 async def test_preferences_round_trips(session: AsyncSession) -> None:
     repo = UserRepository(session)
-    await repo.insert(
-        _sample_row(preferences={"last_active_tenant_id": 7}),
-    )
+    row = _sample_row(preferences={"last_active_tenant_id": 7})
+    await repo.insert(row)
     await session.commit()
 
-    found = await repo.find_by_id("usr-1")
+    found = await repo.find_by_id(row.id)
     assert found is not None
     assert found.preferences == {"last_active_tenant_id": 7}
 
 
 async def test_empty_preferences_default(session: AsyncSession) -> None:
     repo = UserRepository(session)
-    await repo.insert(_sample_row())
+    row = _sample_row()
+    await repo.insert(row)
     await session.commit()
 
-    found = await repo.find_by_id("usr-1")
+    found = await repo.find_by_id(row.id)
     assert found is not None
     assert found.preferences == {}
-
-
-__all__ = []

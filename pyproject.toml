@@ -39,7 +39,6 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "pytest-cov>=5.0",
-    "testcontainers[postgresql]>=4.0",
     # Async SQLite driver: service tests bind an in-memory SQLAlchemy engine
     # instead of spinning up a container.
     "aiosqlite>=0.20",
@@ -67,8 +66,24 @@ packages = ["src"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-addopts = ["--strict-markers", "--strict-config"]
-filterwarnings = ["error"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    # asyncpg connections are torn down at GC when the sync-def session
+    # engine is collected; pytest's unraisable plugin would turn those
+    # benign ResourceWarnings into session failures under filterwarnings=error.
+    # A later TestClient migration closes the engine properly; until then
+    # the plugin is disabled so real warnings still error but __del__ noise
+    # does not.
+    "-p", "no:unraisableexception",
+]
+filterwarnings = [
+    "error",
+    # Starlette warns that httpx is deprecated for TestClient on import.
+    # The test suite uses TestClient (sync portal loop) deliberately, so
+    # the import-time deprecation notice is suppressed.
+    "ignore::starlette.exceptions.StarletteDeprecationWarning",
+]
 
 [tool.coverage.run]
 source = ["src"]
