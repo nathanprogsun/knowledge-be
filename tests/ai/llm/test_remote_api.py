@@ -65,7 +65,7 @@ from src.ai.llm.types import (
     Tool,
     ToolCall,
 )
-from src.common.exception import AIProviderError
+from src.common.exception import ValidationError, AIProviderError
 from src.common.json import JsonObject
 
 BASE_URL = "http://llm.test/v1"
@@ -101,9 +101,9 @@ def test_constructor_rejects_restricted_base_url(monkeypatch: pytest.MonkeyPatch
 
 
 def test_constructor_requires_managed_cloud_credentials() -> None:
-    with pytest.raises(ValueError, match="AppID"):
+    with pytest.raises(ValidationError, match="AppID"):
         RemoteAPIChat(_config(provider="weknoracloud", app_id="", app_secret=""))
-    with pytest.raises(ValueError, match="AppSecret"):
+    with pytest.raises(ValidationError, match="AppSecret"):
         RemoteAPIChat(_config(provider="weknoracloud", app_id="app", app_secret=""))
 
 

@@ -20,7 +20,7 @@ from src.ai.llm.ollama import OllamaChat
 from src.ai.llm.remote_api import RemoteAPIChat
 from src.ai.llm.types import Chat, ChatConfig
 from src.ai.utils.ollama_service import OllamaService
-from src.common.exception import AIProviderError
+from src.common.exception import ValidationError, AIProviderError
 from src.core.contracts.infra import Model, ModelParameters
 
 
@@ -113,7 +113,7 @@ def test_new_remote_chat_anthropic_returns_anthropic_chat() -> None:
 
 
 def test_new_remote_chat_anthropic_requires_api_key() -> None:
-    with pytest.raises(ValueError, match="API key"):
+    with pytest.raises(ValidationError, match="API key"):
         new_remote_chat(
             ChatConfig(source=MODEL_SOURCE_REMOTE, provider="anthropic", model_name="claude")
         )
@@ -185,7 +185,7 @@ def test_new_chat_local_requires_ollama_service() -> None:
 
 
 def test_new_chat_unsupported_source() -> None:
-    with pytest.raises(ValueError, match="unsupported chat model source"):
+    with pytest.raises(ValidationError, match="unsupported chat model source"):
         new_chat(ChatConfig(source="bogus", model_name="m"))
 
 

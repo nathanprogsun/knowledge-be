@@ -42,7 +42,7 @@ from src.ai.llm.types import (
     ToolCall,
 )
 from src.ai.provider.providers.anthropic import ANTHROPIC_BASE_URL
-from src.common.exception import AIProviderError
+from src.common.exception import ValidationError, AIProviderError
 
 BASE_URL = "http://llm.test/v1"
 
@@ -76,7 +76,7 @@ async def _lines(events: list[str]) -> AsyncIterator[str]:
 
 
 def test_constructor_requires_api_key() -> None:
-    with pytest.raises(ValueError, match="API key"):
+    with pytest.raises(ValidationError, match="API key"):
         AnthropicChat(_config(api_key=""))
 
 
