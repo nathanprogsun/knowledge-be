@@ -65,6 +65,10 @@ from src.ai.retrieval.opensearch import (
     new_opensearch_client,
     new_opensearch_repository,
 )
+from src.ai.retrieval.qdrant import (
+    QdrantRetrieveEngineRepository,
+    new_qdrant_retrieve_engine_repository,
+)
 from src.ai.retrieval.registry import (
     ENGINE_BUILD_TIMEOUT_SECONDS,
     REBUILD_COOLDOWN_SECONDS,
@@ -113,6 +117,8 @@ __all__ = [
     "MatchType",
     "MilvusClientConfig",
     "OpenSearchRepository",
+    "QdrantRetrieveEngineRepository",
+
     "RetrieveEngine",
     "RetrieveEngineRegistry",
     "RetrieveEngineRegistryProtocol",
@@ -147,6 +153,8 @@ __all__ = [
     "new_kv_hybrid_retrieve_engine",
     "new_opensearch_client",
     "new_opensearch_repository",
+    "new_qdrant_retrieve_engine_repository",
+
     "new_retrieve_engine_registry",
     "parse_retrieve_driver",
     "sanitize_for_embedding",

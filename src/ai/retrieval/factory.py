@@ -28,6 +28,7 @@ from src.ai.retrieval.kv_hybrid import new_kv_hybrid_retrieve_engine
 from src.ai.retrieval.milvus import new_milvus_retrieve_engine_repository
 from src.ai.retrieval.opensearch import new_opensearch_repository
 from src.ai.retrieval.pgvector import new_postgres_retrieve_engine_repository
+from src.ai.retrieval.qdrant import new_qdrant_retrieve_engine_repository
 from src.ai.retrieval.types import (
     ConnectionConfig,
     IndexConfig,
@@ -127,7 +128,9 @@ async def _new_qdrant_retrieve_engine_repository(
     use_tls: bool,
     index_config: IndexConfig,
 ) -> RetrieveEngineRepository:
-    raise NotImplementedError("qdrant repository lands with the qdrant engine")
+    return await new_qdrant_retrieve_engine_repository(
+        host, port, api_key, use_tls, index_config
+    )
 
 
 async def _new_milvus_retrieve_engine_repository(
