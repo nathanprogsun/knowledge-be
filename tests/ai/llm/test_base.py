@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from src.ai.llm.anthropic import AnthropicChat
 from src.ai.llm.base import (
     MODEL_SOURCE_LOCAL,
     MODEL_SOURCE_REMOTE,
@@ -94,8 +95,21 @@ def test_new_remote_chat_returns_remote_api_chat() -> None:
     assert chat.get_model_name() == "deepseek-chat"
 
 
-def test_new_remote_chat_anthropic_not_implemented() -> None:
-    with pytest.raises(NotImplementedError, match="Anthropic"):
+def test_new_remote_chat_anthropic_returns_anthropic_chat() -> None:
+    chat = new_remote_chat(
+        ChatConfig(
+            source=MODEL_SOURCE_REMOTE,
+            provider="anthropic",
+            model_name="claude-3-5-sonnet",
+            api_key="sk-ant-test",
+        )
+    )
+    assert isinstance(chat, AnthropicChat)
+    assert chat.get_model_name() == "claude-3-5-sonnet"
+
+
+def test_new_remote_chat_anthropic_requires_api_key() -> None:
+    with pytest.raises(ValueError, match="API key"):
         new_remote_chat(
             ChatConfig(source=MODEL_SOURCE_REMOTE, provider="anthropic", model_name="claude")
         )
@@ -131,6 +145,21 @@ def test_new_chat_routes_remote_and_wraps_concurrency() -> None:
     assert chat.get_model_name() == "deepseek-chat"
 
 
+def test_new_chat_anthropic_wraps_concurrency() -> None:
+    chat = new_chat(
+        ChatConfig(
+            source=MODEL_SOURCE_REMOTE,
+            provider="anthropic",
+            model_name="claude-3-5-sonnet",
+            api_key="sk-ant-test",
+            max_concurrency=2,
+        )
+    )
+    assert isinstance(chat, ConcurrencyChat)
+    assert isinstance(chat._inner, AnthropicChat)
+    assert chat.get_model_name() == "claude-3-5-sonnet"
+
+
 def test_new_chat_local_not_implemented() -> None:
     with pytest.raises(NotImplementedError, match="Ollama"):
         new_chat(ChatConfig(source=MODEL_SOURCE_LOCAL, model_name="qwen2"))
@@ -142,7 +171,5 @@ def test_new_chat_unsupported_source() -> None:
 
 
 def test_new_chat_returns_chat_protocol() -> None:
-    chat = new_chat(
-        ChatConfig(source=MODEL_SOURCE_REMOTE, provider="deepseek", model_name="m")
-    )
+    chat = new_chat(ChatConfig(source=MODEL_SOURCE_REMOTE, provider="deepseek", model_name="m"))
     assert isinstance(chat, Chat)
