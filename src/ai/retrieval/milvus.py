@@ -24,8 +24,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from pymilvus import DataType, Function, FunctionType, MilvusClient  # type: ignore[import-untyped]
-from pymilvus.milvus_client.index import IndexParams  # type: ignore[import-untyped]
+from pymilvus import DataType, Function, FunctionType, MilvusClient
+from pymilvus.milvus_client.index import IndexParams
 
 from src.ai.embedding import Context
 from src.ai.retrieval.types import (
