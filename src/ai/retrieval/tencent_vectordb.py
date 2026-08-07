@@ -44,6 +44,7 @@ from src.ai.retrieval.types import (
     SourceType,
 )
 from src.app_logging import logger
+from src.common.exception import ValidationError, VectorStoreError
 
 # ── Constants ────────────────────────────────────────────────────────
 
@@ -323,7 +324,10 @@ class TencentVectorDBRepository:
             return await self._vector_retrieve(ctx, params)
         if params.retriever_type == RetrieverType.KEYWORDS:
             return await self._keywords_retrieve(ctx, params)
-        raise ValueError(f"invalid retriever type: {params.retriever_type}")
+        raise ValidationError(
+            code="tencent_vectordb.invalid_retriever_type",
+            message=f"invalid retriever type: {params.retriever_type}",
+        )
 
     # ── save / batch_save ──
 
@@ -354,7 +358,10 @@ class TencentVectorDBRepository:
                     self._collection(dim).upsert, docs
                 )
             except Exception as exc:
-                raise RuntimeError(f"tencent vectordb batch save {collection_name}: {exc}") from exc
+                raise VectorStoreError(
+    code="tencent_vectordb.batch_save_failed",
+    message=f"tencent vectordb batch save {collection_name}: {exc}",
+) from exc
 
     # ── estimate_storage_size ──
 
@@ -400,7 +407,10 @@ class TencentVectorDBRepository:
                 filter=cond,
             )
         except Exception as exc:
-            raise RuntimeError(f"tencent vectordb delete from {collection_name}: {exc}") from exc
+            raise VectorStoreError(
+    code="tencent_vectordb.delete_failed",
+    message=f"tencent vectordb delete from {collection_name}: {exc}",
+) from exc
 
     # ── copy_indices ──
 
@@ -436,7 +446,10 @@ class TencentVectorDBRepository:
                     offset=offset,
                 )
             except Exception as exc:
-                raise RuntimeError(f"tencent vectordb query source indices: {exc}") from exc
+                raise VectorStoreError(
+    code="tencent_vectordb.query_source_indices_failed",
+    message=f"tencent vectordb query source indices: {exc}",
+) from exc
             batch = docs if isinstance(docs, list) else docs.get("documents", []) if isinstance(docs, dict) else []
             for doc in batch:
                 emb = _from_document(doc)
@@ -462,7 +475,10 @@ class TencentVectorDBRepository:
         try:
             await self._to_thread(self._collection(dimension).upsert, docs)
         except Exception as exc:
-            raise RuntimeError(f"tencent vectordb copy indices: {exc}") from exc
+            raise VectorStoreError(
+    code="tencent_vectordb.copy_indices_failed",
+    message=f"tencent vectordb copy indices: {exc}",
+) from exc
 
     # ── batch_update_chunk_* ──
 
@@ -496,7 +512,10 @@ class TencentVectorDBRepository:
         try:
             collections = await self._to_thread(self._db().list_collections)
         except Exception as exc:
-            raise RuntimeError(f"tencent vectordb list collections: {exc}") from exc
+            raise VectorStoreError(
+    code="tencent_vectordb.list_collections_failed",
+    message=f"tencent vectordb list collections: {exc}",
+) from exc
         collection_list = collections if isinstance(collections, list) else getattr(collections, "collections", [])
         for collection in collection_list:
             name = collection if isinstance(collection, str) else getattr(collection, "collection_name", "")
@@ -509,7 +528,10 @@ class TencentVectorDBRepository:
                     update_fields=fields,
                 )
             except Exception as exc:
-                raise RuntimeError(f"tencent vectordb update chunks in {name}: {exc}") from exc
+                raise VectorStoreError(
+    code="tencent_vectordb.update_chunks_failed",
+    message=f"tencent vectordb update chunks in {name}: {exc}",
+) from exc
 
     # ── retrieve ──
 
@@ -521,7 +543,10 @@ class TencentVectorDBRepository:
         try:
             exists = await self._to_thread(self._db().exists_collection, collection_name)
         except Exception as exc:
-            raise RuntimeError(f"tencent vectordb check collection {collection_name}: {exc}") from exc
+            raise VectorStoreError(
+    code="tencent_vectordb.check_collection_failed",
+    message=f"tencent vectordb check collection {collection_name}: {exc}",
+) from exc
         if not exists:
             return _retrieve_result([], RetrieverType.VECTOR)
         limit = params.top_k if params.top_k > 0 else 10
@@ -540,7 +565,10 @@ class TencentVectorDBRepository:
                 **search_kwargs,
             )
         except Exception as exc:
-            raise RuntimeError(f"tencent vectordb vector search {collection_name}: {exc}") from exc
+            raise VectorStoreError(
+    code="tencent_vectordb.vector_search_failed",
+    message=f"tencent vectordb vector search {collection_name}: {exc}",
+) from exc
         docs = search[0] if search and isinstance(search, list) and isinstance(search[0], list) else []
         results = [
             IndexWithScore(
@@ -567,7 +595,10 @@ class TencentVectorDBRepository:
         try:
             collections = await self._to_thread(self._db().list_collections)
         except Exception as exc:
-            raise RuntimeError(f"tencent vectordb list collections: {exc}") from exc
+            raise VectorStoreError(
+    code="tencent_vectordb.list_collections_failed",
+    message=f"tencent vectordb list collections: {exc}",
+) from exc
         collection_list = collections if isinstance(collections, list) else getattr(collections, "collections", [])
         limit = params.top_k if params.top_k > 0 else 10
         results: list[IndexWithScore] = []
@@ -609,9 +640,10 @@ class TencentVectorDBRepository:
                     is_enabled=int(fields.get(_FIELD_IS_ENABLED, 0)) == 1,
                 ))
         if matched > 0 and failed == matched:
-            raise RuntimeError(
-                "tencent vectordb keyword search failed in all matched collections; "
-                "ensure collections support text search"
+            raise VectorStoreError(
+    code="tencent_vectordb.keyword_search_all_failed",
+    message="tencent vectordb keyword search failed in all matched collections; "
+                "ensure collections support text search",
             )
         results.sort(key=lambda r: r.score, reverse=True)
         if len(results) > limit:
@@ -626,12 +658,18 @@ class TencentVectorDBRepository:
         try:
             await self._to_thread(self._client.create_database_if_not_exists, self._database_name)
         except Exception as exc:
-            raise RuntimeError(f"tencent vectordb ensure database {self._database_name}: {exc}") from exc
+            raise VectorStoreError(
+    code="tencent_vectordb.ensure_database_failed",
+    message=f"tencent vectordb ensure database {self._database_name}: {exc}",
+) from exc
         collection_name = self._collection_name(dimension)
         try:
             exists = await self._to_thread(self._db().exists_collection, collection_name)
         except Exception as exc:
-            raise RuntimeError(f"tencent vectordb check collection {collection_name}: {exc}") from exc
+            raise VectorStoreError(
+    code="tencent_vectordb.check_collection_failed",
+    message=f"tencent vectordb check collection {collection_name}: {exc}",
+) from exc
         if exists:
             self._initialized.add(dimension)
             return
@@ -671,7 +709,10 @@ class TencentVectorDBRepository:
                 logger.info("collection {} already exists, skip create", collection_name)
                 self._initialized.add(dimension)
                 return
-            raise RuntimeError(f"tencent vectordb create collection {collection_name}: {exc}") from exc
+            raise VectorStoreError(
+    code="tencent_vectordb.create_collection_failed",
+    message=f"tencent vectordb create collection {collection_name}: {exc}",
+) from exc
         self._initialized.add(dimension)
 
 

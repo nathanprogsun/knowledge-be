@@ -35,6 +35,7 @@ from src.ai.retrieval.types import (
     RetrieverType,
 )
 from src.app_logging import logger
+from src.common.exception import ValidationError
 
 # ── Constants ────────────────────────────────────────────────────────
 
@@ -217,7 +218,10 @@ class SQLiteRepository:
         self._db = db
         engine = getattr(db, "engine", None)
         if engine is None:
-            raise ValueError("sqlite repository requires a db handle with an 'engine' attribute")
+            raise ValidationError(
+                code="sqlite_vec.engine_required",
+                message="sqlite repository requires a db handle with an 'engine' attribute",
+            )
         self._engine: AsyncEngine = engine
         self._vec_tables: set[int] = set()
         self._schema_initialized = False

@@ -41,6 +41,7 @@ from src.ai.retrieval.types import (
     RetrieverType,
 )
 from src.app_logging import logger
+from src.common.exception import ValidationError
 
 _ENV_INDEX_KEY: str = "ELASTICSEARCH_INDEX"
 _DEFAULT_INDEX_NAME: str = "xwrag_default"
@@ -134,7 +135,10 @@ class ElasticsearchV8Repository(RetrieveEngineRepository):
         del ctx
         doc = to_db_vector_embedding(index_info, params)
         if not doc.get("embedding"):
-            raise ValueError(f"empty embedding vector for chunk ID: {index_info.chunk_id}")
+            raise ValidationError(
+                code="elasticsearch.empty_embedding",
+                message=f"empty embedding vector for chunk ID: {index_info.chunk_id}",
+            )
         await asyncio.to_thread(
             self._client.index, index=self._index, document=doc
         )
@@ -195,7 +199,10 @@ class ElasticsearchV8Repository(RetrieveEngineRepository):
             return await self._vector_retrieve(params)
         if params.retriever_type == RetrieverType.KEYWORDS:
             return await self._keywords_retrieve(params)
-        raise ValueError(f"invalid retriever type: {params.retriever_type}")
+        raise ValidationError(
+            code="elasticsearch.invalid_retriever_type",
+            message=f"invalid retriever type: {params.retriever_type}",
+        )
 
     async def _vector_retrieve(self, params: RetrieveParams) -> list[RetrieveResult]:
         filter_clauses = build_base_conds(params, self._id_field)

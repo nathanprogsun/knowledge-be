@@ -37,6 +37,7 @@ from src.ai.retrieval.types import (
     RetrieverType,
     SourceType,
 )
+from src.common.exception import ValidationError
 
 _CTX = TaskContext()
 _BASE = "weknora_test"
@@ -298,7 +299,7 @@ def test_retrieve_rejects_unknown_type() -> None:
         retriever_type=RetrieverType.WEB_SEARCH, top_k=5,
     )
     import asyncio
-    with pytest.raises(ValueError, match="unsupported retriever type"):
+    with pytest.raises(ValidationError, match="unsupported retriever type"):
         asyncio.run(repo.retrieve(_CTX, params))
 
 

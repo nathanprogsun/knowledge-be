@@ -49,7 +49,7 @@ from src.ai.retrieval.types import (
 )
 from src.ai.retrieval.weaviate import new_weaviate_retrieve_engine_repository_from_env
 from src.app_logging import logger
-from src.common.exception import ConflictError
+from src.common.exception import ConflictError, ValidationError
 
 #: ``RETRIEVE_DRIVER`` values registered by the env path, mapped to the
 #: engine type each registers. The upstream env path also handles
@@ -237,7 +237,10 @@ async def _build_driver_repository(
             os.getenv("DORIS_USERNAME", "root"),
             os.getenv("DORIS_PASSWORD", ""),
         )
-    raise ValueError(f"unsupported retrieve driver: {driver}")
+    raise ValidationError(
+        code="env_registry.unsupported_retrieve_driver",
+        message=f"unsupported retrieve driver: {driver}",
+    )
 
 
 # ── Registration loop ───────────────────────────────────────────────

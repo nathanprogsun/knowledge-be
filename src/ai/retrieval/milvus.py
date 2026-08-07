@@ -42,6 +42,7 @@ from src.ai.retrieval.types import (
     SourceType,
 )
 from src.app_logging import logger
+from src.common.exception import ValidationError
 
 # ── Field constants (upstream const block) ──────────────────────────
 
@@ -220,10 +221,16 @@ class MilvusFilterConverter:
         self, cond: UniversalFilterCondition, counter: list[int]
     ) -> ConvertedFilter:
         if not cond.field or cond.value is None:
-            raise ValueError("milvus filter condition is nil")
+            raise ValidationError(
+                code="milvus.filter_condition_nil",
+                message="milvus filter condition is nil",
+            )
         operator = _COMPARISON_OPERATORS.get(cond.operator)
         if operator is None:
-            raise ValueError(f"unsupported comparison operator: {cond.operator}")
+            raise ValidationError(
+                code="milvus.unsupported_comparison_operator",
+                message=f"unsupported comparison operator: {cond.operator}",
+            )
         name = self._param_name(cond.field, counter)
         return ConvertedFilter(
             expr_str=f"{cond.field} {operator} {{{name}}}",
@@ -234,10 +241,16 @@ class MilvusFilterConverter:
         self, cond: UniversalFilterCondition, counter: list[int]
     ) -> ConvertedFilter:
         if cond.value is None:
-            raise ValueError("milvus filter condition is nil")
+            raise ValidationError(
+                code="milvus.filter_condition_nil",
+                message="milvus filter condition is nil",
+            )
         children = cond.value
         if not isinstance(children, list):
-            raise ValueError("invalid logical condition value type")
+            raise ValidationError(
+                code="milvus.invalid_logical_condition_value",
+                message="invalid logical condition value type",
+            )
         expr = ""
         params: dict[str, Any] = {}
         for child in children:
@@ -251,17 +264,24 @@ class MilvusFilterConverter:
                 expr = f"({expr}) {cond.operator} ({child_result.expr_str})"
                 params.update(child_result.params)
         if not expr:
-            raise ValueError("empty logical condition")
+            raise ValidationError(
+                code="milvus.empty_logical_condition",
+                message="empty logical condition",
+            )
         return ConvertedFilter(expr_str=expr, params=params)
 
     def _convert_in(
         self, cond: UniversalFilterCondition, counter: list[int]
     ) -> ConvertedFilter:
         if not cond.field or cond.value is None:
-            raise ValueError("milvus filter condition is nil")
+            raise ValidationError(
+                code="milvus.filter_condition_nil",
+                message="milvus filter condition is nil",
+            )
         if not isinstance(cond.value, list) or len(cond.value) == 0:
-            raise ValueError(
-                "in operator value must be a slice with at least one value"
+            raise ValidationError(
+                code="milvus.invalid_in_value",
+                message="in operator value must be a slice with at least one value",
             )
         name = self._param_name(cond.field, counter)
         return ConvertedFilter(
@@ -273,10 +293,14 @@ class MilvusFilterConverter:
         self, cond: UniversalFilterCondition, counter: list[int]
     ) -> ConvertedFilter:
         if not cond.field or cond.value is None:
-            raise ValueError("milvus filter condition is nil")
+            raise ValidationError(
+                code="milvus.filter_condition_nil",
+                message="milvus filter condition is nil",
+            )
         if not isinstance(cond.value, list) or len(cond.value) != 2:
-            raise ValueError(
-                "between operator value must be a slice with two elements"
+            raise ValidationError(
+                code="milvus.invalid_between_value",
+                message="between operator value must be a slice with two elements",
             )
         base = self._param_name(cond.field, counter)
         name1 = f"{base}_0"
@@ -290,7 +314,10 @@ class MilvusFilterConverter:
         self, cond: UniversalFilterCondition | None, counter: list[int]
     ) -> ConvertedFilter:
         if cond is None:
-            raise ValueError("milvus filter condition is nil")
+            raise ValidationError(
+                code="milvus.filter_condition_nil",
+                message="milvus filter condition is nil",
+            )
         if cond.operator in _COMPARISON_OPERATORS:
             return self._convert_comparison(cond, counter)
         if cond.operator in _LOGICAL_OPERATORS:
@@ -299,7 +326,10 @@ class MilvusFilterConverter:
             return self._convert_in(cond, counter)
         if cond.operator == "between":
             return self._convert_between(cond, counter)
-        raise ValueError(f"unsupported operator: {cond.operator}")
+        raise ValidationError(
+            code="milvus.unsupported_operator",
+            message=f"unsupported operator: {cond.operator}",
+        )
 
 
 # ── Embedding row (upstream structs.go) ─────────────────────────────
@@ -576,8 +606,9 @@ class MilvusRetrieveEngineRepository:
         logger.debug("[Milvus] Saving index for chunk ID: {}", index_info.chunk_id)
         embedding_db = _to_milvus_vector_embedding(index_info, params)
         if not embedding_db.embedding:
-            raise ValueError(
-                f"empty embedding vector for chunk ID: {index_info.chunk_id}"
+            raise ValidationError(
+                code="milvus.empty_embedding",
+                message=f"empty embedding vector for chunk ID: {index_info.chunk_id}",
             )
         dimension = len(embedding_db.embedding)
         self._ensure_collection(ctx, dimension)
@@ -645,7 +676,10 @@ class MilvusRetrieveEngineRepository:
             return await self.vector_retrieve(ctx, params)
         if params.retriever_type == RetrieverType.KEYWORDS:
             return await self.keywords_retrieve(ctx, params)
-        raise ValueError(f"invalid retriever type: {params.retriever_type}")
+        raise ValidationError(
+            code="milvus.invalid_retriever_type",
+            message=f"invalid retriever type: {params.retriever_type}",
+        )
 
     async def vector_retrieve(
         self, ctx: Context, params: RetrieveParams
