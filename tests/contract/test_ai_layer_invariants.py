@@ -1,4 +1,4 @@
-"""Stage-3 frozen-contract invariants (AI layer).
+"""AI-layer frozen-contract invariants.
 
 Compares the AI-layer data models against the expected upstream contract
 (shape, field names, JSON serialization names, enum values). The reference

@@ -112,7 +112,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(ApplicationError, application_error_handler)  # type: ignore[arg-type]
     # Catch-all fallback must be registered last so the specific
     # ``ApplicationError`` handler still wins for known business errors.
-    app.add_exception_handler(Exception, uncaught_exception_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(Exception, uncaught_exception_handler)
 
 
 __all__ = [
