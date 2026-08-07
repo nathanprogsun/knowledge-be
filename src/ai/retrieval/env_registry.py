@@ -44,6 +44,7 @@ from src.ai.retrieval.types import (
     RetrieverEngineType,
     VectorStoreLike,
 )
+from src.ai.retrieval.weaviate import new_weaviate_retrieve_engine_repository_from_env
 from src.app_logging import logger
 from src.common.exception import ConflictError
 
@@ -161,9 +162,12 @@ async def _new_qdrant_repository(
 
 
 async def _new_weaviate_repository(
-    _host: str, _grpc_address: str, _scheme: str, _api_key: str
+    host: str, grpc_address: str, scheme: str, api_key: str
 ) -> RetrieveEngineRepository:
-    raise NotImplementedError("weaviate repository lands with the weaviate engine")
+    """Build a Weaviate repository from the ``RETRIEVE_DRIVER=weaviate`` env wiring."""
+    return await new_weaviate_retrieve_engine_repository_from_env(
+        host, grpc_address, scheme, api_key, None
+    )
 
 
 async def _new_milvus_repository(

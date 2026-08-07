@@ -36,6 +36,7 @@ from src.ai.retrieval.types import (
     VectorStoreLike,
     is_env_store_id,
 )
+from src.ai.retrieval.weaviate import new_weaviate_retrieve_engine_repository_from_env
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,7 +141,14 @@ async def _new_weaviate_retrieve_engine_repository(
     client_cfg: WeaviateClientConfig,
     index_config: IndexConfig,
 ) -> RetrieveEngineRepository:
-    raise NotImplementedError("weaviate repository lands with the weaviate engine")
+    """Build a Weaviate repository from a store connection config (DB-store path)."""
+    return await new_weaviate_retrieve_engine_repository_from_env(
+        client_cfg.host,
+        client_cfg.grpc_address,
+        client_cfg.scheme,
+        client_cfg.api_key,
+        index_config,
+    )
 
 
 async def _new_doris_retrieve_engine_repository(
