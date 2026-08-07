@@ -1,0 +1,1 @@
+"""Knowledge-tag domain types."""
