@@ -5,6 +5,9 @@ that is not safe for outbound requests (empty URLs are allowed — callers
 apply provider defaults). ``apply_custom_headers`` attaches user-supplied
 custom request headers while skipping the reserved ones (``Authorization``,
 ``Content-Type``, ...) so custom values cannot break auth.
+``post_embedding_with_retry`` posts a JSON body retrying transport errors
+with exponential backoff — the shared body of every provider's upstream
+``doRequestWithRetry`` loop.
 
 The upstream transport pools a single SSRF-safe connection transport
 process-wide; here each client owns its ``httpx.AsyncClient`` and, unlike
@@ -14,12 +17,16 @@ a 3xx response surfaces as an error instead of an unchecked hop.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 
 import httpx
 
-from src.common.exception import ValidationError
+from src.common.exception import AIProviderError, ValidationError
+from src.common.json import JsonValue
 from src.common.oidc_client import validate_ssrf_safe_url
+
+_MAX_BACKOFF_SECONDS = 10.0
 
 # Reserved request headers that user custom headers must never override
 # (the upstream ``ApplyCustomHeaders`` skip set). These are controlled by
@@ -64,6 +71,41 @@ def apply_custom_headers(
         headers[name] = value
 
 
+async def post_embedding_with_retry(
+    http_client: httpx.AsyncClient,
+    url: str,
+    payload: Mapping[str, JsonValue],
+    headers: Mapping[str, str],
+    max_retries: int,
+) -> httpx.Response:
+    """POST ``payload`` to ``url`` retrying transport errors with backoff.
+
+    Mirrors the upstream ``doRequestWithRetry`` loops: only transport
+    errors (``httpx.HTTPError``) are retried, with exponential backoff
+    capped at ``_MAX_BACKOFF_SECONDS``; a non-2xx response is returned to
+    the caller so each provider surfaces its own error body. When every
+    attempt fails with a transport error, ``AIProviderError`` is raised.
+    """
+    last_error: httpx.HTTPError | None = None
+    for attempt in range(max_retries + 1):
+        if attempt > 0:
+            await asyncio.sleep(min(2 ** (attempt - 1), _MAX_BACKOFF_SECONDS))
+        try:
+            return await http_client.post(url, json=payload, headers=headers)
+        except httpx.HTTPError as exc:
+            last_error = exc
+            continue
+    if last_error is not None:
+        raise AIProviderError(
+            f"send request: {last_error}",
+            code="embedding.request_failed",
+        ) from last_error
+    raise AIProviderError(
+        "send request: unknown error",
+        code="embedding.request_failed",
+    )
+
+
 async def validate_embedding_base_url(base_url: str) -> None:
     """Reject a base URL that fails the SSRF safety check.
 
@@ -104,5 +146,6 @@ __all__ = [
     "apply_custom_headers",
     "is_reserved_header",
     "new_embedding_http_client",
+    "post_embedding_with_retry",
     "validate_embedding_base_url",
 ]

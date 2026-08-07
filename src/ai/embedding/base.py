@@ -6,11 +6,10 @@ This module mirrors the upstream ``embedder.go`` contract. It defines the
 ``new_embedder`` factory that routes a config to a provider-backed
 implementation.
 
-Only the OpenAI-compatible route and the local Ollama route are fully
-implemented here. The remaining remote providers raise
-``NotImplementedError`` and are implemented in a followup; the routing
-table below documents every provider the upstream factory dispatches so
-the followup can fill in the placeholders without changing the surface.
+The factory covers every upstream route: Ollama, Aliyun (multimodal via
+DashScope / text via the OpenAI-compatible client), Volcengine, Jina,
+Azure OpenAI, NVIDIA, Gemini, Zhipu, the signed managed-cloud endpoint,
+and the OpenAI-compatible default.
 
 ``src/ai/embedding`` never imports ``core`` / ``db``; the model record is
 passed in as a structural protocol so callers in the core layer supply
@@ -23,9 +22,17 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
+from src.ai.embedding.aliyun import new_aliyun_embedder
+from src.ai.embedding.azure_openai import new_azure_openai_embedder
 from src.ai.embedding.concurrency import wrap_embedding_concurrency
+from src.ai.embedding.gemini import new_gemini_embedder
+from src.ai.embedding.jina import new_jina_embedder
+from src.ai.embedding.nvidia import new_nvidia_embedder
 from src.ai.embedding.ollama import new_ollama_embedder
 from src.ai.embedding.openai import new_openai_embedder
+from src.ai.embedding.volcengine import new_volcengine_embedder
+from src.ai.embedding.weknoracloud import new_weknoracloud_embedder
+from src.ai.embedding.zhipu import new_zhipu_embedder
 from src.ai.provider.detect import detect_provider
 from src.ai.provider.registry import (
     PROVIDER_ALIYUN,
@@ -227,22 +234,66 @@ def config_from_model(
 
 # ── Factory ──────────────────────────────────────────────────────────
 
-# Remote providers whose embedder modules are implemented in a followup.
-# Until then every one of these routes raises ``NotImplementedError`` so
-# the failure is explicit rather than silently routing to the generic
-# OpenAI client.
-_PENDING_PROVIDERS: frozenset[str] = frozenset(
-    {
-        PROVIDER_ALIYUN,
-        PROVIDER_AZURE_OPENAI,
-        PROVIDER_GEMINI,
-        PROVIDER_JINA,
-        PROVIDER_NVIDIA,
-        PROVIDER_VOLCENGINE,
-        PROVIDER_WEKNORACLOUD,
-        PROVIDER_ZHIPU,
-    }
-)
+_ALIYUN_MULTIMODAL_KEYWORDS = ("vision", "multimodal")
+_ALIYUN_TEXT_DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+_ALIYUN_MULTIMODAL_DEFAULT_BASE_URL = "https://dashscope.aliyuncs.com"
+_AZURE_DEFAULT_API_VERSION = "2024-10-21"
+
+
+def _apply_custom_headers(embedder: Embedder, config: Config) -> Embedder:
+    """Attach user-supplied custom headers when the embedder accepts them.
+
+    Mirrors the upstream factory's ``SetCustomHeaders`` calls; the
+    transport skips reserved names so auth headers cannot be overridden.
+    """
+    if isinstance(embedder, CustomHeadersSettable):
+        embedder.set_custom_headers(config.custom_headers)
+    return embedder
+
+
+def _is_aliyun_multimodal_model(model_name: str) -> bool:
+    """True for Aliyun multimodal embedding models (``embedder.go``).
+
+    Multimodal models (``tongyi-embedding-vision-*`` / ``multimodal-embedding-*``)
+    go through the dedicated DashScope endpoint; pure text models reuse
+    the OpenAI-compatible interface.
+    """
+    lowered = model_name.lower()
+    return any(keyword in lowered for keyword in _ALIYUN_MULTIMODAL_KEYWORDS)
+
+
+async def _route_aliyun(config: Config, pooler: EmbedderPooler | None) -> Embedder:
+    """Aliyun dispatch: multimodal -> DashScope, text -> OpenAI-compatible."""
+    if _is_aliyun_multimodal_model(config.model_name):
+        base_url = config.base_url
+        if base_url == "":
+            base_url = _ALIYUN_MULTIMODAL_DEFAULT_BASE_URL
+        elif "/compatible-mode/" in base_url:
+            base_url = base_url.replace("/compatible-mode/v1", "", 1)
+            base_url = base_url.replace("/compatible-mode", "", 1)
+        embedder: Embedder = await new_aliyun_embedder(
+            api_key=config.api_key,
+            base_url=base_url,
+            model_name=config.model_name,
+            truncate_prompt_tokens=config.truncate_prompt_tokens,
+            dimensions=config.dimensions,
+            model_id=config.model_id,
+            pooler=pooler,
+        )
+        return _apply_custom_headers(embedder, config)
+    base_url = config.base_url
+    if base_url == "" or "/compatible-mode/" not in base_url:
+        base_url = _ALIYUN_TEXT_DEFAULT_BASE_URL
+    embedder = await new_openai_embedder(
+        api_key=config.api_key,
+        base_url=base_url,
+        model_name=config.model_name,
+        truncate_prompt_tokens=config.truncate_prompt_tokens,
+        dimensions=config.dimensions,
+        model_id=config.model_id,
+        pooler=pooler,
+    )
+    return _apply_custom_headers(embedder, config)
 
 
 async def new_embedder(
@@ -296,18 +347,97 @@ async def _route_remote(
 
     ``config.provider`` wins when set; otherwise the base URL is
     detected (upstream ``provider.ProviderName`` /
-    ``provider.DetectProvider``). Aliyun carries two routes upstream —
-    multimodal models go through the dedicated DashScope endpoint while
-    text models reuse the OpenAI-compatible client — both are covered by
-    the followup that replaces this placeholder.
+    ``provider.DetectProvider``). Every provider route mirrors the
+    upstream factory, including Aliyun's two-way dispatch (multimodal
+    models via the dedicated DashScope endpoint, text models via the
+    OpenAI-compatible client). Providers that are not recognized fall
+    back to the OpenAI-compatible embedder.
     """
     provider_name = config.provider
     if not provider_name:
         provider_name = detect_provider(config.base_url)
-    if provider_name in _PENDING_PROVIDERS:
-        raise NotImplementedError(
-            f"{provider_name} embedding provider is implemented in a followup"
+
+    if provider_name == PROVIDER_ALIYUN:
+        return await _route_aliyun(config, pooler)
+
+    if provider_name == PROVIDER_VOLCENGINE:
+        embedder: Embedder = await new_volcengine_embedder(
+            api_key=config.api_key,
+            base_url=config.base_url,
+            model_name=config.model_name,
+            truncate_prompt_tokens=config.truncate_prompt_tokens,
+            dimensions=config.dimensions,
+            model_id=config.model_id,
+            pooler=pooler,
         )
+        return _apply_custom_headers(embedder, config)
+
+    if provider_name == PROVIDER_JINA:
+        embedder = await new_jina_embedder(
+            api_key=config.api_key,
+            base_url=config.base_url,
+            model_name=config.model_name,
+            dimensions=config.dimensions,
+            model_id=config.model_id,
+            pooler=pooler,
+        )
+        return _apply_custom_headers(embedder, config)
+
+    if provider_name == PROVIDER_AZURE_OPENAI:
+        api_version = _AZURE_DEFAULT_API_VERSION
+        configured = config.extra_config.get("api_version")
+        if configured:
+            api_version = configured
+        embedder = await new_azure_openai_embedder(
+            api_key=config.api_key,
+            base_url=config.base_url,
+            model_name=config.model_name,
+            truncate_prompt_tokens=config.truncate_prompt_tokens,
+            dimensions=config.dimensions,
+            model_id=config.model_id,
+            api_version=api_version,
+            pooler=pooler,
+        )
+        return _apply_custom_headers(embedder, config)
+
+    if provider_name == PROVIDER_NVIDIA:
+        embedder = await new_nvidia_embedder(
+            api_key=config.api_key,
+            base_url=config.base_url,
+            model_name=config.model_name,
+            dimensions=config.dimensions,
+            model_id=config.model_id,
+            pooler=pooler,
+        )
+        return _apply_custom_headers(embedder, config)
+
+    if provider_name == PROVIDER_GEMINI:
+        embedder = await new_gemini_embedder(
+            api_key=config.api_key,
+            base_url=config.base_url,
+            model_name=config.model_name,
+            truncate_prompt_tokens=config.truncate_prompt_tokens,
+            dimensions=config.dimensions,
+            model_id=config.model_id,
+            pooler=pooler,
+        )
+        return _apply_custom_headers(embedder, config)
+
+    if provider_name == PROVIDER_ZHIPU:
+        embedder = await new_zhipu_embedder(
+            api_key=config.api_key,
+            base_url=config.base_url,
+            model_name=config.model_name,
+            truncate_prompt_tokens=config.truncate_prompt_tokens,
+            dimensions=config.dimensions,
+            model_id=config.model_id,
+            pooler=pooler,
+        )
+        return _apply_custom_headers(embedder, config)
+
+    if provider_name == PROVIDER_WEKNORACLOUD:
+        return await new_weknoracloud_embedder(config)
+
     return await new_openai_embedder(
         api_key=config.api_key,
         base_url=config.base_url,

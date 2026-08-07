@@ -15,13 +15,21 @@ import httpx
 import pytest
 
 from src.ai.embedding import (
+    AliyunEmbedder,
+    AzureOpenAIEmbedder,
     ConcurrencyEmbedder,
     Config,
     Context,
     Embedder,
+    GeminiEmbedder,
+    JinaEmbedder,
     LocalLimiter,
+    NvidiaEmbedder,
     OpenAIEmbedder,
     TaskContext,
+    VolcengineEmbedder,
+    WeKnoraCloudEmbedder,
+    ZhipuEmbedder,
     apply_custom_headers,
     config_from_model,
     gate_named_n,
@@ -190,13 +198,52 @@ async def test_factory_detects_provider_from_base_url() -> None:
 
 
 @pytest.mark.parametrize(
-    "provider",
-    ["aliyun", "volcengine", "jina", "azure_openai", "nvidia", "gemini", "zhipu", "weknoracloud"],
+    ("provider", "model_name", "base_url", "expected"),
+    [
+        # Aliyun text models reuse the OpenAI-compatible client; multimodal
+        # models go through the dedicated DashScope embedder.
+        ("aliyun", "text-embedding-v1", f"{_OPENAI_BASE}/compatible-mode/v1", OpenAIEmbedder),
+        ("aliyun", "tongyi-embedding-vision-v1", _OPENAI_BASE, AliyunEmbedder),
+        ("aliyun", "multimodal-embedding-v1", _OPENAI_BASE, AliyunEmbedder),
+        ("volcengine", "doubao-embedding", _OPENAI_BASE, VolcengineEmbedder),
+        ("jina", "jina-embeddings-v2", _OPENAI_BASE, JinaEmbedder),
+        ("azure_openai", "my-deployment", _OPENAI_BASE, AzureOpenAIEmbedder),
+        ("nvidia", "nvolveqa40k", _OPENAI_BASE, NvidiaEmbedder),
+        ("gemini", "text-embedding-004", _OPENAI_BASE, GeminiEmbedder),
+        ("zhipu", "embedding-2", _OPENAI_BASE, ZhipuEmbedder),
+    ],
 )
-async def test_factory_pending_providers_raise_not_implemented(provider: str) -> None:
-    config = Config(source="remote", provider=provider, model_name="m", model_id="mid")
-    with pytest.raises(NotImplementedError, match="implemented in a followup"):
-        await new_embedder(config, None, None)
+async def test_factory_routes_remote_providers(
+    provider: str,
+    model_name: str,
+    base_url: str,
+    expected: type[Embedder],
+) -> None:
+    config = Config(
+        source="remote",
+        provider=provider,
+        base_url=base_url,
+        model_name=model_name,
+        model_id="mid",
+    )
+    embedder = await new_embedder(config, None, None)
+    assert isinstance(embedder, ConcurrencyEmbedder)
+    assert isinstance(embedder._inner, expected)
+
+
+async def test_factory_routes_remote_weknoracloud() -> None:
+    config = Config(
+        source="remote",
+        provider="weknoracloud",
+        base_url=_OPENAI_BASE,
+        model_name="m",
+        model_id="mid",
+        app_id="aid",
+        app_secret="sec",
+    )
+    embedder = await new_embedder(config, None, None)
+    assert isinstance(embedder, ConcurrencyEmbedder)
+    assert isinstance(embedder._inner, WeKnoraCloudEmbedder)
 
 
 async def test_factory_rejects_unsupported_source() -> None:
