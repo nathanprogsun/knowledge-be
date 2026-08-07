@@ -1,12 +1,17 @@
-"""Retrieval engines: types, interfaces, factory, registry, and hybrid engine.
+"""Retrieval engines: types, interfaces, factory, registry, hybrid engine,
+and the service layer.
 
 Public surface: the domain types (``RetrieverEngineType`` / ``RetrieverType`` /
 ``RetrieveParams`` / ``RetrieveResult`` / ``IndexInfo``), the interfaces
 (``RetrieveEngine`` / ``RetrieveEngineRepository`` / ``RetrieveEngineService`` /
 ``RetrieveEngineRegistry``), the engine factory
 (``new_engine_factory`` / ``create_engine_service_from_store``), the env-driven
-registry (``init_retrieve_engine_registry`` / ``RetrieveEngineRegistry``), and
-the keywords-vector hybrid engine (``new_kv_hybrid_retrieve_engine``).
+registry (``init_retrieve_engine_registry`` / ``RetrieveEngineRegistry``), the
+keywords-vector hybrid engine (``new_kv_hybrid_retrieve_engine``), and the
+service layer: the composite engine (``new_composite_retrieve_engine``), the
+score normalizer (``EngineAwareNormalizer``), the store-tenant ownership
+adapter (``new_vector_store_repo_ownership``), and the KB-to-engine resolver
+(``create_retrieve_engine_for_kb`` / ``verify_binding``).
 
 The ai layer never imports core or storage: stores and the database handle
 are supplied structurally through protocols declared in ``base.py``.
@@ -29,6 +34,11 @@ from src.ai.retrieval.base import (
 )
 from src.ai.retrieval.base import (
     RetrieveEngineRegistry as RetrieveEngineRegistryProtocol,
+)
+from src.ai.retrieval.composite import (
+    CompositeRetrieveEngine,
+    EngineInfo,
+    new_composite_retrieve_engine,
 )
 from src.ai.retrieval.doris import (
     DorisRepository,
@@ -59,15 +69,31 @@ from src.ai.retrieval.factory import (
     is_es_v7,
     new_engine_factory,
 )
+from src.ai.retrieval.kb_engine_resolver import (
+    TenantInfoMissingError,
+    VectorStoreForbiddenError,
+    create_retrieve_engine_for_kb,
+    create_retrieve_engine_from_payload,
+    verify_binding,
+)
 from src.ai.retrieval.kv_hybrid import (
     KVHybridRetrieveEngine,
     new_kv_hybrid_retrieve_engine,
     sanitize_for_embedding,
 )
+from src.ai.retrieval.normalizer import (
+    EngineAwareNormalizer,
+    ScoreNormalizer,
+)
 from src.ai.retrieval.opensearch import (
     OpenSearchRepository,
     new_opensearch_client,
     new_opensearch_repository,
+)
+from src.ai.retrieval.ownership import (
+    TenantStoreOwnership,
+    VectorStoreRepoOwnership,
+    new_vector_store_repo_ownership,
 )
 from src.ai.retrieval.qdrant import (
     QdrantRetrieveEngineRepository,
@@ -114,6 +140,7 @@ __all__ = [
     "REBUILD_COOLDOWN_SECONDS",
     "AppConfig",
     "AuditSink",
+    "CompositeRetrieveEngine",
     "ConnectionConfig",
     "Context",
     "Database",
@@ -121,7 +148,9 @@ __all__ = [
     "ElasticsearchV7Repository",
     "ElasticsearchV8Repository",
     "Embedder",
+    "EngineAwareNormalizer",
     "EngineFactory",
+    "EngineInfo",
     "IndexConfig",
     "IndexInfo",
     "IndexSaveParams",
@@ -142,23 +171,31 @@ __all__ = [
     "RetrieverEngineType",
     "RetrieverType",
     "SQLiteRepository",
+    "ScoreNormalizer",
     "SourceType",
     "StoreLoaderFn",
     "StoreRegistry",
+    "TenantInfoMissingError",
+    "TenantStoreOwnership",
     "TencentVectorDBRepository",
     "VectorStore",
+    "VectorStoreForbiddenError",
     "VectorStoreLike",
     "VectorStoreNotFoundError",
+    "VectorStoreRepoOwnership",
     "VectorStoreRepositoryLike",
     "VectorStoreUnavailableError",
     "WeaviateClientConfig",
     "build_milvus_client_config",
     "create_engine_service_from_store",
+    "create_retrieve_engine_for_kb",
+    "create_retrieve_engine_from_payload",
     "host_from_addr",
     "init_retrieve_engine_registry",
     "is_env_store_id",
     "is_es_v7",
     "load_db_stores_into_registry",
+    "new_composite_retrieve_engine",
     "new_doris_retrieve_engine_repository",
     "new_elasticsearch_v7_client",
     "new_elasticsearch_v7_repository",
@@ -172,6 +209,9 @@ __all__ = [
     "new_retrieve_engine_registry",
     "new_sqlite_retrieve_engine_repository",
     "new_tencent_vectordb_retrieve_engine_repository",
+    "new_vector_store_repo_ownership",
     "parse_retrieve_driver",
     "sanitize_for_embedding",
+    "tenant_info_from_context",
+    "verify_binding",
 ]
