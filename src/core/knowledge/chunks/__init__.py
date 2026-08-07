@@ -1,4 +1,4 @@
-"""Chunk domain vocabulary: types, status, and flags."""
+"""Chunk domain: types, status, flags, revisions, and retrieval questions."""
 
 from __future__ import annotations
 
