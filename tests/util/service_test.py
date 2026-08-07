@@ -35,9 +35,7 @@ class ServiceTest:
     """
 
     @staticmethod
-    async def mock_repo_find_by_primary_key(
-        repo, method_name: str, *, return_value
-    ) -> None:
+    async def mock_repo_find_by_primary_key(repo, method_name: str, *, return_value) -> None:
         """Set ``repo.<method_name>.return_value`` and clear any side effect.
 
         The ``side_effect = None`` reset is important — once a side
@@ -120,4 +118,4 @@ def lookup_by(store: dict, *, key_attr: str = "id"):
     return _lookup
 
 
-__all__ = ["ServiceTest", "stateful_insert", "lookup_by"]
+__all__ = ["ServiceTest", "lookup_by", "stateful_insert"]

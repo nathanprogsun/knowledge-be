@@ -19,9 +19,7 @@ class _Demo(ServiceTest):
 
 async def test_mock_repo_find_by_primary_key() -> None:
     repo = AsyncMock()
-    await _Demo.mock_repo_find_by_primary_key(
-        repo, "find_by_id", return_value="X"
-    )
+    await _Demo.mock_repo_find_by_primary_key(repo, "find_by_id", return_value="X")
     assert await repo.find_by_id(1) == "X"
 
 
@@ -33,17 +31,13 @@ async def test_mock_repo_insert() -> None:
 
 async def test_mock_repo_update_by_tenanted_primary_key() -> None:
     repo = AsyncMock()
-    await _Demo.mock_repo_update_by_tenanted_primary_key(
-        repo, return_value=True
-    )
+    await _Demo.mock_repo_update_by_tenanted_primary_key(repo, return_value=True)
     assert await repo.update_by_tenanted_primary_key() is True
 
 
 async def test_mock_repo_find_by_tenanted_primary_key() -> None:
     repo = AsyncMock()
-    await _Demo.mock_repo_find_by_tenanted_primary_key(
-        repo, return_value=[{"id": 1}]
-    )
+    await _Demo.mock_repo_find_by_tenanted_primary_key(repo, return_value=[{"id": 1}])
     assert await repo.find_by_tenanted_primary_key() == [{"id": 1}]
 
 
