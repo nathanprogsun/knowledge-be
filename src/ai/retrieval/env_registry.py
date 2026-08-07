@@ -6,9 +6,9 @@ registry. Mirror the upstream behavior: per-driver failures are logged and
 skipped, never fatal, and the registry still serves every engine that did
 register.
 
-Concrete engine repositories land in followup engine PRs; until then the
-per-driver repository builders are placeholders that raise
-``NotImplementedError``, so an unset or unimplemented driver degrades to a
+The Postgres driver is wired to its concrete repository; every other
+per-driver repository builder is a placeholder that raises
+``NotImplementedError``, so an unimplemented driver degrades to a
 logged skip rather than a startup failure.
 """
 
@@ -35,6 +35,7 @@ from src.ai.retrieval.factory import create_engine_service_from_store
 from src.ai.retrieval.kv_hybrid import new_kv_hybrid_retrieve_engine
 from src.ai.retrieval.milvus import new_milvus_retrieve_engine_repository
 from src.ai.retrieval.opensearch import new_opensearch_repository
+from src.ai.retrieval.pgvector import new_postgres_retrieve_engine_repository
 from src.ai.retrieval.registry import RetrieveEngineRegistry, new_retrieve_engine_registry
 from src.ai.retrieval.types import (
     ConnectionConfig,
@@ -119,8 +120,8 @@ def _opensearch_connection_config() -> ConnectionConfig:
 # client/repository construction is deferred to the engine PRs.
 
 
-async def _new_postgres_repository(_db: Database) -> RetrieveEngineRepository:
-    raise NotImplementedError("postgres engine repository lands with the pgvector engine")
+async def _new_postgres_repository(db: Database) -> RetrieveEngineRepository:
+    return new_postgres_retrieve_engine_repository(db)
 
 
 async def _new_sqlite_repository(_db: Database) -> RetrieveEngineRepository:

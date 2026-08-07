@@ -4,9 +4,9 @@
 container; ``create_engine_service_from_store`` is the DB-store switch that
 builds an engine service from a ``VectorStore`` config. The switch mirrors
 the upstream factory: each engine path wraps its repository in a
-``KVHybridRetrieveEngine``. Concrete engine repositories land in followup
-engine PRs; until then every repository constructor is a placeholder that
-raises ``NotImplementedError`` so wiring is explicit rather than silent.
+``KVHybridRetrieveEngine``. The Postgres repository is wired to its concrete
+implementation; every other engine repository constructor is a placeholder
+that raises ``NotImplementedError`` so wiring is explicit rather than silent.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from src.ai.retrieval.elasticsearch_v8 import new_elasticsearch_v8_repository
 from src.ai.retrieval.kv_hybrid import new_kv_hybrid_retrieve_engine
 from src.ai.retrieval.milvus import new_milvus_retrieve_engine_repository
 from src.ai.retrieval.opensearch import new_opensearch_repository
+from src.ai.retrieval.pgvector import new_postgres_retrieve_engine_repository
 from src.ai.retrieval.types import (
     ConnectionConfig,
     IndexConfig,
@@ -82,7 +83,7 @@ def host_from_addr(addr: str) -> str:
 
 
 async def _new_postgres_retrieve_engine_repository(db: Database) -> RetrieveEngineRepository:
-    raise NotImplementedError("postgres retrieval repository lands with the pgvector engine")
+    return new_postgres_retrieve_engine_repository(db)
 
 
 async def _new_sqlite_retrieve_engine_repository(db: Database) -> RetrieveEngineRepository:
