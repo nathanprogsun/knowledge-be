@@ -16,7 +16,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import cast
 
-import jieba  # type: ignore[import-not-found]
+import jieba  # type: ignore[import-untyped]
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     Distance,
