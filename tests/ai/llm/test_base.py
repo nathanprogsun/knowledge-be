@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import cast
 
 import pytest
 
@@ -15,8 +16,11 @@ from src.ai.llm.base import (
     new_remote_chat,
 )
 from src.ai.llm.concurrency import ConcurrencyChat
+from src.ai.llm.ollama import OllamaChat
 from src.ai.llm.remote_api import RemoteAPIChat
 from src.ai.llm.types import Chat, ChatConfig
+from src.ai.utils.ollama_service import OllamaService
+from src.common.exception import AIProviderError
 from src.core.contracts.infra import Model, ModelParameters
 
 
@@ -160,8 +164,23 @@ def test_new_chat_anthropic_wraps_concurrency() -> None:
     assert chat.get_model_name() == "claude-3-5-sonnet"
 
 
-def test_new_chat_local_not_implemented() -> None:
-    with pytest.raises(NotImplementedError, match="Ollama"):
+def test_new_chat_local_routes_to_ollama_and_wraps_concurrency() -> None:
+    chat = new_chat(
+        ChatConfig(
+            source=MODEL_SOURCE_LOCAL,
+            model_name="qwen2",
+            max_concurrency=2,
+        ),
+        ollama_service=cast(OllamaService, object()),
+    )
+    assert isinstance(chat, ConcurrencyChat)
+    assert isinstance(chat._inner, OllamaChat)
+    assert chat.get_model_name() == "qwen2"
+    assert chat.get_model_id() == ""
+
+
+def test_new_chat_local_requires_ollama_service() -> None:
+    with pytest.raises(AIProviderError, match="Ollama service is required"):
         new_chat(ChatConfig(source=MODEL_SOURCE_LOCAL, model_name="qwen2"))
 
 

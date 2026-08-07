@@ -16,6 +16,7 @@ import httpx
 import pytest
 
 from src.ai.provider.registry import PROVIDER_AZURE_OPENAI, PROVIDER_WEKNORACLOUD
+from src.ai.utils.ollama_service import OllamaService
 from src.ai.utils.signer import sign_request
 from src.ai.vlm import Config, RemoteAPIVLM, config_from_model, detect_image_mime, new_vlm
 from src.ai.vlm.base import (
@@ -302,6 +303,29 @@ async def test_ollama_vlm_predict_wraps_service_error() -> None:
     vlm = OllamaVLM(model_name="qwen2-vl", model_id="m1", ollama_service=service)
     with pytest.raises(AIProviderError, match="Ollama VLM request failed"):
         await vlm.predict([], "x")
+
+
+async def test_ollama_vlm_works_with_real_ollama_service() -> None:
+    """The real ``OllamaService`` satisfies the ``OllamaChatService`` protocol."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/chat"
+        body = json.loads(request.content)
+        assert body["model"] == "qwen2-vl"
+        assert body["stream"] is False
+        return httpx.Response(
+            200,
+            json={"model": "qwen2-vl", "message": {"content": "described"}},
+        )
+
+    service = OllamaService(base_url="http://ollama.test", transport=httpx.MockTransport(handler))
+    vlm = new_ollama_vlm(
+        model_name="qwen2-vl",
+        model_id="m1",
+        ollama_service=service,
+    )
+    result = await vlm.predict([b"\x89PNG\r\n\x1a\n"], "what is this?")
+    assert result == "described"
 
 
 # ── remote OpenAI-compatible backend ────────────────────────────────

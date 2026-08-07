@@ -20,6 +20,7 @@ from src.ai.utils.ollama_service import (
     resolve_ollama_dial_base_url,
 )
 from src.common.exception import ExternalServiceError
+from src.common.json import JsonObject
 
 _BASE_URL = "http://ollama.test"
 
@@ -334,6 +335,95 @@ async def test_get_model_info_raises_on_malformed_response() -> None:
     service = _service(handler)
     with pytest.raises(ExternalServiceError, match="malformed response"):
         await service.get_model_info("mario")
+
+
+# ── chat ─────────────────────────────────────────────────────────────
+
+
+async def test_chat_sends_request_and_returns_response() -> None:
+    sent: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/chat"
+        sent["body"] = json.loads(request.content)
+        return httpx.Response(
+            200,
+            json={"model": "qwen2", "message": {"content": "hello"}, "done": True},
+        )
+
+    service = _service(handler)
+    request: JsonObject = {
+        "model": "qwen2",
+        "messages": [{"role": "user", "content": "hi"}],
+        "stream": False,
+        "options": {"temperature": 0.1},
+    }
+    response = await service.chat(request)
+    assert response == {"model": "qwen2", "message": {"content": "hello"}, "done": True}
+    assert sent["body"] == request
+
+
+async def test_chat_raises_on_http_error() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="boom")
+
+    service = _service(handler)
+    request: JsonObject = {"model": "qwen2", "stream": False, "messages": []}
+    with pytest.raises(ExternalServiceError, match="failed to complete chat request"):
+        await service.chat(request)
+
+
+async def test_chat_raises_on_malformed_response() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=[])
+
+    service = _service(handler)
+    request: JsonObject = {"model": "qwen2", "stream": False, "messages": []}
+    with pytest.raises(ExternalServiceError, match="malformed response"):
+        await service.chat(request)
+
+
+async def test_chat_stream_yields_frames_until_done() -> None:
+    frames = [
+        {"model": "qwen2", "message": {"content": "Hel"}, "done": False},
+        {"model": "qwen2", "message": {"content": "lo"}, "done": False},
+        {"model": "qwen2", "message": {"content": ""}, "done": True},
+    ]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.path == "/api/chat"
+        assert json.loads(request.content)["stream"] is True
+        lines = ["data: " + json.dumps(frame) for frame in frames]
+        lines.append("data: [DONE]")
+        return httpx.Response(200, text="\n".join(lines) + "\n")
+
+    service = _service(handler)
+    request: JsonObject = {"model": "qwen2", "stream": True, "messages": []}
+    assert [frame async for frame in service.chat_stream(request)] == frames
+
+
+async def test_chat_stream_skips_non_data_lines() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            text='event: message\ndata: {"done": true}\n: comment\n',
+        )
+
+    service = _service(handler)
+    request: JsonObject = {"model": "qwen2", "stream": True}
+    frames = [frame async for frame in service.chat_stream(request)]
+    assert frames == [{"done": True}]
+
+
+async def test_chat_stream_raises_on_http_error() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="boom")
+
+    service = _service(handler)
+    request: JsonObject = {"model": "qwen2", "stream": True}
+    with pytest.raises(ExternalServiceError, match="failed to stream chat response"):
+        async for _frame in service.chat_stream(request):
+            pass
 
 
 # ── pure helpers ─────────────────────────────────────────────────────

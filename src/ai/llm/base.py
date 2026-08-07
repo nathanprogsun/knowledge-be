@@ -6,14 +6,15 @@ layer builds from a form) share the same field mapping. ``new_chat`` routes by
 model source: local models use the Ollama client, remote models use the
 provider routing in ``new_remote_chat`` (Anthropic gets the dedicated
 Messages-protocol client, everything else the OpenAI-compatible
-``RemoteAPIChat``). The local client is supplied by a later provider PR;
-until then that route raises ``NotImplementedError``.
+``RemoteAPIChat``). Both routes are implemented — local models route to the
+Ollama client, Anthropic to the Messages-protocol client.
 """
 
 from __future__ import annotations
 
 from src.ai.llm.anthropic import new_anthropic_chat
 from src.ai.llm.concurrency import wrap_chat_concurrency
+from src.ai.llm.ollama import new_ollama_chat
 from src.ai.llm.remote_api import RemoteAPIChat
 from src.ai.llm.types import Chat, ChatConfig
 from src.ai.provider.detect import detect_provider
@@ -72,8 +73,9 @@ def new_chat(config: ChatConfig, ollama_service: OllamaService | None = None) ->
     """
     source = config.source.lower()
     if source == MODEL_SOURCE_LOCAL:
-        # Implemented by the Ollama provider PR.
-        raise NotImplementedError("Ollama chat is not implemented yet")
+        return wrap_chat_concurrency(
+            new_ollama_chat(config, ollama_service), config.max_concurrency
+        )
     if source == MODEL_SOURCE_REMOTE:
         return wrap_chat_concurrency(new_remote_chat(config), config.max_concurrency)
     raise ValueError(f"unsupported chat model source: {config.source}")

@@ -33,6 +33,7 @@ from src.ai.llm.limiter import (
     set_global_limit,
     set_governor,
 )
+from src.ai.llm.ollama import OllamaChat, new_ollama_chat
 from src.ai.llm.remote_api import RemoteAPIChat, remove_thinking_content
 from src.ai.llm.types import (
     Chat,
@@ -75,6 +76,7 @@ __all__ = [
     "Message",
     "MessageContentPart",
     "ModelConcurrencyLimiter",
+    "OllamaChat",
     "PromptCacheStatus",
     "RedisLimiter",
     "References",
@@ -94,6 +96,7 @@ __all__ = [
     "gate_named_n",
     "is_background_task",
     "new_chat",
+    "new_ollama_chat",
     "new_remote_chat",
     "remove_thinking_content",
     "runtime_stats",

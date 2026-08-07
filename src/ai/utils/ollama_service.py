@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from datetime import datetime
 from typing import Final
 
@@ -373,6 +373,72 @@ class OllamaService:
                 code="ollama.embeddings_failed",
             )
         return [_coerce_embedding(item) for item in raw_embeddings]
+
+    # ── Chat ─────────────────────────────────────────────────────────
+
+    async def chat(self, chat_request: JsonObject) -> JsonObject:
+        """Send one non-streaming ``/api/chat`` request (upstream ``Chat``).
+
+        The request body is passed through verbatim; callers set the
+        ``stream`` flag themselves (the local VLM sends ``False``). Returns
+        the parsed response JSON body. An unreachable service (or a
+        non-optional probe failure) raises ``ExternalServiceError``.
+        """
+        try:
+            response = await self._client.post(
+                f"{self._base_url}/api/chat",
+                json=chat_request,
+            )
+            response.raise_for_status()
+            body = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise ExternalServiceError(
+                f"failed to complete chat request: {exc}",
+                code="ollama.chat_failed",
+            ) from exc
+        if not isinstance(body, dict):
+            raise ExternalServiceError(
+                "failed to complete chat request: malformed response",
+                code="ollama.chat_failed",
+            )
+        return body
+
+    async def chat_stream(self, chat_request: JsonObject) -> AsyncIterator[JsonObject]:
+        """Stream one ``/api/chat`` request, yielding each parsed SSE frame.
+
+        ``chat_request["stream"]`` must be truthy. The response is parsed as
+        Server-Sent Events: ``data:`` lines are decoded to JSON objects and
+        yielded until the ``data: [DONE]`` sentinel or end of stream.
+        """
+        try:
+            async with self._client.stream(
+                "POST",
+                f"{self._base_url}/api/chat",
+                json=chat_request,
+            ) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+                    if line == "data: [DONE]":
+                        return
+                    if line.startswith("data: "):
+                        payload = line[6:]
+                    elif line.startswith("data:"):
+                        payload = line[5:]
+                    else:
+                        continue
+                    try:
+                        frame = json.loads(payload)
+                    except json.JSONDecodeError:
+                        continue
+                    if isinstance(frame, dict):
+                        yield frame
+        except httpx.HTTPError as exc:
+            raise ExternalServiceError(
+                f"failed to stream chat response: {exc}",
+                code="ollama.chat_failed",
+            ) from exc
 
     # ── Pure helpers ─────────────────────────────────────────────────
 
