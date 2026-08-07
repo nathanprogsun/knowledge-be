@@ -22,6 +22,7 @@ from src.ai.graph.types import (
     RetrieveGraphRepository,
 )
 from src.app_logging import logger
+from src.common.exception import ExternalServiceError
 
 # Prefix applied to every namespace label so entity nodes never collide
 # with unrelated labels in the shared graph store.
@@ -103,7 +104,7 @@ def _search_node_query(label_expr: str) -> str:
     )
 
 
-class Neo4jConnectionError(RuntimeError):
+class Neo4jConnectionError(ExternalServiceError):
     """Raised when the Neo4j driver cannot be created or verified."""
 
 

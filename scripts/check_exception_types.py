@@ -52,7 +52,6 @@ import sys
 from pathlib import Path
 from typing import NamedTuple
 
-
 # ─────────────────────────────────────────────────────────────────────────
 # Resolution
 # ─────────────────────────────────────────────────────────────────────────
@@ -107,6 +106,9 @@ ALLOWED_APPLICATION_SUBCLASSES = {
 # intentional pre-existing design.
 ALLOWED_FILE_EXCEPTIONS: dict[str, set[str]] = {
     "app_context/registry.py": {"RuntimeError"},
+    # grpc_tools-generated code raises RuntimeError only as a version guard;
+    # the file is machine-generated and regenerated from the docreader proto.
+    "ai/docreader/proto/docreader_pb2_grpc.py": {"RuntimeError"},
 }
 
 
