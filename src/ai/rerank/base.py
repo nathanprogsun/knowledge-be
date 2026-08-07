@@ -5,12 +5,12 @@ construction parameters shared by every backend, ``config_from_model``
 the model-row-to-config mapping, and ``new_reranker`` the
 provider-routing factory. Provider routing mirrors the upstream factory:
 the configured ``provider`` name wins, falling back to base-URL
-detection; the OpenAI-compatible backend is the default route. The
-remaining provider routes are stubbed until their dedicated backends
-land.
+detection; the OpenAI-compatible backend is the default route, and the
+dedicated backends (Aliyun, Zhipu, Jina, NVIDIA, managed cloud, LKEAP,
+Volcengine) are selected by provider name.
 
 ``CustomHeaderSetter`` is the hook the factory uses to attach
-user-supplied request headers to backends that support them.
+user-supplied request headers to the backends that support them.
 """
 
 from __future__ import annotations
@@ -31,7 +31,14 @@ from src.ai.provider import (
     PROVIDER_ZHIPU,
     detect_provider,
 )
+from src.ai.rerank.aliyun import new_aliyun_reranker
+from src.ai.rerank.jina import new_jina_reranker
+from src.ai.rerank.lkeap import new_lkeap_reranker
+from src.ai.rerank.nvidia import new_nvidia_reranker
 from src.ai.rerank.remote_api import RankResult, new_openai_reranker
+from src.ai.rerank.volcengine import new_volcengine_reranker
+from src.ai.rerank.weknoracloud import new_weknoracloud_reranker
+from src.ai.rerank.zhipu import new_zhipu_reranker
 from src.common.json import JsonObject, JsonValue
 
 
@@ -138,21 +145,6 @@ def config_from_model(
     )
 
 
-# Provider routes whose dedicated backends are not implemented yet.
-# The OpenAI-compatible backend is the factory's default route.
-_STUBBED_PROVIDERS: frozenset[str] = frozenset(
-    {
-        PROVIDER_ALIYUN,
-        PROVIDER_JINA,
-        PROVIDER_LKEAP,
-        PROVIDER_NVIDIA,
-        PROVIDER_VOLCENGINE,
-        PROVIDER_WEKNORACLOUD,
-        PROVIDER_ZHIPU,
-    }
-)
-
-
 async def new_reranker(
     config: RerankerConfig,
     *,
@@ -162,22 +154,34 @@ async def new_reranker(
 
     Provider routing mirrors the upstream factory: the configured
     ``provider`` name wins, otherwise the base URL is detected. The
-    OpenAI-compatible backend is the default route; the remaining
-    provider routes raise ``NotImplementedError`` until their dedicated
-    backends land. ``client`` lets callers (and tests) inject an HTTP
-    client with a mock transport.
+    OpenAI-compatible backend is the default route; the dedicated
+    backends are selected by provider name. ``client`` lets callers (and
+    tests) inject an HTTP client with a mock transport.
     """
     provider_name = config.provider if config.provider else detect_provider(config.base_url)
-    if provider_name in _STUBBED_PROVIDERS:
-        raise NotImplementedError(f"rerank provider {provider_name!r} is not implemented yet")
-    reranker = await new_openai_reranker(
-        model_name=config.model_name,
-        model_id=config.model_id,
-        api_key=config.api_key,
-        base_url=config.base_url,
-        extra_config=config.extra_config,
-        client=client,
-    )
+    if provider_name == PROVIDER_ALIYUN:
+        reranker = await new_aliyun_reranker(config, client=client)
+    elif provider_name == PROVIDER_ZHIPU:
+        reranker = await new_zhipu_reranker(config, client=client)
+    elif provider_name == PROVIDER_JINA:
+        reranker = await new_jina_reranker(config, client=client)
+    elif provider_name == PROVIDER_NVIDIA:
+        reranker = await new_nvidia_reranker(config, client=client)
+    elif provider_name == PROVIDER_WEKNORACLOUD:
+        reranker = await new_weknoracloud_reranker(config, client=client)
+    elif provider_name == PROVIDER_LKEAP:
+        reranker = await new_lkeap_reranker(config)
+    elif provider_name == PROVIDER_VOLCENGINE:
+        reranker = await new_volcengine_reranker(config, client=client)
+    else:
+        reranker = await new_openai_reranker(
+            model_name=config.model_name,
+            model_id=config.model_id,
+            api_key=config.api_key,
+            base_url=config.base_url,
+            extra_config=config.extra_config,
+            client=client,
+        )
     if isinstance(reranker, CustomHeaderSetter):
         reranker.set_custom_headers(config.custom_headers)
     return reranker

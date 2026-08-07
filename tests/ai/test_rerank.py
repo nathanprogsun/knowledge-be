@@ -29,7 +29,14 @@ from src.ai.rerank import (
     new_reranker,
     validate_rerank_base_url,
 )
+from src.ai.rerank.aliyun import AliyunReranker
+from src.ai.rerank.jina import JinaReranker
+from src.ai.rerank.lkeap import LKEAPReranker
+from src.ai.rerank.nvidia import NvidiaReranker
 from src.ai.rerank.remote_api import RerankRequest
+from src.ai.rerank.volcengine import VolcengineReranker
+from src.ai.rerank.weknoracloud import WeKnoraCloudReranker
+from src.ai.rerank.zhipu import ZhipuReranker
 from src.common.exception import ExternalServiceError, ValidationError
 from src.core.contracts.infra import Model as WireModel
 from src.core.contracts.infra import ModelParameters
@@ -296,21 +303,99 @@ async def test_new_reranker_detects_provider_from_base_url() -> None:
     assert isinstance(reranker, OpenAIReranker)
 
 
-@pytest.mark.parametrize(
-    "provider",
-    ["aliyun", "zhipu", "jina", "nvidia", "weknoracloud", "lkeap", "volcengine"],
-)
-async def test_new_reranker_stubs_unimplemented_providers(provider: str) -> None:
-    with pytest.raises(NotImplementedError, match="not implemented"):
-        await new_reranker(
-            RerankerConfig(
-                model_name="m",
-                model_id="rr-8",
-                api_key="sk-test",
-                base_url=_BASE_URL,
-                provider=provider,
-            )
+async def test_new_reranker_routes_aliyun() -> None:
+    reranker = await new_reranker(
+        RerankerConfig(
+            model_name="gte-rerank",
+            model_id="rr-8",
+            api_key="sk-test",
+            base_url=_BASE_URL,
+            provider="aliyun",
         )
+    )
+    assert isinstance(reranker, AliyunReranker)
+
+
+async def test_new_reranker_routes_zhipu() -> None:
+    reranker = await new_reranker(
+        RerankerConfig(
+            model_name="rerank",
+            model_id="rr-8",
+            api_key="sk-test",
+            base_url=_BASE_URL,
+            provider="zhipu",
+        )
+    )
+    assert isinstance(reranker, ZhipuReranker)
+
+
+async def test_new_reranker_routes_jina() -> None:
+    reranker = await new_reranker(
+        RerankerConfig(
+            model_name="jina-reranker-v2",
+            model_id="rr-8",
+            api_key="sk-test",
+            base_url=_BASE_URL,
+            provider="jina",
+        )
+    )
+    assert isinstance(reranker, JinaReranker)
+
+
+async def test_new_reranker_routes_nvidia() -> None:
+    reranker = await new_reranker(
+        RerankerConfig(
+            model_name="nvidia-rerank",
+            model_id="rr-8",
+            api_key="sk-test",
+            base_url=_BASE_URL,
+            provider="nvidia",
+        )
+    )
+    assert isinstance(reranker, NvidiaReranker)
+
+
+async def test_new_reranker_routes_weknoracloud() -> None:
+    reranker = await new_reranker(
+        RerankerConfig(
+            model_name="rerank",
+            model_id="rr-8",
+            api_key="sk-test",
+            base_url=_BASE_URL,
+            provider="weknoracloud",
+            app_id="app",
+            app_secret="secret",
+        )
+    )
+    assert isinstance(reranker, WeKnoraCloudReranker)
+
+
+async def test_new_reranker_routes_lkeap() -> None:
+    reranker = await new_reranker(
+        RerankerConfig(
+            model_name="lke-reranker-base",
+            model_id="rr-8",
+            api_key="secret-id",
+            base_url=_BASE_URL,
+            provider="lkeap",
+            app_secret="secret-key",
+        )
+    )
+    assert isinstance(reranker, LKEAPReranker)
+
+
+async def test_new_reranker_routes_volcengine() -> None:
+    reranker = await new_reranker(
+        RerankerConfig(
+            model_name="doubao-seed-rerank",
+            model_id="rr-8",
+            api_key="ak",
+            base_url=_BASE_URL,
+            provider="volcengine",
+            app_secret="sk",
+        )
+    )
+    assert isinstance(reranker, VolcengineReranker)
 
 
 async def test_new_reranker_applies_custom_headers() -> None:
