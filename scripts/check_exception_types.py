@@ -78,7 +78,7 @@ def resolve_src_root(explicit: str | None) -> Path | None:
 SCANNED_TOP_LEVEL_DIRS = {"core", "db", "ai", "app_context"}
 
 # Errors that may be raised from anywhere inside the scanned dirs.
-ALLOWED_BUILTIN_RAISES = {"NotImplementedError"}
+ALLOWED_BUILTIN_RAISES = {"NotImplementedError", "StopAsyncIteration"}
 
 # Subclasses of ``ApplicationError`` permitted to be raised.  These names
 # are also imported from ``src.common.exception`` and are listed in
