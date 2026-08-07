@@ -23,24 +23,15 @@ from src.ai.retrieval.base import (
     RetrieveEngineService,
 )
 from src.ai.retrieval.kv_hybrid import new_kv_hybrid_retrieve_engine
+from src.ai.retrieval.milvus import new_milvus_retrieve_engine_repository
 from src.ai.retrieval.types import (
     ConnectionConfig,
     IndexConfig,
+    MilvusClientConfig,
     RetrieverEngineType,
     VectorStoreLike,
     is_env_store_id,
 )
-
-
-@dataclass(frozen=True, slots=True)
-class MilvusClientConfig:
-    """Milvus client settings (upstream ``buildMilvusClientConfig``)."""
-
-    address: str = "localhost:19530"
-    username: str = ""
-    password: str = ""
-    db_name: str = ""
-    dial_timeout_seconds: int = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,7 +129,7 @@ async def _new_milvus_retrieve_engine_repository(
     client_cfg: MilvusClientConfig,
     index_config: IndexConfig,
 ) -> RetrieveEngineRepository:
-    raise NotImplementedError("milvus repository lands with the milvus engine")
+    return await new_milvus_retrieve_engine_repository(client_cfg, index_config)
 
 
 async def _new_weaviate_retrieve_engine_repository(

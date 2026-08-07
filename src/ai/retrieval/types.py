@@ -11,6 +11,7 @@ and coerced to these models at the boundary.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import IntEnum, StrEnum
 from typing import Protocol, TypeAlias, runtime_checkable
 
@@ -228,6 +229,21 @@ class VectorStoreLike(Protocol):
     index_config: IndexConfig
 
 
+@dataclass(frozen=True, slots=True)
+class MilvusClientConfig:
+    """Milvus client settings (upstream ``buildMilvusClientConfig``).
+
+    Lives in the shared types module so the Milvus engine and the engine
+    factory can reference it without forming a circular import.
+    """
+
+    address: str = "localhost:19530"
+    username: str = ""
+    password: str = ""
+    db_name: str = ""
+    dial_timeout_seconds: int = 5
+
+
 class VectorStore(BaseModel):
     """A configured vector database instance (upstream ``types.VectorStore``)."""
 
@@ -258,6 +274,7 @@ __all__ = [
     "IndexSaveParams",
     "IndexWithScore",
     "MatchType",
+    "MilvusClientConfig",
     "RetrieveParams",
     "RetrieveResult",
     "RetrieverEngineParams",

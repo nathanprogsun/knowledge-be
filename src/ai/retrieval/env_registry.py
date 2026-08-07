@@ -31,9 +31,11 @@ from src.ai.retrieval.base import (
 )
 from src.ai.retrieval.factory import create_engine_service_from_store
 from src.ai.retrieval.kv_hybrid import new_kv_hybrid_retrieve_engine
+from src.ai.retrieval.milvus import new_milvus_retrieve_engine_repository
 from src.ai.retrieval.registry import RetrieveEngineRegistry, new_retrieve_engine_registry
 from src.ai.retrieval.types import (
     ConnectionConfig,
+    MilvusClientConfig,
     RetrieverEngineType,
     VectorStoreLike,
 )
@@ -148,9 +150,12 @@ async def _new_weaviate_repository(
 
 
 async def _new_milvus_repository(
-    _address: str, _username: str, _password: str, _db_name: str
+    address: str, username: str, password: str, db_name: str
 ) -> RetrieveEngineRepository:
-    raise NotImplementedError("milvus repository lands with the milvus engine")
+    client_cfg = MilvusClientConfig(
+        address=address, username=username, password=password, db_name=db_name
+    )
+    return await new_milvus_retrieve_engine_repository(client_cfg, None)
 
 
 async def _new_doris_repository(
