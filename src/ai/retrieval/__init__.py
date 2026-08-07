@@ -1,0 +1,129 @@
+"""Retrieval engines: types, interfaces, factory, registry, and hybrid engine.
+
+Public surface: the domain types (``RetrieverEngineType`` / ``RetrieverType`` /
+``RetrieveParams`` / ``RetrieveResult`` / ``IndexInfo``), the interfaces
+(``RetrieveEngine`` / ``RetrieveEngineRepository`` / ``RetrieveEngineService`` /
+``RetrieveEngineRegistry``), the engine factory
+(``new_engine_factory`` / ``create_engine_service_from_store``), the env-driven
+registry (``init_retrieve_engine_registry`` / ``RetrieveEngineRegistry``), and
+the keywords-vector hybrid engine (``new_kv_hybrid_retrieve_engine``).
+
+The ai layer never imports core or storage: stores and the database handle
+are supplied structurally through protocols declared in ``base.py``.
+"""
+
+from __future__ import annotations
+
+from src.ai.retrieval.base import (
+    AppConfig,
+    AuditSink,
+    Context,
+    Database,
+    Embedder,
+    EngineFactory,
+    RetrieveEngine,
+    RetrieveEngineRepository,
+    RetrieveEngineService,
+    StoreRegistry,
+    VectorStoreRepositoryLike,
+)
+from src.ai.retrieval.base import (
+    RetrieveEngineRegistry as RetrieveEngineRegistryProtocol,
+)
+from src.ai.retrieval.env_registry import (
+    StoreLoaderFn,
+    init_retrieve_engine_registry,
+    load_db_stores_into_registry,
+    parse_retrieve_driver,
+)
+from src.ai.retrieval.factory import (
+    MilvusClientConfig,
+    WeaviateClientConfig,
+    build_milvus_client_config,
+    create_engine_service_from_store,
+    host_from_addr,
+    is_es_v7,
+    new_engine_factory,
+)
+from src.ai.retrieval.kv_hybrid import (
+    KVHybridRetrieveEngine,
+    new_kv_hybrid_retrieve_engine,
+    sanitize_for_embedding,
+)
+from src.ai.retrieval.registry import (
+    ENGINE_BUILD_TIMEOUT_SECONDS,
+    REBUILD_COOLDOWN_SECONDS,
+    RetrieveEngineRegistry,
+    VectorStoreNotFoundError,
+    VectorStoreUnavailableError,
+    new_retrieve_engine_registry,
+)
+from src.ai.retrieval.types import (
+    ENV_STORE_ID_PREFIX,
+    ConnectionConfig,
+    IndexConfig,
+    IndexInfo,
+    IndexSaveParams,
+    IndexWithScore,
+    MatchType,
+    RetrieveParams,
+    RetrieverEngineParams,
+    RetrieverEngineType,
+    RetrieveResult,
+    RetrieverType,
+    SourceType,
+    VectorStore,
+    VectorStoreLike,
+    is_env_store_id,
+)
+
+__all__ = [
+    "ENGINE_BUILD_TIMEOUT_SECONDS",
+    "ENV_STORE_ID_PREFIX",
+    "REBUILD_COOLDOWN_SECONDS",
+    "AppConfig",
+    "AuditSink",
+    "ConnectionConfig",
+    "Context",
+    "Database",
+    "Embedder",
+    "EngineFactory",
+    "IndexConfig",
+    "IndexInfo",
+    "IndexSaveParams",
+    "IndexWithScore",
+    "KVHybridRetrieveEngine",
+    "MatchType",
+    "MilvusClientConfig",
+    "RetrieveEngine",
+    "RetrieveEngineRegistry",
+    "RetrieveEngineRegistryProtocol",
+    "RetrieveEngineRepository",
+    "RetrieveEngineService",
+    "RetrieveParams",
+    "RetrieveResult",
+    "RetrieverEngineParams",
+    "RetrieverEngineType",
+    "RetrieverType",
+    "SourceType",
+    "StoreLoaderFn",
+    "StoreRegistry",
+    "VectorStore",
+    "VectorStoreLike",
+    "VectorStoreNotFoundError",
+    "VectorStoreRepositoryLike",
+    "VectorStoreUnavailableError",
+    "WeaviateClientConfig",
+    "build_milvus_client_config",
+    "create_engine_service_from_store",
+    "host_from_addr",
+    "init_retrieve_engine_registry",
+    "is_env_store_id",
+    "is_es_v7",
+    "load_db_stores_into_registry",
+    "new_engine_factory",
+    "new_kv_hybrid_retrieve_engine",
+    "new_retrieve_engine_registry",
+    "parse_retrieve_driver",
+    "sanitize_for_embedding",
+]
