@@ -42,6 +42,7 @@ from src.core.infra.mcp_services.oauth import (
     OAuthStateStore,
 )
 from src.core.infra.mcp_services.types import MCPServiceInfo
+from src.core.infra.web_search.registry import build_web_search_client_registry
 from src.db.base import DatabaseEngine
 from src.settings import get_settings
 from src.web.api.auth.router import router as auth_router
@@ -119,6 +120,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # so callers can rely on ``app.state.graph_repository`` existing.
     graph_repository = await build_graph_repository()
     app.state.graph_repository = graph_repository
+
+    # Web-search provider registry: one app-scope registry mapping every
+    # supported provider type to its concrete HTTP client factory. The
+    # registry is stateless (it holds factories only); a client is built
+    # per search call by the dispatch service, so no shutdown hook is
+    # needed here.
+    app.state.web_search_client_registry = build_web_search_client_registry()
     logger.info("lifespan ready")
     try:
         yield
