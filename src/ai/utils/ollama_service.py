@@ -24,7 +24,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.common.exception import ExternalServiceError
-from src.common.json import JsonObject
+from src.common.json import JsonObject, JsonValue
 
 OLLAMA_BASE_URL_ENV: Final = "OLLAMA_BASE_URL"
 OLLAMA_OPTIONAL_ENV: Final = "OLLAMA_OPTIONAL"
@@ -56,6 +56,22 @@ class OllamaModelInfo(BaseModel):
     size: int | None = Field(default=None)
     digest: str | None = Field(default=None)
     modified_at: datetime | None = Field(default=None)
+
+
+class OllamaEmbedRequest(BaseModel):
+    """``/api/embed`` request (the upstream ``ollama/api.EmbedRequest``).
+
+    ``options`` carries model options such as ``num_ctx``; ``truncate``
+    and ``dimensions`` are optional and omitted from the wire when unset.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    model: str
+    input: list[str]
+    truncate: bool | None = Field(default=None)
+    dimensions: int | None = Field(default=None)
+    options: dict[str, JsonValue] = Field(default_factory=dict)
 
 
 def resolve_ollama_dial_base_url() -> str:
@@ -317,6 +333,47 @@ class OllamaService:
             OllamaModelInfo.model_validate(entry) for entry in raw_models if isinstance(entry, dict)
         ]
 
+    async def embeddings(self, request: OllamaEmbedRequest) -> list[list[float]]:
+        """Return embedding vectors for ``request.input`` (upstream ``Embeddings``).
+
+        POSTs ``/api/embed``. An unreachable service (or a non-optional
+        probe failure) raises ``ExternalServiceError``.
+        """
+        payload: dict[str, JsonValue] = {
+            "model": request.model,
+            "input": list(request.input),
+        }
+        if request.truncate is not None:
+            payload["truncate"] = request.truncate
+        if request.dimensions is not None:
+            payload["dimensions"] = request.dimensions
+        if request.options:
+            payload["options"] = request.options
+        try:
+            response = await self._client.post(
+                f"{self._base_url}/api/embed",
+                json=payload,
+            )
+            response.raise_for_status()
+            body = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            raise ExternalServiceError(
+                f"failed to get embedding vectors: {exc}",
+                code="ollama.embeddings_failed",
+            ) from exc
+        if not isinstance(body, dict):
+            raise ExternalServiceError(
+                "failed to get embedding vectors: malformed response",
+                code="ollama.embeddings_failed",
+            )
+        raw_embeddings = body.get("embeddings")
+        if not isinstance(raw_embeddings, list):
+            raise ExternalServiceError(
+                "failed to get embedding vectors: missing embeddings",
+                code="ollama.embeddings_failed",
+            )
+        return [_coerce_embedding(item) for item in raw_embeddings]
+
     # ── Pure helpers ─────────────────────────────────────────────────
 
     @staticmethod
@@ -325,11 +382,19 @@ class OllamaService:
         return name != "" and " " not in name
 
 
+def _coerce_embedding(item: JsonValue) -> list[float]:
+    """Project one ``/api/embed`` embedding entry onto ``list[float]``."""
+    if not isinstance(item, list):
+        return []
+    return [float(value) for value in item if isinstance(value, (int, float))]
+
+
 __all__ = [
     "OLLAMA_BASE_URL_ENV",
     "OLLAMA_DIAL_FALLBACK_URL",
     "OLLAMA_OPTIONAL_ENV",
     "PULL_TIMEOUT_SECONDS",
+    "OllamaEmbedRequest",
     "OllamaModelInfo",
     "OllamaService",
     "ProgressCallback",
