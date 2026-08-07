@@ -8,12 +8,12 @@ the underlying services so no database is needed for the auth path.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import Iterator
 from datetime import UTC, datetime
 
 import pytest
 from fastapi import FastAPI, Request
-from httpx import ASGITransport, AsyncClient
+from fastapi.testclient import TestClient
 
 from src.app_context.lifespan import create_app
 from src.common.exception import NotFoundError, UnauthorizedError
@@ -30,6 +30,7 @@ from src.web.deps import (
     get_system_setting_service,
 )
 from src.web.middleware.auth import require_auth
+from tests.integration.conftest import _noop_lifespan
 
 
 class _FakeUserRepo:
@@ -130,6 +131,7 @@ def app(
     principal_role: dict[str, str],
 ) -> FastAPI:
     application = create_app()
+    application.router.lifespan_context = _noop_lifespan
 
     async def _override_auth(request: Request) -> None:
         """Populate request.state as a principal with ``principal_role``.
@@ -171,9 +173,8 @@ def app(
 
 
 @pytest.fixture
-async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+async def client(app: FastAPI) -> Iterator[TestClient]:
+    with TestClient(app=app, base_url="http://test") as c:
         yield c
 
 
@@ -197,8 +198,8 @@ def _seed_user(repo: _FakeUserRepo, *, is_system_admin: bool = False) -> User:
     return user
 
 
-async def _token(client: AsyncClient, email: str = "alice@example.com") -> str:
-    resp = await client.post("/auth/login", json={"email": email, "password": "correct-horse"})
+async def _token(client: TestClient, email: str = "alice@example.com") -> str:
+    resp = client.post("/auth/login", json={"email": email, "password": "correct-horse"})
     assert resp.status_code == 200
     return str(resp.json()["token"])
 
@@ -207,38 +208,36 @@ async def _token(client: AsyncClient, email: str = "alice@example.com") -> str:
 
 
 async def test_protected_endpoint_requires_auth(
-    client: AsyncClient, fake_users: _FakeUserRepo
+    client: TestClient, fake_users: _FakeUserRepo
 ) -> None:
     _seed_user(fake_users)
-    resp = await client.get("/auth/me")
+    resp = client.get("/auth/me")
     assert resp.status_code == 401
     assert resp.json()["error"]["code"] == "auth.missing_authentication"
 
 
 async def test_protected_endpoint_invalid_token(
-    client: AsyncClient, fake_users: _FakeUserRepo
+    client: TestClient, fake_users: _FakeUserRepo
 ) -> None:
     _seed_user(fake_users)
-    resp = await client.get("/auth/me", headers={"Authorization": "Bearer garbage"})
+    resp = client.get("/auth/me", headers={"Authorization": "Bearer garbage"})
     assert resp.status_code == 401
 
 
-async def test_public_endpoint_bypasses_auth(
-    client: AsyncClient, fake_users: _FakeUserRepo
-) -> None:
+async def test_public_endpoint_bypasses_auth(client: TestClient, fake_users: _FakeUserRepo) -> None:
     _seed_user(fake_users)
-    resp = await client.post(
+    resp = client.post(
         "/auth/login", json={"email": "alice@example.com", "password": "correct-horse"}
     )
     assert resp.status_code == 200
 
 
 async def test_valid_token_allows_protected_endpoint(
-    client: AsyncClient, fake_users: _FakeUserRepo
+    client: TestClient, fake_users: _FakeUserRepo
 ) -> None:
     _seed_user(fake_users)
     token = await _token(client)
-    resp = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    resp = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     assert resp.json()["success"] is True
 
@@ -247,21 +246,21 @@ async def test_valid_token_allows_protected_endpoint(
 
 
 async def test_system_admin_route_rejects_regular_user(
-    client: AsyncClient, fake_users: _FakeUserRepo
+    client: TestClient, fake_users: _FakeUserRepo
 ) -> None:
     _seed_user(fake_users)  # not a system admin
     token = await _token(client)
-    resp = await client.get("/system/admin/settings", headers={"Authorization": f"Bearer {token}"})
+    resp = client.get("/system/admin/settings", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 403
     assert resp.json()["error"]["code"] == "rbac.system_admin_required"
 
 
 async def test_system_admin_route_allows_admin(
-    client: AsyncClient, fake_users: _FakeUserRepo
+    client: TestClient, fake_users: _FakeUserRepo
 ) -> None:
     _seed_user(fake_users, is_system_admin=True)
     token = await _token(client)
-    resp = await client.get("/system/admin/settings", headers={"Authorization": f"Bearer {token}"})
+    resp = client.get("/system/admin/settings", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
 
 
@@ -269,14 +268,14 @@ async def test_system_admin_route_allows_admin(
 
 
 async def test_kv_put_requires_admin_role(
-    client: AsyncClient, fake_users: _FakeUserRepo, principal_role: dict[str, str]
+    client: TestClient, fake_users: _FakeUserRepo, principal_role: dict[str, str]
 ) -> None:
     # Set role to viewer: PUT /tenants/kv/{key} requires Admin, so the
     # gate rejects with 403 before the handler (which needs a DB session).
     principal_role["role"] = "viewer"
     _seed_user(fake_users)
     token = await _token(client)
-    resp = await client.put(
+    resp = client.put(
         "/tenants/kv/web-search-config",
         headers={"Authorization": f"Bearer {token}"},
         json={"max_results": 20},

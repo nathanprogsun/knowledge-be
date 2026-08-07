@@ -2,72 +2,34 @@
 
 Unlike ``test_auth_views.py`` (which overrides ``get_auth_service`` with
 in-memory fakes), this module lets the real ``UserRepository`` +
-``AuthTokenRepository`` execute against a testcontainer Postgres. Only
-``get_async_session`` is overridden - to point at the container's engine
-- so the full web -> service -> repo -> DB path is exercised.
-
-The suite skips when Docker is unavailable (CI runners without Docker,
-sandboxes).
+``AuthTokenRepository`` execute against the real Postgres instance.
+Only ``get_async_session`` is overridden - to point at a dedicated
+engine - so the full web -> service -> repo -> DB path is exercised.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+import uuid
+from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime
 
 import pytest
 import sqlalchemy
 from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
+from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.pool import NullPool
 
 from src.app_context.lifespan import create_app
+from src.settings import get_settings, reset_settings_cache
 from src.util.security import hash_password
 from src.web.deps import get_async_session
-
-_DROP_SQL = sqlalchemy.text("DROP TABLE IF EXISTS users, auth_tokens CASCADE")
-
-_CREATE_USERS_SQL = sqlalchemy.text(
-    """
-    CREATE TABLE users (
-        id VARCHAR(36) PRIMARY KEY,
-        username VARCHAR(100) NOT NULL UNIQUE,
-        email VARCHAR(255) NOT NULL UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        avatar VARCHAR(500),
-        tenant_id INTEGER,
-        is_active BOOLEAN NOT NULL DEFAULT TRUE,
-        can_access_all_tenants BOOLEAN NOT NULL DEFAULT FALSE,
-        is_system_admin BOOLEAN NOT NULL DEFAULT FALSE,
-        preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        deleted_at TIMESTAMP WITH TIME ZONE
-    )
-    """
-)
-
-_CREATE_AUTH_TOKENS_SQL = sqlalchemy.text(
-    """
-    CREATE TABLE auth_tokens (
-        id VARCHAR(36) PRIMARY KEY,
-        user_id VARCHAR(36) NOT NULL,
-        token TEXT NOT NULL,
-        token_type VARCHAR(50) NOT NULL,
-        expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-        is_revoked BOOLEAN NOT NULL DEFAULT FALSE,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT fk_auth_tokens_user FOREIGN KEY (user_id)
-            REFERENCES users(id) ON DELETE CASCADE
-    )
-    """
-)
+from tests.integration.conftest import _noop_lifespan
 
 _SEED_USER_SQL = sqlalchemy.text(
     """
@@ -80,15 +42,15 @@ _SEED_USER_SQL = sqlalchemy.text(
 
 
 @pytest.fixture
-async def engine(pg_url: str) -> AsyncIterator[AsyncEngine]:
-    eng: AsyncEngine = create_async_engine(pg_url)
-    async with eng.begin() as conn:
-        await conn.execute(_DROP_SQL)
-        await conn.execute(_CREATE_USERS_SQL)
-        await conn.execute(_CREATE_AUTH_TOKENS_SQL)
+def _reset_settings() -> None:
+    reset_settings_cache()
+
+
+@pytest.fixture
+async def engine(_reset_settings: None) -> AsyncIterator[AsyncEngine]:
+    settings = get_settings()
+    eng: AsyncEngine = create_async_engine(settings.database_url, poolclass=NullPool)
     yield eng
-    async with eng.begin() as conn:
-        await conn.execute(_DROP_SQL)
     await eng.dispose()
 
 
@@ -100,6 +62,7 @@ def session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
 @pytest.fixture
 def app(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI:
     application = create_app()
+    application.router.lifespan_context = _noop_lifespan
 
     async def _override_session() -> AsyncIterator[AsyncSession]:
         async with session_factory() as session:
@@ -115,25 +78,26 @@ def app(session_factory: async_sessionmaker[AsyncSession]) -> FastAPI:
 
 
 @pytest.fixture
-async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+async def client(app: FastAPI) -> Iterator[TestClient]:
+    with TestClient(app=app, base_url="http://test") as c:
         yield c
 
 
 async def _seed_user(
     session_factory: async_sessionmaker[AsyncSession],
     *,
-    email: str = "alice@example.com",
     password: str = "correct-horse",
     is_active: bool = True,
-) -> str:
+) -> tuple[str, str]:
+    """Insert a unique user and return ``(user_id, email)``."""
+    uid = f"usr-{uuid.uuid4().hex[:12]}"
+    email = f"{uid}@test.example"
     now = datetime.now(UTC)
     async with session_factory() as s:
         await s.execute(
             _SEED_USER_SQL.bindparams(
-                id="usr-1",
-                username="alice",
+                id=uid,
+                username=uid,
                 email=email,
                 password_hash=hash_password(password),
                 tenant_id=7,
@@ -143,37 +107,36 @@ async def _seed_user(
             )
         )
         await s.commit()
-    return "usr-1"
+    return uid, email
 
 
 # ── POST /auth/login ────────────────────────────────────────────────
 
 
 async def test_login_writes_tokens_to_db(
-    client: AsyncClient,
+    client: TestClient,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    await _seed_user(session_factory)
-    resp = await client.post(
+    uid, email = await _seed_user(session_factory)
+    resp = client.post(
         "/auth/login",
-        json={"email": "alice@example.com", "password": "correct-horse"},
+        json={"email": email, "password": "correct-horse"},
     )
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
-    assert body["user"]["id"] == "usr-1"
+    assert body["user"]["id"] == uid
     assert body["token"]
     assert body["refresh_token"]
     assert body["active_tenant"] is None
 
-    # Two token rows (access + refresh) should be in the DB.
     async with session_factory() as s:
         rows = (
             (
                 await s.execute(
                     sqlalchemy.text(
                         "SELECT token_type, is_revoked FROM auth_tokens WHERE user_id = :uid"
-                    ).bindparams(uid="usr-1")
+                    ).bindparams(uid=uid)
                 )
             )
             .mappings()
@@ -185,17 +148,23 @@ async def test_login_writes_tokens_to_db(
 
 
 async def test_login_wrong_password_db_unchanged(
-    client: AsyncClient,
+    client: TestClient,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    await _seed_user(session_factory)
-    resp = await client.post(
+    uid, email = await _seed_user(session_factory)
+    resp = client.post(
         "/auth/login",
-        json={"email": "alice@example.com", "password": "wrong"},
+        json={"email": email, "password": "wrong"},
     )
     assert resp.status_code == 401
     async with session_factory() as s:
-        count = (await s.execute(sqlalchemy.text("SELECT COUNT(*) FROM auth_tokens"))).scalar()
+        count = (
+            await s.execute(
+                sqlalchemy.text("SELECT COUNT(*) FROM auth_tokens WHERE user_id = :uid").bindparams(
+                    uid=uid
+                )
+            )
+        ).scalar()
     assert count == 0
 
 
@@ -203,17 +172,17 @@ async def test_login_wrong_password_db_unchanged(
 
 
 async def test_refresh_revokes_old_token_in_db(
-    client: AsyncClient,
+    client: TestClient,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    await _seed_user(session_factory)
-    login = await client.post(
+    uid, email = await _seed_user(session_factory)
+    login = client.post(
         "/auth/login",
-        json={"email": "alice@example.com", "password": "correct-horse"},
+        json={"email": email, "password": "correct-horse"},
     )
     old_refresh = login.json()["refresh_token"]
 
-    resp = await client.post(
+    resp = client.post(
         "/auth/refresh",
         json={"refreshToken": old_refresh},
     )
@@ -221,7 +190,6 @@ async def test_refresh_revokes_old_token_in_db(
     new_body = resp.json()
     assert new_body["access_token"] != login.json()["token"]
 
-    # Old refresh row should be revoked; 4 rows total (2 from login + 2 from refresh).
     async with session_factory() as s:
         rows = (
             (
@@ -229,7 +197,7 @@ async def test_refresh_revokes_old_token_in_db(
                     sqlalchemy.text(
                         "SELECT token, is_revoked FROM auth_tokens "
                         "WHERE user_id = :uid ORDER BY created_at"
-                    ).bindparams(uid="usr-1")
+                    ).bindparams(uid=uid)
                 )
             )
             .mappings()
@@ -244,17 +212,17 @@ async def test_refresh_revokes_old_token_in_db(
 
 
 async def test_logout_revokes_all_tokens_in_db(
-    client: AsyncClient,
+    client: TestClient,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
-    await _seed_user(session_factory)
-    login = await client.post(
+    uid, email = await _seed_user(session_factory)
+    login = client.post(
         "/auth/login",
-        json={"email": "alice@example.com", "password": "correct-horse"},
+        json={"email": email, "password": "correct-horse"},
     )
     token = login.json()["token"]
 
-    resp = await client.post(
+    resp = client.post(
         "/auth/logout",
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -267,7 +235,7 @@ async def test_logout_revokes_all_tokens_in_db(
                 await s.execute(
                     sqlalchemy.text(
                         "SELECT is_revoked FROM auth_tokens WHERE user_id = :uid"
-                    ).bindparams(uid="usr-1")
+                    ).bindparams(uid=uid)
                 )
             )
             .scalars()
@@ -278,24 +246,24 @@ async def test_logout_revokes_all_tokens_in_db(
 
 
 async def test_logout_then_refresh_fails(
-    client: AsyncClient,
+    client: TestClient,
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     """After logout, the refresh token is revoked and can no longer be used."""
-    await _seed_user(session_factory)
-    login = await client.post(
+    _, email = await _seed_user(session_factory)
+    login = client.post(
         "/auth/login",
-        json={"email": "alice@example.com", "password": "correct-horse"},
+        json={"email": email, "password": "correct-horse"},
     )
     refresh = login.json()["refresh_token"]
     access = login.json()["token"]
 
-    await client.post(
+    client.post(
         "/auth/logout",
         headers={"Authorization": f"Bearer {access}"},
     )
 
-    resp = await client.post(
+    resp = client.post(
         "/auth/refresh",
         json={"refreshToken": refresh},
     )

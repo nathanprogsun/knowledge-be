@@ -1,7 +1,7 @@
 """Web-layer tests for the system-admin router (settings CRUD + audit).
 
-Exercises the router over HTTP via ``httpx.AsyncClient`` against the
-app. Service deps are overridden with the real services backed by
+Exercises the router over HTTP via ``TestClient`` against the app.
+Service deps are overridden with the real services backed by
 ``AsyncMock(spec=...)`` repositories configured with stateful closures,
 so the tests exercise the full HTTP path (routing, serialization,
 exception handling) without touching a real database.
@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient
+from fastapi.testclient import TestClient
 
 from src.core.system.audit_service import AuditLogService
 from src.core.system.system_setting_service import SystemSettingService
@@ -27,8 +27,6 @@ from src.web.deps import (
     get_system_setting_service,
 )
 from src.web.deps.rbac import require_system_admin_dep
-from tests.util.service_test import stateful_insert
-
 
 # ── Fixtures ────────────────────────────────────────────────────────
 
@@ -138,7 +136,7 @@ def settings_repo() -> AsyncMock:
 
 @pytest.fixture(autouse=True)
 def _override_services(
-    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
+    web_app: FastAPI,
     audit_repo: AsyncMock,
     settings_repo: AsyncMock,
 ) -> FastAPI:
@@ -146,7 +144,7 @@ def _override_services(
 
     The system-admin router gates on ``SystemAdminDep``; the header
     channel uses role ``owner`` (not ``system_admin``), so we bypass
-    the dep locally — the test is exercising settings CRUD, not RBAC.
+    the dep locally - the test is exercising settings CRUD, not RBAC.
     """
     web_app.dependency_overrides[require_system_admin_dep] = lambda: None
     web_app.dependency_overrides[get_system_setting_service] = lambda: SystemSettingService(
@@ -163,9 +161,9 @@ def _override_services(
 
 
 async def test_list_settings_returns_registry_keys(
-    web_authed_client: AsyncClient,
+    web_authed_client: TestClient,
 ) -> None:
-    resp = await web_authed_client.get("/system/admin/settings")
+    resp = web_authed_client.get("/system/admin/settings")
     assert resp.status_code == 200
     body = resp.json()
     keys = {r["key"] for r in body}
@@ -180,16 +178,16 @@ async def test_list_settings_returns_registry_keys(
 # ── GET /system/admin/settings/{key} ────────────────────────────────
 
 
-async def test_get_setting_returns_virtual_row(web_authed_client: AsyncClient) -> None:
-    resp = await web_authed_client.get("/system/admin/settings/auth.registration_mode")
+async def test_get_setting_returns_virtual_row(web_authed_client: TestClient) -> None:
+    resp = web_authed_client.get("/system/admin/settings/auth.registration_mode")
     assert resp.status_code == 200
     body = resp.json()
     assert body["key"] == "auth.registration_mode"
     assert body["enum"] == ["self_serve", "invite_only"]
 
 
-async def test_get_unknown_setting_returns_422(web_authed_client: AsyncClient) -> None:
-    resp = await web_authed_client.get("/system/admin/settings/nope.does_not_exist")
+async def test_get_unknown_setting_returns_422(web_authed_client: TestClient) -> None:
+    resp = web_authed_client.get("/system/admin/settings/nope.does_not_exist")
     assert resp.status_code == 422
 
 
@@ -197,10 +195,10 @@ async def test_get_unknown_setting_returns_422(web_authed_client: AsyncClient) -
 
 
 async def test_update_setting_persists_and_audits(
-    web_authed_client: AsyncClient,
+    web_authed_client: TestClient,
     audit_repo: AsyncMock,
 ) -> None:
-    resp = await web_authed_client.put(
+    resp = web_authed_client.put(
         "/system/admin/settings/auth.registration_mode",
         json={"value": "invite_only"},
     )
@@ -214,9 +212,9 @@ async def test_update_setting_persists_and_audits(
 
 
 async def test_update_setting_type_mismatch_returns_422(
-    web_authed_client: AsyncClient,
+    web_authed_client: TestClient,
 ) -> None:
-    resp = await web_authed_client.put(
+    resp = web_authed_client.put(
         "/system/admin/settings/auth.registration_mode",
         json={"value": 123},
     )
@@ -224,9 +222,9 @@ async def test_update_setting_type_mismatch_returns_422(
 
 
 async def test_update_setting_enum_violation_returns_422(
-    web_authed_client: AsyncClient,
+    web_authed_client: TestClient,
 ) -> None:
-    resp = await web_authed_client.put(
+    resp = web_authed_client.put(
         "/system/admin/settings/auth.registration_mode",
         json={"value": "bogus"},
     )
@@ -236,15 +234,15 @@ async def test_update_setting_enum_violation_returns_422(
 # ── DELETE /system/admin/settings/{key} ─────────────────────────────
 
 
-async def test_reset_setting_idempotent(web_authed_client: AsyncClient) -> None:
-    resp = await web_authed_client.delete("/system/admin/settings/auth.registration_mode")
+async def test_reset_setting_idempotent(web_authed_client: TestClient) -> None:
+    resp = web_authed_client.delete("/system/admin/settings/auth.registration_mode")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
 
 
-async def test_reset_unknown_setting_returns_422(web_authed_client: AsyncClient) -> None:
-    resp = await web_authed_client.delete("/system/admin/settings/nope")
+async def test_reset_unknown_setting_returns_422(web_authed_client: TestClient) -> None:
+    resp = web_authed_client.delete("/system/admin/settings/nope")
     assert resp.status_code == 422
 
 
@@ -252,7 +250,7 @@ async def test_reset_unknown_setting_returns_422(web_authed_client: AsyncClient)
 
 
 async def test_system_audit_log_returns_newest_first(
-    web_authed_client: AsyncClient,
+    web_authed_client: TestClient,
     audit_repo: AsyncMock,
 ) -> None:
     now = datetime.now(UTC)
@@ -269,7 +267,7 @@ async def test_system_audit_log_returns_newest_first(
             )
         )
     audit_repo._counter[0] = 100  # type: ignore[attr-defined]
-    resp = await web_authed_client.get("/system/admin/audit-log?limit=2")
+    resp = web_authed_client.get("/system/admin/audit-log?limit=2")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -280,7 +278,7 @@ async def test_system_audit_log_returns_newest_first(
 
 
 async def test_system_audit_log_filter_by_action(
-    web_authed_client: AsyncClient,
+    web_authed_client: TestClient,
     audit_repo: AsyncMock,
 ) -> None:
     now = datetime.now(UTC)
@@ -305,7 +303,7 @@ async def test_system_audit_log_filter_by_action(
             created_at=now,
         )
     )
-    resp = await web_authed_client.get("/system/admin/audit-log?action=system.admin_promoted")
+    resp = web_authed_client.get("/system/admin/audit-log?action=system.admin_promoted")
     assert resp.status_code == 200
     body = resp.json()
     assert len(body["data"]) == 1

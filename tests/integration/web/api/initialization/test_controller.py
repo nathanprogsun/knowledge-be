@@ -1,6 +1,6 @@
 """Web-layer tests for the initialization router.
 
-Per AGENTS.md §9 the router is exercised over ``httpx.AsyncClient``
+Per AGENTS.md §9 the router is exercised over ``TestClient``
 against the real app, with the service dependency overridden by a real
 ``InitializationService`` whose two HTTP clients are backed by
 ``httpx.MockTransport``. That keeps routing, serialization, the role
@@ -21,7 +21,7 @@ from collections.abc import Callable, Iterator
 import httpx
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient
+from fastapi.testclient import TestClient
 
 from src.core.infra.initialization.provider_detect import (
     OLLAMA_BASE_URL_ENV,
@@ -32,7 +32,6 @@ from src.core.infra.initialization.provider_detect import (
 )
 from src.core.infra.initialization.service.initialization_service import InitializationService
 from src.web.deps.infra_initialization import get_initialization_service
-from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 
 _OLLAMA_BASE = "http://ollama.test:11434"
 _REMOTE_BASE = "https://example.com/v1"
@@ -97,9 +96,7 @@ def _build_service(
 ) -> InitializationService:
     """Construct an ``InitializationService`` backed by mock HTTP transports."""
     return InitializationService(
-        ollama_client=OllamaClient(
-            base_url=_OLLAMA_BASE, transport=httpx.MockTransport(ollama)
-        ),
+        ollama_client=OllamaClient(base_url=_OLLAMA_BASE, transport=httpx.MockTransport(ollama)),
         task_store=task_store,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(remote)),
     )
@@ -107,7 +104,7 @@ def _build_service(
 
 @pytest.fixture(autouse=True)
 def app(
-    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
+    web_app: FastAPI,
     task_store: DownloadTaskStore,
 ) -> FastAPI:
     """Override ``get_initialization_service`` on the shared web app (autouse)."""
@@ -118,7 +115,7 @@ def app(
 
 
 @pytest.fixture
-def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa: ARG001
+def client(app: FastAPI, web_authed_client: TestClient) -> TestClient:
     """Alias ``web_authed_client``; depending on ``app`` forces the
     dep-override fixture to run before the test executes."""
     return web_authed_client
@@ -127,8 +124,8 @@ def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa
 # ── GET /initialization/ollama/status ────────────────────────────────
 
 
-async def test_ollama_status_returns_go_envelope(client: AsyncClient) -> None:
-    resp = await client.get("/initialization/ollama/status")
+async def test_ollama_status_returns_go_envelope(client: TestClient) -> None:
+    resp = client.get("/initialization/ollama/status")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -140,8 +137,8 @@ async def test_ollama_status_returns_go_envelope(client: AsyncClient) -> None:
 
 async def test_ollama_status_reports_unavailable_as_200(
     task_store: DownloadTaskStore,
-    web_app: FastAPI,  # noqa: ARG001 - shared app fixture
-    web_authed_client: AsyncClient,
+    web_app: FastAPI,
+    web_authed_client: TestClient,
 ) -> None:
     def down(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("connection refused", request=request)
@@ -149,7 +146,7 @@ async def test_ollama_status_reports_unavailable_as_200(
     web_app.dependency_overrides[get_initialization_service] = lambda: _build_service(
         task_store=task_store, ollama=down
     )
-    resp = await web_authed_client.get("/initialization/ollama/status")
+    resp = web_authed_client.get("/initialization/ollama/status")
     assert resp.status_code == 200
     assert resp.json()["data"]["available"] is False
 
@@ -157,8 +154,8 @@ async def test_ollama_status_reports_unavailable_as_200(
 # ── GET /initialization/ollama/models ────────────────────────────────
 
 
-async def test_list_ollama_models(client: AsyncClient) -> None:
-    resp = await client.get("/initialization/ollama/models")
+async def test_list_ollama_models(client: TestClient) -> None:
+    resp = client.get("/initialization/ollama/models")
     assert resp.status_code == 200
     models = resp.json()["data"]
     assert models[0]["name"] == "qwen3:8b"
@@ -167,8 +164,8 @@ async def test_list_ollama_models(client: AsyncClient) -> None:
 
 async def test_list_ollama_models_maps_unavailable_to_502(
     task_store: DownloadTaskStore,
-    web_app: FastAPI,  # noqa: ARG001 - shared app fixture
-    web_authed_client: AsyncClient,
+    web_app: FastAPI,
+    web_authed_client: TestClient,
 ) -> None:
     def down(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("connection refused", request=request)
@@ -176,7 +173,7 @@ async def test_list_ollama_models_maps_unavailable_to_502(
     web_app.dependency_overrides[get_initialization_service] = lambda: _build_service(
         task_store=task_store, ollama=down
     )
-    resp = await web_authed_client.get("/initialization/ollama/models")
+    resp = web_authed_client.get("/initialization/ollama/models")
     # ExternalServiceError -> 502 via the shared exception handler.
     assert resp.status_code == 502
 
@@ -184,8 +181,8 @@ async def test_list_ollama_models_maps_unavailable_to_502(
 # ── POST /initialization/ollama/models/check ─────────────────────────
 
 
-async def test_check_ollama_models_returns_per_name_map(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_check_ollama_models_returns_per_name_map(client: TestClient) -> None:
+    resp = client.post(
         "/initialization/ollama/models/check",
         json={"models": ["qwen3:8b", "absent"]},
     )
@@ -196,8 +193,8 @@ async def test_check_ollama_models_returns_per_name_map(client: AsyncClient) -> 
 # ── POST /initialization/ollama/models/download ──────────────────────
 
 
-async def test_download_reports_already_present(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_download_reports_already_present(client: TestClient) -> None:
+    resp = client.post(
         "/initialization/ollama/models/download",
         json={"modelName": "qwen3:8b"},
     )
@@ -208,10 +205,10 @@ async def test_download_reports_already_present(client: AsyncClient) -> None:
 
 
 async def test_download_creates_task(
-    client: AsyncClient,
+    client: TestClient,
     task_store: DownloadTaskStore,
 ) -> None:
-    resp = await client.post(
+    resp = client.post(
         "/initialization/ollama/models/download",
         json={"modelName": "llama3:8b"},
     )
@@ -223,8 +220,8 @@ async def test_download_creates_task(
     await task_store.wait_for_pulls()
 
 
-async def test_download_rejects_missing_model_name(client: AsyncClient) -> None:
-    resp = await client.post("/initialization/ollama/models/download", json={})
+async def test_download_rejects_missing_model_name(client: TestClient) -> None:
+    resp = client.post("/initialization/ollama/models/download", json={})
     assert resp.status_code == 422
 
 
@@ -232,12 +229,12 @@ async def test_download_rejects_missing_model_name(client: AsyncClient) -> None:
 
 
 async def test_download_progress_uses_go_json_names(
-    client: AsyncClient,
+    client: TestClient,
     task_store: DownloadTaskStore,
 ) -> None:
     task_store.create(task_id="task-1", model_name="qwen3:8b")
     task_store.update_status("task-1", status=STATUS_DOWNLOADING, progress=42.5, message="下载中")
-    resp = await client.get("/initialization/ollama/download/progress/task-1")
+    resp = client.get("/initialization/ollama/download/progress/task-1")
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["id"] == "task-1"
@@ -248,8 +245,8 @@ async def test_download_progress_uses_go_json_names(
     assert data["endTime"] is None
 
 
-async def test_download_progress_unknown_task_is_404(client: AsyncClient) -> None:
-    resp = await client.get("/initialization/ollama/download/progress/missing")
+async def test_download_progress_unknown_task_is_404(client: TestClient) -> None:
+    resp = client.get("/initialization/ollama/download/progress/missing")
     assert resp.status_code == 404
 
 
@@ -257,12 +254,12 @@ async def test_download_progress_unknown_task_is_404(client: AsyncClient) -> Non
 
 
 async def test_list_download_tasks(
-    client: AsyncClient,
+    client: TestClient,
     task_store: DownloadTaskStore,
 ) -> None:
     task_store.create(task_id="t1", model_name="a")
     task_store.create(task_id="t2", model_name="b")
-    resp = await client.get("/initialization/ollama/download/tasks")
+    resp = client.get("/initialization/ollama/download/tasks")
     assert resp.status_code == 200
     assert {t["id"] for t in resp.json()["data"]} == {"t1", "t2"}
 
@@ -270,8 +267,8 @@ async def test_list_download_tasks(
 # ── POST /initialization/remote/check ────────────────────────────────
 
 
-async def test_remote_check_available(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_remote_check_available(client: TestClient) -> None:
+    resp = client.post(
         "/initialization/remote/check",
         json={"model": "gpt-4o-mini", "baseUrl": _REMOTE_BASE, "apiKey": "sk-x"},
     )
@@ -279,13 +276,13 @@ async def test_remote_check_available(client: AsyncClient) -> None:
     assert resp.json()["data"] == {"available": True, "message": "连接正常，模型可用"}
 
 
-async def test_remote_check_missing_base_url_is_422(client: AsyncClient) -> None:
-    resp = await client.post("/initialization/remote/check", json={"model": "m"})
+async def test_remote_check_missing_base_url_is_422(client: TestClient) -> None:
+    resp = client.post("/initialization/remote/check", json={"model": "m"})
     assert resp.status_code == 422
 
 
-async def test_remote_check_blocks_ssrf_target(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_remote_check_blocks_ssrf_target(client: TestClient) -> None:
+    resp = client.post(
         "/initialization/remote/check",
         json={"model": "m", "baseUrl": "http://127.0.0.1:8080/v1"},
     )
@@ -295,8 +292,8 @@ async def test_remote_check_blocks_ssrf_target(client: AsyncClient) -> None:
 # ── POST /initialization/embedding/test ──────────────────────────────
 
 
-async def test_embedding_test_returns_dimension(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_embedding_test_returns_dimension(client: TestClient) -> None:
+    resp = client.post(
         "/initialization/embedding/test",
         json={"model": "text-embedding-3-small", "baseUrl": _REMOTE_BASE},
     )
@@ -307,8 +304,8 @@ async def test_embedding_test_returns_dimension(client: AsyncClient) -> None:
     assert data["message"] == "测试成功，向量维度=4"
 
 
-async def test_embedding_test_rejects_aliyun_multimodal(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_embedding_test_rejects_aliyun_multimodal(client: TestClient) -> None:
+    resp = client.post(
         "/initialization/embedding/test",
         json={
             "model": "multimodal-embedding-v1",
@@ -325,8 +322,8 @@ async def test_embedding_test_rejects_aliyun_multimodal(client: AsyncClient) -> 
 
 async def test_embedding_test_failure_is_200_with_zero_dimension(
     task_store: DownloadTaskStore,
-    web_app: FastAPI,  # noqa: ARG001 - shared app fixture
-    web_authed_client: AsyncClient,
+    web_app: FastAPI,
+    web_authed_client: TestClient,
 ) -> None:
     def failing(request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, text="bad key")
@@ -334,7 +331,7 @@ async def test_embedding_test_failure_is_200_with_zero_dimension(
     web_app.dependency_overrides[get_initialization_service] = lambda: _build_service(
         task_store=task_store, remote=failing
     )
-    resp = await web_authed_client.post(
+    resp = web_authed_client.post(
         "/initialization/embedding/test",
         json={"model": "m", "baseUrl": _REMOTE_BASE},
     )
@@ -346,8 +343,8 @@ async def test_embedding_test_failure_is_200_with_zero_dimension(
 
 async def test_embedding_test_sends_dimensions_only_when_override_supported(
     task_store: DownloadTaskStore,
-    web_app: FastAPI,  # noqa: ARG001 - shared app fixture
-    web_authed_client: AsyncClient,
+    web_app: FastAPI,
+    web_authed_client: TestClient,
 ) -> None:
     captured: list[httpx.Request] = []
 
@@ -358,11 +355,11 @@ async def test_embedding_test_sends_dimensions_only_when_override_supported(
     web_app.dependency_overrides[get_initialization_service] = lambda: _build_service(
         task_store=task_store, remote=capture
     )
-    await web_authed_client.post(
+    web_authed_client.post(
         "/initialization/embedding/test",
         json={"model": "m", "baseUrl": _REMOTE_BASE, "dimension": 8},
     )
-    await web_authed_client.post(
+    web_authed_client.post(
         "/initialization/embedding/test",
         json={
             "model": "m",
@@ -378,8 +375,8 @@ async def test_embedding_test_sends_dimensions_only_when_override_supported(
 # ── POST /initialization/rerank/check ────────────────────────────────
 
 
-async def test_rerank_check_counts_results(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_rerank_check_counts_results(client: TestClient) -> None:
+    resp = client.post(
         "/initialization/rerank/check",
         json={"model": "bge-reranker", "baseUrl": _REMOTE_BASE},
     )
@@ -391,8 +388,8 @@ async def test_rerank_check_counts_results(client: AsyncClient) -> None:
 
 async def test_rerank_check_empty_results_is_unavailable(
     task_store: DownloadTaskStore,
-    web_app: FastAPI,  # noqa: ARG001 - shared app fixture
-    web_authed_client: AsyncClient,
+    web_app: FastAPI,
+    web_authed_client: TestClient,
 ) -> None:
     def empty(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"results": []})
@@ -400,7 +397,7 @@ async def test_rerank_check_empty_results_is_unavailable(
     web_app.dependency_overrides[get_initialization_service] = lambda: _build_service(
         task_store=task_store, remote=empty
     )
-    resp = await web_authed_client.post(
+    resp = web_authed_client.post(
         "/initialization/rerank/check",
         json={"model": "m", "baseUrl": _REMOTE_BASE},
     )
@@ -409,16 +406,16 @@ async def test_rerank_check_empty_results_is_unavailable(
     assert data["message"] == "重排接口连接成功，但未返回重排结果"
 
 
-async def test_rerank_check_requires_base_url(client: AsyncClient) -> None:
-    resp = await client.post("/initialization/rerank/check", json={"model": "m"})
+async def test_rerank_check_requires_base_url(client: TestClient) -> None:
+    resp = client.post("/initialization/rerank/check", json={"model": "m"})
     assert resp.status_code == 422
 
 
 # ── POST /initialization/asr/check ───────────────────────────────────
 
 
-async def test_asr_check_reports_transcript(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_asr_check_reports_transcript(client: TestClient) -> None:
+    resp = client.post(
         "/initialization/asr/check",
         json={"model": "whisper-1", "baseUrl": _REMOTE_BASE},
     )
@@ -430,8 +427,8 @@ async def test_asr_check_reports_transcript(client: AsyncClient) -> None:
 
 async def test_asr_check_auth_failure_is_unavailable(
     task_store: DownloadTaskStore,
-    web_app: FastAPI,  # noqa: ARG001 - shared app fixture
-    web_authed_client: AsyncClient,
+    web_app: FastAPI,
+    web_authed_client: TestClient,
 ) -> None:
     def unauthorized(request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, text="unauthorized")
@@ -439,7 +436,7 @@ async def test_asr_check_auth_failure_is_unavailable(
     web_app.dependency_overrides[get_initialization_service] = lambda: _build_service(
         task_store=task_store, remote=unauthorized
     )
-    resp = await web_authed_client.post(
+    resp = web_authed_client.post(
         "/initialization/asr/check",
         json={"model": "m", "baseUrl": _REMOTE_BASE},
     )
@@ -450,8 +447,8 @@ async def test_asr_check_auth_failure_is_unavailable(
 
 async def test_asr_check_non_fatal_error_still_reachable(
     task_store: DownloadTaskStore,
-    web_app: FastAPI,  # noqa: ARG001 - shared app fixture
-    web_authed_client: AsyncClient,
+    web_app: FastAPI,
+    web_authed_client: TestClient,
 ) -> None:
     # Go: anything outside the fatal classes proves the endpoint answered.
     def server_error(request: httpx.Request) -> httpx.Response:
@@ -460,7 +457,7 @@ async def test_asr_check_non_fatal_error_still_reachable(
     web_app.dependency_overrides[get_initialization_service] = lambda: _build_service(
         task_store=task_store, remote=server_error
     )
-    resp = await web_authed_client.post(
+    resp = web_authed_client.post(
         "/initialization/asr/check",
         json={"model": "m", "baseUrl": _REMOTE_BASE},
     )
@@ -476,8 +473,8 @@ def _image_upload() -> dict[str, tuple[str, bytes, str]]:
     return {"image": ("probe.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 32, "image/png")}
 
 
-async def test_multimodal_rejects_invalid_storage_type(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_multimodal_rejects_invalid_storage_type(client: TestClient) -> None:
+    resp = client.post(
         "/initialization/multimodal/test",
         files=_image_upload(),
         data={
@@ -489,8 +486,8 @@ async def test_multimodal_rejects_invalid_storage_type(client: AsyncClient) -> N
     assert resp.status_code == 422
 
 
-async def test_multimodal_rejects_incomplete_cos_config(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_multimodal_rejects_incomplete_cos_config(client: TestClient) -> None:
+    resp = client.post(
         "/initialization/multimodal/test",
         files=_image_upload(),
         data={
@@ -503,8 +500,8 @@ async def test_multimodal_rejects_incomplete_cos_config(client: AsyncClient) -> 
     assert resp.status_code == 422
 
 
-async def test_multimodal_rejects_non_image_upload(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_multimodal_rejects_non_image_upload(client: TestClient) -> None:
+    resp = client.post(
         "/initialization/multimodal/test",
         files={"image": ("notes.txt", b"plain text", "text/plain")},
         data={
@@ -518,12 +515,12 @@ async def test_multimodal_rejects_non_image_upload(client: AsyncClient) -> None:
 
 
 async def test_multimodal_valid_request_reports_docreader_gap(
-    client: AsyncClient,
+    client: TestClient,
 ) -> None:
     # DocReader is a downstream dependency: the upstream handler
     # returns data.success=false with this message when the reader
     # is unset.
-    resp = await client.post(
+    resp = client.post(
         "/initialization/multimodal/test",
         files=_image_upload(),
         data={

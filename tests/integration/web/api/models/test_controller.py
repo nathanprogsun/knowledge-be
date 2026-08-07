@@ -1,6 +1,6 @@
 """Web-layer tests for the model router.
 
-Exercises the router over HTTP via ``httpx.AsyncClient`` with
+Exercises the router over HTTP via ``TestClient`` with
 ``get_model_service`` overridden to use a real ``ModelService`` backed
 by an ``AsyncMock(spec=ModelRepository)`` configured with stateful
 closures, so the full web -> service path runs without a database.
@@ -17,14 +17,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient
+from fastapi.testclient import TestClient
 
 from src.common.exception import NotFoundError
 from src.core.infra.models.service.model_service import ModelService
 from src.db.dao.model_repository import ModelRepository
 from src.db.models.infra.model import Model
 from src.web.deps.infra_models import get_model_service
-from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 
 
 @pytest.fixture
@@ -135,8 +134,8 @@ def repo() -> AsyncMock:
 
 @pytest.fixture
 def app(
-    request: pytest.FixtureRequest,  # noqa: ARG001 - explicit fixture-param
-    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
+    request: pytest.FixtureRequest,
+    web_app: FastAPI,
     repo: AsyncMock,
 ) -> FastAPI:
     """Override ``get_model_service`` on the shared web app."""
@@ -149,7 +148,7 @@ def app(
 
 
 @pytest.fixture
-def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa: ARG001
+def client(app: FastAPI, web_authed_client: TestClient) -> TestClient:
     """Alias ``web_authed_client``; depending on ``app`` forces the
     dep-override fixture to run before the test executes."""
     return web_authed_client
@@ -176,10 +175,10 @@ def _create_body(**overrides: Any) -> dict[str, Any]:
 
 
 async def test_create_model_returns_201_envelope(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
-    resp = await client.post("/models", json=_create_body())
+    resp = client.post("/models", json=_create_body())
 
     assert resp.status_code == 201
     payload = resp.json()
@@ -191,9 +190,9 @@ async def test_create_model_returns_201_envelope(
 
 
 async def test_create_model_strips_credential_fields(
-    client: AsyncClient,
+    client: TestClient,
 ) -> None:
-    resp = await client.post("/models", json=_create_body())
+    resp = client.post("/models", json=_create_body())
 
     assert resp.status_code == 201
     params = resp.json()["data"]["parameters"]
@@ -208,8 +207,8 @@ async def test_create_model_strips_credential_fields(
     assert params["base_url"] == "https://api.openai.com/v1"
 
 
-async def test_create_model_rejects_blank_name(client: AsyncClient) -> None:
-    resp = await client.post("/models", json=_create_body(name="   "))
+async def test_create_model_rejects_blank_name(client: TestClient) -> None:
+    resp = client.post("/models", json=_create_body(name="   "))
 
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "model.name_required"
@@ -218,11 +217,11 @@ async def test_create_model_rejects_blank_name(client: AsyncClient) -> None:
 # ── GET /models ─────────────────────────────────────────────────────
 
 
-async def test_list_models_returns_tenant_rows(client: AsyncClient) -> None:
-    await client.post("/models", json=_create_body(name="chat-1"))
-    await client.post("/models", json=_create_body(name="chat-2"))
+async def test_list_models_returns_tenant_rows(client: TestClient) -> None:
+    client.post("/models", json=_create_body(name="chat-1"))
+    client.post("/models", json=_create_body(name="chat-2"))
 
-    resp = await client.get("/models")
+    resp = client.get("/models")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -230,11 +229,11 @@ async def test_list_models_returns_tenant_rows(client: AsyncClient) -> None:
     assert len(payload["data"]) == 2
 
 
-async def test_list_models_filters_by_type(client: AsyncClient) -> None:
-    await client.post("/models", json=_create_body(name="chat", type="KnowledgeQA"))
-    await client.post("/models", json=_create_body(name="embed", type="Embedding"))
+async def test_list_models_filters_by_type(client: TestClient) -> None:
+    client.post("/models", json=_create_body(name="chat", type="KnowledgeQA"))
+    client.post("/models", json=_create_body(name="embed", type="Embedding"))
 
-    resp = await client.get("/models?type=Embedding")
+    resp = client.get("/models?type=Embedding")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -244,11 +243,11 @@ async def test_list_models_filters_by_type(client: AsyncClient) -> None:
 # ── GET /models/{id} ────────────────────────────────────────────────
 
 
-async def test_get_model_returns_one_model(client: AsyncClient) -> None:
-    created = await client.post("/models", json=_create_body())
+async def test_get_model_returns_one_model(client: TestClient) -> None:
+    created = client.post("/models", json=_create_body())
 
     model_id = created.json()["data"]["id"]
-    resp = await client.get(f"/models/{model_id}")
+    resp = client.get(f"/models/{model_id}")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -256,8 +255,8 @@ async def test_get_model_returns_one_model(client: AsyncClient) -> None:
     assert payload["data"]["name"] == "gpt-4o"
 
 
-async def test_get_model_returns_404_when_absent(client: AsyncClient) -> None:
-    resp = await client.get("/models/does-not-exist")
+async def test_get_model_returns_404_when_absent(client: TestClient) -> None:
+    resp = client.get("/models/does-not-exist")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "model.not_found"
@@ -267,12 +266,12 @@ async def test_get_model_returns_404_when_absent(client: AsyncClient) -> None:
 
 
 async def test_update_model_patches_supplied_columns(
-    client: AsyncClient,
+    client: TestClient,
 ) -> None:
-    created = await client.post("/models", json=_create_body())
+    created = client.post("/models", json=_create_body())
     model_id = created.json()["data"]["id"]
 
-    resp = await client.put(
+    resp = client.put(
         f"/models/{model_id}",
         json={"name": "gpt-4-turbo", "description": "renamed"},
     )
@@ -283,8 +282,8 @@ async def test_update_model_patches_supplied_columns(
     assert payload["data"]["description"] == "renamed"
 
 
-async def test_update_model_returns_404_when_absent(client: AsyncClient) -> None:
-    resp = await client.put("/models/does-not-exist", json={"name": "x"})
+async def test_update_model_returns_404_when_absent(client: TestClient) -> None:
+    resp = client.put("/models/does-not-exist", json={"name": "x"})
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "model.not_found"
@@ -294,13 +293,13 @@ async def test_update_model_returns_404_when_absent(client: AsyncClient) -> None
 
 
 async def test_delete_model_removes_row(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
-    created = await client.post("/models", json=_create_body())
+    created = client.post("/models", json=_create_body())
     model_id = created.json()["data"]["id"]
 
-    resp = await client.delete(f"/models/{model_id}")
+    resp = client.delete(f"/models/{model_id}")
 
     assert resp.status_code == 200
     assert resp.json()["success"] is True
@@ -312,8 +311,8 @@ async def test_delete_model_removes_row(
 # ── GET /models/providers ───────────────────────────────────────────
 
 
-async def test_list_providers_returns_catalog(client: AsyncClient) -> None:
-    resp = await client.get("/models/providers")
+async def test_list_providers_returns_catalog(client: TestClient) -> None:
+    resp = client.get("/models/providers")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -333,11 +332,11 @@ async def test_list_providers_returns_catalog(client: AsyncClient) -> None:
 # ── POST /models/{id}/debug ─────────────────────────────────────────
 
 
-async def test_debug_model_returns_envelope(client: AsyncClient) -> None:
-    created = await client.post("/models", json=_create_body())
+async def test_debug_model_returns_envelope(client: TestClient) -> None:
+    created = client.post("/models", json=_create_body())
     model_id = created.json()["data"]["id"]
 
-    resp = await client.post(
+    resp = client.post(
         f"/models/{model_id}/debug",
         data={"input": "hello"},
     )
@@ -350,21 +349,21 @@ async def test_debug_model_returns_envelope(client: AsyncClient) -> None:
     assert data["request"]["model_id"] == model_id
 
 
-async def test_debug_model_returns_404_when_absent(client: AsyncClient) -> None:
-    resp = await client.post("/models/does-not-exist/debug", data={"input": "hi"})
+async def test_debug_model_returns_404_when_absent(client: TestClient) -> None:
+    resp = client.post("/models/does-not-exist/debug", data={"input": "hi"})
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "model.not_found"
 
 
 async def test_debug_model_rejects_oversized_input(
-    client: AsyncClient,
+    client: TestClient,
 ) -> None:
-    created = await client.post("/models", json=_create_body())
+    created = client.post("/models", json=_create_body())
     model_id = created.json()["data"]["id"]
 
     oversize = "x" * (65 * 1024)
-    resp = await client.post(
+    resp = client.post(
         f"/models/{model_id}/debug",
         data={"input": oversize},
     )

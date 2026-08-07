@@ -1,6 +1,6 @@
 """Web-layer tests for the data-source router.
 
-Exercises the router over HTTP via ``httpx.AsyncClient`` against the
+Exercises the router over HTTP via ``TestClient`` against the
 app: the full HTTP path (routing, serialization, exception mapping)
 with the service dependency overridden by a service-backed
 ``AsyncMock(spec=...)`` repository so no database is involved. The
@@ -28,7 +28,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient
+from fastapi.testclient import TestClient
 
 from src.core.infra.datasources.connector_base import ConnectorRegistry
 from src.core.infra.datasources.service.datasource_service import DataSourceService
@@ -41,7 +41,6 @@ from src.web.api.infra.datasources.router import router
 from src.web.deps.infra_datasources import get_datasource_service
 from src.web.deps.rbac import make_role_dep, require_role_dep
 from src.web.middleware.auth import require_auth
-from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 from tests.util.datasource_doubles import (  # type: ignore[attr-defined]
     RecordingIngestor,
     StubConnector,
@@ -51,6 +50,20 @@ from tests.util.datasource_doubles import (  # type: ignore[attr-defined]
 TENANT_ID = 1
 KB_ID = "kb-1"
 NOW = datetime(2026, 4, 1, tzinfo=UTC)
+
+
+@pytest.fixture(autouse=True)
+def _bind_tenant_id_to_admin(
+    admin_user: tuple[int, int],
+) -> None:
+    """Rewrite the module-level ``TENANT_ID`` to the minted admin tenant.
+
+    Per-test conftest mints a fresh ``tenant_id``; this rebind keeps the
+    helper closures (which seed mocks keyed by ``TENANT_ID``) aligned
+    with the principal the authed client presents.
+    """
+    global TENANT_ID
+    TENANT_ID = admin_user[1]
 
 
 # ── App wiring ───────────────────────────────────────────────────────
@@ -216,8 +229,8 @@ def service(
 
 @pytest.fixture
 def app(
-    request: pytest.FixtureRequest,  # noqa: ARG001 - explicit fixture-param
-    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
+    request: pytest.FixtureRequest,
+    web_app: FastAPI,
     service: DataSourceService,
 ) -> FastAPI:
     """Override ``get_datasource_service`` on the shared web app."""
@@ -226,7 +239,7 @@ def app(
 
 
 @pytest.fixture
-def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa: ARG001
+def client(app: FastAPI, web_authed_client: TestClient) -> TestClient:
     """Alias ``web_authed_client``; depending on ``app`` forces the
     dep-override fixture to run before the test executes."""
     return web_authed_client
@@ -235,10 +248,14 @@ def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa
 def _row(
     *,
     id: str = "ds-1",
-    tenant_id: int = TENANT_ID,
+    tenant_id: int | None = None,
     status: str = "active",
     config: dict[str, object] | None = None,
 ) -> DataSource:
+    # ``tenant_id`` default is resolved at call time so the
+    # ``_bind_tenant_id_to_admin`` autouse fixture's rebind is honoured.
+    if tenant_id is None:
+        tenant_id = TENANT_ID
     return DataSource(
         id=id,
         tenant_id=tenant_id,
@@ -362,8 +379,8 @@ def test_role_gate_helper_is_the_shared_rbac_dependency() -> None:
 # ── GET /datasources/types ───────────────────────────────────────────
 
 
-async def test_list_types_returns_all_connectors_sorted(client: AsyncClient) -> None:
-    resp = await client.get("/datasource/types")
+async def test_list_types_returns_all_connectors_sorted(client: TestClient) -> None:
+    resp = client.get("/datasource/types")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -376,8 +393,8 @@ async def test_list_types_returns_all_connectors_sorted(client: AsyncClient) -> 
 # ── POST /datasources/validate-credentials ───────────────────────────
 
 
-async def test_validate_credentials_returns_connected(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_validate_credentials_returns_connected(client: TestClient) -> None:
+    resp = client.post(
         "/datasource/validate-credentials",
         json={"type": "notion", "credentials": {"api_key": "k"}},
     )
@@ -386,8 +403,8 @@ async def test_validate_credentials_returns_connected(client: AsyncClient) -> No
     assert resp.json() == {"status": "connected"}
 
 
-async def test_validate_credentials_unknown_type_returns_404(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_validate_credentials_unknown_type_returns_404(client: TestClient) -> None:
+    resp = client.post(
         "/datasource/validate-credentials",
         json={"type": "nope", "credentials": {}},
     )
@@ -395,19 +412,19 @@ async def test_validate_credentials_unknown_type_returns_404(client: AsyncClient
     assert resp.status_code == 404
 
 
-async def test_validate_credentials_requires_body_fields(client: AsyncClient) -> None:
-    resp = await client.post("/datasource/validate-credentials", json={"type": "notion"})
+async def test_validate_credentials_requires_body_fields(client: TestClient) -> None:
+    resp = client.post("/datasource/validate-credentials", json={"type": "notion"})
 
     assert resp.status_code == 422
 
 
 async def test_validate_credentials_upstream_failure_returns_502(
-    client: AsyncClient,
+    client: TestClient,
     connector: StubConnector,
 ) -> None:
     connector.validate_error = unreachable_error()
 
-    resp = await client.post(
+    resp = client.post(
         "/datasource/validate-credentials",
         json={"type": "notion", "credentials": {"api_key": "bad"}},
     )
@@ -418,8 +435,8 @@ async def test_validate_credentials_upstream_failure_returns_502(
 # ── POST /datasources ────────────────────────────────────────────────
 
 
-async def test_create_returns_201_and_entity(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_create_returns_201_and_entity(client: TestClient) -> None:
+    resp = client.post(
         "/datasource",
         json={"knowledge_base_id": KB_ID, "name": "notion sync", "type": "notion"},
     )
@@ -432,8 +449,8 @@ async def test_create_returns_201_and_entity(client: AsyncClient) -> None:
     assert body["status"] == "active"
 
 
-async def test_create_response_reports_credential_presence_only(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_create_response_reports_credential_presence_only(client: TestClient) -> None:
+    resp = client.post(
         "/datasource",
         json={
             "knowledge_base_id": KB_ID,
@@ -449,8 +466,8 @@ async def test_create_response_reports_credential_presence_only(client: AsyncCli
     assert "credentials" not in resp.json()["config"]
 
 
-async def test_create_rejects_unknown_type_with_404(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_create_rejects_unknown_type_with_404(client: TestClient) -> None:
+    resp = client.post(
         "/datasource",
         json={"knowledge_base_id": KB_ID, "name": "x", "type": "nope"},
     )
@@ -458,8 +475,8 @@ async def test_create_rejects_unknown_type_with_404(client: AsyncClient) -> None
     assert resp.status_code == 404
 
 
-async def test_create_rejects_missing_required_fields(client: AsyncClient) -> None:
-    resp = await client.post("/datasource", json={"name": "x"})
+async def test_create_rejects_missing_required_fields(client: TestClient) -> None:
+    resp = client.post("/datasource", json={"name": "x"})
 
     assert resp.status_code == 422
 
@@ -468,20 +485,20 @@ async def test_create_rejects_missing_required_fields(client: AsyncClient) -> No
 
 
 async def test_list_returns_kb_sources(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
 ) -> None:
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = await client.get("/datasource", params={"kb_id": KB_ID})
+    resp = client.get("/datasource", params={"kb_id": KB_ID})
 
     assert resp.status_code == 200
     assert [d["id"] for d in resp.json()] == ["ds-1"]
 
 
 async def test_list_excludes_other_tenants(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
 ) -> None:
     mine = _row(id="ds-mine")
@@ -490,13 +507,13 @@ async def test_list_excludes_other_tenants(
     rows[mine.id] = mine
     rows[theirs.id] = theirs
 
-    resp = await client.get("/datasource", params={"kb_id": KB_ID})
+    resp = client.get("/datasource", params={"kb_id": KB_ID})
 
     assert [d["id"] for d in resp.json()] == ["ds-mine"]
 
 
-async def test_list_without_kb_id_returns_422(client: AsyncClient) -> None:
-    resp = await client.get("/datasource")
+async def test_list_without_kb_id_returns_422(client: TestClient) -> None:
+    resp = client.get("/datasource")
 
     assert resp.status_code == 422
 
@@ -505,7 +522,7 @@ async def test_list_without_kb_id_returns_422(client: AsyncClient) -> None:
 
 
 async def test_get_returns_entity_with_latest_sync_log(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
     sync_log_repo: AsyncMock,
 ) -> None:
@@ -514,7 +531,7 @@ async def test_get_returns_entity_with_latest_sync_log(
     ds_repo._items_synced[row.id] = 11  # type: ignore[attr-defined]
     sync_log_repo._rows["log-1"] = _log()  # type: ignore[attr-defined]
 
-    resp = await client.get(f"/datasource/{row.id}")
+    resp = client.get(f"/datasource/{row.id}")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -522,20 +539,20 @@ async def test_get_returns_entity_with_latest_sync_log(
     assert body["latest_sync_log"]["id"] == "log-1"
 
 
-async def test_get_missing_returns_404(client: AsyncClient) -> None:
-    resp = await client.get("/datasource/nope")
+async def test_get_missing_returns_404(client: TestClient) -> None:
+    resp = client.get("/datasource/nope")
 
     assert resp.status_code == 404
 
 
 async def test_get_cross_tenant_returns_404(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
 ) -> None:
     row = _row(tenant_id=99)
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = await client.get(f"/datasource/{row.id}")
+    resp = client.get(f"/datasource/{row.id}")
 
     # 404 not 403: a 403 would confirm the id exists.
     assert resp.status_code == 404
@@ -545,26 +562,26 @@ async def test_get_cross_tenant_returns_404(
 
 
 async def test_update_patches_name(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
 ) -> None:
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = await client.put(f"/datasource/{row.id}", json={"name": "renamed"})
+    resp = client.put(f"/datasource/{row.id}", json={"name": "renamed"})
 
     assert resp.status_code == 200
     assert resp.json()["name"] == "renamed"
 
 
 async def test_update_cannot_overwrite_credentials(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
 ) -> None:
     row = _row(config={"credentials": {"api_key": "original"}})
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = await client.put(
+    resp = client.put(
         f"/datasource/{row.id}",
         json={"config": {"credentials": {"api_key": "attacker"}}},
     )
@@ -575,8 +592,8 @@ async def test_update_cannot_overwrite_credentials(
     assert stored["credentials"] == {"api_key": "original"}
 
 
-async def test_update_missing_returns_404(client: AsyncClient) -> None:
-    resp = await client.put("/datasource/nope", json={"name": "x"})
+async def test_update_missing_returns_404(client: TestClient) -> None:
+    resp = client.put("/datasource/nope", json={"name": "x"})
 
     assert resp.status_code == 404
 
@@ -585,20 +602,20 @@ async def test_update_missing_returns_404(client: AsyncClient) -> None:
 
 
 async def test_delete_returns_204_and_soft_deletes(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
 ) -> None:
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = await client.delete(f"/datasource/{row.id}")
+    resp = client.delete(f"/datasource/{row.id}")
 
     assert resp.status_code == 204
     assert ds_repo._rows[row.id].deleted_at is not None  # type: ignore[attr-defined]
 
 
-async def test_delete_missing_returns_404(client: AsyncClient) -> None:
-    resp = await client.delete("/datasource/nope")
+async def test_delete_missing_returns_404(client: TestClient) -> None:
+    resp = client.delete("/datasource/nope")
 
     assert resp.status_code == 404
 
@@ -607,20 +624,20 @@ async def test_delete_missing_returns_404(client: AsyncClient) -> None:
 
 
 async def test_validate_connection_returns_connected(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
 ) -> None:
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = await client.post(f"/datasource/{row.id}/validate")
+    resp = client.post(f"/datasource/{row.id}/validate")
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "connected"}
 
 
 async def test_validate_connection_failure_records_error_state(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
@@ -628,7 +645,7 @@ async def test_validate_connection_failure_records_error_state(
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
     connector.validate_error = unreachable_error("token expired")
 
-    resp = await client.post(f"/datasource/{row.id}/validate")
+    resp = client.post(f"/datasource/{row.id}/validate")
 
     assert resp.status_code == 502
     stored = ds_repo._rows[row.id]  # type: ignore[attr-defined]
@@ -640,7 +657,7 @@ async def test_validate_connection_failure_records_error_state(
 
 
 async def test_list_resources_returns_connector_output(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
@@ -652,7 +669,7 @@ async def test_list_resources_returns_connector_output(
         Resource(external_id="page-1", name="Page", type="page", has_children=True)
     ]
 
-    resp = await client.get(f"/datasource/{row.id}/resources")
+    resp = client.get(f"/datasource/{row.id}/resources")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -661,14 +678,14 @@ async def test_list_resources_returns_connector_output(
 
 
 async def test_list_resources_forwards_parent_id(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = await client.get(f"/datasource/{row.id}/resources", params={"parent_id": "root-9"})
+    resp = client.get(f"/datasource/{row.id}/resources", params={"parent_id": "root-9"})
 
     assert resp.status_code == 200
     assert connector.list_resources_calls == ["root-9"]
@@ -678,7 +695,7 @@ async def test_list_resources_forwards_parent_id(
 
 
 async def test_resolve_ancestors_returns_ancestor_list(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
     connector: StubConnector,
 ) -> None:
@@ -686,7 +703,7 @@ async def test_resolve_ancestors_returns_ancestor_list(
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
     connector.ancestors = ["root-1", "mid-2"]
 
-    resp = await client.post(
+    resp = client.post(
         f"/datasource/{row.id}/resource-ancestors",
         json={"resource_ids": ["leaf-3"]},
     )
@@ -696,13 +713,13 @@ async def test_resolve_ancestors_returns_ancestor_list(
 
 
 async def test_resolve_ancestors_empty_request_returns_empty(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
 ) -> None:
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = await client.post(
+    resp = client.post(
         f"/datasource/{row.id}/resource-ancestors",
         json={"resource_ids": []},
     )
@@ -715,13 +732,13 @@ async def test_resolve_ancestors_empty_request_returns_empty(
 
 
 async def test_manual_sync_returns_running_log(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
 ) -> None:
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = await client.post(f"/datasource/{row.id}/sync")
+    resp = client.post(f"/datasource/{row.id}/sync")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -730,13 +747,13 @@ async def test_manual_sync_returns_running_log(
 
 
 async def test_manual_sync_on_unsyncable_source_returns_422(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
 ) -> None:
     row = _row(status="deleted")
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = await client.post(f"/datasource/{row.id}/sync")
+    resp = client.post(f"/datasource/{row.id}/sync")
 
     assert resp.status_code == 422
 
@@ -745,13 +762,13 @@ async def test_manual_sync_on_unsyncable_source_returns_422(
 
 
 async def test_pause_returns_paused(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
 ) -> None:
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = await client.post(f"/datasource/{row.id}/pause")
+    resp = client.post(f"/datasource/{row.id}/pause")
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "paused"}
@@ -759,13 +776,13 @@ async def test_pause_returns_paused(
 
 
 async def test_resume_returns_active(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
 ) -> None:
     row = _row(status="paused")
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = await client.post(f"/datasource/{row.id}/resume")
+    resp = client.post(f"/datasource/{row.id}/resume")
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "active"}
@@ -776,7 +793,7 @@ async def test_resume_returns_active(
 
 
 async def test_list_sync_logs_returns_history(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
     sync_log_repo: AsyncMock,
 ) -> None:
@@ -784,26 +801,26 @@ async def test_list_sync_logs_returns_history(
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
     sync_log_repo._rows["log-1"] = _log()  # type: ignore[attr-defined]
 
-    resp = await client.get(f"/datasource/{row.id}/logs")
+    resp = client.get(f"/datasource/{row.id}/logs")
 
     assert resp.status_code == 200
     assert [entry["id"] for entry in resp.json()] == ["log-1"]
 
 
 async def test_list_sync_logs_rejects_oversized_limit(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
 ) -> None:
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = await client.get(f"/datasource/{row.id}/logs", params={"limit": 5000})
+    resp = client.get(f"/datasource/{row.id}/logs", params={"limit": 5000})
 
     assert resp.status_code == 422
 
 
 async def test_get_sync_log_returns_entry(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
     sync_log_repo: AsyncMock,
 ) -> None:
@@ -811,27 +828,27 @@ async def test_get_sync_log_returns_entry(
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
     sync_log_repo._rows["log-1"] = _log()  # type: ignore[attr-defined]
 
-    resp = await client.get("/datasource/logs/log-1")
+    resp = client.get("/datasource/logs/log-1")
 
     assert resp.status_code == 200
     assert resp.json()["id"] == "log-1"
 
 
-async def test_get_sync_log_missing_returns_404(client: AsyncClient) -> None:
-    resp = await client.get("/datasource/logs/nope")
+async def test_get_sync_log_missing_returns_404(client: TestClient) -> None:
+    resp = client.get("/datasource/logs/nope")
 
     assert resp.status_code == 404
 
 
 async def test_sync_log_route_is_not_shadowed_by_id_route(
-    client: AsyncClient,
+    client: TestClient,
     ds_repo: AsyncMock,
 ) -> None:
     # "logs" must never be captured as a data-source id.
     row = _row(id="logs")
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = await client.get("/datasource/logs/nope")
+    resp = client.get("/datasource/logs/nope")
 
     assert resp.status_code == 404
     assert "sync log" in resp.text.lower()
@@ -841,7 +858,7 @@ async def test_sync_log_route_is_not_shadowed_by_id_route(
 
 
 async def test_sync_result_tally_visible_through_log_endpoint(
-    client: AsyncClient,
+    client: TestClient,
     service: DataSourceService,
     ds_repo: AsyncMock,
     connector: StubConnector,
@@ -856,11 +873,11 @@ async def test_sync_result_tally_visible_through_log_endpoint(
     ]
     service._ingestor = RecordingIngestor(updates={"b"})
 
-    opened = await client.post(f"/datasource/{row.id}/sync")
+    opened = client.post(f"/datasource/{row.id}/sync")
     log_id = opened.json()["id"]
     await service.process_sync(data_source_id=row.id, sync_log_id=log_id)
 
-    resp = await client.get(f"/datasource/logs/{log_id}")
+    resp = client.get(f"/datasource/logs/{log_id}")
 
     assert resp.status_code == 200
     body = resp.json()

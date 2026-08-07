@@ -1,6 +1,6 @@
 """Web-layer tests for the storage-backend router.
 
-Exercises the router over HTTP via ``httpx.AsyncClient`` against the
+Exercises the router over HTTP via ``TestClient`` against the
 app. The service dependency is overridden with a service backed by an
 ``AsyncMock(spec=StorageBackendRepository)`` configured with stateful
 closures, so the tests exercise the full HTTP path (routing, role
@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient
+from fastapi.testclient import TestClient
 
 from src.common.exception import StorageBackendError
 from src.core.infra.storage_backends.service.storage_backend_service import (
@@ -37,10 +37,23 @@ from src.db.models.storage_backend import (
     StorageBackend,
 )
 from src.web.deps.infra_storage_backends import get_storage_backend_service
-from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 
 # The header auth channel pins the active workspace to 1.
 _TENANT_ID = 1
+
+
+@pytest.fixture(autouse=True)
+def _bind_tenant_id_to_admin(
+    admin_user: tuple[int, int],
+) -> None:
+    """Rewrite the module-level ``_TENANT_ID`` to the minted admin tenant.
+
+    Per-test conftest mints a fresh ``tenant_id``; this rebind keeps the
+    helper closures (which seed mocks keyed by ``_TENANT_ID``) aligned
+    with the principal the authed client presents.
+    """
+    global _TENANT_ID
+    _TENANT_ID = admin_user[1]
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
 _MINIO_CONFIG = StorageBackendConfigInfo(
@@ -97,9 +110,7 @@ def repo() -> AsyncMock:
 
     def _live_for_tenant(tenant_id: int) -> dict[str, StorageBackend]:
         return {
-            bid: r
-            for bid, r in rows.items()
-            if r.tenant_id == tenant_id and r.deleted_at is None
+            bid: r for bid, r in rows.items() if r.tenant_id == tenant_id and r.deleted_at is None
         }
 
     async def _get_by_id(*, tenant_id: int, id: str) -> StorageBackend | None:
@@ -109,14 +120,9 @@ def repo() -> AsyncMock:
         return row
 
     async def _list_for_tenant(tenant_id: int) -> list[StorageBackend]:
-        live = sorted(
-            _live_for_tenant(tenant_id).values(), key=lambda r: (r.created_at, r.id)
-        )
-        return live
+        return sorted(_live_for_tenant(tenant_id).values(), key=lambda r: (r.created_at, r.id))
 
-    async def _find_legacy_alias(
-        *, tenant_id: int, provider: str
-    ) -> StorageBackend | None:
+    async def _find_legacy_alias(*, tenant_id: int, provider: str) -> StorageBackend | None:
         for r in await _list_for_tenant(tenant_id):
             if r.provider == provider and r.legacy_alias:
                 return r
@@ -160,9 +166,7 @@ def repo() -> AsyncMock:
     async def _count_kb_references(*, tenant_id: int, id: str) -> int:
         return kb_refs[0]
 
-    async def _count_active_resource_references(
-        *, tenant_id: int, id: str
-    ) -> int:
+    async def _count_active_resource_references(*, tenant_id: int, id: str) -> int:
         return resource_refs[0]
 
     repo.get_by_id.side_effect = _get_by_id
@@ -184,19 +188,19 @@ def repo() -> AsyncMock:
 
 @pytest.fixture
 def app(
-    request: pytest.FixtureRequest,  # noqa: ARG001 - explicit fixture-param
-    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
+    request: pytest.FixtureRequest,
+    web_app: FastAPI,
     repo: AsyncMock,
 ) -> FastAPI:
     """Override ``get_storage_backend_service`` on the shared web app."""
-    web_app.dependency_overrides[get_storage_backend_service] = (
-        lambda: StorageBackendService(backend_repo=repo)
+    web_app.dependency_overrides[get_storage_backend_service] = lambda: StorageBackendService(
+        backend_repo=repo
     )
     return web_app
 
 
 @pytest.fixture
-def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa: ARG001
+def client(app: FastAPI, web_authed_client: TestClient) -> TestClient:
     """Alias ``web_authed_client``; depending on ``app`` forces the
     dep-override fixture to run before the test executes."""
     return web_authed_client
@@ -206,13 +210,17 @@ def _seed(
     repo: AsyncMock,
     *,
     id: str = "backend-1",
-    tenant_id: int = _TENANT_ID,
+    tenant_id: int | None = None,
     name: str = "Primary MinIO",
     provider: str = "minio",
     source: str = STORAGE_BACKEND_SOURCE_USER,
     status: str = STORAGE_BACKEND_STATUS_ACTIVE,
     legacy_alias: bool = False,
 ) -> StorageBackend:
+    # ``tenant_id`` default is resolved at call time so the
+    # ``_bind_tenant_id_to_admin`` autouse fixture's rebind is honoured.
+    if tenant_id is None:
+        tenant_id = _TENANT_ID
     row = StorageBackend(
         id=id,
         tenant_id=tenant_id,
@@ -232,8 +240,8 @@ def _seed(
 # ── GET /storage-backends/types ─────────────────────────────────────
 
 
-async def test_list_provider_types_returns_the_allowed_set(client: AsyncClient) -> None:
-    resp = await client.get("/storage-backends/types")
+async def test_list_provider_types_returns_the_allowed_set(client: TestClient) -> None:
+    resp = client.get("/storage-backends/types")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -246,10 +254,10 @@ async def test_list_provider_types_returns_the_allowed_set(client: AsyncClient) 
 
 
 async def test_create_returns_201_with_the_created_backend(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
-    resp = await client.post(
+    resp = client.post(
         "/storage-backends",
         json={"name": "Primary MinIO", "provider": "minio", "config": _MINIO_BODY_CONFIG},
     )
@@ -265,12 +273,12 @@ async def test_create_returns_201_with_the_created_backend(
 
 
 async def test_create_rejects_a_duplicate_name_with_409(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     _seed(repo, name="Primary MinIO")
 
-    resp = await client.post(
+    resp = client.post(
         "/storage-backends",
         json={"name": "Primary MinIO", "provider": "minio", "config": _MINIO_BODY_CONFIG},
     )
@@ -279,9 +287,9 @@ async def test_create_rejects_a_duplicate_name_with_409(
 
 
 async def test_create_rejects_an_unsupported_provider_with_422(
-    client: AsyncClient,
+    client: TestClient,
 ) -> None:
-    resp = await client.post(
+    resp = client.post(
         "/storage-backends",
         json={"name": "Nope", "provider": "dropbox", "config": _MINIO_BODY_CONFIG},
     )
@@ -290,9 +298,9 @@ async def test_create_rejects_an_unsupported_provider_with_422(
 
 
 async def test_create_rejects_a_missing_required_config_field_with_422(
-    client: AsyncClient,
+    client: TestClient,
 ) -> None:
-    resp = await client.post(
+    resp = client.post(
         "/storage-backends",
         json={"name": "Incomplete", "provider": "minio", "config": {"mode": "remote"}},
     )
@@ -304,14 +312,14 @@ async def test_create_rejects_a_missing_required_config_field_with_422(
 
 
 async def test_list_masks_credentials_and_reports_the_default(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     _seed(repo, id="backend-1", name="A")
     _seed(repo, id="backend-2", name="B")
     repo._default_backend_id[_TENANT_ID] = "backend-2"  # type: ignore[attr-defined]
 
-    resp = await client.get("/storage-backends")
+    resp = client.get("/storage-backends")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -322,9 +330,9 @@ async def test_list_masks_credentials_and_reports_the_default(
 
 
 async def test_list_is_empty_for_a_workspace_with_no_backends(
-    client: AsyncClient,
+    client: TestClient,
 ) -> None:
-    resp = await client.get("/storage-backends")
+    resp = client.get("/storage-backends")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -333,13 +341,13 @@ async def test_list_is_empty_for_a_workspace_with_no_backends(
 
 
 async def test_list_excludes_other_workspaces(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     _seed(repo, id="mine")
     _seed(repo, id="theirs", tenant_id=99)
 
-    resp = await client.get("/storage-backends")
+    resp = client.get("/storage-backends")
 
     assert [b["id"] for b in resp.json()["data"]] == ["mine"]
 
@@ -348,12 +356,12 @@ async def test_list_excludes_other_workspaces(
 
 
 async def test_get_returns_the_backend_with_masked_credentials(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     _seed(repo)
 
-    resp = await client.get("/storage-backends/backend-1")
+    resp = client.get("/storage-backends/backend-1")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -361,19 +369,19 @@ async def test_get_returns_the_backend_with_masked_credentials(
     assert body["data"]["config"]["access_key_id"] == REDACTED_SECRET_PLACEHOLDER
 
 
-async def test_get_of_a_missing_backend_returns_404(client: AsyncClient) -> None:
-    resp = await client.get("/storage-backends/ghost")
+async def test_get_of_a_missing_backend_returns_404(client: TestClient) -> None:
+    resp = client.get("/storage-backends/ghost")
 
     assert resp.status_code == 404
 
 
 async def test_get_does_not_cross_workspaces(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     _seed(repo, tenant_id=99)
 
-    resp = await client.get("/storage-backends/backend-1")
+    resp = client.get("/storage-backends/backend-1")
 
     assert resp.status_code == 404
 
@@ -382,7 +390,7 @@ async def test_get_does_not_cross_workspaces(
 
 
 async def test_update_renames_and_preserves_redacted_secrets(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     _seed(repo)
@@ -390,7 +398,7 @@ async def test_update_renames_and_preserves_redacted_secrets(
     masked_config["access_key_id"] = REDACTED_SECRET_PLACEHOLDER
     masked_config["secret_access_key"] = REDACTED_SECRET_PLACEHOLDER
 
-    resp = await client.put(
+    resp = client.put(
         "/storage-backends/backend-1",
         json={"name": "Renamed", "config": masked_config},
     )
@@ -403,36 +411,36 @@ async def test_update_renames_and_preserves_redacted_secrets(
 
 
 async def test_update_rejects_a_location_change_with_422(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     _seed(repo)
     moved = dict(_MINIO_BODY_CONFIG)
     moved["bucket_name"] = "elsewhere"
 
-    resp = await client.put("/storage-backends/backend-1", json={"config": moved})
+    resp = client.put("/storage-backends/backend-1", json={"config": moved})
 
     assert resp.status_code == 422
 
 
 async def test_update_of_an_env_backend_returns_422(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     _seed(repo, source=STORAGE_BACKEND_SOURCE_ENV)
 
-    resp = await client.put("/storage-backends/backend-1", json={"name": "Renamed"})
+    resp = client.put("/storage-backends/backend-1", json={"name": "Renamed"})
 
     assert resp.status_code == 422
 
 
 async def test_update_can_disable_an_unreferenced_backend(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     _seed(repo)
 
-    resp = await client.put(
+    resp = client.put(
         "/storage-backends/backend-1",
         json={"status": STORAGE_BACKEND_STATUS_DISABLED},
     )
@@ -441,8 +449,8 @@ async def test_update_can_disable_an_unreferenced_backend(
     assert resp.json()["data"]["status"] == STORAGE_BACKEND_STATUS_DISABLED
 
 
-async def test_update_of_a_missing_backend_returns_404(client: AsyncClient) -> None:
-    resp = await client.put("/storage-backends/ghost", json={"name": "X"})
+async def test_update_of_a_missing_backend_returns_404(client: TestClient) -> None:
+    resp = client.put("/storage-backends/ghost", json={"name": "X"})
 
     assert resp.status_code == 404
 
@@ -451,12 +459,12 @@ async def test_update_of_a_missing_backend_returns_404(client: AsyncClient) -> N
 
 
 async def test_delete_acknowledges_and_soft_deletes(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     _seed(repo)
 
-    resp = await client.delete("/storage-backends/backend-1")
+    resp = client.delete("/storage-backends/backend-1")
 
     assert resp.status_code == 200
     assert resp.json() == {"success": True}
@@ -465,31 +473,31 @@ async def test_delete_acknowledges_and_soft_deletes(
 
 
 async def test_delete_of_the_default_returns_422(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     _seed(repo)
     repo._default_backend_id[_TENANT_ID] = "backend-1"  # type: ignore[attr-defined]
 
-    resp = await client.delete("/storage-backends/backend-1")
+    resp = client.delete("/storage-backends/backend-1")
 
     assert resp.status_code == 422
 
 
 async def test_delete_of_a_bound_backend_returns_422(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     _seed(repo)
     repo._kb_refs[0] = 2  # type: ignore[attr-defined]
 
-    resp = await client.delete("/storage-backends/backend-1")
+    resp = client.delete("/storage-backends/backend-1")
 
     assert resp.status_code == 422
 
 
-async def test_delete_of_a_missing_backend_returns_404(client: AsyncClient) -> None:
-    resp = await client.delete("/storage-backends/ghost")
+async def test_delete_of_a_missing_backend_returns_404(client: TestClient) -> None:
+    resp = client.delete("/storage-backends/ghost")
 
     assert resp.status_code == 404
 
@@ -497,8 +505,8 @@ async def test_delete_of_a_missing_backend_returns_404(client: AsyncClient) -> N
 # ── POST /storage-backends/test ─────────────────────────────────────
 
 
-async def test_test_raw_config_returns_success_true(client: AsyncClient) -> None:
-    resp = await client.post(
+async def test_test_raw_config_returns_success_true(client: TestClient) -> None:
+    resp = client.post(
         "/storage-backends/test",
         json={"name": "Probe", "provider": "minio", "config": _MINIO_BODY_CONFIG},
     )
@@ -508,7 +516,7 @@ async def test_test_raw_config_returns_success_true(client: AsyncClient) -> None
 
 
 async def test_test_raw_config_reports_a_probe_failure_as_200(
-    client: AsyncClient,
+    client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class _FailingAdapter:
@@ -524,7 +532,7 @@ async def test_test_raw_config_reports_a_probe_failure_as_200(
         lambda _self, **_kwargs: _FailingAdapter(),
     )
 
-    resp = await client.post(
+    resp = client.post(
         "/storage-backends/test",
         json={"name": "Probe", "provider": "minio", "config": _MINIO_BODY_CONFIG},
     )
@@ -537,11 +545,11 @@ async def test_test_raw_config_reports_a_probe_failure_as_200(
 
 
 async def test_test_raw_config_reports_an_invalid_body_with_200(
-    client: AsyncClient,
+    client: TestClient,
 ) -> None:
     """A validation failure answers 200 with ``success=false`` (Go keeps
     the HTTP status at 200 and reports the error in the body)."""
-    resp = await client.post(
+    resp = client.post(
         "/storage-backends/test",
         json={"name": "Probe", "provider": "minio", "config": {"mode": "remote"}},
     )
@@ -556,19 +564,19 @@ async def test_test_raw_config_reports_an_invalid_body_with_200(
 
 
 async def test_test_saved_backend_returns_success_true(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     _seed(repo)
 
-    resp = await client.post("/storage-backends/backend-1/test")
+    resp = client.post("/storage-backends/backend-1/test")
 
     assert resp.status_code == 200
     assert resp.json()["success"] is True
 
 
-async def test_test_of_a_missing_backend_returns_404(client: AsyncClient) -> None:
-    resp = await client.post("/storage-backends/ghost/test")
+async def test_test_of_a_missing_backend_returns_404(client: TestClient) -> None:
+    resp = client.post("/storage-backends/ghost/test")
 
     assert resp.status_code == 404
 
@@ -577,12 +585,12 @@ async def test_test_of_a_missing_backend_returns_404(client: AsyncClient) -> Non
 
 
 async def test_set_default_acknowledges_and_points_the_workspace(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     _seed(repo)
 
-    resp = await client.put("/storage-backends/backend-1/default")
+    resp = client.put("/storage-backends/backend-1/default")
 
     assert resp.status_code == 200
     assert resp.json() == {"success": True}
@@ -590,20 +598,20 @@ async def test_set_default_acknowledges_and_points_the_workspace(
 
 
 async def test_set_default_of_a_disabled_backend_returns_422(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     _seed(repo, status=STORAGE_BACKEND_STATUS_DISABLED)
 
-    resp = await client.put("/storage-backends/backend-1/default")
+    resp = client.put("/storage-backends/backend-1/default")
 
     assert resp.status_code == 422
 
 
 async def test_set_default_of_a_missing_backend_returns_404(
-    client: AsyncClient,
+    client: TestClient,
 ) -> None:
-    resp = await client.put("/storage-backends/ghost/default")
+    resp = client.put("/storage-backends/ghost/default")
 
     assert resp.status_code == 404
 
@@ -612,11 +620,11 @@ async def test_set_default_of_a_missing_backend_returns_404(
 
 
 async def test_types_route_wins_over_the_id_route(
-    client: AsyncClient,
+    client: TestClient,
     repo: AsyncMock,
 ) -> None:
     # No row named "types" exists, so a captured id would 404.
-    resp = await client.get("/storage-backends/types")
+    resp = client.get("/storage-backends/types")
 
     assert resp.status_code == 200
     assert isinstance(resp.json()["data"], list)

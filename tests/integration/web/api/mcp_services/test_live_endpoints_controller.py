@@ -32,7 +32,7 @@ import pytest
 import pytest_asyncio
 import respx
 from fastapi import FastAPI
-from httpx import AsyncClient
+from fastapi.testclient import TestClient
 
 from src.ai.mcp_transport import MCPConnectionManager
 from src.app_context.registry import LifeSpanService
@@ -62,7 +62,6 @@ from src.db.dao.mcp_tool_approval_repository import (
 )
 from src.db.models.infra.mcp_services import MCPService
 from src.web.deps.infra_mcp import get_mcp_service
-from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 
 
 def _sse_body(events: list[tuple[str, str]]) -> bytes:
@@ -108,9 +107,7 @@ def mcp_repo() -> AsyncMock:
         rows[row.id] = row
         return row
 
-    async def _soft_delete(
-        tenant_id: int, id: str, *, deleted_at: datetime
-    ) -> bool:
+    async def _soft_delete(tenant_id: int, id: str, *, deleted_at: datetime) -> bool:
         row = await _find_for_tenant(tenant_id, id)
         if row is None:
             return False
@@ -145,7 +142,7 @@ def approvals_repo() -> AsyncMock:
 async def app(
     mcp_repo: AsyncMock,
     approvals_repo: AsyncMock,
-    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
+    web_app: FastAPI,
 ) -> AsyncIterator[FastAPI]:
     """Configure the shared ``web_app`` with live MCP singletons + dep overrides.
 
@@ -227,7 +224,7 @@ async def app(
 
 
 @pytest.fixture
-def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa: ARG001
+def client(app: FastAPI, web_authed_client: TestClient) -> TestClient:
     """Alias ``web_authed_client``; depending on ``app`` forces the
     dep-override fixture to run before the test executes."""
     return web_authed_client
@@ -240,12 +237,12 @@ async def _seed(
     name: str = "live",
     url: str = "https://mcp.live.example/mcp",
     transport_type: str = "http-streamable",
-    tenant_id: int = 1,
+    tenant_id: int | None = None,
 ) -> str:
     now = datetime.now(UTC)
     row = MCPService(
         id=service_id,
-        tenant_id=tenant_id,
+        tenant_id=tenant_id if tenant_id is not None else _MCP_LIVE_SEED_TENANT_ID,
         name=name,
         transport_type=transport_type,
         url=url,
@@ -256,11 +253,26 @@ async def _seed(
     return service_id
 
 
+# Module-level placeholder; the ``_bind_tenant_id_to_admin`` autouse
+# fixture below rebinds it to the per-test minted admin tenant so the
+# seed rows match the principal the authed client presents.
+_MCP_LIVE_SEED_TENANT_ID = 1
+
+
+@pytest.fixture(autouse=True)
+def _bind_tenant_id_to_admin(
+    admin_user: tuple[int, int],
+) -> None:
+    """Pin ``_MCP_LIVE_SEED_TENANT_ID`` to the minted admin tenant per test."""
+    global _MCP_LIVE_SEED_TENANT_ID
+    _MCP_LIVE_SEED_TENANT_ID = admin_user[1]
+
+
 # - Tests ----------------------------------------------------------
 
 
 async def test_list_tools_returns_upstream_tools_over_http_streamable(
-    client: AsyncClient,
+    client: TestClient,
     mcp_repo: AsyncMock,
 ) -> None:
     """``GET /tools`` reaches the upstream via the live HTTP-streamable pool."""
@@ -284,7 +296,7 @@ async def test_list_tools_returns_upstream_tools_over_http_streamable(
     with respx.mock(assert_all_called=False) as router:
         route = router.post("/mcp").mock(side_effect=_echo)
 
-        resp = await client.get("/mcp-services/svc-live/tools")
+        resp = client.get("/mcp-services/svc-live/tools")
 
     assert resp.status_code == 200
     tools = resp.json()["data"]
@@ -295,7 +307,7 @@ async def test_list_tools_returns_upstream_tools_over_http_streamable(
 
 
 async def test_list_tools_does_not_silently_succeed_when_upstream_fails(
-    client: AsyncClient,
+    client: TestClient,
     mcp_repo: AsyncMock,
 ) -> None:
     """An upstream failure degrades to an empty list (the contract
@@ -312,7 +324,7 @@ async def test_list_tools_does_not_silently_succeed_when_upstream_fails(
 
     with respx.mock(assert_all_called=False) as router:
         route = router.post("/mcp").respond(502, text="bad gateway")
-        resp = await client.get("/mcp-services/svc-broken/tools")
+        resp = client.get("/mcp-services/svc-broken/tools")
 
     assert route.call_count >= 1
     assert resp.status_code == 200
@@ -320,7 +332,7 @@ async def test_list_tools_does_not_silently_succeed_when_upstream_fails(
 
 
 async def test_list_tools_uses_sse_transport_when_configured(
-    client: AsyncClient,
+    client: TestClient,
     mcp_repo: AsyncMock,
 ) -> None:
     """``transport_type=sse`` routes through the SSE client (not streamable)."""
@@ -346,7 +358,7 @@ async def test_list_tools_uses_sse_transport_when_configured(
             ),
         )
         try:
-            resp = await client.get("/mcp-services/svc-sse/tools")
+            resp = client.get("/mcp-services/svc-sse/tools")
         except Exception:
             # The SSE mock doesn't reliably drive the streaming
             # round-trip; the route still exercised the live path.
@@ -361,7 +373,7 @@ async def test_list_tools_uses_sse_transport_when_configured(
 
 
 async def test_oauth_authorize_url_still_returns_legacy_shape(
-    client: AsyncClient,
+    client: TestClient,
     mcp_repo: AsyncMock,
 ) -> None:
     """``POST /oauth/authorize-url`` routes through the lifespan-wired manager."""
@@ -371,7 +383,7 @@ async def test_oauth_authorize_url_still_returns_legacy_shape(
         name="oauth",
         url="https://mcp.example.com",
     )
-    resp = await client.post(
+    resp = client.post(
         "/mcp-services/svc-oauth/oauth/authorize-url",
         json={
             "redirect_uri": "https://app.example.com/oauth/callback",

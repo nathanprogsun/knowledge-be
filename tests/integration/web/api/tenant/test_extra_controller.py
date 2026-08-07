@@ -12,7 +12,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient
+from fastapi.testclient import TestClient
 
 from src.core.tenants.api_key_service import TenantAPIKeyService
 from src.core.tenants.kv_service import TenantKVService
@@ -24,7 +24,6 @@ from src.web.deps import (
     get_tenant_api_key_service,
     get_tenant_kv_service,
 )
-from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -53,9 +52,7 @@ def api_key_repo() -> AsyncMock:
         if row is None or row.tenant_id != tenant_id:
             from src.common.exception import NotFoundError
 
-            raise NotFoundError(
-                code="tenant_api_key.not_found", message="Tenant API key not found"
-            )
+            raise NotFoundError(code="tenant_api_key.not_found", message="Tenant API key not found")
         rows[key_id] = row.model_copy(update={"revoked_at": revoked_at})
 
     repo.insert.side_effect = _insert
@@ -99,20 +96,16 @@ def kv_repo() -> AsyncMock:
 
 @pytest.fixture(autouse=True)
 def _override_services(
-    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
+    web_app: FastAPI,
     api_key_repo: AsyncMock,
     kv_repo: AsyncMock,
 ) -> FastAPI:
     """Override tenant service deps on the shared web app (autouse)."""
-    web_app.dependency_overrides[get_tenant_api_key_service] = (
-        lambda: TenantAPIKeyService(
-            api_keys_repo=api_key_repo,
-        )
+    web_app.dependency_overrides[get_tenant_api_key_service] = lambda: TenantAPIKeyService(
+        api_keys_repo=api_key_repo,
     )
-    web_app.dependency_overrides[get_tenant_kv_service] = (
-        lambda: TenantKVService(
-            kv_repo=kv_repo,
-        )
+    web_app.dependency_overrides[get_tenant_kv_service] = lambda: TenantKVService(
+        kv_repo=kv_repo,
     )
     return web_app
 
@@ -141,11 +134,11 @@ async def _seed_key(
 
 
 async def test_list_api_keys(
-    web_authed_client: AsyncClient,
+    web_authed_client: TestClient,
     api_key_repo: AsyncMock,
 ) -> None:
     await _seed_key(api_key_repo)
-    resp = await web_authed_client.get("/tenants/7/api-keys")
+    resp = web_authed_client.get("/tenants/7/api-keys")
     assert resp.status_code == 200
     body = resp.json()
     assert isinstance(body, list)
@@ -158,8 +151,8 @@ async def test_list_api_keys(
 # ── POST /tenants/{id}/api-keys ───────────────────────────────────────
 
 
-async def test_create_api_key(web_authed_client: AsyncClient) -> None:
-    resp = await web_authed_client.post(
+async def test_create_api_key(web_authed_client: TestClient) -> None:
+    resp = web_authed_client.post(
         "/tenants/7/api-keys",
         json={"name": "ci", "full_access": True},
     )
@@ -176,11 +169,11 @@ async def test_create_api_key(web_authed_client: AsyncClient) -> None:
 
 
 async def test_revoke_api_key(
-    web_authed_client: AsyncClient,
+    web_authed_client: TestClient,
     api_key_repo: AsyncMock,
 ) -> None:
     key = await _seed_key(api_key_repo)
-    resp = await web_authed_client.delete(f"/tenants/7/api-keys/{key.id}")
+    resp = web_authed_client.delete(f"/tenants/7/api-keys/{key.id}")
     assert resp.status_code == 200
     assert resp.json()["success"] is True
     assert await api_key_repo.list_for_tenant(7) == []
@@ -190,22 +183,20 @@ async def test_revoke_api_key(
 
 
 async def test_put_and_get_kv(
-    web_authed_client: AsyncClient,
+    web_authed_client: TestClient,
     kv_repo: AsyncMock,
 ) -> None:
-    put = await web_authed_client.put(
-        "/tenants/kv/web-search-config", json={"max_results": 20}
-    )
+    put = web_authed_client.put("/tenants/kv/web-search-config", json={"max_results": 20})
     assert put.status_code == 200
     assert put.json() == {"max_results": 20}
 
-    get = await web_authed_client.get("/tenants/kv/web-search-config")
+    get = web_authed_client.get("/tenants/kv/web-search-config")
     assert get.status_code == 200
     assert get.json() == {"max_results": 20}
 
 
-async def test_get_kv_unsupported_key(web_authed_client: AsyncClient) -> None:
-    resp = await web_authed_client.get("/tenants/kv/nonexistent")
+async def test_get_kv_unsupported_key(web_authed_client: TestClient) -> None:
+    resp = web_authed_client.get("/tenants/kv/nonexistent")
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "tenant_kv.unsupported_key"
 

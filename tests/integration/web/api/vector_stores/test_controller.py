@@ -1,6 +1,6 @@
 """Web-layer tests for the vector-store router (CRUD + types + test).
 
-Exercises the router over HTTP via ``httpx.AsyncClient`` against the
+Exercises the router over HTTP via ``TestClient`` against the
 app. The service dependency is overridden with an
 ``AsyncMock(spec=VectorStoreService)`` configured with stateful
 closures, so the tests exercise the full HTTP path (routing,
@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
-from httpx import AsyncClient
+from fastapi.testclient import TestClient
 
 from src.common.exception import ValidationError
 from src.core.contracts.infra import (
@@ -35,7 +35,6 @@ from src.core.infra.vector_stores.service.vector_store_service import VectorStor
 from src.core.infra.vector_stores.types import VectorStoreInfo
 from src.db.models.infra.vector_store import VectorStore
 from src.web.deps.infra_vector_stores import get_vector_store_service
-from tests.integration.web.conftest import web_app, web_authed_client  # noqa: F401
 
 
 @pytest.fixture
@@ -59,9 +58,7 @@ def fake_service() -> AsyncMock:
             message=f"vector store {store_id} not found",
         )
 
-    async def _create_store(
-        *, tenant_id: int, body: CreateVectorStoreRequest
-    ) -> VectorStoreInfo:
+    async def _create_store(*, tenant_id: int, body: CreateVectorStoreRequest) -> VectorStoreInfo:
         now = datetime.now(UTC)
         counter[0] += 1
         row = VectorStore(
@@ -84,9 +81,7 @@ def fake_service() -> AsyncMock:
     ) -> VectorStoreInfo:
         for r in rows.values():
             if r.id == store_id and r.tenant_id == tenant_id:
-                updated = r.model_copy(
-                    update={"name": body.name, "updated_at": datetime.now(UTC)}
-                )
+                updated = r.model_copy(update={"name": body.name, "updated_at": datetime.now(UTC)})
                 rows[store_id] = updated
                 return VectorStoreInfo.map_from_db(updated)
         raise ValidationError(
@@ -112,9 +107,7 @@ def fake_service() -> AsyncMock:
             error="not found",
         )
 
-    async def _test_raw(
-        engine_type: str, connection_config: dict[str, object]
-    ) -> _TestResponse:
+    async def _test_raw(engine_type: str, connection_config: dict[str, object]) -> _TestResponse:
         return _TestResponse(success=True, version="", error=None)
 
     repo.list_stores.side_effect = _list_stores
@@ -130,8 +123,8 @@ def fake_service() -> AsyncMock:
 
 @pytest.fixture
 def app(
-    request: pytest.FixtureRequest,  # noqa: ARG001 - explicit fixture-param
-    web_app: FastAPI,  # noqa: ARG001 - resolved from the parent conftest
+    request: pytest.FixtureRequest,
+    web_app: FastAPI,
     fake_service: AsyncMock,
 ) -> FastAPI:
     """Override ``get_vector_store_service`` on the shared web app."""
@@ -140,7 +133,7 @@ def app(
 
 
 @pytest.fixture
-def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa: ARG001
+def client(app: FastAPI, web_authed_client: TestClient) -> TestClient:
     """Alias ``web_authed_client``; depending on ``app`` forces the
     dep-override fixture to run before the test executes."""
     return web_authed_client
@@ -149,9 +142,9 @@ def client(app: FastAPI, web_authed_client: AsyncClient) -> AsyncClient:  # noqa
 # ── GET /vector-stores/types ─────────────────────────────────────────
 
 
-async def test_list_types_returns_seven_engines(client: AsyncClient) -> None:
+async def test_list_types_returns_seven_engines(client: TestClient) -> None:
     """The types endpoint returns the seven supported engine types."""
-    resp = await client.get("/vector-stores/types")
+    resp = client.get("/vector-stores/types")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -170,9 +163,9 @@ async def test_list_types_returns_seven_engines(client: AsyncClient) -> None:
 # ── POST /vector-stores/test (raw) ──────────────────────────────────
 
 
-async def test_test_raw_returns_success(client: AsyncClient) -> None:
+async def test_test_raw_returns_success(client: TestClient) -> None:
     """A valid raw config yields a success response with empty version."""
-    resp = await client.post(
+    resp = client.post(
         "/vector-stores/test",
         json={"engine_type": "elasticsearch", "connection_config": {"addr": "http://es:9200"}},
     )
@@ -186,11 +179,11 @@ async def test_test_raw_returns_success(client: AsyncClient) -> None:
 
 
 async def test_create_vector_store_returns_envelope(
-    client: AsyncClient,
+    client: TestClient,
     fake_service: AsyncMock,
 ) -> None:
     """A create call returns the wrapped envelope with masked credentials."""
-    resp = await client.post(
+    resp = client.post(
         "/vector-stores",
         json={
             "name": "es-hot",
@@ -214,11 +207,11 @@ async def test_create_vector_store_returns_envelope(
 
 
 async def test_list_stores_returns_db_rows(
-    client: AsyncClient,
+    client: TestClient,
     fake_service: AsyncMock,
 ) -> None:
     """The list endpoint returns the DB-managed rows."""
-    await client.post(
+    client.post(
         "/vector-stores",
         json={
             "name": "es-a",
@@ -226,7 +219,7 @@ async def test_list_stores_returns_db_rows(
             "connection_config": {"addr": "http://es-a:9200"},
         },
     )
-    resp = await client.get("/vector-stores")
+    resp = client.get("/vector-stores")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -238,12 +231,12 @@ async def test_list_stores_returns_db_rows(
 
 
 async def test_list_stores_synthesises_env_entries(
-    client: AsyncClient,
+    client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Setting ``RETRIEVE_DRIVER`` surfaces an env-store virtual entry."""
     monkeypatch.setenv("RETRIEVE_DRIVER", "postgres")
-    resp = await client.get("/vector-stores")
+    resp = client.get("/vector-stores")
     assert resp.status_code == 200
     body = resp.json()
     data = body["data"]
@@ -256,9 +249,9 @@ async def test_list_stores_synthesises_env_entries(
 # ── GET /vector-stores/{id} ─────────────────────────────────────────
 
 
-async def test_get_store_returns_envelope(client: AsyncClient) -> None:
+async def test_get_store_returns_envelope(client: TestClient) -> None:
     """The get endpoint returns the wrapped store after a create."""
-    create_resp = await client.post(
+    create_resp = client.post(
         "/vector-stores",
         json={
             "name": "es-get",
@@ -267,28 +260,28 @@ async def test_get_store_returns_envelope(client: AsyncClient) -> None:
         },
     )
     store_id = create_resp.json()["data"]["id"]
-    resp = await client.get(f"/vector-stores/{store_id}")
+    resp = client.get(f"/vector-stores/{store_id}")
     assert resp.status_code == 200
     body = resp.json()
     assert body["data"]["id"] == store_id
 
 
 async def test_get_unknown_store_returns_404(
-    client: AsyncClient,
+    client: TestClient,
 ) -> None:
     """An unknown id is rejected with a 404-style status code."""
-    resp = await client.get("/vector-stores/missing")
+    resp = client.get("/vector-stores/missing")
     # ValidationError is mapped to 422 by the exception handler.
     assert resp.status_code in (404, 422)
 
 
 async def test_get_env_store_returns_envelope(
-    client: AsyncClient,
+    client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An env-store id resolves without touching the service."""
     monkeypatch.setenv("RETRIEVE_DRIVER", "qdrant")
-    resp = await client.get("/vector-stores/__env_qdrant__")
+    resp = client.get("/vector-stores/__env_qdrant__")
     assert resp.status_code == 200
     body = resp.json()
     assert body["data"]["id"] == "__env_qdrant__"
@@ -300,10 +293,10 @@ async def test_get_env_store_returns_envelope(
 
 
 async def test_update_store_renames(
-    client: AsyncClient,
+    client: TestClient,
 ) -> None:
     """The put endpoint only mutates the ``name`` field."""
-    create_resp = await client.post(
+    create_resp = client.post(
         "/vector-stores",
         json={
             "name": "es-old",
@@ -312,7 +305,7 @@ async def test_update_store_renames(
         },
     )
     store_id = create_resp.json()["data"]["id"]
-    resp = await client.put(
+    resp = client.put(
         f"/vector-stores/{store_id}",
         json={"name": "es-new"},
     )
@@ -322,12 +315,12 @@ async def test_update_store_renames(
 
 
 async def test_update_env_store_rejected(
-    client: AsyncClient,
+    client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Env-store ids cannot be updated."""
     monkeypatch.setenv("RETRIEVE_DRIVER", "qdrant")
-    resp = await client.put(
+    resp = client.put(
         "/vector-stores/__env_qdrant__",
         json={"name": "renamed"},
     )
@@ -339,10 +332,10 @@ async def test_update_env_store_rejected(
 
 
 async def test_delete_store_soft_deletes(
-    client: AsyncClient,
+    client: TestClient,
 ) -> None:
     """A successful delete returns the success envelope."""
-    create_resp = await client.post(
+    create_resp = client.post(
         "/vector-stores",
         json={
             "name": "es-del",
@@ -351,22 +344,22 @@ async def test_delete_store_soft_deletes(
         },
     )
     store_id = create_resp.json()["data"]["id"]
-    resp = await client.delete(f"/vector-stores/{store_id}")
+    resp = client.delete(f"/vector-stores/{store_id}")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
     # The follow-up get returns a 422 / 404 — the row is invisible to reads.
-    follow = await client.get(f"/vector-stores/{store_id}")
+    follow = client.get(f"/vector-stores/{store_id}")
     assert follow.status_code in (404, 422)
 
 
 async def test_delete_env_store_rejected(
-    client: AsyncClient,
+    client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Env-store ids cannot be deleted."""
     monkeypatch.setenv("RETRIEVE_DRIVER", "qdrant")
-    resp = await client.delete("/vector-stores/__env_qdrant__")
+    resp = client.delete("/vector-stores/__env_qdrant__")
     assert resp.status_code in (400, 422)
 
 
@@ -374,10 +367,10 @@ async def test_delete_env_store_rejected(
 
 
 async def test_test_by_id_runs_probe(
-    client: AsyncClient,
+    client: TestClient,
 ) -> None:
     """The by-id test endpoint surfaces the probe's success response."""
-    create_resp = await client.post(
+    create_resp = client.post(
         "/vector-stores",
         json={
             "name": "es-probe",
@@ -386,19 +379,19 @@ async def test_test_by_id_runs_probe(
         },
     )
     store_id = create_resp.json()["data"]["id"]
-    resp = await client.post(f"/vector-stores/{store_id}/test")
+    resp = client.post(f"/vector-stores/{store_id}/test")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
 
 
 async def test_test_env_store_runs_probe(
-    client: AsyncClient,
+    client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The by-id test endpoint probes env-store entries directly."""
     monkeypatch.setenv("RETRIEVE_DRIVER", "qdrant")
-    resp = await client.post("/vector-stores/__env_qdrant__/test")
+    resp = client.post("/vector-stores/__env_qdrant__/test")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
