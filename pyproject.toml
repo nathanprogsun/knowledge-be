@@ -30,6 +30,7 @@ dependencies = [
     "passlib[bcrypt]>=1.7",
     "grpcio>=1.66",
     "grpcio-tools>=1.66",
+    "neo4j>=6.2.0",
 ]
 
 [project.optional-dependencies]
