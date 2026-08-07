@@ -1,12 +1,14 @@
-"""AWS Signature V4 request signing for S3-compatible storage probes.
+"""AWS Signature V4 request signing for S3-compatible storage.
 
-Extracted so the MinIO / S3 / OBS adapters share one implementation of
-the signing algorithm rather than three copies. Pure computation: no I/O,
-no network, no dependency on any other layer.
+Extracted so the MinIO / S3 / OBS / TOS / OSS / KS3 / COS adapters share
+one implementation of the signing algorithm rather than a copy per
+provider. Pure computation: no I/O, no network, no dependency on any
+other layer.
 
-Only what a connectivity probe needs is implemented — a bodyless request
-(``HEAD``/``GET``) with an empty-payload hash. Multipart uploads and
-streaming signatures are out of scope.
+Supports the connectivity probe (a bodyless ``HEAD``/``GET`` with an
+empty-payload hash) plus the file operations (``PUT``/``GET``/``DELETE``
+with an optional body payload) and presigned GET URLs. Multipart uploads
+and streaming signatures remain out of scope.
 """
 
 from __future__ import annotations
@@ -44,6 +46,13 @@ def canonical_uri(path: str) -> str:
     return urllib.parse.quote(path, safe="/~")
 
 
+def _payload_hash(payload: bytes | None) -> str:
+    """Return the payload hash — empty-payload hash when ``payload`` is None."""
+    if payload is None:
+        return EMPTY_PAYLOAD_SHA256
+    return hashlib.sha256(payload).hexdigest()
+
+
 def sign_request(
     *,
     method: str,
@@ -53,30 +62,34 @@ def sign_request(
     access_key_id: str,
     secret_access_key: str,
     now: datetime | None = None,
+    payload: bytes | None = None,
 ) -> dict[str, str]:
-    """Return the signed headers for a bodyless S3-compatible request.
+    """Return the signed headers for an S3-compatible request.
 
-    ``host`` is the ``Host`` header value (with port when non-default) and
-    ``path`` the absolute request path. The returned mapping carries
-    ``Host``, ``x-amz-date``, ``x-amz-content-sha256`` and
-    ``Authorization``, and is passed straight to the HTTP client.
+    ``host`` is the ``Host`` header value (with port when non-default),
+    ``path`` the absolute request path. ``payload`` hashes the request
+    body; omitting it signs the empty-payload hash (bodyless probes).
+    The returned mapping carries ``Host``, ``x-amz-date``,
+    ``x-amz-content-sha256`` and ``Authorization``, and is passed
+    straight to the HTTP client.
     """
     stamp = now or datetime.now(UTC)
     amz_date = stamp.strftime("%Y%m%dT%H%M%SZ")
     date_stamp = stamp.strftime("%Y%m%d")
+    body_hash = _payload_hash(payload)
 
     signed_headers = "host;x-amz-content-sha256;x-amz-date"
     canonical_headers = (
-        f"host:{host}\nx-amz-content-sha256:{EMPTY_PAYLOAD_SHA256}\nx-amz-date:{amz_date}\n"
+        f"host:{host}\nx-amz-content-sha256:{body_hash}\nx-amz-date:{amz_date}\n"
     )
     canonical_request = "\n".join(
         [
             method.upper(),
             canonical_uri(path),
-            "",  # no query string on a bucket probe
+            "",  # no query string on object requests
             canonical_headers,
             signed_headers,
-            EMPTY_PAYLOAD_SHA256,
+            body_hash,
         ]
     )
     scope = f"{date_stamp}/{region}/{_SERVICE}/{_REQUEST_TYPE}"
@@ -100,9 +113,75 @@ def sign_request(
     return {
         "Host": host,
         "x-amz-date": amz_date,
-        "x-amz-content-sha256": EMPTY_PAYLOAD_SHA256,
+        "x-amz-content-sha256": body_hash,
         "Authorization": authorization,
     }
 
 
-__all__ = ["EMPTY_PAYLOAD_SHA256", "canonical_uri", "sign_request"]
+def presign_get_url(
+    *,
+    scheme: str,
+    host: str,
+    path: str,
+    region: str,
+    access_key_id: str,
+    secret_access_key: str,
+    expires_seconds: int = 86400,
+    now: datetime | None = None,
+) -> str:
+    """Build a SigV4-presigned GET URL valid for ``expires_seconds``.
+
+    The signature covers the canonical URI plus the ``X-Amz-*`` query
+    parameters, so the URL works without a credential exchange on the
+    download side. Used for ``GetFileURL`` on the S3-compatible
+    backends.
+    """
+    stamp = now or datetime.now(UTC)
+    amz_date = stamp.strftime("%Y%m%dT%H%M%SZ")
+    date_stamp = stamp.strftime("%Y%m%d")
+    scope = f"{date_stamp}/{region}/{_SERVICE}/{_REQUEST_TYPE}"
+
+    params = [
+        ("X-Amz-Algorithm", _ALGORITHM),
+        ("X-Amz-Credential", f"{access_key_id}/{scope}"),
+        ("X-Amz-Date", amz_date),
+        ("X-Amz-Expires", str(expires_seconds)),
+        ("X-Amz-SignedHeaders", "host"),
+    ]
+    canonical_query = "&".join(
+        f"{urllib.parse.quote(k, safe='')}={urllib.parse.quote(v, safe='')}"
+        for k, v in params
+    )
+    canonical_request = "\n".join(
+        [
+            "GET",
+            canonical_uri(path),
+            canonical_query,
+            f"host:{host}\n",
+            "host",
+            "UNSIGNED-PAYLOAD",
+        ]
+    )
+    string_to_sign = "\n".join(
+        [
+            _ALGORITHM,
+            amz_date,
+            scope,
+            hashlib.sha256(canonical_request.encode("utf-8")).hexdigest(),
+        ]
+    )
+    signature = hmac.new(
+        _signing_key(secret_access_key, date_stamp, region),
+        string_to_sign.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    signed_url = f"{scheme}://{host}{canonical_uri(path)}"
+    return f"{signed_url}?{canonical_query}&X-Amz-Signature={signature}"
+
+
+__all__ = [
+    "EMPTY_PAYLOAD_SHA256",
+    "canonical_uri",
+    "presign_get_url",
+    "sign_request",
+]
