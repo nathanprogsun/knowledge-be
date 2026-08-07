@@ -7,8 +7,6 @@ int-coercion default behaviour.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
-
 from fastapi import Request
 
 from src.web.deps.context import (
