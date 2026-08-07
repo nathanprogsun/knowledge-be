@@ -13,7 +13,9 @@ issued through ``text()`` so the statements stay portable and testable.
 
 from __future__ import annotations
 
+import contextlib
 import unicodedata
+import uuid
 from collections.abc import Mapping
 from typing import Any
 
@@ -25,6 +27,8 @@ from src.ai.embedding import Context
 from src.ai.retrieval.types import (
     IndexInfo,
     IndexSaveParams,
+    IndexWithScore,
+    MatchType,
     RetrieveParams,
     RetrieverEngineType,
     RetrieveResult,
@@ -229,7 +233,6 @@ class SQLiteRepository:
         try:
             @sqlalchemy.event.listens_for(sync_engine, "connect")
             def _on_connect(dbapi_conn: Any, _connection_record: Any) -> None:
-                import contextlib
                 with contextlib.suppress(Exception):
                     # sqlite-vec only loads on SQLite connections; other
                     # dialects raise. Swallow so the engine stays usable.
@@ -399,7 +402,6 @@ class SQLiteRepository:
         return results
 
     async def _keywords_retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
-        from src.ai.retrieval.types import IndexWithScore, MatchType
         if not params.query:
             return []
         fts_query = _sanitize_fts5_query(params.query)
@@ -446,7 +448,6 @@ class SQLiteRepository:
         )]
 
     async def _vector_retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
-        from src.ai.retrieval.types import IndexWithScore, MatchType
         if not params.embedding:
             return []
         dim = len(params.embedding)
@@ -567,7 +568,6 @@ class SQLiteRepository:
         dimension: int,
         knowledge_type: str,
     ) -> None:
-        import uuid as _uuid
         await self._ensure_schema()
         for source_chunk_id, target_chunk_id in source_to_target_chunk_id_map.items():
             async with self._engine.connect() as conn:
@@ -583,7 +583,7 @@ class SQLiteRepository:
             if src is None:
                 continue
             target_knowledge_id = source_to_target_kb_id_map.get(src[3], "")
-            new_source_id = str(_uuid.uuid4())
+            new_source_id = str(uuid.uuid4())
             async with self._engine.begin() as conn:
                 insert_result = await conn.execute(
                     sqlalchemy.text(

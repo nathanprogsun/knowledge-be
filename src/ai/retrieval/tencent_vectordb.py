@@ -22,11 +22,21 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from tcvectordb.model.enum import FieldType, IndexType, MetricType  # type: ignore[import-untyped]
+from tcvectordb.model.index import (  # type: ignore[import-untyped]
+    FilterIndex,
+    HNSWParams,
+    SparseIndex,
+    VectorIndex,
+)
+
 from src.ai.embedding import Context
 from src.ai.retrieval.types import (
     IndexConfig,
     IndexInfo,
     IndexSaveParams,
+    IndexWithScore,
+    MatchType,
     RetrieveParams,
     RetrieverEngineType,
     RetrieveResult,
@@ -504,7 +514,6 @@ class TencentVectorDBRepository:
     # ── retrieve ──
 
     async def _vector_retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
-        from src.ai.retrieval.types import IndexWithScore, MatchType
         dimension = len(params.embedding)
         if dimension == 0:
             return _retrieve_result([], RetrieverType.VECTOR)
@@ -552,7 +561,6 @@ class TencentVectorDBRepository:
         return _retrieve_result(results, RetrieverType.VECTOR)
 
     async def _keywords_retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
-        from src.ai.retrieval.types import IndexWithScore, MatchType
         query = params.query.strip()
         if query == "":
             return _retrieve_result([], RetrieverType.KEYWORDS)
@@ -627,13 +635,7 @@ class TencentVectorDBRepository:
         if exists:
             self._initialized.add(dimension)
             return
-        from tcvectordb.model.enum import FieldType, IndexType, MetricType  # type: ignore[import-untyped]
-        from tcvectordb.model.index import (  # type: ignore[import-untyped]
-            FilterIndex,
-            HNSWParams,
-            SparseIndex,
-            VectorIndex,
-        )
+
         indexes = [
             VectorIndex(
                 name=_FIELD_VECTOR,

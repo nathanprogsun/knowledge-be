@@ -20,6 +20,7 @@ from src.ai.llm.types import Chat, ChatConfig
 from src.ai.provider.detect import detect_provider
 from src.ai.provider.registry import PROVIDER_ANTHROPIC
 from src.ai.utils.ollama_service import OllamaService
+from src.common.exception import ValidationError
 from src.core.contracts.infra import Model
 
 #: ``Model.source`` values that route to a chat client family.
@@ -78,7 +79,7 @@ def new_chat(config: ChatConfig, ollama_service: OllamaService | None = None) ->
         )
     if source == MODEL_SOURCE_REMOTE:
         return wrap_chat_concurrency(new_remote_chat(config), config.max_concurrency)
-    raise ValueError(f"unsupported chat model source: {config.source}")
+    raise ValidationError(code="chat.unsupported_source", message=f"unsupported chat model source: {config.source}")
 
 
 __all__ = [

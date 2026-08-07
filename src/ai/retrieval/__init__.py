@@ -30,6 +30,10 @@ from src.ai.retrieval.base import (
 from src.ai.retrieval.base import (
     RetrieveEngineRegistry as RetrieveEngineRegistryProtocol,
 )
+from src.ai.retrieval.doris import (
+    DorisRepository,
+    new_doris_retrieve_engine_repository,
+)
 from src.ai.retrieval.elasticsearch_v7 import (
     ElasticsearchV7Repository,
     new_elasticsearch_v7_client,
@@ -39,10 +43,6 @@ from src.ai.retrieval.elasticsearch_v8 import (
     ElasticsearchV8Repository,
     new_elasticsearch_v8_client,
     new_elasticsearch_v8_repository,
-)
-from src.ai.retrieval.doris import (
-    DorisRepository,
-    new_doris_retrieve_engine_repository,
 )
 from src.ai.retrieval.env_registry import (
     StoreLoaderFn,
@@ -117,9 +117,9 @@ __all__ = [
     "ConnectionConfig",
     "Context",
     "Database",
+    "DorisRepository",
     "ElasticsearchV7Repository",
     "ElasticsearchV8Repository",
-    "DorisRepository",
     "Embedder",
     "EngineFactory",
     "IndexConfig",
@@ -131,7 +131,6 @@ __all__ = [
     "MilvusClientConfig",
     "OpenSearchRepository",
     "QdrantRetrieveEngineRepository",
-
     "RetrieveEngine",
     "RetrieveEngineRegistry",
     "RetrieveEngineRegistryProtocol",
@@ -160,17 +159,16 @@ __all__ = [
     "is_env_store_id",
     "is_es_v7",
     "load_db_stores_into_registry",
+    "new_doris_retrieve_engine_repository",
     "new_elasticsearch_v7_client",
     "new_elasticsearch_v7_repository",
     "new_elasticsearch_v8_client",
     "new_elasticsearch_v8_repository",
-    "new_doris_retrieve_engine_repository",
     "new_engine_factory",
     "new_kv_hybrid_retrieve_engine",
     "new_opensearch_client",
     "new_opensearch_repository",
     "new_qdrant_retrieve_engine_repository",
-
     "new_retrieve_engine_registry",
     "new_sqlite_retrieve_engine_repository",
     "new_tencent_vectordb_retrieve_engine_repository",

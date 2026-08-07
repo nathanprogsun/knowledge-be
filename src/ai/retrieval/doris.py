@@ -20,13 +20,16 @@ pymysql is synchronous, so every DB call is dispatched through
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import math
 import os
+import urllib.request
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal, cast
+from urllib.parse import quote
 
 import pymysql  # type: ignore[import-untyped]
 
@@ -35,6 +38,8 @@ from src.ai.retrieval.types import (
     IndexConfig,
     IndexInfo,
     IndexSaveParams,
+    IndexWithScore,
+    MatchType,
     RetrieveParams,
     RetrieverEngineType,
     RetrieveResult,
@@ -639,7 +644,6 @@ class DorisRepository:
     # ── retrieve ──
 
     async def _vector_retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
-        from src.ai.retrieval.types import IndexWithScore, MatchType
         _validate_embedding(params.embedding)
         compat_mode = await self._resolve_compat_mode(ctx)
         query_embedding = list(params.embedding)
@@ -678,7 +682,6 @@ class DorisRepository:
         return _build_retrieve_result(results, RetrieverType.VECTOR)
 
     async def _keywords_retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
-        from src.ai.retrieval.types import IndexWithScore, MatchType
         query = params.query.strip()
         if query == "":
             return _build_retrieve_result([], RetrieverType.KEYWORDS)
@@ -924,9 +927,6 @@ class DorisRepository:
         """Stream Load partial update (legacy compat mode only)."""
         if not rows:
             return
-        import base64
-        import urllib.request
-        from urllib.parse import quote
 
         url = f"{self._fe_http_base}/api/{quote(self._database)}/{quote(table)}/_stream_load"
         body = json.dumps(rows).encode()

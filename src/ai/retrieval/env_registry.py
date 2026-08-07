@@ -29,6 +29,7 @@ from src.ai.retrieval.base import (
     StoreRegistry,
     VectorStoreRepositoryLike,
 )
+from src.ai.retrieval.doris import _connect_doris, new_doris_retrieve_engine_repository
 from src.ai.retrieval.elasticsearch_v7 import new_elasticsearch_v7_repository
 from src.ai.retrieval.elasticsearch_v8 import new_elasticsearch_v8_repository
 from src.ai.retrieval.factory import create_engine_service_from_store, host_from_addr
@@ -38,6 +39,7 @@ from src.ai.retrieval.opensearch import new_opensearch_repository
 from src.ai.retrieval.pgvector import new_postgres_retrieve_engine_repository
 from src.ai.retrieval.qdrant import new_qdrant_retrieve_engine_repository
 from src.ai.retrieval.registry import RetrieveEngineRegistry, new_retrieve_engine_registry
+from src.ai.retrieval.sqlite_vec import new_sqlite_retrieve_engine_repository
 from src.ai.retrieval.types import (
     ConnectionConfig,
     IndexConfig,
@@ -127,7 +129,6 @@ async def _new_postgres_repository(db: Database) -> RetrieveEngineRepository:
 
 
 async def _new_sqlite_repository(db: Database) -> RetrieveEngineRepository:
-    from src.ai.retrieval.sqlite_vec import new_sqlite_retrieve_engine_repository
 
     return new_sqlite_retrieve_engine_repository(db)
 
@@ -185,7 +186,6 @@ async def _new_milvus_repository(
 async def _new_doris_repository(
     addr: str, http_port: int, database: str, username: str, password: str
 ) -> RetrieveEngineRepository:
-    from src.ai.retrieval.doris import _connect_doris, new_doris_retrieve_engine_repository
 
     http_base = f"http://{host_from_addr(addr)}:{http_port}"
     db = _connect_doris(addr, username, password, database)

@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import tcvectordb  # type: ignore[import-untyped]
+
 from src.ai.retrieval.base import (
     AppConfig,
     AuditSink,
@@ -22,6 +24,7 @@ from src.ai.retrieval.base import (
     RetrieveEngineRepository,
     RetrieveEngineService,
 )
+from src.ai.retrieval.doris import _connect_doris, new_doris_retrieve_engine_repository
 from src.ai.retrieval.elasticsearch_v7 import new_elasticsearch_v7_repository
 from src.ai.retrieval.elasticsearch_v8 import new_elasticsearch_v8_repository
 from src.ai.retrieval.kv_hybrid import new_kv_hybrid_retrieve_engine
@@ -29,6 +32,8 @@ from src.ai.retrieval.milvus import new_milvus_retrieve_engine_repository
 from src.ai.retrieval.opensearch import new_opensearch_repository
 from src.ai.retrieval.pgvector import new_postgres_retrieve_engine_repository
 from src.ai.retrieval.qdrant import new_qdrant_retrieve_engine_repository
+from src.ai.retrieval.sqlite_vec import new_sqlite_retrieve_engine_repository
+from src.ai.retrieval.tencent_vectordb import new_tencent_vectordb_retrieve_engine_repository
 from src.ai.retrieval.types import (
     ConnectionConfig,
     IndexConfig,
@@ -88,7 +93,6 @@ async def _new_postgres_retrieve_engine_repository(db: Database) -> RetrieveEngi
 
 
 async def _new_sqlite_retrieve_engine_repository(db: Database) -> RetrieveEngineRepository:
-    from src.ai.retrieval.sqlite_vec import new_sqlite_retrieve_engine_repository
 
     return new_sqlite_retrieve_engine_repository(db)
 
@@ -163,7 +167,6 @@ async def _new_doris_retrieve_engine_repository(
     database: str,
     index_config: IndexConfig,
 ) -> RetrieveEngineRepository:
-    from src.ai.retrieval.doris import _connect_doris, new_doris_retrieve_engine_repository
 
     db = _connect_doris(addr, username, password, database)
     return new_doris_retrieve_engine_repository(db, http_base, username, password, database, index_config)
@@ -176,9 +179,6 @@ async def _new_tencent_vectordb_retrieve_engine_repository(
     database: str,
     index_config: IndexConfig,
 ) -> RetrieveEngineRepository:
-    import tcvectordb  # type: ignore[import-untyped]
-
-    from src.ai.retrieval.tencent_vectordb import new_tencent_vectordb_retrieve_engine_repository
 
     client = tcvectordb.RPCVectorDBClient(
         addr, username=username, key=api_key, timeout=10

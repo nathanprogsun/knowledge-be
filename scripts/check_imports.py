@@ -160,6 +160,8 @@ def main() -> int:
 
     errors: list[str] = []
     for file in files:
+        if file.name.endswith(("_pb2.py", "_pb2_grpc.py")):
+            continue
         errors.extend(check_file(file))
 
     if errors:
