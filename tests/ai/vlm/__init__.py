@@ -1,0 +1,2 @@
+"""VLM client tests.
+"""
