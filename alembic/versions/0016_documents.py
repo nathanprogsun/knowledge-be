@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0016"
+revision: str = "0016_documents"
 down_revision: str | None = "0015_knowledge_bases"
 branch_labels: tuple[str, ...] | None = None
 depends_on: tuple[str, ...] | None = None
