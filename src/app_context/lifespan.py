@@ -31,6 +31,7 @@ import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.ai.graph.neo4j_repo import build_graph_repository
 from src.ai.mcp_transport import MCPConnectionManager
 from src.app_context.registry import LifeSpanService
 from src.app_logging import configure_logging, logger
@@ -112,6 +113,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         mcp_oauth_manager_factory=_oauth_manager_factory,
     )
     app.state.lifespan_service = lifespan_service
+
+    # Graph repository (Neo4j). Enabled only when ``NEO4J_ENABLE`` is
+    # ``true``; a disabled deployment still registers a no-op repository
+    # so callers can rely on ``app.state.graph_repository`` existing.
+    graph_repository = await build_graph_repository()
+    app.state.graph_repository = graph_repository
     logger.info("lifespan ready")
     try:
         yield
@@ -121,6 +128,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await oauth_http_client.aclose()
         await oidc_client.aclose()
         await db_engine.close()
+        await graph_repository.close()
         app.state.lifespan_service = None
 
 
