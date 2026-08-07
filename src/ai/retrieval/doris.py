@@ -26,7 +26,7 @@ import os
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import pymysql  # type: ignore[import-untyped]
 
@@ -78,11 +78,11 @@ _COLUMNS_FOR_COPY = [
     _FIELD_TAG_ID, _FIELD_IS_ENABLED, _FIELD_EMBEDDING,
 ]
 
-_COMPAT_MODE_AUTO = "auto"
-_COMPAT_MODE_LEGACY = "legacy"
-_COMPAT_MODE_INNER_PRODUCT_DUPLICATE = "inner_product_duplicate"
-
 CompatMode = Literal["auto", "legacy", "inner_product_duplicate"]
+
+_COMPAT_MODE_AUTO: CompatMode = "auto"
+_COMPAT_MODE_LEGACY: CompatMode = "legacy"
+_COMPAT_MODE_INNER_PRODUCT_DUPLICATE: CompatMode = "inner_product_duplicate"
 
 
 # ── Helpers ─────────────────────────────────────────────────────────
@@ -408,7 +408,7 @@ class DorisRepository:
         self._buckets_num = _get_buckets_num(index_cfg, 0)
         self._replication_num = _get_replication_num(index_cfg, 0)
         configured, invalid = _resolve_configured_compat_mode()
-        self._compat_mode_requested: CompatMode = configured
+        self._compat_mode_requested: str = configured
         if invalid:
             logger.warning(
                 "Invalid {}={}, defaulting to {}",
@@ -443,7 +443,8 @@ class DorisRepository:
             def _do() -> tuple[Any, ...] | None:
                 with self._db.cursor() as cur:
                     cur.execute(sql, args or ())
-                    return cur.fetchone()
+                    row = cur.fetchone()
+                    return cast("tuple[Any, ...] | None", row)
             return await asyncio.to_thread(_do)
 
     # ── compat mode resolution ──
@@ -467,7 +468,7 @@ class DorisRepository:
                 "Auto-selected compat mode {} for new tables", self._compat_mode_resolved
             )
             return self._compat_mode_resolved
-        self._compat_mode_resolved = requested
+        self._compat_mode_resolved = cast(CompatMode, requested)
         return self._compat_mode_resolved
 
     async def _probe_compat_mode(self, ctx: Context) -> bool:
@@ -827,7 +828,7 @@ class DorisRepository:
         self,
         ctx: Context,
         chunk_ids: list[str],
-        mutate,
+        mutate: Any,
         action: str,
     ) -> None:
         if not chunk_ids:
@@ -869,7 +870,7 @@ class DorisRepository:
         self, ctx: Context, chunk_status_map: Mapping[str, bool]
     ) -> None:
         mapping = await self._lookup_chunk_row_keys(ctx, list(chunk_status_map.keys()))
-        by_table: dict[str, list[dict]] = {}
+        by_table: dict[str, list[dict[str, Any]]] = {}
         for chunk_id, locations in mapping.items():
             enabled = chunk_status_map.get(chunk_id)
             if enabled is None:
@@ -885,7 +886,7 @@ class DorisRepository:
         self, ctx: Context, chunk_tag_map: Mapping[str, str]
     ) -> None:
         mapping = await self._lookup_chunk_row_keys(ctx, list(chunk_tag_map.keys()))
-        by_table: dict[str, list[dict]] = {}
+        by_table: dict[str, list[dict[str, Any]]] = {}
         for chunk_id, locations in mapping.items():
             tag_id = chunk_tag_map.get(chunk_id)
             if tag_id is None:
@@ -918,7 +919,7 @@ class DorisRepository:
         return out
 
     async def _partial_update_rows(
-        self, ctx: Context, table: str, columns: list[str], rows: list[dict]
+        self, ctx: Context, table: str, columns: list[str], rows: list[dict[str, Any]]
     ) -> None:
         """Stream Load partial update (legacy compat mode only)."""
         if not rows:

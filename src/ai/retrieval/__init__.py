@@ -44,7 +44,6 @@ from src.ai.retrieval.doris import (
     DorisRepository,
     new_doris_retrieve_engine_repository,
 )
-)
 from src.ai.retrieval.env_registry import (
     StoreLoaderFn,
     init_retrieve_engine_registry,
@@ -118,7 +117,6 @@ __all__ = [
     "ConnectionConfig",
     "Context",
     "Database",
-<<<<<<< HEAD
     "ElasticsearchV7Repository",
     "ElasticsearchV8Repository",
     "DorisRepository",
@@ -162,7 +160,6 @@ __all__ = [
     "is_env_store_id",
     "is_es_v7",
     "load_db_stores_into_registry",
-<<<<<<< HEAD
     "new_elasticsearch_v7_client",
     "new_elasticsearch_v7_repository",
     "new_elasticsearch_v8_client",

@@ -176,7 +176,7 @@ async def _new_tencent_vectordb_retrieve_engine_repository(
     database: str,
     index_config: IndexConfig,
 ) -> RetrieveEngineRepository:
-    import tcvectordb
+    import tcvectordb  # type: ignore[import-untyped]
 
     from src.ai.retrieval.tencent_vectordb import new_tencent_vectordb_retrieve_engine_repository
 

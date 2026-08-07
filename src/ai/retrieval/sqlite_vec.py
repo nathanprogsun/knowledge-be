@@ -228,7 +228,7 @@ class SQLiteRepository:
             return
         try:
             @sqlalchemy.event.listens_for(sync_engine, "connect")
-            def _on_connect(dbapi_conn, _connection_record):
+            def _on_connect(dbapi_conn: Any, _connection_record: Any) -> None:
                 import contextlib
                 with contextlib.suppress(Exception):
                     # sqlite-vec only loads on SQLite connections; other
@@ -519,14 +519,15 @@ class SQLiteRepository:
         if not ids:
             return
         await self._ensure_schema()
-        ph = _placeholders(len(ids))
+        ph = ", ".join(f":p{i}" for i in range(len(ids)))
+        params = {f"p{i}": v for i, v in enumerate(ids)}
         async with self._engine.begin() as conn:
             rows = await conn.execute(
                 sqlalchemy.text(
                     f"SELECT id, dimension FROM {_TABLE_LITE_EMBEDDINGS} "
                     f"WHERE {field_name} IN ({ph})"
                 ),
-                ids,
+                params,
             )
             dim_ids: dict[int, list[int]] = {}
             for row in rows:
@@ -538,19 +539,20 @@ class SQLiteRepository:
                 if dim not in self._vec_tables:
                     continue
                 table = _vec_table_name(dim)
-                id_ph = _placeholders(len(row_ids))
+                id_ph = ", ".join(f":v{i}" for i in range(len(row_ids)))
+                vec_params = {f"v{i}": v for i, v in enumerate(row_ids)}
                 await conn.execute(
                     sqlalchemy.text(f"DELETE FROM {table} WHERE rowid IN ({id_ph})"),
-                    row_ids,
+                    vec_params,
                 )
             await conn.execute(
                 sqlalchemy.text(f"DELETE FROM {_TABLE_FTS} WHERE rowid IN ("
                                f"SELECT id FROM {_TABLE_LITE_EMBEDDINGS} WHERE {field_name} IN ({ph}))"),
-                ids,
+                params,
             )
             await conn.execute(
                 sqlalchemy.text(f"DELETE FROM {_TABLE_LITE_EMBEDDINGS} WHERE {field_name} IN ({ph})"),
-                ids,
+                params,
             )
 
     # ── copy_indices ──
@@ -611,7 +613,7 @@ class SQLiteRepository:
                         target_chunk_id, target_knowledge_id, target_knowledge_base_id,
                     )
 
-    async def _copy_vec(self, conn, src_id: int, dst_id: int, dim: int) -> None:
+    async def _copy_vec(self, conn: Any, src_id: int, dst_id: int, dim: int) -> None:
         if dim not in self._vec_tables:
             return
         table = _vec_table_name(dim)
@@ -624,7 +626,7 @@ class SQLiteRepository:
         )
 
     async def _sync_fts5_insert_row(
-        self, conn, row_id: int, content: str, source_id: str,
+        self, conn: Any, row_id: int, content: str, source_id: str,
         chunk_id: str, knowledge_id: str, knowledge_base_id: str,
     ) -> None:
         tokenized = _tokenize_cjk_bigram(content)

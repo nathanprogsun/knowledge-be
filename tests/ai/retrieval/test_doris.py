@@ -57,15 +57,15 @@ class _FakeCursor:
         self._script = script
         self._index = 0
         self.executed: list[tuple[str, list[Any]]] = []
-        self._fetchone_result: tuple | None = None
-        self._fetchall_result: list[tuple] = []
+        self._fetchone_result: tuple[Any, ...] | None = None
+        self._fetchall_result: list[tuple[Any, ...]] = []
         self.rowcount = 1
 
-    def __enter__(self):
+    def __enter__(self) -> _FakeCursor:
         return self
 
-    def __exit__(self, *_exc):
-        return False
+    def __exit__(self, *_exc: Any) -> None:
+        return None
 
     def execute(self, sql: str, args: Any = ()) -> int:
         self.executed.append((sql, list(args) if args else []))
@@ -98,10 +98,10 @@ class _FakeCursor:
             self._fetchall_result = []
             self.rowcount = 1
 
-    def fetchone(self):
+    def fetchone(self) -> tuple[Any, ...] | None:
         return self._fetchone_result
 
-    def fetchall(self):
+    def fetchall(self) -> list[tuple[Any, ...]]:
         return list(self._fetchall_result)
 
 
@@ -113,13 +113,13 @@ class _FakeDB:
         self.committed = 0
         self.rolled_back = 0
 
-    def cursor(self):
+    def cursor(self) -> _FakeCursor:
         return self._cursor
 
-    def commit(self):
+    def commit(self) -> None:
         self.committed += 1
 
-    def rollback(self):
+    def rollback(self) -> None:
         self.rolled_back += 1
 
 
@@ -176,14 +176,14 @@ def test_get_replication_num_default_when_zero() -> None:
     assert _get_replication_num(IndexConfig(replication_num=3), 1) == 3
 
 
-def test_resolve_configured_compat_mode_defaults_to_auto(monkeypatch) -> None:
+def test_resolve_configured_compat_mode_defaults_to_auto(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("DORIS_COMPAT_MODE", raising=False)
     mode, invalid = _resolve_configured_compat_mode()
     assert mode == "auto"
     assert invalid == ""
 
 
-def test_resolve_configured_compat_mode_recognizes_aliases(monkeypatch) -> None:
+def test_resolve_configured_compat_mode_recognizes_aliases(monkeypatch: pytest.MonkeyPatch) -> None:
     for value, expected in (
         ("legacy", "legacy"),
         ("inner_product_duplicate", "inner_product_duplicate"),
@@ -196,7 +196,7 @@ def test_resolve_configured_compat_mode_recognizes_aliases(monkeypatch) -> None:
         assert invalid == ""
 
 
-def test_resolve_configured_compat_mode_invalid_falls_back(monkeypatch) -> None:
+def test_resolve_configured_compat_mode_invalid_falls_back(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DORIS_COMPAT_MODE", "garbage")
     mode, invalid = _resolve_configured_compat_mode()
     assert mode == "auto"
@@ -353,7 +353,7 @@ def test_estimate_storage_size_accumulates() -> None:
 # ── save / batch_save ──────────────────────────────────────────────
 
 
-async def test_save_delegates_to_batch_save(monkeypatch) -> None:
+async def test_save_delegates_to_batch_save(monkeypatch: pytest.MonkeyPatch) -> None:
     repo, _db = _new_repo()
     bs = AsyncMock(return_value=None)
     monkeypatch.setattr(repo, "batch_save", bs)
@@ -404,15 +404,18 @@ async def test_batch_save_validates_embedding() -> None:
 
 async def test_retrieve_dispatches_by_type() -> None:
     repo, _ = _new_repo()
-    monkey_calls = []
-    async def _kw(*_a, **_k):
+    monkey_calls: list[str] = []
+
+    async def _kw(*_a: Any, **_k: Any) -> list[Any]:
         monkey_calls.append("kw")
         return []
-    async def _vc(*_a, **_k):
+
+    async def _vc(*_a: Any, **_k: Any) -> list[Any]:
         monkey_calls.append("vc")
         return []
-    repo._keywords_retrieve = _kw  # type: ignore[assignment]
-    repo._vector_retrieve = _vc  # type: ignore[assignment]
+
+    repo._keywords_retrieve = _kw  # type: ignore[method-assign]
+    repo._vector_retrieve = _vc  # type: ignore[method-assign]
     await repo.retrieve(_CTX, RetrieveParams(retriever_type=RetrieverType.KEYWORDS))
     await repo.retrieve(_CTX, RetrieveParams(retriever_type=RetrieverType.VECTOR))
     assert monkey_calls == ["kw", "vc"]
@@ -574,7 +577,7 @@ async def test_batch_update_chunk_tag_id_rewrite() -> None:
 
 
 async def test_batch_update_chunk_enabled_status_legacy_uses_stream_load(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repo, db = _new_repo()
     repo._compat_mode_resolved = "legacy"
@@ -583,12 +586,10 @@ async def test_batch_update_chunk_enabled_status_legacy_uses_stream_load(
         ("SELECT TABLE_NAME", [("weknora_embeddings_4",)]),
         ("SELECT", [("row-1", "c-1")]),  # lookup
     ]
-    monkeypatch.setattr(
-        repo, "_partial_update_rows",
-        AsyncMock(return_value=None),
-    )
+    partial_update = AsyncMock(return_value=None)
+    monkeypatch.setattr(repo, "_partial_update_rows", partial_update)
     await repo.batch_update_chunk_enabled_status(_CTX, {"c-1": True})
-    repo._partial_update_rows.assert_awaited()
+    partial_update.assert_awaited()
 
 
 # ── Constructor ────────────────────────────────────────────────────

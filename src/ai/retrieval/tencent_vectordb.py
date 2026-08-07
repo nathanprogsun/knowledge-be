@@ -31,6 +31,7 @@ from src.ai.retrieval.types import (
     RetrieverEngineType,
     RetrieveResult,
     RetrieverType,
+    SourceType,
 )
 from src.app_logging import logger
 
@@ -193,7 +194,7 @@ def _to_document(emb: VectorEmbedding) -> dict[str, Any]:
     }
 
 
-def _from_document(doc: dict) -> VectorEmbedding:
+def _from_document(doc: dict[str, Any]) -> VectorEmbedding:
     """Parse a search/query result dict into a VectorEmbedding."""
     fields = doc.get("fields", doc)
 
@@ -239,7 +240,7 @@ def _base_filter(params: RetrieveParams) -> str:
 
 
 def _retrieve_result(
-    results: list, retriever_type: RetrieverType
+    results: list[Any], retriever_type: RetrieverType
 ) -> list[RetrieveResult]:
     return [RetrieveResult(
         results=results,
@@ -480,7 +481,7 @@ class TencentVectorDBRepository:
             await self._update_chunk_fields(ctx, chunk_ids, {_FIELD_TAG_ID: tag_id})
 
     async def _update_chunk_fields(
-        self, ctx: Context, chunk_ids: list[str], fields: dict
+        self, ctx: Context, chunk_ids: list[str], fields: dict[str, Any]
     ) -> None:
         try:
             collections = await self._to_thread(self._db().list_collections)
@@ -537,7 +538,7 @@ class TencentVectorDBRepository:
                 id=d.get("id", ""),
                 content=d.get("fields", {}).get(_FIELD_CONTENT, ""),
                 source_id=d.get("fields", {}).get(_FIELD_SOURCE_ID, ""),
-                source_type=int(d.get("fields", {}).get(_FIELD_SOURCE_TYPE, 0)),
+                source_type=SourceType(int(d.get("fields", {}).get(_FIELD_SOURCE_TYPE, 0))),
                 chunk_id=d.get("fields", {}).get(_FIELD_CHUNK_ID, ""),
                 knowledge_id=d.get("fields", {}).get(_FIELD_KNOWLEDGE_ID, ""),
                 knowledge_base_id=d.get("fields", {}).get(_FIELD_KNOWLEDGE_BASE_ID, ""),
@@ -590,7 +591,7 @@ class TencentVectorDBRepository:
                     id=str(doc.get("id", "")),
                     content=str(fields.get(_FIELD_CONTENT, "")),
                     source_id=str(fields.get(_FIELD_SOURCE_ID, "")),
-                    source_type=int(fields.get(_FIELD_SOURCE_TYPE, 0)),
+                    source_type=SourceType(int(fields.get(_FIELD_SOURCE_TYPE, 0))),
                     chunk_id=str(fields.get(_FIELD_CHUNK_ID, "")),
                     knowledge_id=str(fields.get(_FIELD_KNOWLEDGE_ID, "")),
                     knowledge_base_id=str(fields.get(_FIELD_KNOWLEDGE_BASE_ID, "")),

@@ -55,13 +55,13 @@ class _FakeCollection:
 
     def __init__(self, name: str) -> None:
         self.name = name
-        self.calls: list[tuple[str, dict]] = []
+        self.calls: list[tuple[str, dict[str, Any]]] = []
 
-    def upsert(self, documents, **_kw):
+    def upsert(self, documents: Any, **_kw: Any) -> dict[str, Any]:
         self.calls.append(("upsert", {"documents": documents, **_kw}))
         return {"affectedCount": len(documents) if isinstance(documents, list) else 1}
 
-    def search(self, vectors, **_kw):
+    def search(self, vectors: Any, **_kw: Any) -> list[list[dict[str, Any]]]:
         self.calls.append(("search", {"vectors": vectors, **_kw}))
         return [[{"id": "row-1", "score": 0.9, "fields": {
             "content": "hello", "source_id": "src-1", "source_type": 0,
@@ -69,7 +69,7 @@ class _FakeCollection:
             "knowledge_base_id": "kb-1", "tag_id": "t-1", "is_enabled": 1,
         }}]]
 
-    def search_by_text(self, texts, **_kw):
+    def search_by_text(self, texts: Any, **_kw: Any) -> list[dict[str, Any]]:
         self.calls.append(("search_by_text", {"texts": texts, **_kw}))
         return [{"id": "row-2", "score": 0.8, "fields": {
             "content": "world", "source_id": "src-2", "source_type": 0,
@@ -77,19 +77,19 @@ class _FakeCollection:
             "knowledge_base_id": "kb-2", "tag_id": "t-2", "is_enabled": 1,
         }}]
 
-    def fulltext_search(self, data, **_kw):
+    def fulltext_search(self, data: Any, **_kw: Any) -> list[Any]:
         self.calls.append(("fulltext_search", {"data": data, **_kw}))
         return []
 
-    def query(self, **_kw):
+    def query(self, **_kw: Any) -> list[Any]:
         self.calls.append(("query", dict(_kw)))
         return []
 
-    def delete(self, **_kw):
+    def delete(self, **_kw: Any) -> dict[str, Any]:
         self.calls.append(("delete", dict(_kw)))
         return {"affectedCount": 0}
 
-    def update(self, **_kw):
+    def update(self, **_kw: Any) -> dict[str, Any]:
         self.calls.append(("update", dict(_kw)))
         return {"affectedCount": 0}
 
@@ -105,7 +105,7 @@ class _FakeDatabase:
         self.name = name
         self._collections = collections or []
         self.collections_map: dict[str, _FakeCollection] = {}
-        self.calls: list[tuple[str, dict]] = []
+        self.calls: list[tuple[str, dict[str, Any]]] = []
 
     def Collection(self, name: str) -> _FakeCollection:
         coll = self.collections_map.get(name)
@@ -121,11 +121,11 @@ class _FakeDatabase:
     def create_collection_if_not_exists(self, name: str) -> None:
         self.calls.append(("create_database", {"name": name}))
 
-    def create_collection(self, name: str, *_args, **_kw) -> None:
+    def create_collection(self, name: str, *_args: Any, **_kw: Any) -> None:
         self.calls.append(("create_collection", {"name": name}))
         self._collections.append(name)
 
-    def list_collections(self):
+    def list_collections(self) -> list[str]:
         self.calls.append(("list_collections", {}))
         return list(self._collections)
 
@@ -135,7 +135,7 @@ class _FakeClient:
 
     def __init__(self, database: _FakeDatabase) -> None:
         self._database = database
-        self.calls: list[tuple[str, dict]] = []
+        self.calls: list[tuple[str, dict[str, Any]]] = []
 
     def Database(self, name: str) -> _FakeDatabase:
         return self._database
@@ -178,7 +178,7 @@ def test_resolve_collection_name_priority() -> None:
     assert _resolve_collection_name(cfg3, "UNLIKELY_ENV_KEY_xyz", "default") == "default"
 
 
-def test_resolve_replica_number_uses_env(monkeypatch) -> None:
+def test_resolve_replica_number_uses_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TENCENT_VECTORDB_REPLICA_NUMBER", "3")
     assert _resolve_replica_number(IndexConfig()) == 3
     assert _resolve_replica_number(IndexConfig(replica_number=5)) == 5
@@ -352,7 +352,7 @@ def test_estimate_storage_size_accumulates() -> None:
 async def test_save_delegates_to_batch_save() -> None:
     repo, _, _ = _new_repo()
     bs = AsyncMock(return_value=None)
-    repo.batch_save = bs
+    repo.batch_save = bs  # type: ignore[method-assign]
     info = IndexInfo(source_id="s1", chunk_id="c1")
     await repo.save(_CTX, info, {"embedding": {"s1": [1.0]}})
     bs.assert_awaited_once()
@@ -390,15 +390,18 @@ async def test_batch_save_skips_empty_embedding() -> None:
 
 async def test_retrieve_dispatches_by_type() -> None:
     repo, _, _ = _new_repo(existing_collections=["emb_4"], dimensions=[4])
-    seen = []
-    async def _kw(*_a, **_k):
+    seen: list[str] = []
+
+    async def _kw(*_a: Any, **_k: Any) -> list[Any]:
         seen.append("kw")
         return []
-    async def _vc(*_a, **_k):
+
+    async def _vc(*_a: Any, **_k: Any) -> list[Any]:
         seen.append("vc")
         return []
-    repo._keywords_retrieve = _kw  # type: ignore[assignment]
-    repo._vector_retrieve = _vc  # type: ignore[assignment]
+
+    repo._keywords_retrieve = _kw  # type: ignore[method-assign]
+    repo._vector_retrieve = _vc  # type: ignore[method-assign]
     await repo.retrieve(_CTX, RetrieveParams(retriever_type=RetrieverType.KEYWORDS))
     await repo.retrieve(_CTX, RetrieveParams(retriever_type=RetrieverType.VECTOR))
     assert seen == ["kw", "vc"]
@@ -459,7 +462,7 @@ async def test_keywords_retrieve_searches_all_collections() -> None:
         RetrieveParams(query="hello world", top_k=5, retriever_type=RetrieverType.KEYWORDS),
     )
     # Both collections tried
-    text_calls = []
+    text_calls: list[tuple[str, dict[str, Any]]] = []
     for name in ("emb_4", "emb_768"):
         if name in db.collections_map:
             text_calls.extend(c for c in db.collections_map[name].calls if c[0] == "search_by_text")
@@ -504,7 +507,8 @@ async def test_copy_indices_empty_mapping_is_noop() -> None:
 async def test_copy_indices_queries_and_upserts() -> None:
     repo, db, _ = _new_repo(dimensions=[4])
     coll = db.collections_map.setdefault("emb_4", _FakeCollection("emb_4"))
-    def _query(**_kw):
+
+    def _query(**_kw: Any) -> list[dict[str, Any]]:
         coll.calls.append(("query", dict(_kw)))
         return [{
             "id": "src-c-1", "vector": [1.0, 2.0, 3.0, 4.0], "fields": {
@@ -513,7 +517,7 @@ async def test_copy_indices_queries_and_upserts() -> None:
                 "knowledge_base_id": "src-kb-1", "tag_id": "t-1", "is_enabled": 1,
             }
         }]
-    coll.query = _query
+    coll.query = _query  # type: ignore[method-assign]
     await repo.copy_indices(
         _CTX,
         "src-kb",
@@ -587,7 +591,7 @@ def test_new_tencent_vectordb_retrieve_engine_repository_returns_repo() -> None:
     assert repo._use_dimension_suffix is True
 
 
-def test_constructor_reads_index_config(monkeypatch) -> None:
+def test_constructor_reads_index_config(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("TENCENT_VECTORDB_DATABASE", raising=False)
     client = _FakeClient(_FakeDatabase("from_env_db"))
     repo = new_tencent_vectordb_retrieve_engine_repository(
@@ -598,7 +602,7 @@ def test_constructor_reads_index_config(monkeypatch) -> None:
     assert repo._replicas_num == 4
 
 
-def test_constructor_uses_env_when_database_name_empty(monkeypatch) -> None:
+def test_constructor_uses_env_when_database_name_empty(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TENCENT_VECTORDB_DATABASE", "env_db")
     client = _FakeClient(_FakeDatabase("env_db"))
     repo = new_tencent_vectordb_retrieve_engine_repository(client, "", None)
