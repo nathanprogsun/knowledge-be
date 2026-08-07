@@ -1,0 +1,162 @@
+"""Strict route-locking gate test.
+
+Fetches the live OpenAPI schema produced by ``create_app()`` and pins the
+EXACT set of routes. Any endpoint added or removed without updating the
+expected literals below fails the build - this is a route-surface
+contract gate, not a behavior test.
+
+Auth is enforced by the request-scoped auth dependency (middleware), not
+by FastAPI security schemes, so the OpenAPI schema advertises no per-route
+``security`` field. The public/authed split below is therefore derived from
+the auth dependency's exempt-path list (the handlers that take no auth
+dependency), not from the schema's security metadata.
+"""
+
+from __future__ import annotations
+
+import warnings
+from typing import Any
+
+import pytest
+
+from src.app_context.lifespan import create_app
+
+_OPENAPI_PATH = "/openapi.json"
+
+# Auth-exempt endpoints - the handlers that take no auth dependency.
+# Kept as a sorted list so the public contract reads top-to-bottom.
+_EXPECTED_PUBLIC_ROUTES: list[str] = [
+    "/auth/login",
+    "/auth/oidc/callback",
+    "/auth/oidc/config",
+    "/auth/oidc/url",
+    "/auth/refresh",
+    "/auth/register",
+    "/health",
+]
+
+# The complete route surface exposed by the app. Adding or removing a
+# route requires updating this set; otherwise the gate fails.
+_EXPECTED_ALL_ROUTES: set[str] = {
+    "/auth/change-password",
+    "/auth/login",
+    "/auth/logout",
+    "/auth/me",
+    "/auth/oidc/callback",
+    "/auth/oidc/config",
+    "/auth/oidc/url",
+    "/auth/refresh",
+    "/auth/register",
+    "/auth/validate",
+    "/datasource",
+    "/datasource/logs/{log_id}",
+    "/datasource/types",
+    "/datasource/validate-credentials",
+    "/datasource/{id}",
+    "/datasource/{id}/logs",
+    "/datasource/{id}/pause",
+    "/datasource/{id}/resource-ancestors",
+    "/datasource/{id}/resources",
+    "/datasource/{id}/resume",
+    "/datasource/{id}/sync",
+    "/datasource/{id}/validate",
+    "/health",
+    "/initialization/asr/check",
+    "/initialization/embedding/test",
+    "/initialization/multimodal/test",
+    "/initialization/ollama/download/progress/{task_id}",
+    "/initialization/ollama/download/tasks",
+    "/initialization/ollama/models",
+    "/initialization/ollama/models/check",
+    "/initialization/ollama/models/download",
+    "/initialization/ollama/status",
+    "/initialization/remote/check",
+    "/initialization/rerank/check",
+    "/mcp-services",
+    "/mcp-services/{service_id}",
+    "/mcp-services/{service_id}/oauth/authorize-url",
+    "/mcp-services/{service_id}/oauth/status",
+    "/mcp-services/{service_id}/oauth/token",
+    "/mcp-services/{service_id}/resources",
+    "/mcp-services/{service_id}/test",
+    "/mcp-services/{service_id}/tool-approvals",
+    "/mcp-services/{service_id}/tool-approvals/{tool_name}",
+    "/mcp-services/{service_id}/tools",
+    "/models",
+    "/models/providers",
+    "/models/{model_id}",
+    "/models/{model_id}/debug",
+    "/storage-backends",
+    "/storage-backends/test",
+    "/storage-backends/types",
+    "/storage-backends/{id}",
+    "/storage-backends/{id}/default",
+    "/storage-backends/{id}/test",
+    "/system/admin/audit-log",
+    "/system/admin/settings",
+    "/system/admin/settings/{key}",
+    "/tenants",
+    "/tenants/all",
+    "/tenants/kv/{key}",
+    "/tenants/search",
+    "/tenants/{tenant_id}",
+    "/tenants/{tenant_id}/api-keys",
+    "/tenants/{tenant_id}/api-keys/{key_id}",
+    "/tenants/{tenant_id}/api-principal-config",
+    "/vector-stores",
+    "/vector-stores/test",
+    "/vector-stores/types",
+    "/vector-stores/{store_id}",
+    "/vector-stores/{store_id}/test",
+    "/web-search-providers",
+    "/web-search-providers/test",
+    "/web-search-providers/types",
+    "/web-search-providers/{provider_id}",
+    "/web-search-providers/{provider_id}/test",
+    "/web-search/providers",
+}
+
+
+@pytest.fixture(scope="session")
+def openapi_paths() -> dict[str, Any]:
+    """Live OpenAPI ``paths`` mapping built from a fresh ``create_app()``.
+
+    The app is constructed without entering its lifespan, so no DB engine,
+    OIDC client, or MCP transport is started - OpenAPI generation only
+    walks the registered routes and needs none of those resources.
+
+    ``starlette.testclient`` emits a one-time deprecation notice on import
+    under the pinned starlette release (it prefers ``httpx2``). The project
+    turns warnings into errors, so the import + schema fetch run inside a
+    narrow ``catch_warnings`` scope that ignores only that notice; every
+    other warning keeps failing the build.
+    """
+    application = create_app()
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=r"Using `httpx` with `starlette.testclient` is deprecated",
+        )
+        from fastapi.testclient import TestClient
+
+        client = TestClient(application)
+        response = client.get(_OPENAPI_PATH)
+    assert response.status_code == 200, response.text
+    return response.json()["paths"]
+
+
+def test_public_routes_available(openapi_paths: dict[str, Any]) -> None:
+    """The auth-exempt endpoints must remain exactly this set.
+
+    Filters the live paths down to the known public set; the comparison
+    fails if any public route is removed or renamed. Additions of new
+    public routes are caught by ``test_all_routes_available``.
+    """
+    public_set = set(_EXPECTED_PUBLIC_ROUTES)
+    actual = sorted(path for path in openapi_paths if path in public_set)
+    assert actual == _EXPECTED_PUBLIC_ROUTES
+
+
+def test_all_routes_available(openapi_paths: dict[str, Any]) -> None:
+    """The full route surface must match the pinned set exactly."""
+    assert set(openapi_paths.keys()) == _EXPECTED_ALL_ROUTES
