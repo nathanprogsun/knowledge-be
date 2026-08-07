@@ -29,12 +29,16 @@ from src.ai.retrieval.base import (
     StoreRegistry,
     VectorStoreRepositoryLike,
 )
+from src.ai.retrieval.elasticsearch_v7 import new_elasticsearch_v7_repository
+from src.ai.retrieval.elasticsearch_v8 import new_elasticsearch_v8_repository
 from src.ai.retrieval.factory import create_engine_service_from_store
 from src.ai.retrieval.kv_hybrid import new_kv_hybrid_retrieve_engine
 from src.ai.retrieval.milvus import new_milvus_retrieve_engine_repository
+from src.ai.retrieval.opensearch import new_opensearch_repository
 from src.ai.retrieval.registry import RetrieveEngineRegistry, new_retrieve_engine_registry
 from src.ai.retrieval.types import (
     ConnectionConfig,
+    IndexConfig,
     MilvusClientConfig,
     RetrieverEngineType,
     VectorStoreLike,
@@ -123,18 +127,30 @@ async def _new_sqlite_repository(_db: Database) -> RetrieveEngineRepository:
     raise NotImplementedError("sqlite engine repository lands with the sqlite-vec engine")
 
 
-async def _new_elasticsearch_v8_repository(_cfg: AppConfig) -> RetrieveEngineRepository:
-    raise NotImplementedError("elasticsearch v8 repository lands with the elasticsearch engine")
+async def _new_elasticsearch_v8_repository(cfg: AppConfig) -> RetrieveEngineRepository:
+    return await new_elasticsearch_v8_repository(
+        os.getenv("ELASTICSEARCH_ADDR", ""),
+        os.getenv("ELASTICSEARCH_USERNAME", ""),
+        os.getenv("ELASTICSEARCH_PASSWORD", ""),
+        cfg,
+        IndexConfig(),
+    )
 
 
-async def _new_elasticsearch_v7_repository(_cfg: AppConfig) -> RetrieveEngineRepository:
-    raise NotImplementedError("elasticsearch v7 repository lands with the elasticsearch engine")
+async def _new_elasticsearch_v7_repository(cfg: AppConfig) -> RetrieveEngineRepository:
+    return await new_elasticsearch_v7_repository(
+        os.getenv("ELASTICSEARCH_ADDR", ""),
+        os.getenv("ELASTICSEARCH_USERNAME", ""),
+        os.getenv("ELASTICSEARCH_PASSWORD", ""),
+        cfg,
+        IndexConfig(),
+    )
 
 
 async def _new_opensearch_repository(
-    _cc: ConnectionConfig, _audit_sink: AuditSink | None
+    cc: ConnectionConfig, audit_sink: AuditSink | None
 ) -> RetrieveEngineRepository:
-    raise NotImplementedError("opensearch repository lands with the opensearch engine")
+    return await new_opensearch_repository(cc, audit_sink, "", None)
 
 
 async def _new_qdrant_repository(

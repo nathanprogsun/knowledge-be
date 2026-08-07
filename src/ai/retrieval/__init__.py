@@ -30,6 +30,16 @@ from src.ai.retrieval.base import (
 from src.ai.retrieval.base import (
     RetrieveEngineRegistry as RetrieveEngineRegistryProtocol,
 )
+from src.ai.retrieval.elasticsearch_v7 import (
+    ElasticsearchV7Repository,
+    new_elasticsearch_v7_client,
+    new_elasticsearch_v7_repository,
+)
+from src.ai.retrieval.elasticsearch_v8 import (
+    ElasticsearchV8Repository,
+    new_elasticsearch_v8_client,
+    new_elasticsearch_v8_repository,
+)
 from src.ai.retrieval.env_registry import (
     StoreLoaderFn,
     init_retrieve_engine_registry,
@@ -49,6 +59,11 @@ from src.ai.retrieval.kv_hybrid import (
     KVHybridRetrieveEngine,
     new_kv_hybrid_retrieve_engine,
     sanitize_for_embedding,
+)
+from src.ai.retrieval.opensearch import (
+    OpenSearchRepository,
+    new_opensearch_client,
+    new_opensearch_repository,
 )
 from src.ai.retrieval.registry import (
     ENGINE_BUILD_TIMEOUT_SECONDS,
@@ -86,6 +101,8 @@ __all__ = [
     "ConnectionConfig",
     "Context",
     "Database",
+    "ElasticsearchV7Repository",
+    "ElasticsearchV8Repository",
     "Embedder",
     "EngineFactory",
     "IndexConfig",
@@ -95,6 +112,7 @@ __all__ = [
     "KVHybridRetrieveEngine",
     "MatchType",
     "MilvusClientConfig",
+    "OpenSearchRepository",
     "RetrieveEngine",
     "RetrieveEngineRegistry",
     "RetrieveEngineRegistryProtocol",
@@ -121,8 +139,14 @@ __all__ = [
     "is_env_store_id",
     "is_es_v7",
     "load_db_stores_into_registry",
+    "new_elasticsearch_v7_client",
+    "new_elasticsearch_v7_repository",
+    "new_elasticsearch_v8_client",
+    "new_elasticsearch_v8_repository",
     "new_engine_factory",
     "new_kv_hybrid_retrieve_engine",
+    "new_opensearch_client",
+    "new_opensearch_repository",
     "new_retrieve_engine_registry",
     "parse_retrieve_driver",
     "sanitize_for_embedding",

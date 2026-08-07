@@ -22,8 +22,11 @@ from src.ai.retrieval.base import (
     RetrieveEngineRepository,
     RetrieveEngineService,
 )
+from src.ai.retrieval.elasticsearch_v7 import new_elasticsearch_v7_repository
+from src.ai.retrieval.elasticsearch_v8 import new_elasticsearch_v8_repository
 from src.ai.retrieval.kv_hybrid import new_kv_hybrid_retrieve_engine
 from src.ai.retrieval.milvus import new_milvus_retrieve_engine_repository
+from src.ai.retrieval.opensearch import new_opensearch_repository
 from src.ai.retrieval.types import (
     ConnectionConfig,
     IndexConfig,
@@ -93,7 +96,7 @@ async def _new_elasticsearch_v8_retrieve_engine_repository(
     cfg: AppConfig,
     index_config: IndexConfig,
 ) -> RetrieveEngineRepository:
-    raise NotImplementedError("elasticsearch v8 repository lands with the elasticsearch engine")
+    return await new_elasticsearch_v8_repository(addr, username, password, cfg, index_config)
 
 
 async def _new_elasticsearch_v7_retrieve_engine_repository(
@@ -103,7 +106,7 @@ async def _new_elasticsearch_v7_retrieve_engine_repository(
     cfg: AppConfig,
     index_config: IndexConfig,
 ) -> RetrieveEngineRepository:
-    raise NotImplementedError("elasticsearch v7 repository lands with the elasticsearch engine")
+    return await new_elasticsearch_v7_repository(addr, username, password, cfg, index_config)
 
 
 async def _new_opensearch_retrieve_engine_repository(
@@ -112,7 +115,7 @@ async def _new_opensearch_retrieve_engine_repository(
     store_id: str,
     index_config: IndexConfig,
 ) -> RetrieveEngineRepository:
-    raise NotImplementedError("opensearch repository lands with the opensearch engine")
+    return await new_opensearch_repository(cc, audit_sink, store_id, index_config)
 
 
 async def _new_qdrant_retrieve_engine_repository(
