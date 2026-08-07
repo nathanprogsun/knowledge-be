@@ -30,6 +30,7 @@ from src.ai.retrieval.types import (
     RetrieverEngineType,
     RetrieverType,
 )
+from src.common.exception import AIProviderError
 
 _CTX = TaskContext()
 
@@ -297,7 +298,7 @@ def test_chunk_slice_splits_contiguous_ranges() -> None:
 async def test_batch_embed_with_backoff_retries_then_raises() -> None:
     embedder = _FakeEmbedder()
     embedder.batch_embed_with_pool = AsyncMock(side_effect=RuntimeError("boom"))
-    with pytest.raises(RuntimeError, match="boom"):
+    with pytest.raises(AIProviderError, match="boom"):
         await _batch_embed_with_backoff(_CTX, cast("Embedder", embedder), ["a"])
     assert embedder.batch_embed_with_pool.await_count == 5
 

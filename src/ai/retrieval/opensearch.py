@@ -18,7 +18,7 @@ import os
 import re
 import uuid
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any, NoReturn, cast
 
 from opensearchpy import OpenSearch
 from opensearchpy.exceptions import (
@@ -45,6 +45,7 @@ from src.ai.retrieval.types import (
     RetrieverType,
     SourceType,
 )
+from src.common.exception import ApplicationError, ValidationError, VectorStoreError
 
 _DEFAULT_BASE_INDEX: str = "weknora"
 _ENV_INDEX_KEY: str = "OPENSEARCH_INDEX"
@@ -61,7 +62,7 @@ _INDEX_NAME_RE: re.Pattern[str] = re.compile(r"^[a-z0-9][a-z0-9_-]{0,254}$")
 # ── Sentinel errors ─────────────────────────────────────────────────
 
 
-class OpenSearchEngineError(Exception):
+class OpenSearchEngineError(VectorStoreError):
     """Base error for OpenSearch engine failures."""
 
 
@@ -105,12 +106,12 @@ def _is_transient(exc: Exception) -> bool:
     return isinstance(exc, (TransportEngineError, CircuitBreakerError))
 
 
-def _wrap_transport(exc: Exception) -> Exception:
+def _wrap_transport(exc: Exception) -> VectorStoreError:
     """Classify a raw SDK error into a sentinel based on HTTP status."""
     if isinstance(exc, (AuthenticationException, AuthorizationException)):
         return AuthError("authentication failed")
     if isinstance(exc, NotFoundError):
-        return exc
+        return IndexNotFoundError(str(exc))
     if isinstance(exc, TransportError):
         status = getattr(exc, "status_code", 0)
         if status == 429:
@@ -119,6 +120,15 @@ def _wrap_transport(exc: Exception) -> Exception:
     if isinstance(exc, OSConnectionError):
         return TransportEngineError("transport error")
     return TransportEngineError(str(exc))
+
+
+def _reraise_or_wrap(exc: BaseException, wrap_cls: type[ApplicationError]) -> NoReturn:
+    """Re-raise ``exc`` if it is a sanctioned ApplicationError.
+
+    Otherwise wrap it in ``wrap_cls`` - used for values the static checker
+    cannot prove are sanctioned, such as cached init errors.
+    """
+    raise exc if isinstance(exc, ApplicationError) else wrap_cls(str(exc))
 
 
 def _is_not_found(exc: Exception) -> bool:
@@ -382,13 +392,13 @@ class OpenSearchRepository(RetrieveEngineRepository):
         if dim in self._dims_ready:
             err = self._dim_errs.get(dim)
             if err is not None:
-                raise err
+                _reraise_or_wrap(err, VectorStoreError)
             return
         async with self._init_lock:
             if dim in self._dims_ready:
                 err = self._dim_errs.get(dim)
                 if err is not None:
-                    raise err
+                    _reraise_or_wrap(err, VectorStoreError)
                 return
             try:
                 await self._create_index_and_alias(ctx, dim)
@@ -403,12 +413,12 @@ class OpenSearchRepository(RetrieveEngineRepository):
     async def _ensure_keywords_index(self, ctx: Context) -> None:
         if self._keywords_ready:
             if self._keywords_err:
-                raise self._keywords_err
+                _reraise_or_wrap(self._keywords_err, VectorStoreError)
             return
         async with self._init_lock:
             if self._keywords_ready:
                 if self._keywords_err:
-                    raise self._keywords_err
+                    _reraise_or_wrap(self._keywords_err, VectorStoreError)
                 return
             try:
                 name = self._keywords_index()
@@ -444,7 +454,7 @@ class OpenSearchRepository(RetrieveEngineRepository):
                 index_created = False
             else:
                 if isinstance(exc, OpenSearchEngineError):
-                    raise exc
+                    _reraise_or_wrap(exc, VectorStoreError)
                 raise _wrap_transport(exc) from exc
         else:
             index_created = True
@@ -457,7 +467,7 @@ class OpenSearchRepository(RetrieveEngineRepository):
                 with contextlib.suppress(Exception):
                     await asyncio.to_thread(self._client.indices.delete, index=real_index)
             if isinstance(exc, OpenSearchEngineError):
-                raise exc
+                _reraise_or_wrap(exc, VectorStoreError)
             raise _wrap_transport(exc) from exc
         if index_created:
             await self._audit.emit_index_created(ctx, alias, dim)
@@ -598,7 +608,10 @@ class OpenSearchRepository(RetrieveEngineRepository):
             await self._ensure_ready(ctx, dim) if dim > 0 else await self._ensure_keywords_index(ctx)
             index = self._index_alias(dim) if dim > 0 else self._keywords_index()
             return await self._keywords_retrieve(ctx, params, index)
-        raise ValueError(f"unsupported retriever type: {params.retriever_type}")
+        raise ValidationError(
+            code="opensearch.unsupported_retriever_type",
+            message=f"unsupported retriever type: {params.retriever_type}",
+        )
 
     async def _vector_retrieve(
         self, ctx: Context, params: RetrieveParams, dim: int

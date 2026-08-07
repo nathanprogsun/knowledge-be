@@ -35,6 +35,7 @@ from src.ai.retrieval.types import (
     VectorStore,
     VectorStoreLike,
 )
+from src.common.exception import ValidationError
 
 _CTX = TaskContext()
 
@@ -146,14 +147,14 @@ async def test_create_engine_service_routes_each_engine_type(
 
 async def test_create_engine_service_unknown_engine_raises() -> None:
     store = cast("VectorStoreLike", SimpleNamespace(engine_type="unknown"))
-    with pytest.raises(ValueError, match="unsupported engine type: unknown"):
+    with pytest.raises(ValidationError, match="unsupported engine type: unknown"):
         await create_engine_service_from_store(_CTX, store, _DB(), _Cfg())
 
 
 async def test_create_engine_service_rejects_legacy_engine_types() -> None:
     for legacy in (RetrieverEngineType.INFINITY, RetrieverEngineType.ELASTICFAISS):
         store = _store(legacy)
-        with pytest.raises(ValueError, match="unsupported engine type"):
+        with pytest.raises(ValidationError, match="unsupported engine type"):
             await create_engine_service_from_store(_CTX, store, _DB(), _Cfg())
 
 
@@ -162,7 +163,7 @@ async def test_create_engine_service_rejects_legacy_engine_types() -> None:
 
 async def test_create_postgres_engine_requires_default_connection() -> None:
     store = _store(RetrieverEngineType.POSTGRES, cc=ConnectionConfig(use_default_connection=False))
-    with pytest.raises(ValueError, match="use_default_connection=true"):
+    with pytest.raises(ValidationError, match="use_default_connection=true"):
         await factory_module._create_postgres_engine(store, _DB())
 
 
@@ -300,11 +301,11 @@ async def test_create_milvus_engine_wraps_repo(monkeypatch: pytest.MonkeyPatch) 
 
 
 async def test_create_doris_engine_requires_addr_and_database() -> None:
-    with pytest.raises(ValueError, match="requires addr"):
+    with pytest.raises(ValidationError, match="requires addr"):
         await factory_module._create_doris_engine(
             _store(RetrieverEngineType.DORIS, cc=ConnectionConfig(database="weknora"))
         )
-    with pytest.raises(ValueError, match="requires database"):
+    with pytest.raises(ValidationError, match="requires database"):
         await factory_module._create_doris_engine(
             _store(RetrieverEngineType.DORIS, cc=ConnectionConfig(addr="doris-fe:9030"))
         )

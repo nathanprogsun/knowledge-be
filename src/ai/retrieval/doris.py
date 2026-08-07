@@ -46,6 +46,7 @@ from src.ai.retrieval.types import (
     RetrieverType,
 )
 from src.app_logging import logger
+from src.common.exception import StorageBackendError, ValidationError
 
 # ── Constants ────────────────────────────────────────────────────────
 
@@ -170,11 +171,14 @@ def _parse_embedding_literal(raw: str | bytes) -> list[float]:
 
 
 def _validate_embedding(vec: list[float]) -> None:
-    """Raise ``ValueError`` if any element is NaN or infinite."""
+    """Raise ``ValidationError`` if any element is NaN or infinite."""
     for i, v in enumerate(vec):
         f = float(v)
         if math.isnan(f) or math.isinf(f):
-            raise ValueError(f"embedding[{i}] is not finite: {f}")
+            raise ValidationError(
+                code="doris.embedding_not_finite",
+                message=f"embedding[{i}] is not finite: {f}",
+            )
 
 
 def _normalize_embedding(vec: list[float]) -> list[float]:
@@ -458,7 +462,7 @@ class DorisRepository:
         if self._compat_mode_resolved is not None:
             return self._compat_mode_resolved
         if self._compat_resolve_error is not None:
-            raise self._compat_resolve_error
+            raise StorageBackendError(str(self._compat_resolve_error))
         requested: str = self._compat_mode_requested
         if requested == "" or requested == _COMPAT_MODE_AUTO:
             if requested == "":
@@ -531,7 +535,10 @@ class DorisRepository:
             return await self._vector_retrieve(ctx, params)
         if params.retriever_type == RetrieverType.KEYWORDS:
             return await self._keywords_retrieve(ctx, params)
-        raise ValueError(f"invalid retriever type: {params.retriever_type}")
+        raise ValidationError(
+            code="doris.invalid_retriever_type",
+            message=f"invalid retriever type: {params.retriever_type}",
+        )
 
     # ── save / batch_save ──
 
@@ -945,12 +952,16 @@ class DorisRepository:
             with urllib.request.urlopen(req, timeout=30) as resp:
                 resp_body = resp.read()
                 if resp.status // 100 != 2:
-                    raise RuntimeError(f"stream load HTTP {resp.status}: {resp_body}")
+                    raise StorageBackendError(
+                        code="doris.stream_load_http_failed",
+                        message=f"stream load HTTP {resp.status}: {resp_body}",
+                    )
                 result = json.loads(resp_body)
                 status = result.get("Status", "")
                 if status not in ("Success", "Publish Timeout"):
-                    raise RuntimeError(
-                        f"stream load failed: status={status} msg={result.get('Message')}"
+                    raise StorageBackendError(
+                        code="doris.stream_load_failed",
+                        message=f"stream load failed: status={status} msg={result.get('Message')}",
                     )
 
         async with self._lock:

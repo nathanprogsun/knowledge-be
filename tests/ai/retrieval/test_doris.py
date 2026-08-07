@@ -43,6 +43,7 @@ from src.ai.retrieval.types import (
     RetrieverType,
     SourceType,
 )
+from src.common.exception import ValidationError
 
 _CTX = TaskContext()
 
@@ -227,11 +228,11 @@ def test_parse_embedding_literal_empty() -> None:
 
 def test_validate_embedding_rejects_nan_inf() -> None:
     _validate_embedding([1.0, 2.0, 3.0])
-    with pytest.raises(ValueError, match="not finite"):
+    with pytest.raises(ValidationError, match="not finite"):
         _validate_embedding([1.0, float("nan"), 2.0])
-    with pytest.raises(ValueError, match="not finite"):
+    with pytest.raises(ValidationError, match="not finite"):
         _validate_embedding([1.0, float("inf")])
-    with pytest.raises(ValueError, match="not finite"):
+    with pytest.raises(ValidationError, match="not finite"):
         _validate_embedding([float("-inf"), 2.0])
 
 
@@ -395,7 +396,7 @@ async def test_batch_save_skips_empty_embedding() -> None:
 async def test_batch_save_validates_embedding() -> None:
     repo, _db = _new_repo()
     info = IndexInfo(source_id="src-1", chunk_id="c1")
-    with pytest.raises(ValueError, match="not finite"):
+    with pytest.raises(ValidationError, match="not finite"):
         await repo.batch_save(_CTX, [info], {"embedding": {"src-1": [float("nan")]}})
 
 
@@ -423,7 +424,7 @@ async def test_retrieve_dispatches_by_type() -> None:
 
 async def test_retrieve_invalid_type_raises() -> None:
     repo, _ = _new_repo()
-    with pytest.raises(ValueError, match="invalid retriever type"):
+    with pytest.raises(ValidationError, match="invalid retriever type"):
         await repo.retrieve(_CTX, RetrieveParams(retriever_type=RetrieverType.WEB_SEARCH))
 
 

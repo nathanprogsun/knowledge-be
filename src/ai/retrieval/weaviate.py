@@ -41,6 +41,7 @@ from src.ai.retrieval.types import (
     SourceType,
 )
 from src.app_logging import logger
+from src.common.exception import ValidationError
 
 # ── Payload field names ───────────────────────────────────────────────
 
@@ -478,8 +479,9 @@ class WeaviateRetrieveEngineRepository:
         """Store a single object in Weaviate."""
         embedding = _to_embedding(index_info, params)
         if not embedding:
-            raise ValueError(
-                f"empty embedding vector for chunk ID: {index_info.chunk_id}"
+            raise ValidationError(
+                code="weaviate.empty_embedding",
+                message=f"empty embedding vector for chunk ID: {index_info.chunk_id}",
             )
         dimension = len(embedding)
         await self._ensure_collection(ctx, dimension)
@@ -539,7 +541,10 @@ class WeaviateRetrieveEngineRepository:
             return await self._vector_retrieve(ctx, params)
         if params.retriever_type == RetrieverType.KEYWORDS:
             return await self._keywords_retrieve(ctx, params)
-        raise ValueError(f"invalid retriever type: {params.retriever_type}")
+        raise ValidationError(
+            code="weaviate.invalid_retriever_type",
+            message=f"invalid retriever type: {params.retriever_type}",
+        )
 
     async def _vector_retrieve(
         self, ctx: Context, params: RetrieveParams

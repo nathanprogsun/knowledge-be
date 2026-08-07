@@ -36,6 +36,7 @@ from src.ai.retrieval.types import (
     RetrieverType,
     SourceType,
 )
+from src.common.exception import ValidationError
 
 _CTX = TaskContext()
 
@@ -543,7 +544,7 @@ async def test_ensure_schema_only_runs_once() -> None:
 
 
 def test_new_sqlite_retrieve_engine_repository_requires_engine() -> None:
-    with pytest.raises(ValueError, match="requires a db handle with an 'engine' attribute"):
+    with pytest.raises(ValidationError, match="requires a db handle with an 'engine' attribute"):
         new_sqlite_retrieve_engine_repository(object())
 
 

@@ -48,6 +48,7 @@ from src.ai.retrieval.types import (
     RetrieverType,
     SourceType,
 )
+from src.common.exception import ValidationError
 
 _CTX = TaskContext()
 
@@ -237,7 +238,7 @@ async def test_save_upserts_single_row() -> None:
 
 async def test_save_rejects_empty_embedding() -> None:
     repo = _repo()
-    with pytest.raises(ValueError, match="empty embedding vector"):
+    with pytest.raises(ValidationError, match="empty embedding vector"):
         await repo.save(_CTX, _index_info(), {})
 
 
@@ -319,7 +320,7 @@ async def test_retrieve_dispatches_keywords() -> None:
 async def test_retrieve_invalid_type_raises() -> None:
     repo = _repo()
     params = RetrieveParams(retriever_type=RetrieverType.WEB_SEARCH)
-    with pytest.raises(ValueError, match="invalid retriever type"):
+    with pytest.raises(ValidationError, match="invalid retriever type"):
         await repo.retrieve(_CTX, params)
 
 
@@ -660,13 +661,13 @@ def test_filter_between_builds_range() -> None:
 
 def test_filter_rejects_nil_condition() -> None:
     converter = MilvusFilterConverter()
-    with pytest.raises(ValueError, match="condition is nil"):
+    with pytest.raises(ValidationError, match="condition is nil"):
         converter.convert(None)
 
 
 def test_filter_rejects_unknown_operator() -> None:
     converter = MilvusFilterConverter()
-    with pytest.raises(ValueError, match="unsupported operator"):
+    with pytest.raises(ValidationError, match="unsupported operator"):
         converter.convert(
             UniversalFilterCondition(field="x", operator="bogus", value=1)
         )
@@ -674,7 +675,7 @@ def test_filter_rejects_unknown_operator() -> None:
 
 def test_filter_in_rejects_non_list() -> None:
     converter = MilvusFilterConverter()
-    with pytest.raises(ValueError, match="must be a slice"):
+    with pytest.raises(ValidationError, match="must be a slice"):
         converter.convert(
             UniversalFilterCondition(field="x", operator="in", value="not-a-list")
         )
@@ -682,7 +683,7 @@ def test_filter_in_rejects_non_list() -> None:
 
 def test_filter_in_rejects_empty_list() -> None:
     converter = MilvusFilterConverter()
-    with pytest.raises(ValueError, match="must be a slice"):
+    with pytest.raises(ValidationError, match="must be a slice"):
         converter.convert(
             UniversalFilterCondition(field="x", operator="in", value=[])
         )

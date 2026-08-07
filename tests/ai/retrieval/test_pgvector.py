@@ -29,6 +29,7 @@ from src.ai.retrieval.types import (
     RetrieverType,
     SourceType,
 )
+from src.common.exception import ValidationError
 
 _CTX = TaskContext()
 
@@ -297,7 +298,7 @@ async def test_batch_save_empty_list_is_noop() -> None:
 async def test_retrieve_invalid_type_raises_value_error() -> None:
     """A valid-but-unsupported retriever type (e.g. WEB_SEARCH) raises ValueError."""
     repo, _ = _make_repo()
-    with pytest.raises(ValueError, match="invalid retriever type"):
+    with pytest.raises(ValidationError, match="invalid retriever type"):
         await repo.retrieve(
             _CTX,
             _params(retriever_type=RetrieverType.WEB_SEARCH),

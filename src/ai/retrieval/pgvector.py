@@ -35,6 +35,7 @@ from src.ai.retrieval.types import (
     SourceType,
 )
 from src.app_logging import logger
+from src.common.exception import ValidationError
 
 # ── Constants ────────────────────────────────────────────────────────
 
@@ -259,7 +260,10 @@ class PostgresRetrieveEngineRepository:
             return await self._keywords_retrieve(ctx, params)
         if params.retriever_type == RetrieverType.VECTOR:
             return await self._vector_retrieve(ctx, params)
-        raise ValueError(f"invalid retriever type: {params.retriever_type}")
+        raise ValidationError(
+            code="pgvector.invalid_retriever_type",
+            message=f"invalid retriever type: {params.retriever_type}",
+        )
 
     async def _keywords_retrieve(
         self, ctx: Context, params: RetrieveParams

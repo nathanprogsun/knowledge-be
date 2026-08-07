@@ -39,6 +39,7 @@ from src.ai.retrieval.types import (
     RetrieverEngineType,
     RetrieverType,
 )
+from src.common.exception import ValidationError
 
 _CTX = TaskContext()
 
@@ -409,7 +410,7 @@ async def test_retrieve_dispatches_by_type() -> None:
 
 async def test_retrieve_invalid_type_raises() -> None:
     repo, _, _ = _new_repo()
-    with pytest.raises(ValueError, match="invalid retriever type"):
+    with pytest.raises(ValidationError, match="invalid retriever type"):
         await repo.retrieve(_CTX, RetrieveParams(retriever_type=RetrieverType.WEB_SEARCH))
 
 

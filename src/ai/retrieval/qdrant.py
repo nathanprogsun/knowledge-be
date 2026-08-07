@@ -47,6 +47,7 @@ from src.ai.retrieval.types import (
     SourceType,
 )
 from src.app_logging import logger
+from src.common.exception import ValidationError
 
 # ── Payload field names ───────────────────────────────────────────────
 
@@ -401,7 +402,10 @@ class QdrantRetrieveEngineRepository:
         """Store a single point in Qdrant."""
         data = _to_embedding_data(index_info, params)
         if not data.embedding:
-            raise ValueError(f"empty embedding vector for chunk ID: {index_info.chunk_id}")
+            raise ValidationError(
+                code="qdrant.empty_embedding",
+                message=f"empty embedding vector for chunk ID: {index_info.chunk_id}",
+            )
         dimension = len(data.embedding)
         await self._ensure_collection(ctx, dimension)
         collection_name = self._get_collection_name(dimension)
@@ -457,7 +461,10 @@ class QdrantRetrieveEngineRepository:
             return await self._vector_retrieve(ctx, params)
         if params.retriever_type == RetrieverType.KEYWORDS:
             return await self._keywords_retrieve(ctx, params)
-        raise ValueError(f"invalid retriever type: {params.retriever_type}")
+        raise ValidationError(
+            code="qdrant.invalid_retriever_type",
+            message=f"invalid retriever type: {params.retriever_type}",
+        )
 
     async def _vector_retrieve(
         self, ctx: Context, params: RetrieveParams

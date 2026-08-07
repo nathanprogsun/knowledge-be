@@ -43,6 +43,7 @@ from src.ai.retrieval.types import (
     is_env_store_id,
 )
 from src.ai.retrieval.weaviate import new_weaviate_retrieve_engine_repository_from_env
+from src.common.exception import ValidationError
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,8 +193,9 @@ async def _new_tencent_vectordb_retrieve_engine_repository(
 async def _create_postgres_engine(store: VectorStoreLike, db: Database) -> RetrieveEngineService:
     cc = store.connection_config
     if not cc.use_default_connection:
-        raise ValueError(
-            "custom postgres connections not yet supported; use use_default_connection=true"
+        raise ValidationError(
+            code="engine_factory.unsupported_postgres_connection",
+            message="custom postgres connections not yet supported; use use_default_connection=true",
         )
     repo = await _new_postgres_retrieve_engine_repository(db)
     return new_kv_hybrid_retrieve_engine(repo, RetrieverEngineType.POSTGRES)
@@ -274,9 +276,15 @@ async def _create_weaviate_engine(store: VectorStoreLike) -> RetrieveEngineServi
 async def _create_doris_engine(store: VectorStoreLike) -> RetrieveEngineService:
     cc = store.connection_config
     if cc.addr == "":
-        raise ValueError("doris connection requires addr (host:port)")
+        raise ValidationError(
+            code="engine_factory.doris_addr_required",
+            message="doris connection requires addr (host:port)",
+        )
     if cc.database == "":
-        raise ValueError("doris connection requires database")
+        raise ValidationError(
+            code="engine_factory.doris_database_required",
+            message="doris connection requires database",
+        )
     http_port = cc.http_port
     if http_port <= 0:
         http_port = 8030
@@ -342,7 +350,10 @@ async def create_engine_service_from_store(
         return await _create_tencent_vectordb_engine(store)
     if engine_type == RetrieverEngineType.OPENSEARCH:
         return await _create_opensearch_engine(ctx, store, audit_sink)
-    raise ValueError(f"unsupported engine type: {store.engine_type}")
+    raise ValidationError(
+        code="engine_factory.unsupported_engine_type",
+        message=f"unsupported engine type: {store.engine_type}",
+    )
 
 
 def new_engine_factory(

@@ -31,6 +31,7 @@ from src.ai.retrieval.types import (
     RetrieverType,
     SourceType,
 )
+from src.common.exception import ValidationError
 
 _CTX = TaskContext()
 _INDEX = "test_index"
@@ -215,7 +216,7 @@ def test_v7_save_rejects_empty_embedding() -> None:
     repo = _v7_repo()
     info = _index_info()
     import asyncio
-    with pytest.raises(ValueError, match="empty embedding"):
+    with pytest.raises(ValidationError, match="empty embedding"):
         asyncio.run(repo.save(_CTX, info, {}))
 
 
@@ -261,7 +262,7 @@ def test_v7_retrieve_rejects_vector_type() -> None:
     repo = _v7_repo()
     params = RetrieveParams(retriever_type=RetrieverType.VECTOR, top_k=5)
     import asyncio
-    with pytest.raises(ValueError, match="invalid retriever type"):
+    with pytest.raises(ValidationError, match="invalid retriever type"):
         asyncio.run(repo.retrieve(_CTX, params))
 
 
@@ -455,7 +456,7 @@ def test_v8_retrieve_rejects_unknown_type() -> None:
     repo = _v8_repo()
     params = RetrieveParams(retriever_type=RetrieverType.WEB_SEARCH, top_k=5)
     import asyncio
-    with pytest.raises(ValueError, match="invalid retriever type"):
+    with pytest.raises(ValidationError, match="invalid retriever type"):
         asyncio.run(repo.retrieve(_CTX, params))
 
 

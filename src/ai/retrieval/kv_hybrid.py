@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import re
 from collections.abc import Mapping
+from typing import NoReturn
 
 from src.ai.embedding import Context, Embedder
 from src.ai.retrieval.base import RetrieveEngineRepository
@@ -25,6 +26,7 @@ from src.ai.retrieval.types import (
     RetrieverType,
 )
 from src.app_logging import logger
+from src.common.exception import AIProviderError, ApplicationError, VectorStoreError
 
 #: Absolute upper bound for any single embedding input; beyond this we
 #: truncate (with a warning) instead of blindly forwarding to the embedding
@@ -47,6 +49,16 @@ _EMBEDDING_IMAGE_PAYLOAD_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"(?i)data:image/[a-z0-9.+-]+;base64,[a-z0-9+/=]{200,}"),
     re.compile(r"(?i)data:[a-z0-9.+/-]+;base64,[a-z0-9+/=]{200,}"),
 )
+
+
+def _reraise_or_wrap(exc: BaseException, wrap_cls: type[ApplicationError]) -> NoReturn:
+    """Re-raise ``exc`` if it is a sanctioned ApplicationError.
+
+    Otherwise wrap it in ``wrap_cls`` - used for values the static checker
+    cannot prove are sanctioned, such as cached errors or ``asyncio.gather``
+    results.
+    """
+    raise exc if isinstance(exc, ApplicationError) else wrap_cls(str(exc))
 
 
 def sanitize_for_embedding(ctx: Context, content: str) -> str:
@@ -118,7 +130,7 @@ async def _batch_embed_with_backoff(
                 await asyncio.sleep(delay)
                 delay *= 2
     assert last_error is not None
-    raise last_error
+    _reraise_or_wrap(last_error, AIProviderError)
 
 
 class KVHybridRetrieveEngine:
@@ -287,7 +299,7 @@ class KVHybridRetrieveEngine:
         )
         for result in results:
             if isinstance(result, BaseException):
-                raise result
+                _reraise_or_wrap(result, VectorStoreError)
 
     async def _bounded_concurrent_batch_save(
         self,
@@ -313,7 +325,7 @@ class KVHybridRetrieveEngine:
         )
         for result in results:
             if isinstance(result, BaseException):
-                raise result
+                _reraise_or_wrap(result, VectorStoreError)
 
     async def _concurrent_batch_save_no_embedding(
         self,
@@ -326,7 +338,7 @@ class KVHybridRetrieveEngine:
         )
         for result in results:
             if isinstance(result, BaseException):
-                raise result
+                _reraise_or_wrap(result, VectorStoreError)
 
     async def _bounded_concurrent_batch_save_no_embedding(
         self,
@@ -346,7 +358,7 @@ class KVHybridRetrieveEngine:
         )
         for result in results:
             if isinstance(result, BaseException):
-                raise result
+                _reraise_or_wrap(result, VectorStoreError)
 
 
 def new_kv_hybrid_retrieve_engine(

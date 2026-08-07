@@ -34,6 +34,7 @@ from src.ai.retrieval.types import (
     RetrieverType,
     SourceType,
 )
+from src.common.exception import ValidationError
 from src.ai.retrieval.weaviate import (
     FIELD_CHUNK_ID,
     FIELD_CONTENT,
@@ -362,7 +363,7 @@ async def test_save_skips_creation_when_collection_already_exists() -> None:
 async def test_save_rejects_empty_embedding() -> None:
     r = _repo()
     info = _index_info(source_id="s-1")
-    with pytest.raises(ValueError, match="empty embedding"):
+    with pytest.raises(ValidationError, match="empty embedding"):
         await r.save(_CTX, info, _save_params("s-1", []))
 
 
@@ -587,7 +588,7 @@ async def test_retrieve_dispatch_rejects_unknown_retriever_type() -> None:
     r = _repo()
     params = RetrieveParams(retriever_type=RetrieverType.VECTOR)
     object.__setattr__(params, "retriever_type", "bogus")
-    with pytest.raises(ValueError, match="invalid retriever type"):
+    with pytest.raises(ValidationError, match="invalid retriever type"):
         await r.retrieve(_CTX, params)
 
 
