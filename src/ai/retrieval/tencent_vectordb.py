@@ -177,14 +177,14 @@ def _to_vector_embedding(index_info: IndexInfo, params: IndexSaveParams) -> Vect
     )
 
 
-def _to_document(emb: VectorEmbedding) -> dict:
+def _to_document(emb: VectorEmbedding) -> dict[str, Any]:
     """Build a dict document for the SDK's ``upsert``."""
     return {
         "id": emb.id,
         "vector": emb.embedding,
         _FIELD_CONTENT: emb.content,
         _FIELD_SOURCE_ID: emb.source_id,
-        _FIELD_SOURCE_TYPE: _bool_to_uint64(emb.source_type),
+        _FIELD_SOURCE_TYPE: _bool_to_uint64(bool(emb.source_type)),
         _FIELD_CHUNK_ID: emb.chunk_id,
         _FIELD_KNOWLEDGE_ID: emb.knowledge_id,
         _FIELD_KNOWLEDGE_BASE_ID: emb.knowledge_base_id,
@@ -241,7 +241,6 @@ def _base_filter(params: RetrieveParams) -> str:
 def _retrieve_result(
     results: list, retriever_type: RetrieverType
 ) -> list[RetrieveResult]:
-    from src.ai.retrieval.types import IndexWithScore, MatchType
     return [RetrieveResult(
         results=results,
         retriever_engine_type=RetrieverEngineType.TENCENT_VECTORDB,
@@ -281,13 +280,13 @@ class TencentVectorDBRepository:
 
     # ── async SDK wrappers ──
 
-    async def _to_thread(self, func, *args, **kwargs):
+    async def _to_thread(self, func: Any, *args: Any, **kwargs: Any) -> Any:
         return await asyncio.to_thread(func, *args, **kwargs)
 
-    def _db(self):
+    def _db(self) -> Any:
         return self._client.Database(self._database_name)
 
-    def _collection(self, dimension: int):
+    def _collection(self, dimension: int) -> Any:
         return self._db().Collection(self._collection_name(dimension))
 
     def _collection_name(self, dimension: int) -> str:
@@ -406,7 +405,6 @@ class TencentVectorDBRepository:
     ) -> None:
         if not source_to_target_chunk_id_map:
             return
-        collection_name = self._collection_name(dimension)
         chunk_ids = list(source_to_target_chunk_id_map.keys())
         all_embeddings: list[VectorEmbedding] = []
         offset = 0
@@ -603,8 +601,8 @@ class TencentVectorDBRepository:
                 ))
         if matched > 0 and failed == matched:
             raise RuntimeError(
-                f"tencent vectordb keyword search failed in all matched collections; "
-                f"ensure collections support text search"
+                "tencent vectordb keyword search failed in all matched collections; "
+                "ensure collections support text search"
             )
         results.sort(key=lambda r: r.score, reverse=True)
         if len(results) > limit:
@@ -628,37 +626,33 @@ class TencentVectorDBRepository:
         if exists:
             self._initialized.add(dimension)
             return
-        from tcvectordb.model.enum import FieldType, IndexType, MetricType
-        from tcvectordb.model.index import (
-            FilterIndex, HNSWParam, Indexes, SparseVectorIndex, VectorIndex,
+        from tcvectordb.model.enum import FieldType, IndexType, MetricType  # type: ignore[import-untyped]
+        from tcvectordb.model.index import (  # type: ignore[import-untyped]
+            FilterIndex,
+            HNSWParams,
+            SparseIndex,
+            VectorIndex,
         )
-        indexes = Indexes(
-            vector_index=[VectorIndex(
-                filter_index=FilterIndex(
-                    field_name=_FIELD_VECTOR, field_type=FieldType.Vector, index_type=IndexType.HNSW,
-                ),
+        indexes = [
+            VectorIndex(
+                name=_FIELD_VECTOR,
                 dimension=dimension,
+                index_type=IndexType.HNSW,
                 metric_type=MetricType.COSINE,
-                params=HNSWParam(m=16, ef_construction=200),
-            )],
-            sparse_vector_index=[SparseVectorIndex(
-                field_name=_FIELD_SPARSE_VECTOR,
-                field_type=FieldType.SparseVector,
-                index_type=IndexType.SPARSE_INVERTED,
-                metric_type=MetricType.IP,
-            )],
-            filter_index=[
-                FilterIndex(field_name=_FIELD_ID, field_type=FieldType.String, index_type=IndexType.PRIMARY_KEY),
-                FilterIndex(field_name=_FIELD_CONTENT, field_type=FieldType.String, index_type=IndexType.FILTER),
-                FilterIndex(field_name=_FIELD_SOURCE_ID, field_type=FieldType.String, index_type=IndexType.FILTER),
-                FilterIndex(field_name=_FIELD_SOURCE_TYPE, field_type=FieldType.Uint64, index_type=IndexType.FILTER),
-                FilterIndex(field_name=_FIELD_CHUNK_ID, field_type=FieldType.String, index_type=IndexType.FILTER),
-                FilterIndex(field_name=_FIELD_KNOWLEDGE_ID, field_type=FieldType.String, index_type=IndexType.FILTER),
-                FilterIndex(field_name=_FIELD_KNOWLEDGE_BASE_ID, field_type=FieldType.String, index_type=IndexType.FILTER),
-                FilterIndex(field_name=_FIELD_TAG_ID, field_type=FieldType.String, index_type=IndexType.FILTER),
-                FilterIndex(field_name=_FIELD_IS_ENABLED, field_type=FieldType.Uint64, index_type=IndexType.FILTER),
-            ],
-        )
+                field_type=FieldType.Vector,
+                params=HNSWParams(m=16, efconstruction=200),
+            ),
+            SparseIndex(name=_FIELD_SPARSE_VECTOR),
+            FilterIndex(name=_FIELD_ID, field_type=FieldType.String, index_type=IndexType.PRIMARY_KEY),
+            FilterIndex(name=_FIELD_CONTENT, field_type=FieldType.String, index_type=IndexType.FILTER),
+            FilterIndex(name=_FIELD_SOURCE_ID, field_type=FieldType.String, index_type=IndexType.FILTER),
+            FilterIndex(name=_FIELD_SOURCE_TYPE, field_type=FieldType.Uint64, index_type=IndexType.FILTER),
+            FilterIndex(name=_FIELD_CHUNK_ID, field_type=FieldType.String, index_type=IndexType.FILTER),
+            FilterIndex(name=_FIELD_KNOWLEDGE_ID, field_type=FieldType.String, index_type=IndexType.FILTER),
+            FilterIndex(name=_FIELD_KNOWLEDGE_BASE_ID, field_type=FieldType.String, index_type=IndexType.FILTER),
+            FilterIndex(name=_FIELD_TAG_ID, field_type=FieldType.String, index_type=IndexType.FILTER),
+            FilterIndex(name=_FIELD_IS_ENABLED, field_type=FieldType.Uint64, index_type=IndexType.FILTER),
+        ]
         try:
             await self._to_thread(
                 self._db().create_collection,
@@ -666,7 +660,7 @@ class TencentVectorDBRepository:
                 self._shards_num,
                 self._replicas_num,
                 f"embeddings collection with dimension {dimension}",
-                indexes,
+                indexes=indexes,
             )
         except Exception as exc:
             msg = str(exc).lower()

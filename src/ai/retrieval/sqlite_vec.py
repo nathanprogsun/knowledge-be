@@ -13,16 +13,13 @@ issued through ``text()`` so the statements stay portable and testable.
 
 from __future__ import annotations
 
-import math
-import re
 import unicodedata
 from collections.abc import Mapping
 from typing import Any
 
 import sqlalchemy
+import sqlite_vec  # type: ignore[import-untyped]
 from sqlalchemy.ext.asyncio import AsyncEngine
-
-import sqlite_vec
 
 from src.ai.embedding import Context
 from src.ai.retrieval.types import (
@@ -131,10 +128,7 @@ _CJK_RANGES = (
 
 def _is_cjk(ch: str) -> bool:
     cp = ord(ch)
-    for lo, hi in _CJK_RANGES:
-        if lo <= cp <= hi:
-            return True
-    return False
+    return any(lo <= cp <= hi for lo, hi in _CJK_RANGES)
 
 
 def _tokenize_cjk_bigram(text: str) -> str:
@@ -228,11 +222,20 @@ class SQLiteRepository:
     def _register_sqlite_vec_extension(self, engine: AsyncEngine) -> None:
         """Load the sqlite-vec extension on every new DBAPI connection."""
         try:
-            @sqlalchemy.event.listens_for(engine.sync_engine, "connect")
+            sync_engine = engine.sync_engine
+        except AttributeError:
+            logger.debug("engine has no sync_engine attribute; skipping sqlite-vec registration")
+            return
+        try:
+            @sqlalchemy.event.listens_for(sync_engine, "connect")
             def _on_connect(dbapi_conn, _connection_record):
-                sqlite_vec.load(dbapi_conn)
-        except Exception as exc:
-            logger.warning("Failed to register sqlite-vec extension: {}", exc)
+                import contextlib
+                with contextlib.suppress(Exception):
+                    # sqlite-vec only loads on SQLite connections; other
+                    # dialects raise. Swallow so the engine stays usable.
+                    sqlite_vec.load(dbapi_conn)
+        except Exception:
+            logger.debug("Could not register sqlite-vec listener (non-SQLite engine)")
 
     async def _ensure_schema(self) -> None:
         """Create tables and FTS5 on first use (async)."""
@@ -568,7 +571,7 @@ class SQLiteRepository:
             async with self._engine.connect() as conn:
                 result = await conn.execute(
                     sqlalchemy.text(
-                        f"SELECT source_id, source_type, chunk_id, knowledge_id, "
+                        f"SELECT id, source_id, source_type, chunk_id, knowledge_id, "
                         f"knowledge_base_id, tag_id, content, dimension, is_enabled "
                         f"FROM {_TABLE_LITE_EMBEDDINGS} WHERE chunk_id = :chunk_id LIMIT 1"
                     ),
@@ -590,21 +593,21 @@ class SQLiteRepository:
                     ),
                     {
                         "source_id": new_source_id,
-                        "source_type": int(src[1]),
+                        "source_type": int(src[2]),
                         "chunk_id": target_chunk_id,
                         "knowledge_id": target_knowledge_id,
                         "knowledge_base_id": target_knowledge_base_id,
-                        "tag_id": src[5],
-                        "content": src[6],
-                        "dimension": int(src[7]),
-                        "is_enabled": int(src[8]),
+                        "tag_id": src[6],
+                        "content": src[7],
+                        "dimension": int(src[8]),
+                        "is_enabled": int(src[9]),
                     },
                 )
                 new_row_id = insert_result.lastrowid or 0
-                if new_row_id > 0 and int(src[7]) > 0:
-                    await self._copy_vec(conn, int(src[0]), new_row_id, int(src[7]))
+                if new_row_id > 0 and int(src[8]) > 0:
+                    await self._copy_vec(conn, int(src[0]), new_row_id, int(src[8]))
                     await self._sync_fts5_insert_row(
-                        conn, new_row_id, src[6], new_source_id,
+                        conn, new_row_id, src[7], new_source_id,
                         target_chunk_id, target_knowledge_id, target_knowledge_base_id,
                     )
 

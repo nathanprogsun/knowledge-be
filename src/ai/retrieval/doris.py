@@ -28,7 +28,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-import pymysql
+import pymysql  # type: ignore[import-untyped]
 
 from src.ai.embedding import Context
 from src.ai.retrieval.types import (
@@ -113,7 +113,7 @@ def _get_replication_num(cfg: IndexConfig | None, default: int) -> int:
     return default
 
 
-def _resolve_configured_compat_mode() -> tuple[CompatMode, str]:
+def _resolve_configured_compat_mode() -> tuple[str, str]:
     """Parse ``DORIS_COMPAT_MODE`` env var; returns (mode, invalid_raw)."""
     raw = os.getenv(_ENV_DORIS_COMPAT_MODE, "").strip()
     if raw == "":
@@ -316,9 +316,8 @@ def _build_base_filter(params: RetrieveParams) -> _WhereBuilder:
 
 
 def _build_retrieve_result(
-    results: list, retriever_type: RetrieverType
+    results: list[Any], retriever_type: RetrieverType
 ) -> list[RetrieveResult]:
-    from src.ai.retrieval.types import IndexWithScore, MatchType
     return [RetrieveResult(
         results=results,
         retriever_engine_type=RetrieverEngineType.DORIS,
@@ -431,17 +430,17 @@ class DorisRepository:
                     return int(affected or 0)
             return await asyncio.to_thread(_do)
 
-    async def _query(self, sql: str, args: list[Any] | None = None) -> list[tuple]:
+    async def _query(self, sql: str, args: list[Any] | None = None) -> list[tuple[Any, ...]]:
         async with self._lock:
-            def _do() -> list[tuple]:
+            def _do() -> list[tuple[Any, ...]]:
                 with self._db.cursor() as cur:
                     cur.execute(sql, args or ())
                     return list(cur.fetchall())
             return await asyncio.to_thread(_do)
 
-    async def _query_row(self, sql: str, args: list[Any] | None = None) -> tuple | None:
+    async def _query_row(self, sql: str, args: list[Any] | None = None) -> tuple[Any, ...] | None:
         async with self._lock:
-            def _do() -> tuple | None:
+            def _do() -> tuple[Any, ...] | None:
                 with self._db.cursor() as cur:
                     cur.execute(sql, args or ())
                     return cur.fetchone()
@@ -454,7 +453,7 @@ class DorisRepository:
             return self._compat_mode_resolved
         if self._compat_resolve_error is not None:
             raise self._compat_resolve_error
-        requested = self._compat_mode_requested
+        requested: str = self._compat_mode_requested
         if requested == "" or requested == _COMPAT_MODE_AUTO:
             if requested == "":
                 self._compat_mode_resolved = _COMPAT_MODE_INNER_PRODUCT_DUPLICATE
@@ -663,7 +662,7 @@ class DorisRepository:
             f"HAVING score >= %s "
             f"ORDER BY score DESC LIMIT {params.top_k}"
         )
-        args = where_args + [params.threshold]
+        args = [*where_args, params.threshold]
         rows = await self._query(stmt, args)
         results = [
             IndexWithScore(
@@ -695,7 +694,7 @@ class DorisRepository:
                 f"FROM `{table}` WHERE {where_clause} "
                 f"AND {_FIELD_CONTENT} MATCH_ANY %s LIMIT {params.top_k}"
             )
-            args = where_args + [query]
+            args = [*where_args, query]
             try:
                 rows = await self._query(stmt, args)
             except Exception as exc:
@@ -924,8 +923,8 @@ class DorisRepository:
         """Stream Load partial update (legacy compat mode only)."""
         if not rows:
             return
-        import urllib.request
         import base64
+        import urllib.request
         from urllib.parse import quote
 
         url = f"{self._fe_http_base}/api/{quote(self._database)}/{quote(table)}/_stream_load"
