@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from typing import cast
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -25,6 +26,7 @@ from src.ai.rerank.transport import (
 )
 from src.ai.utils.signer import sign_request
 from src.common.exception import ExternalServiceError, ValidationError
+from src.common.json import JsonObject
 
 # Path appended to the configured managed-cloud base URL.
 _CLOUD_RERANK_PATH = "/api/v1/rerank"
@@ -96,7 +98,7 @@ class WeKnoraCloudReranker:
         response = await post_json_with_ssrf_safety(
             self._client,
             url,
-            json_body=payload,
+            json_body=cast(JsonObject, payload),
             headers=headers,
         )
         if response.status_code != 200:

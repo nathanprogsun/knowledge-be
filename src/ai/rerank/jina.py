@@ -9,6 +9,7 @@ the shared rank-result shape. ``new_jina_reranker`` applies the SSRF gate.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import cast
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -22,6 +23,7 @@ from src.ai.rerank.transport import (
     validate_rerank_base_url,
 )
 from src.common.exception import ExternalServiceError
+from src.common.json import JsonObject
 
 # Default Jina base URL (the ``/rerank`` suffix is appended per request).
 _DEFAULT_BASE_URL = "https://api.jina.ai/v1"
@@ -85,7 +87,7 @@ class JinaReranker:
         response = await post_json_with_ssrf_safety(
             self._client,
             url,
-            json_body=payload,
+            json_body=cast(JsonObject, payload),
             headers=headers,
         )
         if response.status_code != 200:

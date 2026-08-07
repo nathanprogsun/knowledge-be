@@ -10,10 +10,12 @@ builds one from the resolved credentials and region.
 
 from __future__ import annotations
 
-from tencentcloud.common.credential import Credential
-from tencentcloud.common.profile.client_profile import ClientProfile
-from tencentcloud.lkeap.v20240522.lkeap_client_async import LkeapClient
-from tencentcloud.lkeap.v20240522.models import RunRerankRequest
+from tencentcloud.common.credential import Credential  # type: ignore[import-untyped]
+from tencentcloud.common.profile.client_profile import ClientProfile  # type: ignore[import-untyped]
+from tencentcloud.lkeap.v20240522.lkeap_client_async import (  # type: ignore[import-untyped]
+    LkeapClient,
+)
+from tencentcloud.lkeap.v20240522.models import RunRerankRequest  # type: ignore[import-untyped]
 
 import src.ai.rerank.base as base
 from src.ai.rerank.remote_api import DocumentInfo, RankResult

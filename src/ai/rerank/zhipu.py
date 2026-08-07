@@ -10,6 +10,7 @@ default endpoint wholesale. ``new_zhipu_reranker`` applies the SSRF gate.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import cast
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -23,6 +24,7 @@ from src.ai.rerank.transport import (
     validate_rerank_base_url,
 )
 from src.common.exception import ExternalServiceError
+from src.common.json import JsonObject
 
 # Default Zhipu rerank endpoint (a full URL, not a base).
 _DEFAULT_ENDPOINT = "https://open.bigmodel.cn/api/paas/v4/rerank"
@@ -105,7 +107,7 @@ class ZhipuReranker:
         response = await post_json_with_ssrf_safety(
             self._client,
             self._endpoint,
-            json_body=payload,
+            json_body=cast(JsonObject, payload),
             headers=headers,
         )
         if response.status_code != 200:
