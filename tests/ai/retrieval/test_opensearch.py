@@ -331,6 +331,62 @@ def test_delete_rejects_too_many() -> None:
         asyncio.run(repo.delete_by_chunk_id_list(_CTX, ids, 128, "doc"))
 
 
+def test_delete_by_source_id_list() -> None:
+    client = _mock_os_client()
+    repo = _repo(client)
+    import asyncio
+    asyncio.run(repo.delete_by_source_id_list(_CTX, ["s1", "s2"], 128, "doc"))
+    client.delete_by_query.assert_called_once()
+    _, kwargs = client.delete_by_query.call_args
+    assert "source_id" in kwargs["body"]["query"]["terms"]
+    assert kwargs["body"]["query"]["terms"]["source_id"] == ["s1", "s2"]
+    assert kwargs["refresh"] is True
+
+
+def test_delete_by_source_id_list_empty_skips() -> None:
+    client = _mock_os_client()
+    repo = _repo(client)
+    import asyncio
+    asyncio.run(repo.delete_by_source_id_list(_CTX, [], 128, "doc"))
+    client.delete_by_query.assert_not_called()
+
+
+def test_delete_by_source_id_list_rejects_too_many() -> None:
+    repo = _repo()
+    ids = [f"s{i}" for i in range(1001)]
+    import asyncio
+    with pytest.raises(BatchTooLargeError, match="source_id-delete"):
+        asyncio.run(repo.delete_by_source_id_list(_CTX, ids, 128, "doc"))
+
+
+def test_delete_by_knowledge_id_list() -> None:
+    client = _mock_os_client()
+    repo = _repo(client)
+    import asyncio
+    asyncio.run(repo.delete_by_knowledge_id_list(_CTX, ["k1", "k2"], 128, "doc"))
+    client.delete_by_query.assert_called_once()
+    _, kwargs = client.delete_by_query.call_args
+    assert "knowledge_id" in kwargs["body"]["query"]["terms"]
+    assert kwargs["body"]["query"]["terms"]["knowledge_id"] == ["k1", "k2"]
+    assert kwargs["refresh"] is True
+
+
+def test_delete_by_knowledge_id_list_empty_skips() -> None:
+    client = _mock_os_client()
+    repo = _repo(client)
+    import asyncio
+    asyncio.run(repo.delete_by_knowledge_id_list(_CTX, [], 128, "doc"))
+    client.delete_by_query.assert_not_called()
+
+
+def test_delete_by_knowledge_id_list_rejects_too_many() -> None:
+    repo = _repo()
+    ids = [f"k{i}" for i in range(1001)]
+    import asyncio
+    with pytest.raises(BatchTooLargeError, match="knowledge_id-delete"):
+        asyncio.run(repo.delete_by_knowledge_id_list(_CTX, ids, 128, "doc"))
+
+
 # ── repository: copy_indices ─────────────────────────────────────────
 
 

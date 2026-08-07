@@ -307,6 +307,79 @@ def test_v7_estimate_storage_size() -> None:
     assert size > 0
 
 
+def test_v7_delete_by_source_id_list() -> None:
+    client = _mock_v7_client()
+    repo = _v7_repo(client)
+    import asyncio
+    asyncio.run(repo.delete_by_source_id_list(_CTX, ["s1", "s2"], 128, "doc"))
+    client.delete_by_query.assert_called_once()
+    _, kwargs = client.delete_by_query.call_args
+    assert "source_id" in kwargs["body"]["query"]["terms"]
+    assert kwargs["body"]["query"]["terms"]["source_id"] == ["s1", "s2"]
+    assert kwargs["index"] == _INDEX
+
+
+def test_v7_delete_by_source_id_list_empty_skips() -> None:
+    client = _mock_v7_client()
+    repo = _v7_repo(client)
+    import asyncio
+    asyncio.run(repo.delete_by_source_id_list(_CTX, [], 128, "doc"))
+    client.delete_by_query.assert_not_called()
+
+
+def test_v7_delete_by_knowledge_id_list() -> None:
+    client = _mock_v7_client()
+    repo = _v7_repo(client)
+    import asyncio
+    asyncio.run(repo.delete_by_knowledge_id_list(_CTX, ["k1", "k2"], 128, "doc"))
+    client.delete_by_query.assert_called_once()
+    _, kwargs = client.delete_by_query.call_args
+    assert "knowledge_id" in kwargs["body"]["query"]["terms"]
+    assert kwargs["body"]["query"]["terms"]["knowledge_id"] == ["k1", "k2"]
+    assert kwargs["index"] == _INDEX
+
+
+def test_v7_delete_by_knowledge_id_list_empty_skips() -> None:
+    client = _mock_v7_client()
+    repo = _v7_repo(client)
+    import asyncio
+    asyncio.run(repo.delete_by_knowledge_id_list(_CTX, [], 128, "doc"))
+    client.delete_by_query.assert_not_called()
+
+
+def test_v7_copy_indices_paginates_and_saves() -> None:
+    client = _mock_v7_client()
+    client.search.return_value = {
+        "hits": {"hits": [
+            _search_hit(doc_id="d1", chunk_id="src_c1", knowledge_id="src_k1"),
+            _search_hit(doc_id="d2", chunk_id="src_c2", knowledge_id="src_k2"),
+        ]}
+    }
+    repo = _v7_repo(client)
+    import asyncio
+    asyncio.run(repo.copy_indices(
+        _CTX,
+        source_knowledge_base_id="src_kb",
+        source_to_target_kb_id_map={"src_k1": "tgt_k1", "src_k2": "tgt_k2"},
+        source_to_target_chunk_id_map={"src_c1": "tgt_c1", "src_c2": "tgt_c2"},
+        target_knowledge_base_id="tgt_kb",
+        dimension=128,
+        knowledge_type="doc",
+    ))
+    client.bulk.assert_called_once()
+
+
+def test_v7_copy_indices_empty_map_skips() -> None:
+    client = _mock_v7_client()
+    repo = _v7_repo(client)
+    import asyncio
+    asyncio.run(repo.copy_indices(
+        _CTX, "kb", {}, {}, "tgt", 128, "doc",
+    ))
+    client.search.assert_not_called()
+    client.bulk.assert_not_called()
+
+
 # ── v8 repository ────────────────────────────────────────────────────
 
 
@@ -407,6 +480,56 @@ def test_v8_delete_by_source_id_list() -> None:
     client.delete_by_query.assert_called_once()
     _, kwargs = client.delete_by_query.call_args
     assert "source_id" in kwargs["query"]["terms"]
+    assert kwargs["query"]["terms"]["source_id"] == ["s1", "s2"]
+    assert kwargs["index"] == _INDEX
+
+
+def test_v8_delete_by_source_id_list_empty_skips() -> None:
+    client = _mock_v8_client()
+    repo = _v8_repo(client)
+    import asyncio
+    asyncio.run(repo.delete_by_source_id_list(_CTX, [], 128, "doc"))
+    client.delete_by_query.assert_not_called()
+
+
+def test_v8_delete_by_chunk_id_list() -> None:
+    client = _mock_v8_client()
+    repo = _v8_repo(client)
+    import asyncio
+    asyncio.run(repo.delete_by_chunk_id_list(_CTX, ["c1", "c2"], 128, "doc"))
+    client.delete_by_query.assert_called_once()
+    _, kwargs = client.delete_by_query.call_args
+    assert "chunk_id" in kwargs["query"]["terms"]
+    assert kwargs["query"]["terms"]["chunk_id"] == ["c1", "c2"]
+    assert kwargs["index"] == _INDEX
+
+
+def test_v8_delete_by_chunk_id_list_empty_skips() -> None:
+    client = _mock_v8_client()
+    repo = _v8_repo(client)
+    import asyncio
+    asyncio.run(repo.delete_by_chunk_id_list(_CTX, [], 128, "doc"))
+    client.delete_by_query.assert_not_called()
+
+
+def test_v8_delete_by_knowledge_id_list() -> None:
+    client = _mock_v8_client()
+    repo = _v8_repo(client)
+    import asyncio
+    asyncio.run(repo.delete_by_knowledge_id_list(_CTX, ["k1", "k2"], 128, "doc"))
+    client.delete_by_query.assert_called_once()
+    _, kwargs = client.delete_by_query.call_args
+    assert "knowledge_id" in kwargs["query"]["terms"]
+    assert kwargs["query"]["terms"]["knowledge_id"] == ["k1", "k2"]
+    assert kwargs["index"] == _INDEX
+
+
+def test_v8_delete_by_knowledge_id_list_empty_skips() -> None:
+    client = _mock_v8_client()
+    repo = _v8_repo(client)
+    import asyncio
+    asyncio.run(repo.delete_by_knowledge_id_list(_CTX, [], 128, "doc"))
+    client.delete_by_query.assert_not_called()
 
 
 def test_v8_batch_update_chunk_enabled_status() -> None:
