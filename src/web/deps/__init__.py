@@ -71,6 +71,17 @@ from src.web.deps.knowledge_tags import (
     TagServiceDep,
     get_tag_service,
 )
+from src.web.deps.knowledge import (
+    KnowledgeServiceDep,
+    get_knowledge_service,
+)
+from src.web.deps.knowledge_faq import (
+    FAQImportRunnerDep,
+    FAQServiceDep,
+    get_faq_import_runner,
+    get_faq_service,
+)
+)
 from src.web.deps.rbac import (
     CrossTenantDep,
     PathTenantMatchDep,
@@ -108,9 +119,14 @@ __all__ = [
     "CrossTenantDep",
     "CurrentUserContextDep",
     "DataSourceServiceDep",
+    "FAQImportRunnerDep",
+    "FAQServiceDep",
     "InitializationServiceDep",
+<<<<<<< HEAD
     "KBServiceDep",
     "KnowledgeDocumentsDep",
+=======
+>>>>>>> feat/pr-81-faq-views
     "KnowledgeServiceDep",
     "MCPServiceDep",
     "ModelServiceDep",
@@ -141,9 +157,15 @@ __all__ = [
     "get_chunk_revision_service",
     "get_chunk_service",
     "get_datasource_service",
+<<<<<<< HEAD
     "get_documents_orchestrator",
     "get_initialization_service",
     "get_kb_service",
+=======
+    "get_faq_import_runner",
+    "get_faq_service",
+    "get_initialization_service",
+>>>>>>> feat/pr-81-faq-views
     "get_knowledge_service",
     "get_mcp_service",
     "get_model_service",

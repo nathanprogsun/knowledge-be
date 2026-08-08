@@ -1,4 +1,4 @@
-"""Knowledge-domain web integration tests."""
+"""FAQ web integration tests."""
 
 from __future__ import annotations
 
