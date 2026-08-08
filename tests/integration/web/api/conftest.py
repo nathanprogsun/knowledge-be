@@ -25,6 +25,20 @@ from src.core.contracts.infra import (
     CreateStorageBackendRequest,
     CreateVectorStoreRequest,
 )
+from src.core.contracts.knowledge import FAQEntryPayload
+
+
+@pytest.fixture
+def default_create_faq_request() -> dict[str, object]:
+    """Minimal-valid body for ``POST /knowledge-bases/{id}/faq/entry``.
+
+    ``standard_question`` is the only mandatory payload field; an answer
+    is included so the content sanitizer accepts the entry.
+    """
+    return FAQEntryPayload(
+        standard_question="测试问题",
+        answers=["测试答案"],
+    ).model_dump(mode="json", exclude_none=True)
 
 
 @pytest.fixture
@@ -147,6 +161,7 @@ def default_create_vector_stores_request() -> dict[str, object]:
 
 __all__ = [
     "default_create_datasource_request",
+    "default_create_faq_request",
     "default_create_initialization_request",
     "default_create_mcp_services_request",
     "default_create_models_request",
