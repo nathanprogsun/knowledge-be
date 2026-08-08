@@ -25,6 +25,18 @@ from src.core.contracts.infra import (
     CreateStorageBackendRequest,
     CreateVectorStoreRequest,
 )
+from src.core.contracts.knowledge import CreateKnowledgeBaseRequest
+
+
+@pytest.fixture
+def default_create_knowledge_base_request() -> dict[str, object]:
+    """Minimal-valid body for ``POST /knowledge-bases``.
+
+    ``name`` is the only mandatory field; the fixture relies on the
+    contract defaults for ``type`` / ``is_temporary`` so tests can
+    override individual fields without re-declaring the full body.
+    """
+    return CreateKnowledgeBaseRequest(name="placeholder").model_dump(mode="json", exclude_none=True)
 
 
 @pytest.fixture
@@ -148,6 +160,7 @@ def default_create_vector_stores_request() -> dict[str, object]:
 __all__ = [
     "default_create_datasource_request",
     "default_create_initialization_request",
+    "default_create_knowledge_base_request",
     "default_create_mcp_services_request",
     "default_create_models_request",
     "default_create_register_request",
