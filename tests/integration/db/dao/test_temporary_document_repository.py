@@ -230,18 +230,26 @@ async def test_list_expired_returns_only_stale(session: AsyncSession) -> None:
     repo = TemporaryDocumentRepository(session)
     sid = f"session-{uuid.uuid4().hex[:8]}"
     now = datetime.now(UTC)
-    # Use a fixed ancient expiry so this row is always among the oldest
-    # expired rows and survives the global limit=10 sweep even when prior
-    # runs left expired rows behind in the shared dev DB.
     expired = await repo.create(
-        _make_row(tid, sid, expires_at=datetime(2000, 1, 1, tzinfo=UTC))
+        _make_row(tid, sid, expires_at=now - timedelta(minutes=5))
     )
     fresh = await repo.create(
         _make_row(tid, sid, expires_at=now + timedelta(hours=1))
     )
     await session.commit()
 
-    rows = await repo.list_expired(before=now, limit=10)
-    ids = [r.id for r in rows]
-    assert expired.id in ids
-    assert fresh.id not in ids
+    try:
+        rows = await repo.list_expired(before=now, limit=10)
+        ids = [r.id for r in rows]
+        assert expired.id in ids
+        assert fresh.id not in ids
+    finally:
+        # Self-clean so the global expiry sweep does not accumulate rows
+        # across repeated runs on the shared dev DB.
+        await repo.delete_scoped(
+            tenant_id=tid, session_id=sid, document_id=expired.id, now=now
+        )
+        await repo.delete_scoped(
+            tenant_id=tid, session_id=sid, document_id=fresh.id, now=now
+        )
+        await session.commit()
