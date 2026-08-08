@@ -81,6 +81,16 @@ from src.web.deps.knowledge_faq import (
     get_faq_import_runner,
     get_faq_service,
 )
+from src.web.deps.knowledge_wiki import (
+    KBServiceDep,
+    WikiFolderServiceDep,
+    WikiLintServiceDep,
+    WikiPageServiceDep,
+    get_kb_service,
+    get_wiki_folder_service,
+    get_wiki_lint_service,
+    get_wiki_page_service,
+)
 from src.web.deps.rbac import (
     CrossTenantDep,
     PathTenantMatchDep,
@@ -147,6 +157,9 @@ __all__ = [
     "TenantServiceDep",
     "VectorStoreServiceDep",
     "WebSearchProviderServiceDep",
+    "WikiFolderServiceDep",
+    "WikiLintServiceDep",
+    "WikiPageServiceDep",
     "get_async_session",
     "get_audit_log_service",
     "get_auth_service",
@@ -173,6 +186,9 @@ __all__ = [
     "get_tenant_service",
     "get_vector_store_service",
     "get_web_search_provider_service",
+    "get_wiki_folder_service",
+    "get_wiki_lint_service",
+    "get_wiki_page_service",
     "require_tenant_id",
     "require_user_id",
 ]
