@@ -136,6 +136,18 @@ def default_create_register_request() -> dict[str, object]:
 
 
 @pytest.fixture
+def default_create_tag_request() -> dict[str, object]:
+    """Minimal-valid body for ``POST /knowledge-bases/{id}/tags``.
+
+    ``name`` is the only mandatory field on
+    ``src.core.contracts.knowledge.CreateTagRequest``; ``color`` and
+    ``sort_order`` are optional and omitted so the service applies its
+    defaults.
+    """
+    return {"name": "placeholder"}
+
+
+@pytest.fixture
 def default_create_vector_stores_request() -> dict[str, object]:
     """Minimal-valid body for ``POST /vector-stores``."""
     return CreateVectorStoreRequest(
@@ -153,6 +165,7 @@ __all__ = [
     "default_create_register_request",
     "default_create_storage_backends_request",
     "default_create_system_request",
+    "default_create_tag_request",
     "default_create_tenant_request",
     "default_create_vector_stores_request",
 ]

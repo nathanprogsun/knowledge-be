@@ -51,6 +51,10 @@ from src.web.deps.infra_web_search import (
     WebSearchProviderServiceDep,
     get_web_search_provider_service,
 )
+from src.web.deps.knowledge_tags import (
+    TagServiceDep,
+    get_tag_service,
+)
 from src.web.deps.rbac import (
     CrossTenantDep,
     PathTenantMatchDep,
@@ -103,6 +107,7 @@ __all__ = [
     "StorageBackendServiceDep",
     "SystemAdminDep",
     "SystemSettingServiceDep",
+    "TagServiceDep",
     "TenantAPIKeyServiceDep",
     "TenantKVServiceDep",
     "TenantMemberServiceDep",
@@ -121,6 +126,7 @@ __all__ = [
     "get_request_user_id",
     "get_storage_backend_service",
     "get_system_setting_service",
+    "get_tag_service",
     "get_tenant_api_key_service",
     "get_tenant_kv_service",
     "get_tenant_member_service",
