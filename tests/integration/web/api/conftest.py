@@ -164,6 +164,22 @@ def default_create_register_request() -> dict[str, object]:
 
 
 @pytest.fixture
+def default_create_chunk_request() -> dict[str, object]:
+    """Minimal-valid body for the chunk router's write surface.
+
+    Chunks are produced by the ingest pipeline, so the router exposes no
+    ``POST /chunks`` create endpoint. The fixture therefore carries the
+    write-body shape shared by its mutations (``PUT /chunks/.../{id}``):
+    ``content`` / ``is_enabled`` / ``expected_revision``, every field
+    optional. Tests override individual fields to drive the error paths.
+    """
+    return {
+        "content": "placeholder chunk content",
+        "expected_revision": 0,
+    }
+
+
+@pytest.fixture
 def default_create_vector_stores_request() -> dict[str, object]:
     """Minimal-valid body for ``POST /vector-stores``."""
     return CreateVectorStoreRequest(
@@ -174,6 +190,7 @@ def default_create_vector_stores_request() -> dict[str, object]:
 
 
 __all__ = [
+    "default_create_chunk_request",
     "default_create_datasource_request",
     "default_create_document_request",
     "default_create_initialization_request",

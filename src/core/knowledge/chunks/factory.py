@@ -8,11 +8,13 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.knowledge.chunks.revisions import ChunkRevisionService
 from src.core.knowledge.chunks.service.chunk_service import (
     ChunkIndexSyncer,
     ChunkService,
 )
 from src.db.dao.chunk_repository import ChunkRepository
+from src.db.dao.chunk_revision_repository import ChunkRevisionRepository
 
 
 def build_chunk_service(
@@ -32,4 +34,9 @@ def build_chunk_service(
     )
 
 
-__all__ = ["build_chunk_service"]
+def build_chunk_revision_service(session: AsyncSession) -> ChunkRevisionService:
+    """Per-request revision-history service with a fresh revision repository."""
+    return ChunkRevisionService(ChunkRevisionRepository(session))
+
+
+__all__ = ["build_chunk_revision_service", "build_chunk_service"]

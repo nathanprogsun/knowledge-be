@@ -80,4 +80,41 @@ async def get_chunk_revision(
     return ChunkRevisionInfo.map_from_db(row)
 
 
-__all__ = ["ChunkRevisionInfo", "get_chunk_revision", "list_chunk_revisions"]
+class ChunkRevisionService:
+    """Request-scoped chunk-revision history queries.
+
+    Wraps the module-level read functions over a per-request
+    ``ChunkRevisionRepository`` so the web layer can depend on a built
+    service (via ``build_chunk_revision_service``) instead of importing
+    the repository itself.
+    """
+
+    def __init__(self, repo: ChunkRevisionRepository) -> None:
+        self._repo = repo
+
+    async def list_revisions(self, *, tenant_id: int, chunk_id: str) -> list[ChunkRevisionInfo]:
+        """Return the chunk's revision history, newest revision first."""
+        return await list_chunk_revisions(self._repo, tenant_id=tenant_id, chunk_id=chunk_id)
+
+    async def get_revision(
+        self,
+        *,
+        tenant_id: int,
+        chunk_id: str,
+        revision: int,
+    ) -> ChunkRevisionInfo:
+        """Return one historical snapshot, raising ``NotFoundError`` when absent."""
+        return await get_chunk_revision(
+            self._repo,
+            tenant_id=tenant_id,
+            chunk_id=chunk_id,
+            revision=revision,
+        )
+
+
+__all__ = [
+    "ChunkRevisionInfo",
+    "ChunkRevisionService",
+    "get_chunk_revision",
+    "list_chunk_revisions",
+]

@@ -32,6 +32,8 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from src.common.exception import NotFoundError, ValidationError
+from src.common.json import JsonValue
+from src.core.contracts.knowledge import Chunk as ChunkContract
 from src.db.dao.chunk_repository import ChunkRepository
 from src.db.models.chunk import Chunk
 
@@ -73,6 +75,54 @@ def image_urls_in_content(content: str) -> set[str]:
         if src:
             urls.add(src)
     return urls
+
+
+def _string_list(value: JsonValue | None) -> list[str] | None:
+    """Narrow a JSONB relation list to the wire ``list[str]`` shape.
+
+    The relation columns store raw JSON; the wire contract narrows them to
+    string lists, so a scalar or absent value projects as ``None``.
+    """
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return [str(item) for item in value]
+    return None
+
+
+def chunk_to_contract(row: Chunk) -> ChunkContract:
+    """Project a storage chunk row onto the frozen wire contract.
+
+    The contract carries the documented wire fields; internal retrieval
+    bookkeeping columns (``seq_id``, ``content_revision``,
+    ``index_status``, ``last_editor_id``, ``flags``) stay off the wire,
+    mirroring the documented API response.
+    """
+    return ChunkContract(
+        id=row.id,
+        tenant_id=row.tenant_id,
+        knowledge_id=row.knowledge_id,
+        knowledge_base_id=row.knowledge_base_id,
+        tag_id=row.tag_id,
+        content=row.content,
+        chunk_index=row.chunk_index,
+        is_enabled=row.is_enabled,
+        status=row.status,
+        start_at=row.start_at,
+        end_at=row.end_at,
+        pre_chunk_id=row.pre_chunk_id,
+        next_chunk_id=row.next_chunk_id,
+        chunk_type=row.chunk_type,
+        parent_chunk_id=row.parent_chunk_id,
+        relation_chunks=_string_list(row.relation_chunks),
+        indirect_relation_chunks=_string_list(row.indirect_relation_chunks),
+        metadata=row.metadata,
+        content_hash=row.content_hash,
+        image_info=row.image_info,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+        deleted_at=row.deleted_at,
+    )
 
 
 def validate_edited_chunk_images(source_content: str, edited_content: str) -> None:
@@ -286,6 +336,7 @@ class ChunkService:
 __all__ = [
     "ChunkIndexSyncer",
     "ChunkService",
+    "chunk_to_contract",
     "image_urls_in_content",
     "validate_edited_chunk_images",
 ]

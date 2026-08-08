@@ -15,6 +15,12 @@ from src.web.deps.auth import (
     get_auth_service,
     get_oidc_service,
 )
+from src.web.deps.chunks import (
+    ChunkRevisionServiceDep,
+    ChunkServiceDep,
+    get_chunk_revision_service,
+    get_chunk_service,
+)
 from src.web.deps.infra_datasources import (
     DataSourceServiceDep,
     get_datasource_service,
@@ -93,6 +99,8 @@ __all__ = [
     "AuditLogServiceDep",
     "AuthDep",
     "AuthServiceDep",
+    "ChunkRevisionServiceDep",
+    "ChunkServiceDep",
     "CrossTenantDep",
     "CurrentUserContextDep",
     "DataSourceServiceDep",
@@ -125,6 +133,8 @@ __all__ = [
     "get_async_session",
     "get_audit_log_service",
     "get_auth_service",
+    "get_chunk_revision_service",
+    "get_chunk_service",
     "get_datasource_service",
     "get_documents_orchestrator",
     "get_initialization_service",
