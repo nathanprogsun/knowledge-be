@@ -16,6 +16,10 @@ from pydantic import BaseModel, ConfigDict
 
 from src.db.models.knowledge_tag import KnowledgeTag
 
+# Default tag name for entries without an explicit tag; a freshly
+# created tag carrying this name is pinned to the front of the list.
+UNTAGGED_TAG_NAME = "未分类"
+
 
 class TagInfo(BaseModel):
     """Service-side projection of a ``tags`` row plus usage counts."""
@@ -53,4 +57,4 @@ class TagInfo(BaseModel):
         )
 
 
-__all__ = ["TagInfo"]
+__all__ = ["UNTAGGED_TAG_NAME", "TagInfo"]
