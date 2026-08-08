@@ -145,6 +145,23 @@ def default_create_vector_stores_request() -> dict[str, object]:
     ).model_dump(mode="json", exclude_none=True)
 
 
+@pytest.fixture
+def default_create_wiki_request() -> dict[str, object]:
+    """Minimal-valid body for ``POST /knowledgebase/{kb_id}/wiki/pages``.
+
+    ``slug`` is the only mandatory field on the wiki page create request;
+    content, placement, and page-type fields default to the empty value
+    server-side. Tests that exercise the page-type / status validation
+    override these fields.
+    """
+    return {
+        "slug": "entity/acme-corp",
+        "title": "Acme Corp",
+        "page_type": "entity",
+        "content": "# Acme Corp\n\nA fictional company.",
+    }
+
+
 __all__ = [
     "default_create_datasource_request",
     "default_create_initialization_request",
@@ -155,4 +172,5 @@ __all__ = [
     "default_create_system_request",
     "default_create_tenant_request",
     "default_create_vector_stores_request",
+    "default_create_wiki_request",
 ]

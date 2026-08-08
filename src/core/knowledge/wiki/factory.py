@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.knowledge.knowledge_bases.factory import build_kb_service
 from src.core.knowledge.wiki.folders import WikiFolderService
+from src.core.knowledge.wiki.lint_service import WikiLintService
 from src.core.knowledge.wiki.page_service import WikiPageService
 from src.db.dao.wiki_page_repository import WikiFolderRepository, WikiPageRepository
 
@@ -31,4 +33,16 @@ def build_wiki_folder_service(session: AsyncSession) -> WikiFolderService:
     )
 
 
-__all__ = ["build_wiki_folder_service", "build_wiki_page_service"]
+def build_wiki_lint_service(session: AsyncSession) -> WikiLintService:
+    """Per-request ``WikiLintService`` composed from request-scoped services."""
+    return WikiLintService(
+        wiki_service=build_wiki_page_service(session),
+        kb_service=build_kb_service(session),
+    )
+
+
+__all__ = [
+    "build_wiki_folder_service",
+    "build_wiki_lint_service",
+    "build_wiki_page_service",
+]
