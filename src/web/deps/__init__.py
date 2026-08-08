@@ -51,6 +51,12 @@ from src.web.deps.infra_web_search import (
     WebSearchProviderServiceDep,
     get_web_search_provider_service,
 )
+from src.web.deps.knowledge_documents import (
+    KnowledgeDocumentsDep,
+    KnowledgeServiceDep,
+    get_documents_orchestrator,
+    get_knowledge_service,
+)
 from src.web.deps.rbac import (
     CrossTenantDep,
     PathTenantMatchDep,
@@ -87,6 +93,8 @@ __all__ = [
     "CurrentUserContextDep",
     "DataSourceServiceDep",
     "InitializationServiceDep",
+    "KnowledgeDocumentsDep",
+    "KnowledgeServiceDep",
     "MCPServiceDep",
     "ModelServiceDep",
     "OidcServiceDep",
@@ -113,7 +121,9 @@ __all__ = [
     "get_audit_log_service",
     "get_auth_service",
     "get_datasource_service",
+    "get_documents_orchestrator",
     "get_initialization_service",
+    "get_knowledge_service",
     "get_mcp_service",
     "get_model_service",
     "get_oidc_service",

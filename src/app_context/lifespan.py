@@ -56,6 +56,10 @@ from src.web.api.infra.web_search.catalog_router import (
     router as web_search_catalog_router,
 )
 from src.web.api.infra.web_search.router import router as web_search_router
+from src.web.api.knowledge.documents.router import (
+    documents_router,
+    kb_documents_router,
+)
 from src.web.api.system.router import router as system_router
 from src.web.api.tenants.router import router as tenants_router
 from src.web.exception_handler import register_exception_handlers
@@ -160,6 +164,7 @@ def create_app() -> FastAPI:
     application.include_router(auth_router)
     application.include_router(datasources_router)
     application.include_router(initialization_router)
+    application.include_router(kb_documents_router)
     application.include_router(mcp_services_router)
     application.include_router(models_router)
     application.include_router(storage_backends_router)
@@ -168,6 +173,7 @@ def create_app() -> FastAPI:
     application.include_router(vector_stores_router)
     application.include_router(web_search_catalog_router)
     application.include_router(web_search_router)
+    application.include_router(documents_router)
 
     @application.get("/health", tags=["meta"])
     async def health() -> dict[str, str]:
