@@ -16,6 +16,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.db.models.wiki_page import WikiFolder, WikiIndexEntry, WikiPage
+
 # ── Page types ───────────────────────────────────────────────────────
 
 WIKI_PAGE_TYPE_SUMMARY = "summary"
@@ -227,6 +229,154 @@ class WikiPageListFilter(BaseModel):
     sort_order: str = "desc"
 
 
+# ── Graph modes ──────────────────────────────────────────────────────
+
+WIKI_GRAPH_MODE_OVERVIEW = "overview"
+WIKI_GRAPH_MODE_EGO = "ego"
+
+# ── Index view ───────────────────────────────────────────────────────
+# Page types that make up a wiki's user-visible directory. The index page
+# itself is excluded; unknown types requested at runtime are passed
+# through verbatim so a new page type starts showing up without a code
+# change.
+
+WIKI_INDEX_CONTENT_PAGE_TYPES: tuple[str, ...] = (
+    WIKI_PAGE_TYPE_SUMMARY,
+    WIKI_PAGE_TYPE_ENTITY,
+    WIKI_PAGE_TYPE_CONCEPT,
+    WIKI_PAGE_TYPE_SYNTHESIS,
+    WIKI_PAGE_TYPE_COMPARISON,
+)
+
+# Per-group window for the index view; cursor is an opaque offset string.
+WIKI_INDEX_DEFAULT_LIMIT = 50
+WIKI_INDEX_MAX_LIMIT = 200
+
+# ── Domain input / output shapes ─────────────────────────────────────
+
+
+class WikiPageListResponse(BaseModel):
+    """One page of the KB's wiki pages plus the unpaginated total."""
+
+    model_config = ConfigDict(frozen=True)
+
+    pages: list[WikiPage]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class WikiGraphRequest(BaseModel):
+    """Service-layer input for a wiki link-graph query.
+
+    ``limit <= 0`` disables the cap entirely and is reserved for internal
+    callers; the HTTP handler clamps external traffic into a safe range.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    knowledge_base_id: str
+    mode: str = WIKI_GRAPH_MODE_OVERVIEW
+    center: str = ""
+    depth: int = 0
+    types: list[str] = Field(default_factory=list)
+    limit: int = 0
+
+
+class WikiGraphNode(BaseModel):
+    """One node of the wiki link graph."""
+
+    model_config = ConfigDict(frozen=True)
+
+    slug: str
+    title: str = ""
+    page_type: str = ""
+    link_count: int = 0
+
+
+class WikiGraphEdge(BaseModel):
+    """A directed edge between two wiki page slugs."""
+
+    model_config = ConfigDict(frozen=True)
+
+    source: str
+    target: str
+
+
+class WikiGraphMeta(BaseModel):
+    """How the returned subgraph relates to the full KB graph."""
+
+    model_config = ConfigDict(frozen=True)
+
+    mode: str
+    total: int
+    returned: int
+    truncated: bool
+    center: str = ""
+    depth: int = 0
+
+
+class WikiGraphData(BaseModel):
+    """The link graph slice returned to a graph query."""
+
+    model_config = ConfigDict(frozen=True)
+
+    nodes: list[WikiGraphNode]
+    edges: list[WikiGraphEdge]
+    meta: WikiGraphMeta
+
+
+class WikiIndexGroup(BaseModel):
+    """Entries for one page type in the structured index response."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: str
+    total: int
+    items: list[WikiIndexEntry]
+    next_cursor: str = ""
+
+
+class WikiIndexResponse(BaseModel):
+    """The structured directory index for a KB.
+
+    The heavy directory markdown is assembled on demand from the light
+    projection; only the LLM-generated intro survives in ``wiki_pages``.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    intro: str
+    version: int
+    groups: list[WikiIndexGroup]
+
+
+class WikiStats(BaseModel):
+    """Aggregate statistics about a KB's wiki."""
+
+    model_config = ConfigDict(frozen=True)
+
+    total_pages: int
+    pages_by_type: dict[str, int]
+    total_links: int
+    orphan_count: int
+    recent_updates: list[WikiPage]
+    pending_tasks: int = 0
+    pending_issues: int = 0
+    is_active: bool = False
+
+
+class WikiFolderNode(BaseModel):
+    """One directory node with its page count and expand affordance."""
+
+    model_config = ConfigDict(frozen=True)
+
+    folder: WikiFolder
+    page_count: int
+    has_children: bool
+
+
 __all__ = [
     "WIKI_CATEGORY_MAX_DEPTH",
     "WIKI_EDIT_SOURCE_AGENT",
@@ -234,6 +384,11 @@ __all__ = [
     "WIKI_EDIT_SOURCE_REVERT",
     "WIKI_EDIT_SOURCE_USER",
     "WIKI_FOLDER_ROOT_ID",
+    "WIKI_GRAPH_MODE_EGO",
+    "WIKI_GRAPH_MODE_OVERVIEW",
+    "WIKI_INDEX_CONTENT_PAGE_TYPES",
+    "WIKI_INDEX_DEFAULT_LIMIT",
+    "WIKI_INDEX_MAX_LIMIT",
     "WIKI_MAX_REVISIONS_HARD_CAP",
     "WIKI_MAX_REVISIONS_PER_PAGE",
     "WIKI_PAGE_STATUS_ARCHIVED",
@@ -246,7 +401,17 @@ __all__ = [
     "WIKI_PAGE_TYPE_SUMMARY",
     "WIKI_PAGE_TYPE_SYNTHESIS",
     "WIKI_PRUNABLE_EDIT_SOURCES",
+    "WikiFolderNode",
+    "WikiGraphData",
+    "WikiGraphEdge",
+    "WikiGraphMeta",
+    "WikiGraphNode",
+    "WikiGraphRequest",
+    "WikiIndexGroup",
+    "WikiIndexResponse",
     "WikiPageListFilter",
+    "WikiPageListResponse",
+    "WikiStats",
     "clean_category_part",
     "clean_category_path",
     "is_valid_page_status",
