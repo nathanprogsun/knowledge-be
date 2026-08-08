@@ -26,6 +26,7 @@ from src.core.contracts.infra import (
     CreateVectorStoreRequest,
 )
 from src.core.contracts.knowledge import CreateKnowledgeBaseRequest
+from src.core.contracts.knowledge import CreateManualKnowledgeRequest
 
 
 @pytest.fixture
@@ -51,6 +52,21 @@ def default_create_datasource_request() -> dict[str, object]:
         knowledge_base_id="kb-1",
         name="placeholder",
         type="placeholder",
+    ).model_dump(mode="json", exclude_none=True)
+
+
+@pytest.fixture
+def default_create_document_request() -> dict[str, object]:
+    """Minimal-valid body for ``POST /knowledge-bases/{id}/knowledge/manual``.
+
+    The document router exposes several create endpoints; the manual
+    Markdown create is the representative one, so the shared fixture
+    emits its minimum-valid body. Tests for the other create variants
+    declare their own bodies inline.
+    """
+    return CreateManualKnowledgeRequest(
+        title="placeholder",
+        content="# placeholder content",
     ).model_dump(mode="json", exclude_none=True)
 
 
@@ -159,6 +175,7 @@ def default_create_vector_stores_request() -> dict[str, object]:
 
 __all__ = [
     "default_create_datasource_request",
+    "default_create_document_request",
     "default_create_initialization_request",
     "default_create_knowledge_base_request",
     "default_create_mcp_services_request",
