@@ -2,7 +2,9 @@
 
 Implements the ``tags`` and ``document_tags`` surfaces: tag CRUD
 (scoped by ``tenant_id``), paginated keyword filtering within a
-knowledge base, and document-tag bind/unbind.
+knowledge base, document-tag bind/unbind, and the per-tag reference
+counts (live documents / chunks) that back list stats and the
+delete guard.
 
 Tags are hard-deleted (no ``deleted_at`` column on the table), so
 reads need no soft-delete filter and deletes remove the row outright.
@@ -17,7 +19,7 @@ input reaches only bindparam slots, never the SQL string.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import cast
+from typing import NamedTuple, cast
 
 from sqlalchemy import CursorResult, text
 
@@ -38,6 +40,13 @@ def escape_like_pattern(term: str) -> str:
     for char in _LIKE_SPECIAL_CHARS:
         escaped = escaped.replace(char, _LIKE_ESCAPE_CHAR + char)
     return escaped
+
+
+class TagReferenceCounts(NamedTuple):
+    """Aggregate live-document and live-chunk references for one tag."""
+
+    knowledge_count: int
+    chunk_count: int
 
 
 class TagRepository(GenericRepository[KnowledgeTag]):
@@ -167,6 +176,89 @@ class TagRepository(GenericRepository[KnowledgeTag]):
         )
         return (cast("CursorResult[SqlValue]", result).rowcount or 0) > 0
 
+    # ── Reference counts ────────────────────────────────────────────
+
+    async def count_references(
+        self,
+        *,
+        tenant_id: int,
+        knowledge_base_id: str,
+        tag_id: str,
+    ) -> TagReferenceCounts:
+        """Return the live-document and live-chunk counts for one tag.
+
+        Documents come from ``document_tags`` joined to live
+        ``documents`` rows; chunks carry their own ``tag_id`` column.
+        Both sides filter soft-deleted rows, mirroring the upstream
+        count semantics.
+        """
+        knowledge_stmt = text(
+            "select count(*) from document_tags dt "
+            "join documents d on dt.knowledge_id = d.id and d.deleted_at is null "
+            "where d.tenant_id = :tenant_id and d.knowledge_base_id = :kb_id "
+            "and dt.tag_id = :tag_id"
+        ).bindparams(tenant_id=tenant_id, kb_id=knowledge_base_id, tag_id=tag_id)
+        knowledge_total = (await self._session.execute(knowledge_stmt)).scalar_one()
+
+        chunk_stmt = text(
+            "select count(*) from chunks "
+            "where tenant_id = :tenant_id and knowledge_base_id = :kb_id "
+            "and tag_id = :tag_id and deleted_at is null"
+        ).bindparams(tenant_id=tenant_id, kb_id=knowledge_base_id, tag_id=tag_id)
+        chunk_total = (await self._session.execute(chunk_stmt)).scalar_one()
+        return TagReferenceCounts(
+            knowledge_count=int(knowledge_total),
+            chunk_count=int(chunk_total),
+        )
+
+    async def batch_count_references(
+        self,
+        *,
+        tenant_id: int,
+        knowledge_base_id: str,
+        tag_ids: list[str],
+    ) -> dict[str, TagReferenceCounts]:
+        """Return per-tag reference counts in two aggregate queries.
+
+        Every requested id is present in the result, zero-filled when
+        nothing references it.
+        """
+        result: dict[str, TagReferenceCounts] = {
+            tag_id: TagReferenceCounts(0, 0) for tag_id in tag_ids
+        }
+        if not tag_ids:
+            return result
+        placeholders = ", ".join(f":tag{i}" for i in range(len(tag_ids)))
+        params: BindParams = {f"tag{i}": tag_id for i, tag_id in enumerate(tag_ids)}
+        params["tenant_id"] = tenant_id
+        params["kb_id"] = knowledge_base_id
+
+        knowledge_stmt = text(
+            "select dt.tag_id, count(*) as total from document_tags dt "
+            "join documents d on dt.knowledge_id = d.id and d.deleted_at is null "
+            "where d.tenant_id = :tenant_id and d.knowledge_base_id = :kb_id "
+            f"and dt.tag_id in ({placeholders}) "
+            "group by dt.tag_id"
+        ).bindparams(**params)
+        for row in (await self._session.execute(knowledge_stmt)).mappings().all():
+            current = result.get(row["tag_id"])
+            if current is not None:
+                result[row["tag_id"]] = TagReferenceCounts(int(row["total"]), current.chunk_count)
+
+        chunk_stmt = text(
+            "select tag_id, count(*) as total from chunks "
+            "where tenant_id = :tenant_id and knowledge_base_id = :kb_id "
+            f"and tag_id in ({placeholders}) and deleted_at is null "
+            "group by tag_id"
+        ).bindparams(**params)
+        for row in (await self._session.execute(chunk_stmt)).mappings().all():
+            current = result.get(row["tag_id"])
+            if current is not None:
+                result[row["tag_id"]] = TagReferenceCounts(
+                    current.knowledge_count, int(row["total"])
+                )
+        return result
+
     # ── Document-tag bind / unbind ──────────────────────────────────
 
     async def set_knowledge_tags(self, *, knowledge_id: str, tag_ids: list[str]) -> None:
@@ -230,4 +322,4 @@ class TagRepository(GenericRepository[KnowledgeTag]):
         return cast("CursorResult[SqlValue]", result).rowcount or 0
 
 
-__all__ = ["TagRepository", "escape_like_pattern"]
+__all__ = ["TagReferenceCounts", "TagRepository", "escape_like_pattern"]
