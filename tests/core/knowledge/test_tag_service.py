@@ -86,6 +86,12 @@ def _make_tag_repo() -> tuple[AsyncMock, dict[str, KnowledgeTag]]:
             return None
         return row
 
+    async def _get_by_seq_id(tenant_id: int, seq_id: int) -> KnowledgeTag | None:
+        for row in rows.values():
+            if row.seq_id == seq_id and row.tenant_id == tenant_id:
+                return row
+        return None
+
     async def _get_by_name(
         tenant_id: int,
         knowledge_base_id: str,
@@ -147,6 +153,7 @@ def _make_tag_repo() -> tuple[AsyncMock, dict[str, KnowledgeTag]]:
     repo.create.side_effect = _create
     repo.update.side_effect = _update
     repo.get_by_id.side_effect = _get_by_id
+    repo.get_by_seq_id.side_effect = _get_by_seq_id
     repo.get_by_name.side_effect = _get_by_name
     repo.list_by_kb.side_effect = _list_by_kb
     repo.delete.side_effect = _delete
@@ -536,6 +543,49 @@ class TestUpdateTag:
         with pytest.raises(NotFoundError) as exc_info:
             await service.update_tag(tenant_id=_TENANT, tag_id="tag-abc", name="new")
         assert exc_info.value.code == "tag.not_found"
+
+
+# ── resolve_tag_id ───────────────────────────────────────────────────
+
+
+class TestResolveTagId:
+    async def test_passes_through_a_uuid(
+        self, service: TagService, tag_repo_and_rows: tuple[AsyncMock, dict[str, KnowledgeTag]]
+    ) -> None:
+        _repo, _rows = tag_repo_and_rows
+
+        resolved = await service.resolve_tag_id(tenant_id=_TENANT, tag_id="tag-abc")
+
+        assert resolved == "tag-abc"
+
+    async def test_resolves_a_numeric_seq_id(
+        self, service: TagService, tag_repo_and_rows: tuple[AsyncMock, dict[str, KnowledgeTag]]
+    ) -> None:
+        _repo, rows = tag_repo_and_rows
+        rows["tag-abc"] = _tag_row(seq_id=10000001)
+
+        resolved = await service.resolve_tag_id(tenant_id=_TENANT, tag_id="10000001")
+
+        assert resolved == "tag-abc"
+
+    async def test_unknown_seq_id_raises_not_found(
+        self, service: TagService, tag_repo_and_rows: tuple[AsyncMock, dict[str, KnowledgeTag]]
+    ) -> None:
+        _repo, rows = tag_repo_and_rows
+        rows["tag-abc"] = _tag_row(tenant_id=999, seq_id=10000001)
+
+        with pytest.raises(NotFoundError) as exc_info:
+            await service.resolve_tag_id(tenant_id=_TENANT, tag_id="10000001")
+        assert exc_info.value.code == "tag.not_found"
+
+    async def test_empty_id_raises_validation(
+        self, service: TagService, tag_repo_and_rows: tuple[AsyncMock, dict[str, KnowledgeTag]]
+    ) -> None:
+        _repo, _rows = tag_repo_and_rows
+
+        with pytest.raises(ValidationError) as exc_info:
+            await service.resolve_tag_id(tenant_id=_TENANT, tag_id="")
+        assert exc_info.value.code == "tag.tag_id_required"
 
 
 # ── delete_tag ──────────────────────────────────────────────────────

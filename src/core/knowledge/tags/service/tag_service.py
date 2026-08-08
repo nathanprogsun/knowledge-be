@@ -242,6 +242,34 @@ class TagService:
             return False
         return await self._tag_repo.delete(tenant_id=tenant_id, id=tag_id)
 
+    # ── Id resolution ───────────────────────────────────────────────
+
+    async def resolve_tag_id(self, *, tenant_id: int, tag_id: str) -> str:
+        """Resolve a ``tag_id`` path value to the tag's UUID.
+
+        ``tag_id`` may be either the tag's UUID or its numeric
+        ``seq_id``. A numeric value is looked up tenant-scoped and its
+        UUID returned; anything else is treated as a UUID verbatim.
+        A numeric value that matches no tenant-scoped tag raises
+        ``tag.not_found``.
+        """
+        if not tag_id:
+            raise ValidationError(
+                code="tag.tag_id_required",
+                message="标签ID不能为空",
+            )
+        try:
+            seq_id = int(tag_id)
+        except ValueError:
+            return tag_id
+        row = await self._tag_repo.get_by_seq_id(tenant_id, seq_id)
+        if row is None:
+            raise NotFoundError(
+                code="tag.not_found",
+                message="标签不存在",
+            )
+        return row.id
+
     # ── Document-tag bind / unbind ──────────────────────────────────
 
     async def set_knowledge_tags(
