@@ -15,10 +15,14 @@ from src.core.chat.pipeline.steps.query_understand import (
 )
 from src.core.chat.pipeline.steps.search_entity import SearchEntityPlugin
 from src.core.chat.pipeline.steps.search_parallel import SearchParallelPlugin
+from src.core.chat.pipeline.steps.extract_entity import ExtractEntityStep
+from src.core.chat.pipeline.steps.search import SearchStep
 
 __all__ = [
+    "ExtractEntityStep",
     "QueryUnderstandPlugin",
     "SearchEntityPlugin",
     "SearchParallelPlugin",
+    "SearchStep",
     "parse_structured_query_output",
 ]
