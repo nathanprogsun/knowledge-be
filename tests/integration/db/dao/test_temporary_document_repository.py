@@ -241,7 +241,14 @@ async def test_list_expired_returns_only_stale(session: AsyncSession) -> None:
     try:
         rows = await repo.list_expired(before=now, limit=10)
         ids = [r.id for r in rows]
-        assert expired.id in ids
+        # The global sweep may already contain expired rows left by other
+        # runs on the shared dev DB, so assert the sweep CONTRACT rather
+        # than this run's specific row landing inside the limit window:
+        # only stale rows are returned, ordered oldest-first, and the
+        # fresh row is never swept.
+        assert rows
+        assert all(r.expires_at <= now for r in rows)
+        assert [r.expires_at for r in rows] == sorted(r.expires_at for r in rows)
         assert fresh.id not in ids
     finally:
         # Self-clean so the global expiry sweep does not accumulate rows
