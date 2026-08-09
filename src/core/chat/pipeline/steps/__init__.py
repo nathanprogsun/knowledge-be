@@ -17,12 +17,36 @@ from src.core.chat.pipeline.steps.search_entity import SearchEntityPlugin
 from src.core.chat.pipeline.steps.search_parallel import SearchParallelPlugin
 from src.core.chat.pipeline.steps.extract_entity import ExtractEntityStep
 from src.core.chat.pipeline.steps.search import SearchStep
+from src.core.chat.pipeline.steps.filter_topk import (
+    FilterTopKPlugin,
+    sort_search_results_deterministically,
+)
+from src.core.chat.pipeline.steps.rerank import (
+    RerankModelService,
+    RerankPlugin,
+    apply_mmr,
+    clean_passage_for_rerank,
+    composite_score,
+    get_enriched_passage,
+    rerank_fallback_min_score,
+)
+from src.core.chat.pipeline.steps.web_fetch import WebFetchPlugin
 
 __all__ = [
     "ExtractEntityStep",
+    "FilterTopKPlugin",
     "QueryUnderstandPlugin",
+    "RerankModelService",
+    "RerankPlugin",
     "SearchEntityPlugin",
     "SearchParallelPlugin",
     "SearchStep",
+    "WebFetchPlugin",
+    "apply_mmr",
+    "clean_passage_for_rerank",
+    "composite_score",
+    "get_enriched_passage",
     "parse_structured_query_output",
+    "rerank_fallback_min_score",
+    "sort_search_results_deterministically",
 ]
