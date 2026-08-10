@@ -109,8 +109,10 @@ from src.web.deps.rbac import (
 from src.web.deps.session import SessionDep, get_async_session
 from src.web.deps.system import (
     AuditLogServiceDep,
+    FavoriteServiceDep,
     SystemSettingServiceDep,
     get_audit_log_service,
+    get_favorite_service,
     get_system_setting_service,
 )
 from src.web.deps.tenants import (
@@ -138,6 +140,7 @@ __all__ = [
     "DataSourceServiceDep",
     "FAQImportRunnerDep",
     "FAQServiceDep",
+    "FavoriteServiceDep",
     "InitializationServiceDep",
     "KBServiceDep",
     "KnowledgeDocumentsDep",
@@ -180,6 +183,7 @@ __all__ = [
     "get_documents_orchestrator",
     "get_faq_import_runner",
     "get_faq_service",
+    "get_favorite_service",
     "get_initialization_service",
     "get_kb_service",
     "get_knowledge_service",
