@@ -56,6 +56,7 @@ from src.web.api.chat.messages.router import (
 )
 from src.web.api.chat.router import router as chat_router
 from src.web.api.chat.sessions.router import router as sessions_router
+from src.web.api.favorites.router import router as favorites_router
 from src.web.api.infra.datasources.router import router as datasources_router
 from src.web.api.infra.initialization.router import router as initialization_router
 from src.web.api.infra.mcp_services.router import router as mcp_services_router
@@ -81,6 +82,7 @@ from src.web.api.knowledge.wiki.router import router as wiki_router
 from src.web.api.knowledge_bases.router import router as knowledge_bases_router
 from src.web.api.organizations.router import router as organizations_router
 from src.web.api.system.router import router as system_router
+from src.web.api.system.service_views import router as system_service_router
 from src.web.api.tenants.router import router as tenants_router
 from src.web.exception_handler import register_exception_handlers
 
@@ -189,6 +191,7 @@ def create_app() -> FastAPI:
     application.include_router(datasources_router)
     application.include_router(faq_import_progress_router)
     application.include_router(faq_router)
+    application.include_router(favorites_router)
     application.include_router(initialization_router)
     application.include_router(knowledge_bases_router)
     application.include_router(kb_documents_router)
@@ -202,6 +205,7 @@ def create_app() -> FastAPI:
     application.include_router(storage_backends_router)
     application.include_router(suggestion_router)
     application.include_router(system_router)
+    application.include_router(system_service_router)
     application.include_router(tenants_router)
     application.include_router(vector_stores_router)
     application.include_router(web_search_catalog_router)
