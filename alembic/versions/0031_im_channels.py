@@ -22,7 +22,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0031_im_channels"
-down_revision: str | None = "0030_embed_channels"
+down_revision: str | None = "0030_agent_shares"
 branch_labels: tuple[str, ...] | None = None
 depends_on: tuple[str, ...] | None = None
 

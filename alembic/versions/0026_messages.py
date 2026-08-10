@@ -19,8 +19,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0025_messages"
-down_revision: str | None = "0024_knowledge_processing_spans"
+revision: str = "0026_messages"
+down_revision: str | None = "0025_sessions"
 branch_labels: tuple[str, ...] | None = None
 depends_on: tuple[str, ...] | None = None
 
