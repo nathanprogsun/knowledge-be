@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 import httpx
 from fastapi import FastAPI
@@ -72,6 +73,7 @@ from src.web.api.knowledge.faq.router import router as faq_router
 from src.web.api.knowledge.tags.router import router as knowledge_tags_router
 from src.web.api.knowledge.wiki.router import router as wiki_router
 from src.web.api.knowledge_bases.router import router as knowledge_bases_router
+from src.web.api.system.router import info_router as system_info_router
 from src.web.api.system.router import router as system_router
 from src.web.api.tenants.router import router as tenants_router
 from src.web.exception_handler import register_exception_handlers
@@ -83,6 +85,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging()
     settings = get_settings()
     logger.info("starting {}", settings.app_name)
+
+    # Record the boot instant for ``GET /system/info`` (mirrors the
+    # upstream ``runtime.ServerStartedAt()`` value); the per-request
+    # ``SystemInfoService`` reads it back from ``app.state`` so the
+    # uptime calculation reflects process lifetime, not request time.
+    app.state.started_at = datetime.now(UTC)
 
     db_engine = DatabaseEngine(
         url=settings.database_url,
@@ -189,6 +197,7 @@ def create_app() -> FastAPI:
     application.include_router(models_router)
     application.include_router(skills_router)
     application.include_router(storage_backends_router)
+    application.include_router(system_info_router)
     application.include_router(system_router)
     application.include_router(tenants_router)
     application.include_router(vector_stores_router)

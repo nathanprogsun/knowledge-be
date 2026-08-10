@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from src.core.system.audit_actions import AuditAction, AuditOutcome
 from src.core.system.audit_service import AuditLogListResult, AuditLogService
+from src.core.system.info_service import SystemInfoService, SystemInfoSnapshot
 from src.core.system.system_setting_service import SystemSettingService
 
 __all__ = [
@@ -11,5 +12,7 @@ __all__ = [
     "AuditLogListResult",
     "AuditLogService",
     "AuditOutcome",
+    "SystemInfoService",
+    "SystemInfoSnapshot",
     "SystemSettingService",
 ]
