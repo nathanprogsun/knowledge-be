@@ -13,9 +13,11 @@ from collections.abc import Awaitable, Callable
 from typing import Annotated
 
 from fastapi import Depends, Request
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.common.exception import UnauthorizedError
 from src.core.auth.permissions import TenantAPIKeyScope, TenantRole
+from src.core.tenants.factory import build_tenant_member_service
 from src.settings import get_settings
 from src.web.middleware.audit import get_audit_service
 from src.web.middleware.rbac import require_role, require_system_admin
@@ -112,7 +114,7 @@ async def require_cross_tenant_dep(request: Request) -> None:
     function now no-ops; real enforcement is performed by the new
     DB-backed gate, which is wired in a later commit.
     """
-    return None
+    return
 
 
 async def require_path_tenant_match_dep(request: Request) -> None:
@@ -122,7 +124,7 @@ async def require_path_tenant_match_dep(request: Request) -> None:
     :func:`validate_active_tenant_association`; the alias remains so
     router signatures stay intact during the staged migration.
     """
-    return None
+    return
 
 
 def _get_principal_user_id(request: Request) -> str | None:
@@ -140,7 +142,7 @@ def _get_principal_tenant_id(request: Request) -> int:
 
 async def validate_active_tenant_association(
     request: Request,
-    session: object,
+    session: AsyncSession,
     user_id: Annotated[str | None, Depends(_get_principal_user_id)] = None,
     tenant_id: Annotated[int, Depends(_get_principal_tenant_id)] = 0,
 ) -> dict[str, object]:
@@ -167,9 +169,7 @@ async def validate_active_tenant_association(
             message="Workspace context missing",
         )
 
-    from src.core.tenants.factory import build_tenant_member_service
-
-    member_service = build_tenant_member_service(session)  # type: ignore[arg-type]
+    member_service = build_tenant_member_service(session)
     membership = await member_service.get_membership(
         user_id=user_id,
         tenant_id=tenant_id,

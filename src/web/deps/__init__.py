@@ -21,6 +21,10 @@ from src.web.deps.auth import (
     get_auth_service,
     get_oidc_service,
 )
+from src.web.deps.chat import (
+    ChatServiceDep,
+    get_chat_service,
+)
 from src.web.deps.chunks import (
     ChunkRevisionServiceDep,
     ChunkServiceDep,
@@ -73,9 +77,7 @@ from src.web.deps.knowledge_bases import (
 )
 from src.web.deps.knowledge_documents import (
     KnowledgeDocumentsDep,
-    KnowledgeServiceDep,
     get_documents_orchestrator,
-    get_knowledge_service,
 )
 from src.web.deps.knowledge_faq import (
     FAQImportRunnerDep,
@@ -88,11 +90,9 @@ from src.web.deps.knowledge_tags import (
     get_tag_service,
 )
 from src.web.deps.knowledge_wiki import (
-    KBServiceDep,
     WikiFolderServiceDep,
     WikiLintServiceDep,
     WikiPageServiceDep,
-    get_kb_service,
     get_wiki_folder_service,
     get_wiki_lint_service,
     get_wiki_page_service,
@@ -129,6 +129,7 @@ __all__ = [
     "AuditLogServiceDep",
     "AuthDep",
     "AuthServiceDep",
+    "ChatServiceDep",
     "ChunkRevisionServiceDep",
     "ChunkServiceDep",
     "CrossTenantDep",
@@ -171,6 +172,7 @@ __all__ = [
     "get_async_session",
     "get_audit_log_service",
     "get_auth_service",
+    "get_chat_service",
     "get_chunk_revision_service",
     "get_chunk_service",
     "get_custom_agent_service",

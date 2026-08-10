@@ -38,6 +38,7 @@ _EXPECTED_PUBLIC_ROUTES: list[str] = [
 # The complete route surface exposed by the app. Adding or removing a
 # route requires updating this set; otherwise the gate fails.
 _EXPECTED_ALL_ROUTES: set[str] = {
+    "/agent-chat/{session_id}",
     "/auth/change-password",
     "/auth/login",
     "/auth/logout",
@@ -90,6 +91,8 @@ _EXPECTED_ALL_ROUTES: set[str] = {
     "/knowledge-bases/{id}/knowledge/manual",
     "/knowledge-bases/{id}/knowledge/passage",
     "/knowledge-bases/{id}/knowledge/url",
+    "/knowledge-chat/{session_id}",
+    "/knowledge-search",
     "/knowledge/move",
     "/knowledge/move/progress/{task_id}",
     "/knowledge/{id}",

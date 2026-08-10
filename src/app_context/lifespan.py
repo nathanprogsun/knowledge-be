@@ -48,6 +48,7 @@ from src.settings import get_settings
 from src.web.api.agents.router import router as agents_router
 from src.web.api.agents.skill_views import skill_router as skills_router
 from src.web.api.auth.router import router as auth_router
+from src.web.api.chat.router import router as chat_router
 from src.web.api.infra.datasources.router import router as datasources_router
 from src.web.api.infra.initialization.router import router as initialization_router
 from src.web.api.infra.mcp_services.router import router as mcp_services_router
@@ -58,19 +59,19 @@ from src.web.api.infra.web_search.catalog_router import (
     router as web_search_catalog_router,
 )
 from src.web.api.infra.web_search.router import router as web_search_router
-from src.web.api.knowledge_bases.router import router as knowledge_bases_router
+from src.web.api.knowledge.chunker.router import router as chunker_router
+from src.web.api.knowledge.chunks.router import router as chunks_router
 from src.web.api.knowledge.documents.router import (
     documents_router,
     kb_documents_router,
 )
-from src.web.api.knowledge.chunker.router import router as chunker_router
-from src.web.api.knowledge.chunks.router import router as chunks_router
-from src.web.api.knowledge.tags.router import router as knowledge_tags_router
 from src.web.api.knowledge.faq.router import (
     import_progress_router as faq_import_progress_router,
 )
 from src.web.api.knowledge.faq.router import router as faq_router
+from src.web.api.knowledge.tags.router import router as knowledge_tags_router
 from src.web.api.knowledge.wiki.router import router as wiki_router
+from src.web.api.knowledge_bases.router import router as knowledge_bases_router
 from src.web.api.system.router import router as system_router
 from src.web.api.tenants.router import router as tenants_router
 from src.web.exception_handler import register_exception_handlers
@@ -174,6 +175,7 @@ def create_app() -> FastAPI:
 
     application.include_router(agents_router)
     application.include_router(auth_router)
+    application.include_router(chat_router)
     application.include_router(chunker_router)
     application.include_router(chunks_router)
     application.include_router(datasources_router)
