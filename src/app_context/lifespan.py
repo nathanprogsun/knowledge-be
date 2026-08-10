@@ -48,7 +48,14 @@ from src.settings import get_settings
 from src.web.api.agents.router import router as agents_router
 from src.web.api.agents.skill_views import skill_router as skills_router
 from src.web.api.auth.router import router as auth_router
+from src.web.api.chat.messages.router import (
+    router as messages_router,
+)
+from src.web.api.chat.messages.router import (
+    suggestion_router,
+)
 from src.web.api.chat.router import router as chat_router
+from src.web.api.chat.sessions.router import router as sessions_router
 from src.web.api.infra.datasources.router import router as datasources_router
 from src.web.api.infra.initialization.router import router as initialization_router
 from src.web.api.infra.mcp_services.router import router as mcp_services_router
@@ -186,9 +193,12 @@ def create_app() -> FastAPI:
     application.include_router(kb_documents_router)
     application.include_router(knowledge_tags_router)
     application.include_router(mcp_services_router)
+    application.include_router(messages_router)
     application.include_router(models_router)
+    application.include_router(sessions_router)
     application.include_router(skills_router)
     application.include_router(storage_backends_router)
+    application.include_router(suggestion_router)
     application.include_router(system_router)
     application.include_router(tenants_router)
     application.include_router(vector_stores_router)
