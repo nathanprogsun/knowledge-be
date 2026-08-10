@@ -15,7 +15,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.common.exception import UnauthorizedError
+from src.common.exception import PermissionDeniedError, UnauthorizedError
 from src.core.auth.permissions import TenantAPIKeyScope, TenantRole
 from src.core.tenants.factory import build_tenant_member_service
 from src.settings import get_settings
@@ -118,13 +118,47 @@ async def require_cross_tenant_dep(request: Request) -> None:
 
 
 async def require_path_tenant_match_dep(request: Request) -> None:
-    """Backward-compat shim.
+    """Verify the path's ``tenant_id`` matches the caller's active workspace.
 
-    See :func:`require_cross_tenant_dep`. Replaced by
-    :func:`validate_active_tenant_association`; the alias remains so
-    router signatures stay intact during the staged migration.
+    Guards every ``/{tenant_id}/...`` route against cross-tenant
+    addressability: when the URL's ``tenant_id`` differs from the
+    caller's active workspace, the caller is not a member of the
+    addressed workspace and the request must be rejected with
+    ``rbac.not_a_member`` (mirrors Go's middleware/auth.go path-vs-claim
+    match). Bypassed for system admins and platform-scope API keys.
+
+    Routes without a ``tenant_id`` path parameter are a no-op (the dep
+    is wired into both kinds of route via ``PathTenantMatchDep``).
     """
-    return
+    if _is_system_admin(request):
+        return
+    scope = _api_key_scope(request)
+    if scope is not None and scope.is_platform():
+        return
+
+    raw_path_tid = request.path_params.get("tenant_id")
+    if raw_path_tid is None:
+        return
+    try:
+        path_tid = int(raw_path_tid)
+    except (TypeError, ValueError):
+        return
+
+    active_tid = _principal_tenant_id(request)
+    if active_tid == 0:
+        # No active tenant context yet — let downstream gates (role /
+        # membership) handle the missing context rather than masking it
+        # with a generic "not a member" error.
+        return
+
+    if path_tid != active_tid:
+        raise PermissionDeniedError(
+            code="rbac.not_a_member",
+            message=(
+                f"Active workspace {active_tid} is not a member of "
+                f"addressed workspace {path_tid}"
+            ),
+        )
 
 
 def _get_principal_user_id(request: Request) -> str | None:
