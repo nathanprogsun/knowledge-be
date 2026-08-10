@@ -1,5 +1,91 @@
-"""IM-channel domain (models, adapters, supervisor)."""
+"""IM-channel domain — models, adapters, supervisor, service.
+
+Public surface for the IM channel domain. The adapter abstraction,
+the message wire shapes, the connection supervisor, and the
+channel service are re-exported so callers can write
+``from src.core.channels.im import IMChannelService, IMAdapter, ...``.
+"""
 
 from __future__ import annotations
 
-__all__: list[str] = []
+from src.core.channels.im.adapter_base import (
+    CHAT_TYPE_DIRECT,
+    CHAT_TYPE_GROUP,
+    MESSAGE_TYPE_FILE,
+    MESSAGE_TYPE_IMAGE,
+    MESSAGE_TYPE_TEXT,
+    MESSAGE_TYPES,
+    CallbackRequest,
+    Context,
+    EventContext,
+    FileDownloader,
+    IMAdapter,
+    IncomingMessage,
+    QuotedMessage,
+    ReplyMessage,
+    StreamSender,
+)
+from src.core.channels.im.service.im_channel_service import (
+    ChannelCreateRequest,
+    ChannelUpdateRequest,
+    IMChannelService,
+    build_im_channel_service,
+    compute_bot_identity,
+)
+from src.core.channels.im.supervisor import (
+    DEFAULT_HEALTH_INTERVAL_SECONDS,
+    DEFAULT_RECYCLE_INTERVAL_SECONDS,
+    DEFAULT_SUPERVISOR_RETRY_DELAY_SECONDS,
+    AdapterFactory,
+    IMSupervisor,
+    SupervisorConfig,
+    get_default_supervisor,
+    run_supervised,
+)
+from src.core.channels.im.types import (
+    IM_MODE_WEBHOOK,
+    IM_MODE_WEBSOCKET,
+    IM_OUTPUT_MODE_STREAM,
+    IM_PLATFORMS,
+    IM_SESSION_MODE_THREAD,
+    IM_SESSION_MODE_USER,
+    IMChannelInfo,
+)
+
+__all__ = [
+    "CHAT_TYPE_DIRECT",
+    "CHAT_TYPE_GROUP",
+    "DEFAULT_HEALTH_INTERVAL_SECONDS",
+    "DEFAULT_RECYCLE_INTERVAL_SECONDS",
+    "DEFAULT_SUPERVISOR_RETRY_DELAY_SECONDS",
+    "IM_MODE_WEBHOOK",
+    "IM_MODE_WEBSOCKET",
+    "IM_OUTPUT_MODE_STREAM",
+    "IM_PLATFORMS",
+    "IM_SESSION_MODE_THREAD",
+    "IM_SESSION_MODE_USER",
+    "MESSAGE_TYPES",
+    "MESSAGE_TYPE_FILE",
+    "MESSAGE_TYPE_IMAGE",
+    "MESSAGE_TYPE_TEXT",
+    "AdapterFactory",
+    "CallbackRequest",
+    "ChannelCreateRequest",
+    "ChannelUpdateRequest",
+    "Context",
+    "EventContext",
+    "FileDownloader",
+    "IMAdapter",
+    "IMChannelInfo",
+    "IMChannelService",
+    "IMSupervisor",
+    "IncomingMessage",
+    "QuotedMessage",
+    "ReplyMessage",
+    "StreamSender",
+    "SupervisorConfig",
+    "build_im_channel_service",
+    "compute_bot_identity",
+    "get_default_supervisor",
+    "run_supervised",
+]
