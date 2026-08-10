@@ -13,6 +13,7 @@ from arq.worker import Function
 from src.workers.base import BaseWorker
 from src.workers.registry import all_functions
 from src.workers.settings import get_worker_settings
+from src.workers.tasks import manual_process  # noqa: F401  # side-effect: registers the task handler
 
 
 class DefaultWorker(BaseWorker):
