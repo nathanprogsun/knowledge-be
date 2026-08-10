@@ -588,7 +588,7 @@ def test_format_query_results_renders_jsonl_records() -> None:
     )
     assert rendered.startswith("=== DuckDB Query Results ===\n\nExecuted SQL: SELECT * FROM k_1")
     assert "Returned 1 rows" in rendered
-    assert 'record 1: {"month": "Jan", "revenue": "100"}' in rendered
+    assert 'record 1: {"month":"Jan","revenue":"100"}' in rendered
 
 
 def test_format_query_results_empty() -> None:
