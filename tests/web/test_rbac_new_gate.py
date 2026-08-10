@@ -42,11 +42,10 @@ def patched_member_service(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
     def _factory(session: object) -> AsyncMock:
         return service
 
-    # The gate imports the factory lazily; patch by fully-qualified path
-    # so the module import does not run at fixture time (avoids the
-    # pre-existing circular-import cycle in src.web.deps).
+    # The gate imports the factory at module top; patch the rbac-module
+    # binding so the gate uses the mock service.
     monkeypatch.setattr(
-        "src.core.tenants.factory.build_tenant_member_service",
+        "src.web.deps.rbac.build_tenant_member_service",
         _factory,
     )
     return service
