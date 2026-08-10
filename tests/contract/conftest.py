@@ -98,14 +98,15 @@ def faker_seed() -> None:
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Collect the ``stage4_contract`` module.
+    """Collect the stage contract modules.
 
-    The live contract tests live in a module named after the stage (not
-    ``test_*``), so the default ``python_files`` pattern skips it. This
-    hook registers the explicit module name so ``pytest tests/contract/``
-    discovers it.
+    The live contract tests live in modules named after the stage (not
+    ``test_*``), so the default ``python_files`` pattern skips them. This
+    hook registers the explicit module names so ``pytest tests/contract/``
+    discovers them.
     """
     config.addinivalue_line("python_files", "stage4_contract.py")
+    config.addinivalue_line("python_files", "stage5_contract.py")
 
 
 @pytest.fixture(scope="session")

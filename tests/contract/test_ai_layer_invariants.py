@@ -2,8 +2,7 @@
 
 Compares the AI-layer data models against the expected upstream contract
 (shape, field names, JSON serialization names, enum values). The reference
-values are derived from the read-only upstream Go source in the workspace
-root and the frozen contract documentation in the agent workspace.
+values are derived from the upstream API contract.
 
 These checks are intentionally read-only and model-only — they exercise
 no I/O, no SDK calls, no network. They serve as the milestone gate that
@@ -11,8 +10,6 @@ blocks any future drift between the Python port and the contract.
 """
 
 from __future__ import annotations
-
-import pytest
 
 from src.ai.llm.types import (
     ChatResponse,
@@ -24,9 +21,8 @@ from src.ai.llm.types import (
 from src.ai.provider.registry import ALL_PROVIDERS, PROVIDER_ANTHROPIC
 from src.ai.retrieval.types import RetrieverEngineType
 
-
 # ---------------------------------------------------------------------------
-# LLM wire contracts — mirror `internal/types/chat.go`
+# LLM wire contracts
 # ---------------------------------------------------------------------------
 
 
@@ -68,7 +64,9 @@ class TestStreamResponseContract:
             "mcp_oauth_required",
             "mcp_oauth_resolved",
         }
-        assert actual == expected, f"ResponseType drift: missing={expected-actual} extra={actual-expected}"
+        assert actual == expected, (
+            f"ResponseType drift: missing={expected - actual} extra={actual - expected}"
+        )
 
 
 class TestTokenUsageContract:
@@ -94,7 +92,7 @@ class TestLLMToolCallContract:
 
 
 # ---------------------------------------------------------------------------
-# Provider registry — mirror `internal/models/provider/provider.go`
+# Provider registry — mirror the upstream provider catalog
 # ---------------------------------------------------------------------------
 
 
@@ -147,7 +145,7 @@ class TestProviderRegistryContract:
 
 
 # ---------------------------------------------------------------------------
-# Retrieval engine types — mirror `internal/types/retriever.go`
+# Retrieval engine types — mirror the upstream engine catalog
 # ---------------------------------------------------------------------------
 
 

@@ -1,0 +1,392 @@
+{
+  "_comment": "Chat/agent wire shapes captured from the reference API fixtures and the merged web-layer wire models. Each contract name lists the JSON field set the reference emits for that object; each endpoint entry lists the HTTP status and the top-level response key set. The two QA endpoints stream Server-Sent Events whose frames carry the StreamResponse field set (always-present id / response_type / content / done plus the optional slots). Field name comparison is exact (no drift in either direction).",
+  "contracts": {
+    "StreamResponse": [
+      "id", "response_type", "content", "done", "knowledge_references",
+      "session_id", "assistant_message_id", "tool_calls", "data", "usage",
+      "finish_reason"
+    ],
+    "SearchResult": [
+      "id", "content", "knowledge_id", "chunk_index", "knowledge_title",
+      "start_at", "end_at", "seq", "score", "match_type", "sub_chunk_id",
+      "metadata", "chunk_type", "parent_chunk_id", "image_info",
+      "knowledge_filename", "knowledge_source", "knowledge_channel",
+      "chunk_metadata", "matched_content", "knowledge_description",
+      "knowledge_custom_metadata", "knowledge_base_id"
+    ],
+    "SearchKnowledgeEnvelope": ["success", "data"],
+    "Agent": [
+      "id", "name", "description", "avatar", "is_builtin", "tenant_id",
+      "created_by", "config", "created_at", "updated_at", "deleted_at"
+    ],
+    "AgentEnvelope": ["success", "data"],
+    "AgentListEnvelope": ["success", "data", "disabled_own_agent_ids"],
+    "DeleteAgentResponse": ["success", "message"],
+    "AgentPlaceholderGroup": [
+      "all", "system_prompt", "agent_system_prompt", "context_template",
+      "rewrite_system_prompt", "rewrite_prompt", "fallback_prompt"
+    ],
+    "SuggestedQuestionsData": ["questions"],
+    "SuggestedQuestionsEnvelope": ["success", "data"],
+    "TypePresetsEnvelope": ["success", "data"],
+    "SkillInfoResponse": ["name", "description"],
+    "SkillListEnvelope": ["success", "data", "skills_available"]
+  },
+  "requests": {
+    "CreateKnowledgeQARequest": [
+      "query", "knowledge_base_ids", "knowledge_ids", "agent_enabled",
+      "agent_id", "agent_source_tenant_id", "web_search_enabled",
+      "summary_model_id", "mcp_service_ids", "skill_names", "tag_ids",
+      "mentioned_items", "disable_title", "images", "attachment_uploads",
+      "attachment_ids", "channel", "suggestion_attribution"
+    ],
+    "SearchKnowledgeRequest": [
+      "query", "knowledge_base_id", "knowledge_base_ids", "knowledge_ids",
+      "tag_ids", "mentioned_items"
+    ],
+    "MentionedItemRequest": [
+      "id", "name", "type", "kb_type", "kb_id", "kb_name", "service_id",
+      "skill_name"
+    ],
+    "ImageAttachment": ["data", "url", "caption"],
+    "AttachmentUpload": ["data", "file_name", "file_size"],
+    "SuggestionAttribution": ["suggestion_set_id", "question_id"],
+    "CreateAgentRequest": ["name", "description", "avatar", "config"],
+    "UpdateAgentRequest": ["name", "description", "avatar", "config"]
+  },
+  "stream_response_types": [
+    "answer", "references", "thinking", "tool_call", "tool_result",
+    "error", "reflection", "session_title", "agent_query", "complete",
+    "stop"
+  ],
+  "endpoints": {
+    "POST /knowledge-chat/{session_id}": {
+      "status": 200,
+      "keys": [
+        "id", "response_type", "content", "done", "knowledge_references",
+        "session_id", "assistant_message_id", "tool_calls", "data", "usage",
+        "finish_reason"
+      ]
+    },
+    "POST /agent-chat/{session_id}": {
+      "status": 200,
+      "keys": [
+        "id", "response_type", "content", "done", "knowledge_references",
+        "session_id", "assistant_message_id", "tool_calls", "data", "usage",
+        "finish_reason"
+      ]
+    },
+    "POST /knowledge-search": {
+      "status": 200,
+      "keys": ["success", "data"]
+    },
+    "GET /agents/placeholders": {
+      "status": 200,
+      "keys": ["success", "data"]
+    },
+    "GET /agents/type-presets": {
+      "status": 200,
+      "keys": ["success", "data"]
+    },
+    "POST /agents": {
+      "status": 201,
+      "keys": ["success", "data"]
+    },
+    "GET /agents": {
+      "status": 200,
+      "keys": ["success", "data", "disabled_own_agent_ids"]
+    },
+    "GET /agents/{id}": {
+      "status": 200,
+      "keys": ["success", "data"]
+    },
+    "PUT /agents/{id}": {
+      "status": 200,
+      "keys": ["success", "data"]
+    },
+    "DELETE /agents/{id}": {
+      "status": 200,
+      "keys": ["success", "message"]
+    },
+    "POST /agents/{id}/copy": {
+      "status": 201,
+      "keys": ["success", "data"]
+    },
+    "GET /agents/{id}/suggested-questions": {
+      "status": 200,
+      "keys": ["success", "data"]
+    },
+    "GET /skills": {
+      "status": 200,
+      "keys": ["success", "data", "skills_available"]
+    }
+  },
+  "samples": {
+    "StreamResponse": {
+      "agent_query": {
+        "id": "req-contract-1",
+        "response_type": "agent_query",
+        "content": "",
+        "done": false,
+        "session_id": "s1",
+        "assistant_message_id": "msg-1",
+        "data": {
+          "session_id": "s1",
+          "assistant_message_id": "msg-1"
+        }
+      },
+      "thinking": {
+        "id": "req-contract-1",
+        "response_type": "thinking",
+        "content": "Let me search the knowledge base for that.",
+        "done": false
+      },
+      "tool_call": {
+        "id": "req-contract-1",
+        "response_type": "tool_call",
+        "content": "",
+        "done": false,
+        "tool_calls": [
+          {
+            "id": "call_1",
+            "type": "function",
+            "function": {
+              "name": "web_search",
+              "arguments": "{\"query\":\"hello\"}"
+            }
+          }
+        ],
+        "data": {
+          "tool_name": "web_search",
+          "tool_call_id": "call_1",
+          "iteration": 0
+        }
+      },
+      "references": {
+        "id": "req-contract-1",
+        "response_type": "references",
+        "content": "",
+        "done": false,
+        "knowledge_references": [
+          {
+            "id": "chunk-1",
+            "content": "sample chunk content",
+            "knowledge_id": "knowledge-1",
+            "chunk_index": 0,
+            "knowledge_title": "Sample document",
+            "start_at": 0,
+            "end_at": 24,
+            "seq": 0,
+            "score": 0.92,
+            "match_type": 0,
+            "sub_chunk_id": [],
+            "metadata": {},
+            "chunk_type": "text",
+            "parent_chunk_id": "",
+            "image_info": "",
+            "knowledge_filename": "sample.txt",
+            "knowledge_source": "file",
+            "knowledge_channel": "web",
+            "chunk_metadata": null,
+            "matched_content": "",
+            "knowledge_description": "",
+            "knowledge_custom_metadata": "",
+            "knowledge_base_id": "kb-1"
+          }
+        ]
+      },
+      "answer": {
+        "id": "req-contract-1",
+        "response_type": "answer",
+        "content": "Here is the answer.",
+        "done": true
+      },
+      "complete": {
+        "id": "req-contract-1",
+        "response_type": "complete",
+        "content": "",
+        "done": false,
+        "data": {
+          "final_answer": "Here is the answer."
+        }
+      }
+    },
+    "SearchResult": {
+      "id": "chunk-1",
+      "content": "sample chunk content",
+      "knowledge_id": "knowledge-1",
+      "chunk_index": 0,
+      "knowledge_title": "Sample document",
+      "start_at": 0,
+      "end_at": 24,
+      "seq": 0,
+      "score": 0.92,
+      "match_type": 0,
+      "sub_chunk_id": [],
+      "metadata": {},
+      "chunk_type": "text",
+      "parent_chunk_id": "",
+      "image_info": "",
+      "knowledge_filename": "sample.txt",
+      "knowledge_source": "file",
+      "knowledge_channel": "web",
+      "chunk_metadata": null,
+      "matched_content": "",
+      "knowledge_description": "",
+      "knowledge_custom_metadata": "",
+      "knowledge_base_id": "kb-1"
+    },
+    "SearchKnowledgeEnvelope": {
+      "success": true,
+      "data": [
+        {
+          "id": "chunk-1",
+          "content": "sample chunk content",
+          "knowledge_id": "knowledge-1",
+          "chunk_index": 0,
+          "knowledge_title": "Sample document",
+          "start_at": 0,
+          "end_at": 24,
+          "seq": 0,
+          "score": 0.92,
+          "match_type": 0,
+          "sub_chunk_id": [],
+          "metadata": {},
+          "chunk_type": "text",
+          "parent_chunk_id": "",
+          "image_info": "",
+          "knowledge_filename": "sample.txt",
+          "knowledge_source": "file",
+          "knowledge_channel": "web",
+          "chunk_metadata": null,
+          "matched_content": "",
+          "knowledge_description": "",
+          "knowledge_custom_metadata": "",
+          "knowledge_base_id": "kb-1"
+        }
+      ]
+    },
+    "Agent": {
+      "id": "agent-1",
+      "name": "Contract agent",
+      "description": null,
+      "avatar": null,
+      "is_builtin": false,
+      "tenant_id": 100,
+      "created_by": "usr-1",
+      "config": {
+        "agent_mode": "quick-answer",
+        "model_id": null,
+        "temperature": 0.7,
+        "max_completion_tokens": 2048,
+        "web_search_enabled": true,
+        "multi_turn_enabled": true,
+        "history_turns": 5,
+        "embedding_top_k": 10,
+        "keyword_threshold": 0.3,
+        "vector_threshold": 0.5,
+        "rerank_top_k": 5,
+        "rerank_threshold": 0.5,
+        "max_iterations": 10,
+        "web_search_max_results": 5,
+        "fallback_strategy": "model",
+        "thinking": false,
+        "citation_enabled": true,
+        "question_suggestions": {
+          "starters": {
+            "enabled": true,
+            "mode": "hybrid",
+            "items": [],
+            "count": 6
+          },
+          "follow_ups": {
+            "enabled": false,
+            "mode": "hybrid",
+            "count": 3,
+            "categories": ["clarify", "deepen", "action"],
+            "max_context_turns": 2,
+            "suppress_on_fallback": true,
+            "suppress_when_answer_asks_question": true,
+            "knowledge_fallback": true
+          }
+        }
+      },
+      "created_at": "2026-08-01T00:00:00Z",
+      "updated_at": "2026-08-01T00:00:00Z",
+      "deleted_at": null
+    },
+    "AgentEnvelope": {
+      "success": true,
+      "data": {
+        "id": "agent-1",
+        "name": "Contract agent",
+        "description": null,
+        "avatar": null,
+        "is_builtin": false,
+        "tenant_id": 100,
+        "created_by": "usr-1",
+        "config": {
+          "agent_mode": "quick-answer"
+        },
+        "created_at": "2026-08-01T00:00:00Z",
+        "updated_at": "2026-08-01T00:00:00Z",
+        "deleted_at": null
+      }
+    },
+    "AgentListEnvelope": {
+      "success": true,
+      "data": [
+        {
+          "id": "agent-1",
+          "name": "Contract agent",
+          "description": null,
+          "avatar": null,
+          "is_builtin": false,
+          "tenant_id": 100,
+          "created_by": "usr-1",
+          "config": {
+            "agent_mode": "quick-answer"
+          },
+          "created_at": "2026-08-01T00:00:00Z",
+          "updated_at": "2026-08-01T00:00:00Z",
+          "deleted_at": null
+        }
+      ],
+      "disabled_own_agent_ids": []
+    },
+    "AgentPlaceholderGroup": {
+      "all": [
+        {
+          "name": "{query}",
+          "label": "Query",
+          "description": "The current user query"
+        }
+      ],
+      "system_prompt": [],
+      "agent_system_prompt": [],
+      "context_template": [],
+      "rewrite_system_prompt": [],
+      "rewrite_prompt": [],
+      "fallback_prompt": []
+    },
+    "SuggestedQuestionsData": {
+      "questions": [
+        {
+          "question": "What is this about?",
+          "source": "kb",
+          "knowledge_base_id": "kb-1"
+        }
+      ]
+    },
+    "SkillListEnvelope": {
+      "success": true,
+      "data": [
+        {
+          "name": "web-search",
+          "description": "Search the web"
+        }
+      ],
+      "skills_available": true
+    }
+  }
+}
