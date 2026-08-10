@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol, TypeVar, runtime_checkable
 
-from src.ai.embedding import Context, Embedder
+from src.ai.embedding import Context, Embedder, TaskContext
 from src.app_logging import logger
 from src.common.json import JsonObject
 from src.core.knowledge.documents.chunk_pipeline import (
@@ -753,6 +753,57 @@ class DocumentProcessPipeline:
         return ProcessOutcome(parse_status=status, skipped=True)
 
 
+# ── Worker entry point ─────────────────────────────────────────────────
+
+
+async def process_document(
+    *,
+    tenant_id: int,
+    knowledge_id: str,
+    knowledge_base_id: str,
+    file_path: str = "",
+    file_name: str = "",
+    file_type: str = "",
+    url: str = "",
+    enable_multimodel: bool = False,
+    language: str = "",
+    request_id: str = "",
+    now: datetime | None = None,
+    ctx: Context | None = None,
+    pipeline: DocumentProcessPipeline | None = None,
+) -> ProcessOutcome:
+    """Worker-side entry point for one document-process run.
+
+    Constructs a :class:`DocumentProcessPipeline` (or accepts an
+    externally-built one) and forwards the parsed task payload to
+    :meth:`DocumentProcessPipeline.run`. All seams default to
+    ``None``; the worker wiring layer is responsible for providing a
+    fully composed pipeline (knowledge repo, KB service, chunk repo,
+    reader, file reader, embedding / index resolvers, post-process
+    dispatcher, storage resolver) before the pipeline can perform a
+    real run.
+
+    ``ctx`` defaults to a background :class:`TaskContext` so background
+    ingestion workers hit the provider governor's throttled path.
+    """
+    selected = pipeline or DocumentProcessPipeline()
+    selected_ctx = ctx or TaskContext(is_background_task=True)
+    return await selected.run(
+        ctx=selected_ctx,
+        tenant_id=tenant_id,
+        knowledge_id=knowledge_id,
+        knowledge_base_id=knowledge_base_id,
+        file_path=file_path,
+        file_name=file_name,
+        file_type=file_type,
+        url=url,
+        enable_multimodel=enable_multimodel,
+        language=language,
+        request_id=request_id,
+        now=now,
+    )
+
+
 __all__ = [
     "DocumentProcessPipeline",
     "EmbeddingResolver",
@@ -764,4 +815,5 @@ __all__ = [
     "TenantStorageResolver",
     "build_chunk_rows",
     "kb_needs_embedding",
+    "process_document",
 ]
