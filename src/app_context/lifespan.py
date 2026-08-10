@@ -45,6 +45,8 @@ from src.core.infra.mcp_services.types import MCPServiceInfo
 from src.core.infra.web_search.registry import build_web_search_client_registry
 from src.db.base import DatabaseEngine
 from src.settings import get_settings
+from src.web.api.agents.router import router as agents_router
+from src.web.api.agents.skill_views import skill_router as skills_router
 from src.web.api.auth.router import router as auth_router
 from src.web.api.infra.datasources.router import router as datasources_router
 from src.web.api.infra.initialization.router import router as initialization_router
@@ -170,6 +172,7 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(application)
 
+    application.include_router(agents_router)
     application.include_router(auth_router)
     application.include_router(chunker_router)
     application.include_router(chunks_router)
@@ -182,6 +185,7 @@ def create_app() -> FastAPI:
     application.include_router(knowledge_tags_router)
     application.include_router(mcp_services_router)
     application.include_router(models_router)
+    application.include_router(skills_router)
     application.include_router(storage_backends_router)
     application.include_router(system_router)
     application.include_router(tenants_router)

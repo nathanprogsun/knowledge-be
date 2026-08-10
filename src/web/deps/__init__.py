@@ -8,6 +8,12 @@ from ``src.web.deps`` regardless of which module a dependency lives in.
 
 from __future__ import annotations
 
+from src.web.deps.agents import (
+    CustomAgentServiceDep,
+    SkillsManagerDep,
+    get_custom_agent_service,
+    get_skills_manager,
+)
 from src.web.deps.auth import (
     AuthServiceDep,
     CurrentUserContextDep,
@@ -57,6 +63,10 @@ from src.web.deps.infra_web_search import (
     WebSearchProviderServiceDep,
     get_web_search_provider_service,
 )
+from src.web.deps.knowledge import (
+    KnowledgeServiceDep,
+    get_knowledge_service,
+)
 from src.web.deps.knowledge_bases import (
     KBServiceDep,
     get_kb_service,
@@ -67,19 +77,15 @@ from src.web.deps.knowledge_documents import (
     get_documents_orchestrator,
     get_knowledge_service,
 )
-from src.web.deps.knowledge_tags import (
-    TagServiceDep,
-    get_tag_service,
-)
-from src.web.deps.knowledge import (
-    KnowledgeServiceDep,
-    get_knowledge_service,
-)
 from src.web.deps.knowledge_faq import (
     FAQImportRunnerDep,
     FAQServiceDep,
     get_faq_import_runner,
     get_faq_service,
+)
+from src.web.deps.knowledge_tags import (
+    TagServiceDep,
+    get_tag_service,
 )
 from src.web.deps.knowledge_wiki import (
     KBServiceDep,
@@ -127,6 +133,7 @@ __all__ = [
     "ChunkServiceDep",
     "CrossTenantDep",
     "CurrentUserContextDep",
+    "CustomAgentServiceDep",
     "DataSourceServiceDep",
     "FAQImportRunnerDep",
     "FAQServiceDep",
@@ -147,6 +154,7 @@ __all__ = [
     "RoleOwnerDep",
     "RoleViewerDep",
     "SessionDep",
+    "SkillsManagerDep",
     "StorageBackendServiceDep",
     "SystemAdminDep",
     "SystemSettingServiceDep",
@@ -165,18 +173,20 @@ __all__ = [
     "get_auth_service",
     "get_chunk_revision_service",
     "get_chunk_service",
+    "get_custom_agent_service",
     "get_datasource_service",
     "get_documents_orchestrator",
-    "get_initialization_service",
-    "get_kb_service",
     "get_faq_import_runner",
     "get_faq_service",
+    "get_initialization_service",
+    "get_kb_service",
     "get_knowledge_service",
     "get_mcp_service",
     "get_model_service",
     "get_oidc_service",
     "get_request_tenant_id",
     "get_request_user_id",
+    "get_skills_manager",
     "get_storage_backend_service",
     "get_system_setting_service",
     "get_tag_service",

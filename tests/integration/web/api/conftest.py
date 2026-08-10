@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import pytest
 
+from src.core.contracts.agents import CreateAgentRequest
 from src.core.contracts.infra import (
     CreateDataSourceRequest,
     CreateMCPServiceRequest,
@@ -25,9 +26,11 @@ from src.core.contracts.infra import (
     CreateStorageBackendRequest,
     CreateVectorStoreRequest,
 )
-from src.core.contracts.knowledge import CreateKnowledgeBaseRequest
-from src.core.contracts.knowledge import CreateManualKnowledgeRequest
-from src.core.contracts.knowledge import FAQEntryPayload
+from src.core.contracts.knowledge import (
+    CreateKnowledgeBaseRequest,
+    CreateManualKnowledgeRequest,
+    FAQEntryPayload,
+)
 
 
 @pytest.fixture
@@ -67,6 +70,19 @@ def default_create_datasource_request() -> dict[str, object]:
         name="placeholder",
         type="placeholder",
     ).model_dump(mode="json", exclude_none=True)
+
+
+@pytest.fixture
+def default_create_agent_request() -> dict[str, object]:
+    """Minimal-valid body for ``POST /agents``.
+
+    ``name`` is the only mandatory field; the fixture relies on the
+    contract defaults for ``config`` so tests can override individual
+    fields without re-declaring the full body.
+    """
+    return CreateAgentRequest(name="placeholder").model_dump(
+        mode="json", exclude_none=True
+    )
 
 
 @pytest.fixture
@@ -233,6 +249,7 @@ def default_create_wiki_request() -> dict[str, object]:
 
 
 __all__ = [
+    "default_create_agent_request",
     "default_create_chunk_request",
     "default_create_datasource_request",
     "default_create_document_request",
