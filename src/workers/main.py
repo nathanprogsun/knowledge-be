@@ -10,6 +10,7 @@ import asyncio
 
 from arq.worker import Function
 
+from src.workers import tasks  # noqa: F401  (registers task handlers)
 from src.workers.base import BaseWorker
 from src.workers.registry import all_functions
 from src.workers.settings import get_worker_settings
