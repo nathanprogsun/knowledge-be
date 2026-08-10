@@ -261,5 +261,92 @@ class MessageRepository(GenericRepository[Message]):
         result = await self._session.execute(stmt)
         return [str(value) for value in result.scalars().all()]
 
+    async def search_by_keyword(
+        self,
+        *,
+        keyword: str,
+        session_ids: list[str] | None = None,
+        limit: int = 20,
+    ) -> list[Message]:
+        """ILIKE search across the caller's live messages.
+
+        When ``session_ids`` is supplied, the search is restricted to those
+        sessions; otherwise it scans every live row of the workspace.
+        Sessions whose ``session_id`` is empty are always ignored by the
+        SQL filter — the live-row guard already covers them.
+
+        The match runs against ``content``; an empty ``keyword`` short-
+        circuits to an empty list to keep the SQL ``like`` predicate
+        well-formed regardless of the caller.
+        """
+        term = (keyword or "").strip()
+        if not term:
+            return []
+        # ``session_id`` / ``id`` / ``created_at`` are literal column
+        # names declared in this module — not user input. The ``like``
+        # pattern is a bindparam, never an f-string interpolation.
+        self._assert_safe_identifier("session_id", kind="column")
+        self._assert_safe_identifier("id", kind="column")
+        self._assert_safe_identifier("created_at", kind="column")
+        self._assert_safe_identifier("content", kind="column")
+        ids_clause = ""
+        if session_ids:
+            ids_clause = f" and session_id in :session_ids"
+        stmt = text(
+            f"select * from {_TABLE_NAME} "
+            "where content ilike :pattern "
+            f"and {_LIVE} "
+            f"{ids_clause} "
+            f"order by {_RECENT_ORDER} limit :limit"
+        ).bindparams(
+            pattern=f"%{term}%",
+            limit=limit,
+            **({"session_ids": tuple(session_ids)} if session_ids else {}),
+        )
+        result = await self._session.execute(stmt)
+        return [self._hydrate(m) for m in result.mappings().all()]
+
+    async def list_by_knowledge_ids(
+        self,
+        knowledge_ids: list[str],
+    ) -> list[Message]:
+        """Bulk lookup of live messages by their ``knowledge_id`` column.
+
+        Used by the search path to map KB vector-search hits back to the
+        messages that produced them. Returns an empty list when
+        ``knowledge_ids`` is empty so the SQL ``in`` clause is well-formed.
+        """
+        if not knowledge_ids:
+            return []
+        self._assert_safe_identifier("knowledge_id", kind="column")
+        stmt = text(
+            f"select * from {_TABLE_NAME} "
+            "where knowledge_id in :knowledge_ids "
+            f"and {_LIVE} order by {_RECENT_ORDER}"
+        ).bindparams(knowledge_ids=tuple(knowledge_ids))
+        result = await self._session.execute(stmt)
+        return [self._hydrate(m) for m in result.mappings().all()]
+
+    async def list_by_request_ids(
+        self,
+        request_ids: list[str],
+    ) -> list[Message]:
+        """Bulk lookup of live messages by their ``request_id`` column.
+
+        The search path uses this to fetch the partner of a Q&A pair
+        that matched on only one role. Returns an empty list when
+        ``request_ids`` is empty so the SQL ``in`` clause is well-formed.
+        """
+        if not request_ids:
+            return []
+        self._assert_safe_identifier("request_id", kind="column")
+        stmt = text(
+            f"select * from {_TABLE_NAME} "
+            "where request_id in :request_ids "
+            f"and {_LIVE} order by {_RECENT_ORDER}"
+        ).bindparams(request_ids=tuple(request_ids))
+        result = await self._session.execute(stmt)
+        return [self._hydrate(m) for m in result.mappings().all()]
+
 
 __all__ = ["MessageRepository"]
