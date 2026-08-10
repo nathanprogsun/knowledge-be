@@ -146,7 +146,7 @@ async def list_pages(
     folder_id: str | None = Query(default=None),
     category_depth: int | None = Query(default=None),
     page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=20, ge=1, le=1000),
+    page_size: int = Query(default=20, ge=1, le=100),
     sort_by: str = Query(default="updated_at"),
     sort_order: str = Query(default="desc"),
 ) -> WikiEnvelope[WikiPageListData]:

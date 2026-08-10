@@ -1,7 +1,7 @@
 """Unit tests for :mod:`src.common.pagination`.
 
 Field names are part of the public HTTP contract: the request uses
-``page`` / ``page_size`` (capped at 1000) and the response carries the
+``page`` / ``page_size`` (capped at 100) and the response carries the
 rows under ``data`` (not ``items``). These tests pin both.
 """
 
@@ -27,12 +27,12 @@ def test_pagination_accepts_valid_values() -> None:
     assert p.page_size == 50
 
 
-@pytest.mark.parametrize("page_size", [1, 1000])
+@pytest.mark.parametrize("page_size", [1, 100])
 def test_pagination_accepts_page_size_boundaries(page_size: int) -> None:
     assert Pagination(page_size=page_size).page_size == page_size
 
 
-@pytest.mark.parametrize("page_size", [0, 1001])
+@pytest.mark.parametrize("page_size", [0, 101])
 def test_pagination_rejects_page_size_out_of_range(page_size: int) -> None:
     with pytest.raises(ValidationError):
         Pagination(page_size=page_size)
