@@ -11,7 +11,7 @@ registry and decorate their handlers.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Final, Protocol, TypeAlias, cast
+from typing import Any, Final, Protocol, TypeAlias, cast
 
 from arq.typing import WorkerCoroutine
 from arq.worker import Function
@@ -25,15 +25,17 @@ JsonValue: TypeAlias = (
 
 
 class TaskHandler(Protocol):
-    """Async task handler: ``(ctx, **payload) -> None``.
+    """Async task handler: ``(ctx, **payload) -> Any``.
 
-    ``__qualname__`` is required because ARQ uses it as the default
-    function name when a handler is registered without an explicit name.
+    Returns any JSON-serializable value; ARQ persists the result so
+    callers can inspect it. ``__qualname__`` is required because ARQ
+    uses it as the default function name when a handler is registered
+    without an explicit name.
     """
 
     __qualname__: str
 
-    async def __call__(self, ctx: WorkerContext, **payload: JsonValue) -> None: ...
+    async def __call__(self, ctx: WorkerContext, **payload: JsonValue) -> Any: ...
 
 
 _REGISTRY: Final[dict[str, TaskHandler]] = {}
