@@ -13,6 +13,10 @@ Column notes
   bind type.
 - `retriever_engines` accepts both the object form `{"engines": [...]}`
   and the legacy bare array `[...]`.
+- `api_key` is a legacy single-key column. New machine credentials are
+  issued through the `tenant_api_keys` table (revocable, named, scope-
+  tagged) and that table is the supported path. The column is kept for
+  back-compat with upstream rows that pre-date the split.
 - `api_principal_config` carries an HMAC secret and must never reach
   the wire layer.
 """
@@ -55,6 +59,7 @@ class Tenant(TableModel):
     description: str | None = None
     retriever_engines: JsonObject | list[JsonObject] = Field(default_factory=dict)
     status: str = "active"
+    api_key: str = Field(default="")
     business: str = ""
     storage_quota: int = DEFAULT_STORAGE_QUOTA_BYTES
     storage_used: int = 0
