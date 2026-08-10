@@ -75,6 +75,10 @@ from src.web.deps.knowledge_bases import (
     KBServiceDep,
     get_kb_service,
 )
+from src.web.deps.organizations import (
+    OrganizationServiceDep,
+    get_organization_service,
+)
 from src.web.deps.knowledge_documents import (
     KnowledgeDocumentsDep,
     get_documents_orchestrator,
@@ -145,6 +149,7 @@ __all__ = [
     "MCPServiceDep",
     "ModelServiceDep",
     "OidcServiceDep",
+    "OrganizationServiceDep",
     "PathTenantMatchDep",
     "RequestTenantIdDep",
     "RequestUserIdDep",
@@ -186,6 +191,7 @@ __all__ = [
     "get_mcp_service",
     "get_model_service",
     "get_oidc_service",
+    "get_organization_service",
     "get_request_tenant_id",
     "get_request_user_id",
     "get_skills_manager",

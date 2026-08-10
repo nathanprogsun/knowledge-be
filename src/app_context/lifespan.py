@@ -72,6 +72,7 @@ from src.web.api.knowledge.faq.router import router as faq_router
 from src.web.api.knowledge.tags.router import router as knowledge_tags_router
 from src.web.api.knowledge.wiki.router import router as wiki_router
 from src.web.api.knowledge_bases.router import router as knowledge_bases_router
+from src.web.api.organizations.router import router as organizations_router
 from src.web.api.system.router import router as system_router
 from src.web.api.tenants.router import router as tenants_router
 from src.web.exception_handler import register_exception_handlers
@@ -187,6 +188,7 @@ def create_app() -> FastAPI:
     application.include_router(knowledge_tags_router)
     application.include_router(mcp_services_router)
     application.include_router(models_router)
+    application.include_router(organizations_router)
     application.include_router(skills_router)
     application.include_router(storage_backends_router)
     application.include_router(system_router)
