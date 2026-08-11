@@ -53,7 +53,9 @@ class IMChannelInfo(BaseModel):
     """Service-side projection of an ``im_channels`` row.
 
     The wire contract is a subset of these fields; secret-bearing
-    ``credentials`` never cross into the projection.
+    ``credentials`` never cross into the projection. ``credentials_configured``
+    is the only credential-derived signal the projection carries — it is
+    computed from the raw row before the secret column is dropped.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -69,6 +71,7 @@ class IMChannelInfo(BaseModel):
     knowledge_base_id: str
     bot_identity: str
     session_mode: str
+    credentials_configured: bool = False
     created_at: datetime
     updated_at: datetime
 
@@ -76,6 +79,8 @@ class IMChannelInfo(BaseModel):
     def map_from_db(cls, db: IMChannel) -> Self:
         """Build a projection from the raw storage row, dropping secrets."""
         record = db.model_dump()
+        credentials = record.get("credentials")
+        record["credentials_configured"] = bool(credentials) and credentials != {}
         record.pop("credentials", None)
         record.pop("deleted_at", None)
         return cls.model_validate(record)

@@ -23,7 +23,12 @@ from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.common.exception import ConflictError, NotFoundError, ValidationError
+from src.common.exception import (
+    ConflictError,
+    ExternalServiceError,
+    NotFoundError,
+    ValidationError,
+)
 from src.common.json import JsonObject
 from src.core.channels.im.adapter_base import IMAdapter
 from src.core.channels.im.supervisor import (
@@ -483,6 +488,50 @@ class IMChannelService:
         """Return ``(adapter, channel, running)`` for the active channel."""
         return self._supervisor.get_channel_adapter(channel_id)
 
+    async def ensure_channel_adapter(
+        self, channel_id: str
+    ) -> tuple[IMAdapter, IMChannelInfo]:
+        """Resolve the durable row and return a running adapter for ``channel_id``.
+
+        Mirrors the runtime contract the callback path relies on: the
+        live row is the source of truth, so a replica that missed a
+        cache invalidation still re-reads credentials and config before
+        routing a callback. A deleted row tears down the runtime and
+        raises ``NotFoundError``; a disabled row tears down the runtime
+        and raises an availability error. When the active adapter is
+        missing or was built from a stale config, the channel is
+        (re)started first.
+        """
+        row = await self._channel_repo.get_by_id_global(channel_id)
+        if row is None:
+            self._supervisor.stop_channel(channel_id)
+            raise NotFoundError(
+                code="im.channel_not_found",
+                message=f"im channel {channel_id} not found",
+            )
+        if not row.enabled:
+            self._supervisor.stop_channel(channel_id)
+            raise ExternalServiceError(
+                code="im.channel_disabled",
+                message="channel is disabled",
+            )
+        adapter, cached, running = self._supervisor.get_channel_adapter(channel_id)
+        if not running or cached is None or not _same_runtime_config(cached, row):
+            try:
+                await self._supervisor.start_channel(row)
+            except Exception as exc:
+                raise ExternalServiceError(
+                    code="im.channel_not_available",
+                    message="channel adapter is not active on this instance",
+                ) from exc
+            adapter, cached, running = self._supervisor.get_channel_adapter(channel_id)
+        if not running or cached is None or adapter is None:
+            raise ExternalServiceError(
+                code="im.channel_not_available",
+                message="channel adapter is not active on this instance",
+            )
+        return adapter, IMChannelInfo.map_from_db(cached)
+
     def active_channel_count(self) -> int:
         """Return the count of currently-running supervised channels."""
         return self._supervisor.active_channel_count()
@@ -583,6 +632,27 @@ def _require_credentials(credentials: JsonObject | None) -> JsonObject:
 def _now() -> datetime:
     """Return a timezone-aware ``now`` for stamping channel rows."""
     return datetime.now(UTC)
+
+
+def _same_runtime_config(cached: IMChannel, fresh: IMChannel) -> bool:
+    """Compare the config-relevant fields that shape adapter creation.
+
+    Timestamps are intentionally excluded (database precision differs
+    from the in-memory value), so an unrelated update never forces a
+    webhook adapter rebuild on every callback.
+    """
+    return (
+        cached.id == fresh.id
+        and cached.tenant_id == fresh.tenant_id
+        and cached.agent_id == fresh.agent_id
+        and cached.platform == fresh.platform
+        and cached.enabled == fresh.enabled
+        and cached.mode == fresh.mode
+        and cached.output_mode == fresh.output_mode
+        and cached.knowledge_base_id == fresh.knowledge_base_id
+        and cached.session_mode == fresh.session_mode
+        and cached.credentials == fresh.credentials
+    )
 
 
 # ── Factory ──────────────────────────────────────────────────────────

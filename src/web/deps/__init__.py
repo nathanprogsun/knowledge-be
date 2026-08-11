@@ -66,7 +66,6 @@ from src.web.deps.evaluation import (
     EvaluationServiceDep,
     get_evaluation_service,
 )
-)
 from src.web.deps.infra_datasources import (
     DataSourceServiceDep,
     get_datasource_service,
@@ -102,6 +101,12 @@ from src.web.deps.infra_vector_stores import (
 from src.web.deps.infra_web_search import (
     WebSearchProviderServiceDep,
     get_web_search_provider_service,
+)
+from src.web.deps.im_channels import (
+    IMChannelServiceDep,
+    IMCommandRegistryDep,
+    get_im_channel_service,
+    get_im_command_registry,
 )
 from src.web.deps.knowledge import (
     KnowledgeServiceDep,
@@ -195,6 +200,8 @@ __all__ = [
     "KBServiceDep",
     "KnowledgeDocumentsDep",
     "KnowledgeServiceDep",
+    "IMChannelServiceDep",
+    "IMCommandRegistryDep",
     "MCPServiceDep",
     "MessageContextDep",
     "MessageServiceDep",
@@ -252,6 +259,8 @@ __all__ = [
     "get_initialization_service",
     "get_kb_service",
     "get_knowledge_service",
+    "get_im_channel_service",
+    "get_im_command_registry",
     "get_mcp_service",
     "get_message_context",
     "get_message_service",
