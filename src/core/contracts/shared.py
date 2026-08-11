@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.common.json import JsonObject
+from src.common.json import JsonObject, JsonValue
 
 
 class ErrorDetail(BaseModel):
@@ -10,7 +10,11 @@ class ErrorDetail(BaseModel):
 
     code: str | None = Field(default=None)
     message: str
-    details: str | None = Field(default=None)
+    # ``JsonValue`` so domain errors can carry arbitrary structured
+    # context (e.g. FastAPI's per-field Pydantic error list, ``{"loc":
+    # [...], "msg": "..."}``) without lossy string coercion — mirrors
+    # Go's ``AppError.Details any`` in ``internal/errors/errors.go``.
+    details: JsonValue | None = Field(default=None)
 
 
 class ErrorResponse(BaseModel):

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -17,6 +19,7 @@ from src.core.contracts.tenants import (
     UpdateTenantRequest,
 )
 from src.core.tenants.types import TenantAPIKeyInfo
+from src.db.dao.users_repository import UserRepository
 from src.web.api.tenants.views import (
     DeleteTenantResponse,
     TenantEnvelope,
@@ -32,6 +35,7 @@ from src.web.deps import (
     RoleAdminDep,
     RoleOwnerDep,
     RoleViewerDep,
+    SessionDep,
     TenantAPIKeyServiceDep,
     TenantKVServiceDep,
     TenantMemberServiceDep,
@@ -77,12 +81,20 @@ async def create_tenant(
     body: CreateTenantRequest,
     tenant_service: TenantServiceDep,
     member_service: TenantMemberServiceDep,
+    session: SessionDep,
 ) -> TenantEnvelope:
     """Create a workspace; the status is assigned server-side.
 
     The creator becomes an Owner of the new workspace (mirrors Go's
     ``memberService.EnsureOwner`` after create), so the workspace is
     reachable through the membership-scoped endpoints immediately.
+
+    The creator's ``preferences.last_active_tenant_id`` is set to the
+    new workspace id so the next JWT-mint lands here (mirrors Go's
+    home-or-first-membership resolution in
+    ``userService.resolveLoginTenantID``). Without this the creator
+    would be locked out of their own tenant-scoped endpoints until
+    the auth middleware's fallback fires.
     """
     info = await tenant_service.create_tenant(
         name=body.name,
@@ -94,6 +106,22 @@ async def create_tenant(
     user_id = get_user_id()
     if user_id is not None:
         await member_service.ensure_owner(user_id=user_id, tenant_id=info.id)
+        # Persist last_active_tenant_id so the next login mints a JWT
+        # carrying the new workspace as the active tenant. The
+        # auth-middleware fallback covers existing users whose
+        # preference was never set; this forward-write keeps new
+        # creators from having to rely on it.
+        user_repo = UserRepository(session)
+        existing = await user_repo.find_by_id(user_id)
+        merged_prefs: JsonObject = dict(existing.preferences or {})
+        merged_prefs["last_active_tenant_id"] = info.id
+        await user_repo.update_by_primary_key(
+            {"id": user_id},
+            {
+                "preferences": merged_prefs,
+                "updated_at": datetime.now(UTC),
+            },
+        )
     return tenant_envelope(info)
 
 
@@ -132,11 +160,21 @@ async def search_tenants(
 
 @router.get("", response_model=TenantListEnvelope)
 async def list_my_tenants(
+    request: Request,
     _ctx: CurrentUserContextDep,
     tenant_service: TenantServiceDep,
     member_service: TenantMemberServiceDep,
 ) -> TenantListEnvelope:
-    """Return every workspace visible to the authenticated user."""
+    """Return every workspace visible to the authenticated user.
+
+    API-key principals have no associated ``user_id`` and therefore no
+    memberships to enumerate. Mirrors Go's behaviour of denying
+    user-scoped reads for non-user principals; the workspace list is
+    addressable through the per-workspace routes when the key's
+    ``tenant_id`` is known.
+    """
+    if getattr(request.state, "api_key_scope", None) is not None:
+        return tenant_list_envelope([])
     user_id = get_user_id()
     if user_id is None:
         raise ValidationError(

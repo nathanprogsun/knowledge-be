@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
+from pydantic import BaseModel
 
 from src.common.exception import NotFoundError, ValidationError
 from src.core.contracts.shared import ErrorDetail, ErrorResponse
@@ -39,6 +40,14 @@ def _build_app() -> FastAPI:
     async def raise_http_exception() -> None:
         raise HTTPException(status_code=418, detail="teapot")
 
+    class _Echo(BaseModel):
+        name: str
+        age: int
+
+    @app.post("/echo")
+    async def echo(body: _Echo) -> dict[str, str]:
+        return {"name": body.name}
+
     return app
 
 
@@ -58,6 +67,25 @@ def test_validation_error_status_422() -> None:
     response = client.get("/raise_validation_error")
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "demo.bad_input"
+
+
+def test_request_validation_error_uses_app_envelope() -> None:
+    """FastAPI body validation is wrapped in the standard envelope (PR-146 B3).
+
+    Without the explicit handler, FastAPI emits ``{"detail": [...]}`` for
+    malformed bodies. We override to keep the contract single-shape so
+    the frontend does not have to branch on envelope type.
+    """
+    client = TestClient(_build_app(), raise_server_exceptions=False)
+    response = client.post("/echo", json={"age": "not-an-int"})
+    assert response.status_code == 422
+    body = response.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "request.validation_error"
+    assert body["error"]["message"] == "Request validation failed"
+    # Per-field Pydantic diagnostics are preserved in ``details``.
+    assert isinstance(body["error"]["details"], list)
+    assert body["error"]["details"], "details must carry the per-field errors"
 
 
 def test_uncaught_exception_returns_envelope_with_status_500() -> None:

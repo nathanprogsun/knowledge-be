@@ -95,6 +95,25 @@ async def _resolve_jwt(
     except UnauthorizedError:
         return False
 
+    # Fallback for users whose JWT carries no tenant_id (e.g. the
+    # ``preferences.last_active_tenant_id`` was never written, as was
+    # the case for every tenant created before PR-146). Mirrors Go's
+    # ``userService.resolveLoginTenantID`` →
+    # ``homeOrFirstMembershipTenant``: a tenantless identity with at
+    # least one active membership is dropped into the earliest one so
+    # the user lands somewhere usable rather than at the locked gate.
+    if tenant_id is None and not info.is_system_admin:
+        try:
+            member_service = build_tenant_member_service(session)
+            memberships = await member_service.list_by_user(info.id)
+        except Exception:
+            await session.rollback()
+            memberships = []
+        for m in memberships:
+            if getattr(m, "deleted_at", None) is None:
+                tenant_id = m.tenant_id
+                break
+
     # Resolve the user's role in the active tenant (if any).
     role = ""
     if tenant_id is not None:

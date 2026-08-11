@@ -469,3 +469,44 @@ async def test_embed_auth_stub_raises_not_implemented() -> None:
 
 
 __all__ = []
+
+
+# ── Path tenant match (PR-146 B4) ──────────────────────────────────
+
+
+async def test_path_tenant_match_passes_when_match() -> None:
+    from src.web.deps.rbac import require_path_tenant_match_dep
+
+    request = _make_request(tenant_id="42")
+    request.scope["path_params"] = {"tenant_id": "42"}
+    # Should not raise.
+    await require_path_tenant_match_dep(request)
+
+
+async def test_path_tenant_match_raises_on_mismatch() -> None:
+    from src.common.exception import PermissionDeniedError
+    from src.web.deps.rbac import require_path_tenant_match_dep
+
+    request = _make_request(tenant_id="42")
+    request.scope["path_params"] = {"tenant_id": "99"}
+    with pytest.raises(PermissionDeniedError) as excinfo:
+        await require_path_tenant_match_dep(request)
+    assert excinfo.value.code == "rbac.not_a_member"
+
+
+async def test_path_tenant_match_noop_when_no_path_param() -> None:
+    from src.web.deps.rbac import require_path_tenant_match_dep
+
+    request = _make_request(tenant_id="42")
+    # No ``tenant_id`` in path_params → dep is a no-op so it can be
+    # wired into both per-tenant and non-tenant routes.
+    await require_path_tenant_match_dep(request)
+
+
+async def test_path_tenant_match_bypassed_for_system_admin() -> None:
+    from src.web.deps.rbac import require_path_tenant_match_dep
+
+    request = _make_request(tenant_id="42", is_system_admin=True)
+    request.scope["path_params"] = {"tenant_id": "99"}
+    # System admins can address any workspace.
+    await require_path_tenant_match_dep(request)
