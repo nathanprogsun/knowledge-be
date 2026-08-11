@@ -1,0 +1,2102 @@
+{
+  "generated_at": "2026-08-11",
+  "total_paths": 196,
+  "endpoints": [
+    {
+      "path": "/agent-chat/{session_id}",
+      "method": "POST",
+      "operation_id": "agent_qa_agent_chat__session_id__post",
+      "tags": [
+        "chat"
+      ]
+    },
+    {
+      "path": "/agents",
+      "method": "POST",
+      "operation_id": "create_agent_agents_post",
+      "tags": [
+        "agents"
+      ]
+    },
+    {
+      "path": "/agents",
+      "method": "GET",
+      "operation_id": "list_agents_agents_get",
+      "tags": [
+        "agents"
+      ]
+    },
+    {
+      "path": "/agents/placeholders",
+      "method": "GET",
+      "operation_id": "get_placeholders_agents_placeholders_get",
+      "tags": [
+        "agents"
+      ]
+    },
+    {
+      "path": "/agents/type-presets",
+      "method": "GET",
+      "operation_id": "get_agent_type_presets_agents_type_presets_get",
+      "tags": [
+        "agents"
+      ]
+    },
+    {
+      "path": "/agents/{agent_id}/embed-channels",
+      "method": "POST",
+      "operation_id": "create_embed_channel_agents__agent_id__embed_channels_post",
+      "tags": [
+        "embed-channels"
+      ]
+    },
+    {
+      "path": "/agents/{agent_id}/embed-channels",
+      "method": "GET",
+      "operation_id": "list_embed_channels_agents__agent_id__embed_channels_get",
+      "tags": [
+        "embed-channels"
+      ]
+    },
+    {
+      "path": "/agents/{agent_id}/im-channels",
+      "method": "POST",
+      "operation_id": "create_im_channel_agents__agent_id__im_channels_post",
+      "tags": [
+        "im-channels"
+      ]
+    },
+    {
+      "path": "/agents/{agent_id}/im-channels",
+      "method": "GET",
+      "operation_id": "list_im_channels_agents__agent_id__im_channels_get",
+      "tags": [
+        "im-channels"
+      ]
+    },
+    {
+      "path": "/agents/{id}",
+      "method": "GET",
+      "operation_id": "get_agent_agents__id__get",
+      "tags": [
+        "agents"
+      ]
+    },
+    {
+      "path": "/agents/{id}",
+      "method": "PUT",
+      "operation_id": "update_agent_agents__id__put",
+      "tags": [
+        "agents"
+      ]
+    },
+    {
+      "path": "/agents/{id}",
+      "method": "DELETE",
+      "operation_id": "delete_agent_agents__id__delete",
+      "tags": [
+        "agents"
+      ]
+    },
+    {
+      "path": "/agents/{id}/copy",
+      "method": "POST",
+      "operation_id": "copy_agent_agents__id__copy_post",
+      "tags": [
+        "agents"
+      ]
+    },
+    {
+      "path": "/agents/{id}/suggested-questions",
+      "method": "GET",
+      "operation_id": "get_suggested_questions_agents__id__suggested_questions_get",
+      "tags": [
+        "agents"
+      ]
+    },
+    {
+      "path": "/auth/change-password",
+      "method": "POST",
+      "operation_id": "change_password_auth_change_password_post",
+      "tags": [
+        "auth"
+      ]
+    },
+    {
+      "path": "/auth/login",
+      "method": "POST",
+      "operation_id": "login_auth_login_post",
+      "tags": [
+        "auth"
+      ]
+    },
+    {
+      "path": "/auth/logout",
+      "method": "POST",
+      "operation_id": "logout_auth_logout_post",
+      "tags": [
+        "auth"
+      ]
+    },
+    {
+      "path": "/auth/me",
+      "method": "GET",
+      "operation_id": "me_auth_me_get",
+      "tags": [
+        "auth"
+      ]
+    },
+    {
+      "path": "/auth/oidc/callback",
+      "method": "GET",
+      "operation_id": "oidc_callback_auth_oidc_callback_get",
+      "tags": [
+        "auth"
+      ]
+    },
+    {
+      "path": "/auth/oidc/config",
+      "method": "GET",
+      "operation_id": "oidc_config_auth_oidc_config_get",
+      "tags": [
+        "auth"
+      ]
+    },
+    {
+      "path": "/auth/oidc/url",
+      "method": "GET",
+      "operation_id": "oidc_url_auth_oidc_url_get",
+      "tags": [
+        "auth"
+      ]
+    },
+    {
+      "path": "/auth/refresh",
+      "method": "POST",
+      "operation_id": "refresh_token_auth_refresh_post",
+      "tags": [
+        "auth"
+      ]
+    },
+    {
+      "path": "/auth/register",
+      "method": "POST",
+      "operation_id": "register_auth_register_post",
+      "tags": [
+        "auth"
+      ]
+    },
+    {
+      "path": "/auth/validate",
+      "method": "GET",
+      "operation_id": "validate_token_auth_validate_get",
+      "tags": [
+        "auth"
+      ]
+    },
+    {
+      "path": "/chunker/preview",
+      "method": "POST",
+      "operation_id": "preview_chunking_chunker_preview_post",
+      "tags": [
+        "chunker"
+      ]
+    },
+    {
+      "path": "/chunks/by-id/{id}",
+      "method": "GET",
+      "operation_id": "get_chunk_by_id_only_chunks_by_id__id__get",
+      "tags": [
+        "chunks"
+      ]
+    },
+    {
+      "path": "/chunks/by-id/{id}/questions",
+      "method": "PUT",
+      "operation_id": "upsert_generated_question_chunks_by_id__id__questions_put",
+      "tags": [
+        "chunks"
+      ]
+    },
+    {
+      "path": "/chunks/by-id/{id}/questions",
+      "method": "DELETE",
+      "operation_id": "delete_generated_question_chunks_by_id__id__questions_delete",
+      "tags": [
+        "chunks"
+      ]
+    },
+    {
+      "path": "/chunks/by-id/{id}/questions/regenerate",
+      "method": "POST",
+      "operation_id": "regenerate_generated_questions_chunks_by_id__id__questions_regenerate_post",
+      "tags": [
+        "chunks"
+      ]
+    },
+    {
+      "path": "/chunks/{knowledge_id}",
+      "method": "GET",
+      "operation_id": "list_knowledge_chunks_chunks__knowledge_id__get",
+      "tags": [
+        "chunks"
+      ]
+    },
+    {
+      "path": "/chunks/{knowledge_id}",
+      "method": "DELETE",
+      "operation_id": "delete_chunks_by_knowledge_id_chunks__knowledge_id__delete",
+      "tags": [
+        "chunks"
+      ]
+    },
+    {
+      "path": "/chunks/{knowledge_id}/{id}",
+      "method": "PUT",
+      "operation_id": "update_chunk_chunks__knowledge_id___id__put",
+      "tags": [
+        "chunks"
+      ]
+    },
+    {
+      "path": "/chunks/{knowledge_id}/{id}",
+      "method": "DELETE",
+      "operation_id": "delete_chunk_chunks__knowledge_id___id__delete",
+      "tags": [
+        "chunks"
+      ]
+    },
+    {
+      "path": "/chunks/{knowledge_id}/{id}/revert",
+      "method": "POST",
+      "operation_id": "revert_chunk_chunks__knowledge_id___id__revert_post",
+      "tags": [
+        "chunks"
+      ]
+    },
+    {
+      "path": "/chunks/{knowledge_id}/{id}/revisions",
+      "method": "GET",
+      "operation_id": "list_chunk_revisions_chunks__knowledge_id___id__revisions_get",
+      "tags": [
+        "chunks"
+      ]
+    },
+    {
+      "path": "/datasource",
+      "method": "POST",
+      "operation_id": "create_datasource_datasource_post",
+      "tags": [
+        "datasources"
+      ]
+    },
+    {
+      "path": "/datasource",
+      "method": "GET",
+      "operation_id": "list_datasources_datasource_get",
+      "tags": [
+        "datasources"
+      ]
+    },
+    {
+      "path": "/datasource/logs/{log_id}",
+      "method": "GET",
+      "operation_id": "get_sync_log_datasource_logs__log_id__get",
+      "tags": [
+        "datasources"
+      ]
+    },
+    {
+      "path": "/datasource/types",
+      "method": "GET",
+      "operation_id": "list_connector_types_datasource_types_get",
+      "tags": [
+        "datasources"
+      ]
+    },
+    {
+      "path": "/datasource/validate-credentials",
+      "method": "POST",
+      "operation_id": "validate_credentials_datasource_validate_credentials_post",
+      "tags": [
+        "datasources"
+      ]
+    },
+    {
+      "path": "/datasource/{id}",
+      "method": "GET",
+      "operation_id": "get_datasource_datasource__id__get",
+      "tags": [
+        "datasources"
+      ]
+    },
+    {
+      "path": "/datasource/{id}",
+      "method": "PUT",
+      "operation_id": "update_datasource_datasource__id__put",
+      "tags": [
+        "datasources"
+      ]
+    },
+    {
+      "path": "/datasource/{id}",
+      "method": "DELETE",
+      "operation_id": "delete_datasource_datasource__id__delete",
+      "tags": [
+        "datasources"
+      ]
+    },
+    {
+      "path": "/datasource/{id}/logs",
+      "method": "GET",
+      "operation_id": "list_sync_logs_datasource__id__logs_get",
+      "tags": [
+        "datasources"
+      ]
+    },
+    {
+      "path": "/datasource/{id}/pause",
+      "method": "POST",
+      "operation_id": "pause_datasource_datasource__id__pause_post",
+      "tags": [
+        "datasources"
+      ]
+    },
+    {
+      "path": "/datasource/{id}/resource-ancestors",
+      "method": "POST",
+      "operation_id": "resolve_resource_ancestors_datasource__id__resource_ancestors_post",
+      "tags": [
+        "datasources"
+      ]
+    },
+    {
+      "path": "/datasource/{id}/resources",
+      "method": "GET",
+      "operation_id": "list_available_resources_datasource__id__resources_get",
+      "tags": [
+        "datasources"
+      ]
+    },
+    {
+      "path": "/datasource/{id}/resume",
+      "method": "POST",
+      "operation_id": "resume_datasource_datasource__id__resume_post",
+      "tags": [
+        "datasources"
+      ]
+    },
+    {
+      "path": "/datasource/{id}/sync",
+      "method": "POST",
+      "operation_id": "manual_sync_datasource__id__sync_post",
+      "tags": [
+        "datasources"
+      ]
+    },
+    {
+      "path": "/datasource/{id}/validate",
+      "method": "POST",
+      "operation_id": "validate_connection_datasource__id__validate_post",
+      "tags": [
+        "datasources"
+      ]
+    },
+    {
+      "path": "/embed-channels",
+      "method": "GET",
+      "operation_id": "list_all_embed_channels_embed_channels_get",
+      "tags": [
+        "embed-channels"
+      ]
+    },
+    {
+      "path": "/embed-channels/{channel_id}",
+      "method": "GET",
+      "operation_id": "get_embed_channel_embed_channels__channel_id__get",
+      "tags": [
+        "embed-channels"
+      ]
+    },
+    {
+      "path": "/embed-channels/{channel_id}",
+      "method": "PUT",
+      "operation_id": "update_embed_channel_embed_channels__channel_id__put",
+      "tags": [
+        "embed-channels"
+      ]
+    },
+    {
+      "path": "/embed-channels/{channel_id}",
+      "method": "DELETE",
+      "operation_id": "delete_embed_channel_embed_channels__channel_id__delete",
+      "tags": [
+        "embed-channels"
+      ]
+    },
+    {
+      "path": "/embed-channels/{channel_id}/preview-session",
+      "method": "POST",
+      "operation_id": "issue_preview_session_embed_channels__channel_id__preview_session_post",
+      "tags": [
+        "embed-channels"
+      ]
+    },
+    {
+      "path": "/embed-channels/{channel_id}/rotate-token",
+      "method": "POST",
+      "operation_id": "rotate_embed_token_embed_channels__channel_id__rotate_token_post",
+      "tags": [
+        "embed-channels"
+      ]
+    },
+    {
+      "path": "/embed-channels/{channel_id}/stats",
+      "method": "GET",
+      "operation_id": "get_embed_channel_stats_embed_channels__channel_id__stats_get",
+      "tags": [
+        "embed-channels"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/agent-chat/{session_id}",
+      "method": "POST",
+      "operation_id": "embed_agent_chat_embed__channel_id__agent_chat__session_id__post",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/chunks/{chunk_id}",
+      "method": "GET",
+      "operation_id": "get_embed_chunk_embed__channel_id__chunks__chunk_id__get",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/config",
+      "method": "GET",
+      "operation_id": "get_embed_config_embed__channel_id__config_get",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/exchange",
+      "method": "POST",
+      "operation_id": "exchange_embed_session_embed__channel_id__exchange_post",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/files",
+      "method": "GET",
+      "operation_id": "embed_files_embed__channel_id__files_get",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/knowledge-chat/{session_id}",
+      "method": "POST",
+      "operation_id": "embed_knowledge_chat_embed__channel_id__knowledge_chat__session_id__post",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/messages/{session_id}/load",
+      "method": "GET",
+      "operation_id": "embed_load_messages_embed__channel_id__messages__session_id__load_get",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/sessions",
+      "method": "POST",
+      "operation_id": "create_embed_session_embed__channel_id__sessions_post",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/sessions/{session_id}/events",
+      "method": "POST",
+      "operation_id": "embed_relay_webhook_event_embed__channel_id__sessions__session_id__events_post",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/sessions/{session_id}/mcp-oauth-resolutions/{pending_id}",
+      "method": "POST",
+      "operation_id": "embed_resolve_mcp_oauth_embed__channel_id__sessions__session_id__mcp_oauth_resolutions__pending_id__post",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/sessions/{session_id}/mcp-oauth-resolutions/{pending_id}/cancel",
+      "method": "POST",
+      "operation_id": "embed_cancel_mcp_oauth_embed__channel_id__sessions__session_id__mcp_oauth_resolutions__pending_id__cancel_post",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/sessions/{session_id}/mcp-services/{service_id}/oauth/authorize-url",
+      "method": "POST",
+      "operation_id": "embed_mcp_oauth_authorize_url_embed__channel_id__sessions__session_id__mcp_services__service_id__oauth_authorize_url_post",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/sessions/{session_id}/mcp-services/{service_id}/oauth/status",
+      "method": "GET",
+      "operation_id": "embed_mcp_oauth_status_embed__channel_id__sessions__session_id__mcp_services__service_id__oauth_status_get",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/sessions/{session_id}/messages/{message_id}/suggestions",
+      "method": "GET",
+      "operation_id": "embed_get_message_suggestions_embed__channel_id__sessions__session_id__messages__message_id__suggestions_get",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/sessions/{session_id}/messages/{message_id}/suggestions",
+      "method": "POST",
+      "operation_id": "embed_ensure_message_suggestions_embed__channel_id__sessions__session_id__messages__message_id__suggestions_post",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/sessions/{session_id}/stop",
+      "method": "POST",
+      "operation_id": "embed_stop_session_embed__channel_id__sessions__session_id__stop_post",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/sessions/{session_id}/suggestion-events",
+      "method": "POST",
+      "operation_id": "embed_record_suggestion_event_embed__channel_id__sessions__session_id__suggestion_events_post",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/sessions/{session_id}/tool-approvals/{pending_id}",
+      "method": "POST",
+      "operation_id": "embed_resolve_tool_approval_embed__channel_id__sessions__session_id__tool_approvals__pending_id__post",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/embed/{channel_id}/suggested-questions",
+      "method": "GET",
+      "operation_id": "get_embed_suggested_questions_embed__channel_id__suggested_questions_get",
+      "tags": [
+        "embed"
+      ]
+    },
+    {
+      "path": "/evaluation",
+      "method": "POST",
+      "operation_id": "run_evaluation_evaluation_post",
+      "tags": [
+        "evaluation"
+      ]
+    },
+    {
+      "path": "/evaluation",
+      "method": "GET",
+      "operation_id": "get_evaluation_result_evaluation_get",
+      "tags": [
+        "evaluation"
+      ]
+    },
+    {
+      "path": "/faq/import/progress/{task_id}",
+      "method": "GET",
+      "operation_id": "get_faq_import_progress_faq_import_progress__task_id__get",
+      "tags": [
+        "knowledge.faq"
+      ]
+    },
+    {
+      "path": "/health",
+      "method": "GET",
+      "operation_id": "health_health_get",
+      "tags": [
+        "meta"
+      ]
+    },
+    {
+      "path": "/im-channels",
+      "method": "GET",
+      "operation_id": "list_all_im_channels_im_channels_get",
+      "tags": [
+        "im-channels"
+      ]
+    },
+    {
+      "path": "/im-channels/{channel_id}",
+      "method": "PUT",
+      "operation_id": "update_im_channel_im_channels__channel_id__put",
+      "tags": [
+        "im-channels"
+      ]
+    },
+    {
+      "path": "/im-channels/{channel_id}",
+      "method": "DELETE",
+      "operation_id": "delete_im_channel_im_channels__channel_id__delete",
+      "tags": [
+        "im-channels"
+      ]
+    },
+    {
+      "path": "/im-channels/{channel_id}/toggle",
+      "method": "POST",
+      "operation_id": "toggle_im_channel_im_channels__channel_id__toggle_post",
+      "tags": [
+        "im-channels"
+      ]
+    },
+    {
+      "path": "/im/callback/{channel_id}",
+      "method": "GET",
+      "operation_id": "im_callback_get",
+      "tags": [
+        "im-callback"
+      ]
+    },
+    {
+      "path": "/im/callback/{channel_id}",
+      "method": "POST",
+      "operation_id": "im_callback_post",
+      "tags": [
+        "im-callback"
+      ]
+    },
+    {
+      "path": "/initialization/asr/check",
+      "method": "POST",
+      "operation_id": "check_asr_model_initialization_asr_check_post",
+      "tags": [
+        "initialization"
+      ]
+    },
+    {
+      "path": "/initialization/embedding/test",
+      "method": "POST",
+      "operation_id": "test_embedding_model_initialization_embedding_test_post",
+      "tags": [
+        "initialization"
+      ]
+    },
+    {
+      "path": "/initialization/multimodal/test",
+      "method": "POST",
+      "operation_id": "test_multimodal_function_initialization_multimodal_test_post",
+      "tags": [
+        "initialization"
+      ]
+    },
+    {
+      "path": "/initialization/ollama/download/progress/{task_id}",
+      "method": "GET",
+      "operation_id": "get_download_progress_initialization_ollama_download_progress__task_id__get",
+      "tags": [
+        "initialization"
+      ]
+    },
+    {
+      "path": "/initialization/ollama/download/tasks",
+      "method": "GET",
+      "operation_id": "list_download_tasks_initialization_ollama_download_tasks_get",
+      "tags": [
+        "initialization"
+      ]
+    },
+    {
+      "path": "/initialization/ollama/models",
+      "method": "GET",
+      "operation_id": "list_ollama_models_initialization_ollama_models_get",
+      "tags": [
+        "initialization"
+      ]
+    },
+    {
+      "path": "/initialization/ollama/models/check",
+      "method": "POST",
+      "operation_id": "check_ollama_models_initialization_ollama_models_check_post",
+      "tags": [
+        "initialization"
+      ]
+    },
+    {
+      "path": "/initialization/ollama/models/download",
+      "method": "POST",
+      "operation_id": "download_ollama_model_initialization_ollama_models_download_post",
+      "tags": [
+        "initialization"
+      ]
+    },
+    {
+      "path": "/initialization/ollama/status",
+      "method": "GET",
+      "operation_id": "check_ollama_status_initialization_ollama_status_get",
+      "tags": [
+        "initialization"
+      ]
+    },
+    {
+      "path": "/initialization/remote/check",
+      "method": "POST",
+      "operation_id": "check_remote_model_initialization_remote_check_post",
+      "tags": [
+        "initialization"
+      ]
+    },
+    {
+      "path": "/initialization/rerank/check",
+      "method": "POST",
+      "operation_id": "check_rerank_model_initialization_rerank_check_post",
+      "tags": [
+        "initialization"
+      ]
+    },
+    {
+      "path": "/knowledge-bases",
+      "method": "POST",
+      "operation_id": "create_knowledge_base_knowledge_bases_post",
+      "tags": [
+        "knowledge-bases"
+      ]
+    },
+    {
+      "path": "/knowledge-bases",
+      "method": "GET",
+      "operation_id": "list_knowledge_bases_knowledge_bases_get",
+      "tags": [
+        "knowledge-bases"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/copy",
+      "method": "POST",
+      "operation_id": "copy_knowledge_base_knowledge_bases_copy_post",
+      "tags": [
+        "knowledge-bases"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}",
+      "method": "GET",
+      "operation_id": "get_knowledge_base_knowledge_bases__id__get",
+      "tags": [
+        "knowledge-bases"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}",
+      "method": "PUT",
+      "operation_id": "update_knowledge_base_knowledge_bases__id__put",
+      "tags": [
+        "knowledge-bases"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}",
+      "method": "DELETE",
+      "operation_id": "delete_knowledge_base_knowledge_bases__id__delete",
+      "tags": [
+        "knowledge-bases"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/duplicate",
+      "method": "POST",
+      "operation_id": "duplicate_knowledge_base_knowledge_bases__id__duplicate_post",
+      "tags": [
+        "knowledge-bases"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/faq/entries",
+      "method": "GET",
+      "operation_id": "list_faq_entries_knowledge_bases__id__faq_entries_get",
+      "tags": [
+        "knowledge.faq"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/faq/entries",
+      "method": "DELETE",
+      "operation_id": "delete_faq_entries_knowledge_bases__id__faq_entries_delete",
+      "tags": [
+        "knowledge.faq"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/faq/entries",
+      "method": "POST",
+      "operation_id": "import_faq_entries_knowledge_bases__id__faq_entries_post",
+      "tags": [
+        "knowledge.faq"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/faq/entries/export",
+      "method": "GET",
+      "operation_id": "export_faq_entries_knowledge_bases__id__faq_entries_export_get",
+      "tags": [
+        "knowledge.faq"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/faq/entries/{entry_id}",
+      "method": "GET",
+      "operation_id": "get_faq_entry_knowledge_bases__id__faq_entries__entry_id__get",
+      "tags": [
+        "knowledge.faq"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/faq/entries/{entry_id}",
+      "method": "PUT",
+      "operation_id": "update_faq_entry_knowledge_bases__id__faq_entries__entry_id__put",
+      "tags": [
+        "knowledge.faq"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/faq/entry",
+      "method": "POST",
+      "operation_id": "create_faq_entry_knowledge_bases__id__faq_entry_post",
+      "tags": [
+        "knowledge.faq"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/hybrid-search",
+      "method": "POST",
+      "operation_id": "hybrid_search_knowledge_bases__id__hybrid_search_post",
+      "tags": [
+        "knowledge-bases"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/hybrid-search",
+      "method": "GET",
+      "operation_id": "hybrid_search_get_knowledge_bases__id__hybrid_search_get",
+      "tags": [
+        "knowledge-bases"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/knowledge",
+      "method": "GET",
+      "operation_id": "list_documents_knowledge_bases__id__knowledge_get",
+      "tags": [
+        "knowledge-documents"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/knowledge/file",
+      "method": "POST",
+      "operation_id": "create_file_document_knowledge_bases__id__knowledge_file_post",
+      "tags": [
+        "knowledge-documents"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/knowledge/manual",
+      "method": "POST",
+      "operation_id": "create_manual_document_knowledge_bases__id__knowledge_manual_post",
+      "tags": [
+        "knowledge-documents"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/knowledge/passage",
+      "method": "POST",
+      "operation_id": "create_passage_document_knowledge_bases__id__knowledge_passage_post",
+      "tags": [
+        "knowledge-documents"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/knowledge/url",
+      "method": "POST",
+      "operation_id": "create_url_document_knowledge_bases__id__knowledge_url_post",
+      "tags": [
+        "knowledge-documents"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/move-targets",
+      "method": "GET",
+      "operation_id": "list_move_targets_knowledge_bases__id__move_targets_get",
+      "tags": [
+        "knowledge-bases"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/tags",
+      "method": "GET",
+      "operation_id": "list_tags_knowledge_bases__id__tags_get",
+      "tags": [
+        "tags"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/tags",
+      "method": "POST",
+      "operation_id": "create_tag_knowledge_bases__id__tags_post",
+      "tags": [
+        "tags"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/tags/{tag_id}",
+      "method": "PUT",
+      "operation_id": "update_tag_knowledge_bases__id__tags__tag_id__put",
+      "tags": [
+        "tags"
+      ]
+    },
+    {
+      "path": "/knowledge-bases/{id}/tags/{tag_id}",
+      "method": "DELETE",
+      "operation_id": "delete_tag_knowledge_bases__id__tags__tag_id__delete",
+      "tags": [
+        "tags"
+      ]
+    },
+    {
+      "path": "/knowledge-chat/{session_id}",
+      "method": "POST",
+      "operation_id": "knowledge_qa_knowledge_chat__session_id__post",
+      "tags": [
+        "chat"
+      ]
+    },
+    {
+      "path": "/knowledge-search",
+      "method": "POST",
+      "operation_id": "search_knowledge_knowledge_search_post",
+      "tags": [
+        "chat"
+      ]
+    },
+    {
+      "path": "/knowledge/move",
+      "method": "POST",
+      "operation_id": "move_documents_knowledge_move_post",
+      "tags": [
+        "knowledge-documents"
+      ]
+    },
+    {
+      "path": "/knowledge/move/progress/{task_id}",
+      "method": "GET",
+      "operation_id": "get_move_progress_knowledge_move_progress__task_id__get",
+      "tags": [
+        "knowledge-documents"
+      ]
+    },
+    {
+      "path": "/knowledge/{id}",
+      "method": "GET",
+      "operation_id": "get_document_knowledge__id__get",
+      "tags": [
+        "knowledge-documents"
+      ]
+    },
+    {
+      "path": "/knowledge/{id}",
+      "method": "PUT",
+      "operation_id": "update_document_knowledge__id__put",
+      "tags": [
+        "knowledge-documents"
+      ]
+    },
+    {
+      "path": "/knowledge/{id}",
+      "method": "DELETE",
+      "operation_id": "delete_document_knowledge__id__delete",
+      "tags": [
+        "knowledge-documents"
+      ]
+    },
+    {
+      "path": "/knowledge/{id}/cancel-parse",
+      "method": "POST",
+      "operation_id": "cancel_document_parse_knowledge__id__cancel_parse_post",
+      "tags": [
+        "knowledge-documents"
+      ]
+    },
+    {
+      "path": "/knowledge/{id}/clone",
+      "method": "POST",
+      "operation_id": "clone_document_knowledge__id__clone_post",
+      "tags": [
+        "knowledge-documents"
+      ]
+    },
+    {
+      "path": "/knowledge/{id}/reparse",
+      "method": "POST",
+      "operation_id": "reparse_document_knowledge__id__reparse_post",
+      "tags": [
+        "knowledge-documents"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/auto-fix",
+      "method": "POST",
+      "operation_id": "auto_fix_knowledgebase__kb_id__wiki_auto_fix_post",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/folders",
+      "method": "GET",
+      "operation_id": "list_folders_knowledgebase__kb_id__wiki_folders_get",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/folders",
+      "method": "POST",
+      "operation_id": "create_folder_knowledgebase__kb_id__wiki_folders_post",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/folders/{folder_id}",
+      "method": "PUT",
+      "operation_id": "update_folder_knowledgebase__kb_id__wiki_folders__folder_id__put",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/folders/{folder_id}",
+      "method": "DELETE",
+      "operation_id": "delete_folder_knowledgebase__kb_id__wiki_folders__folder_id__delete",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/graph",
+      "method": "GET",
+      "operation_id": "get_graph_knowledgebase__kb_id__wiki_graph_get",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/index",
+      "method": "GET",
+      "operation_id": "get_index_knowledgebase__kb_id__wiki_index_get",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/lint",
+      "method": "GET",
+      "operation_id": "lint_knowledgebase__kb_id__wiki_lint_get",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/move-page",
+      "method": "PUT",
+      "operation_id": "move_page_knowledgebase__kb_id__wiki_move_page_put",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/pages",
+      "method": "GET",
+      "operation_id": "list_pages_knowledgebase__kb_id__wiki_pages_get",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/pages",
+      "method": "POST",
+      "operation_id": "create_page_knowledgebase__kb_id__wiki_pages_post",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/pages/{slug}",
+      "method": "GET",
+      "operation_id": "get_page_knowledgebase__kb_id__wiki_pages__slug__get",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/pages/{slug}",
+      "method": "PUT",
+      "operation_id": "update_page_knowledgebase__kb_id__wiki_pages__slug__put",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/pages/{slug}",
+      "method": "DELETE",
+      "operation_id": "delete_page_knowledgebase__kb_id__wiki_pages__slug__delete",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/rebuild-links",
+      "method": "POST",
+      "operation_id": "rebuild_links_knowledgebase__kb_id__wiki_rebuild_links_post",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/search",
+      "method": "GET",
+      "operation_id": "search_pages_knowledgebase__kb_id__wiki_search_get",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/knowledgebase/{kb_id}/wiki/stats",
+      "method": "GET",
+      "operation_id": "get_stats_knowledgebase__kb_id__wiki_stats_get",
+      "tags": [
+        "wiki"
+      ]
+    },
+    {
+      "path": "/mcp-services",
+      "method": "POST",
+      "operation_id": "create_mcp_service_mcp_services_post",
+      "tags": [
+        "mcp-services"
+      ]
+    },
+    {
+      "path": "/mcp-services",
+      "method": "GET",
+      "operation_id": "list_mcp_services_mcp_services_get",
+      "tags": [
+        "mcp-services"
+      ]
+    },
+    {
+      "path": "/mcp-services/{service_id}",
+      "method": "GET",
+      "operation_id": "get_mcp_service_mcp_services__service_id__get",
+      "tags": [
+        "mcp-services"
+      ]
+    },
+    {
+      "path": "/mcp-services/{service_id}",
+      "method": "PUT",
+      "operation_id": "update_mcp_service_mcp_services__service_id__put",
+      "tags": [
+        "mcp-services"
+      ]
+    },
+    {
+      "path": "/mcp-services/{service_id}",
+      "method": "DELETE",
+      "operation_id": "delete_mcp_service_mcp_services__service_id__delete",
+      "tags": [
+        "mcp-services"
+      ]
+    },
+    {
+      "path": "/mcp-services/{service_id}/oauth/authorize-url",
+      "method": "POST",
+      "operation_id": "start_oauth_authorization_mcp_services__service_id__oauth_authorize_url_post",
+      "tags": [
+        "mcp-services"
+      ]
+    },
+    {
+      "path": "/mcp-services/{service_id}/oauth/status",
+      "method": "GET",
+      "operation_id": "get_oauth_status_mcp_services__service_id__oauth_status_get",
+      "tags": [
+        "mcp-services"
+      ]
+    },
+    {
+      "path": "/mcp-services/{service_id}/oauth/token",
+      "method": "DELETE",
+      "operation_id": "revoke_oauth_token_mcp_services__service_id__oauth_token_delete",
+      "tags": [
+        "mcp-services"
+      ]
+    },
+    {
+      "path": "/mcp-services/{service_id}/resources",
+      "method": "GET",
+      "operation_id": "list_mcp_service_resources_mcp_services__service_id__resources_get",
+      "tags": [
+        "mcp-services"
+      ]
+    },
+    {
+      "path": "/mcp-services/{service_id}/test",
+      "method": "POST",
+      "operation_id": "test_mcp_service_mcp_services__service_id__test_post",
+      "tags": [
+        "mcp-services"
+      ]
+    },
+    {
+      "path": "/mcp-services/{service_id}/tool-approvals",
+      "method": "GET",
+      "operation_id": "list_mcp_tool_approvals_mcp_services__service_id__tool_approvals_get",
+      "tags": [
+        "mcp-services"
+      ]
+    },
+    {
+      "path": "/mcp-services/{service_id}/tool-approvals/{tool_name}",
+      "method": "PUT",
+      "operation_id": "set_mcp_tool_approval_mcp_services__service_id__tool_approvals__tool_name__put",
+      "tags": [
+        "mcp-services"
+      ]
+    },
+    {
+      "path": "/mcp-services/{service_id}/tools",
+      "method": "GET",
+      "operation_id": "list_mcp_service_tools_mcp_services__service_id__tools_get",
+      "tags": [
+        "mcp-services"
+      ]
+    },
+    {
+      "path": "/messages/chat-history-stats",
+      "method": "GET",
+      "operation_id": "chat_history_stats_messages_chat_history_stats_get",
+      "tags": [
+        "messages"
+      ]
+    },
+    {
+      "path": "/messages/search",
+      "method": "POST",
+      "operation_id": "search_messages_messages_search_post",
+      "tags": [
+        "messages"
+      ]
+    },
+    {
+      "path": "/messages/{session_id}/load",
+      "method": "GET",
+      "operation_id": "load_messages_messages__session_id__load_get",
+      "tags": [
+        "messages"
+      ]
+    },
+    {
+      "path": "/messages/{session_id}/{message_id}",
+      "method": "DELETE",
+      "operation_id": "delete_message_messages__session_id___message_id__delete",
+      "tags": [
+        "messages"
+      ]
+    },
+    {
+      "path": "/models",
+      "method": "POST",
+      "operation_id": "create_model_models_post",
+      "tags": [
+        "models"
+      ]
+    },
+    {
+      "path": "/models",
+      "method": "GET",
+      "operation_id": "list_models_models_get",
+      "tags": [
+        "models"
+      ]
+    },
+    {
+      "path": "/models/providers",
+      "method": "GET",
+      "operation_id": "list_model_providers_models_providers_get",
+      "tags": [
+        "models"
+      ]
+    },
+    {
+      "path": "/models/{model_id}",
+      "method": "GET",
+      "operation_id": "get_model_models__model_id__get",
+      "tags": [
+        "models"
+      ]
+    },
+    {
+      "path": "/models/{model_id}",
+      "method": "PUT",
+      "operation_id": "update_model_models__model_id__put",
+      "tags": [
+        "models"
+      ]
+    },
+    {
+      "path": "/models/{model_id}",
+      "method": "DELETE",
+      "operation_id": "delete_model_models__model_id__delete",
+      "tags": [
+        "models"
+      ]
+    },
+    {
+      "path": "/models/{model_id}/debug",
+      "method": "POST",
+      "operation_id": "debug_model_models__model_id__debug_post",
+      "tags": [
+        "models"
+      ]
+    },
+    {
+      "path": "/organizations",
+      "method": "POST",
+      "operation_id": "create_organization_organizations_post",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations",
+      "method": "GET",
+      "operation_id": "list_my_organizations_organizations_get",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/join",
+      "method": "POST",
+      "operation_id": "join_by_invite_code_organizations_join_post",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/join-by-id",
+      "method": "POST",
+      "operation_id": "join_by_organization_id_organizations_join_by_id_post",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/join-request",
+      "method": "POST",
+      "operation_id": "submit_join_request_organizations_join_request_post",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/preview/{code}",
+      "method": "GET",
+      "operation_id": "preview_by_invite_code_organizations_preview__code__get",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/search",
+      "method": "GET",
+      "operation_id": "search_organizations_organizations_search_get",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/{id}",
+      "method": "GET",
+      "operation_id": "get_organization_organizations__id__get",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/{id}",
+      "method": "PUT",
+      "operation_id": "update_organization_organizations__id__put",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/{id}",
+      "method": "DELETE",
+      "operation_id": "delete_organization_organizations__id__delete",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/{id}/invite",
+      "method": "POST",
+      "operation_id": "invite_member_organizations__id__invite_post",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/{id}/invite-code",
+      "method": "POST",
+      "operation_id": "generate_invite_code_organizations__id__invite_code_post",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/{id}/join-requests",
+      "method": "GET",
+      "operation_id": "list_join_requests_organizations__id__join_requests_get",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/{id}/join-requests/{request_id}/review",
+      "method": "PUT",
+      "operation_id": "review_join_request_organizations__id__join_requests__request_id__review_put",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/{id}/leave",
+      "method": "POST",
+      "operation_id": "leave_organization_organizations__id__leave_post",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/{id}/members",
+      "method": "GET",
+      "operation_id": "list_members_organizations__id__members_get",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/{id}/members/{tenant_id}",
+      "method": "PUT",
+      "operation_id": "update_member_role_organizations__id__members__tenant_id__put",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/{id}/members/{tenant_id}",
+      "method": "DELETE",
+      "operation_id": "remove_member_organizations__id__members__tenant_id__delete",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/{id}/request-upgrade",
+      "method": "POST",
+      "operation_id": "request_role_upgrade_organizations__id__request_upgrade_post",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/{id}/search-tenants",
+      "method": "GET",
+      "operation_id": "search_tenants_for_invite_organizations__id__search_tenants_get",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/organizations/{id}/search-users",
+      "method": "GET",
+      "operation_id": "search_users_for_invite_organizations__id__search_users_get",
+      "tags": [
+        "organizations"
+      ]
+    },
+    {
+      "path": "/sessions",
+      "method": "POST",
+      "operation_id": "create_session_sessions_post",
+      "tags": [
+        "sessions"
+      ]
+    },
+    {
+      "path": "/sessions",
+      "method": "GET",
+      "operation_id": "list_sessions_sessions_get",
+      "tags": [
+        "sessions"
+      ]
+    },
+    {
+      "path": "/sessions/batch",
+      "method": "DELETE",
+      "operation_id": "batch_delete_sessions_sessions_batch_delete",
+      "tags": [
+        "sessions"
+      ]
+    },
+    {
+      "path": "/sessions/{session_id}",
+      "method": "GET",
+      "operation_id": "get_session_sessions__session_id__get",
+      "tags": [
+        "sessions"
+      ]
+    },
+    {
+      "path": "/sessions/{session_id}",
+      "method": "PUT",
+      "operation_id": "update_session_sessions__session_id__put",
+      "tags": [
+        "sessions"
+      ]
+    },
+    {
+      "path": "/sessions/{session_id}",
+      "method": "DELETE",
+      "operation_id": "delete_session_sessions__session_id__delete",
+      "tags": [
+        "sessions"
+      ]
+    },
+    {
+      "path": "/sessions/{session_id}/messages",
+      "method": "DELETE",
+      "operation_id": "clear_session_messages_sessions__session_id__messages_delete",
+      "tags": [
+        "sessions"
+      ]
+    },
+    {
+      "path": "/sessions/{session_id}/messages/{message_id}/suggestions",
+      "method": "GET",
+      "operation_id": "get_suggestions_sessions__session_id__messages__message_id__suggestions_get",
+      "tags": [
+        "suggestions"
+      ]
+    },
+    {
+      "path": "/sessions/{session_id}/messages/{message_id}/suggestions",
+      "method": "POST",
+      "operation_id": "ensure_suggestions_sessions__session_id__messages__message_id__suggestions_post",
+      "tags": [
+        "suggestions"
+      ]
+    },
+    {
+      "path": "/sessions/{session_id}/pin",
+      "method": "POST",
+      "operation_id": "pin_session_sessions__session_id__pin_post",
+      "tags": [
+        "sessions"
+      ]
+    },
+    {
+      "path": "/sessions/{session_id}/pin",
+      "method": "DELETE",
+      "operation_id": "unpin_session_sessions__session_id__pin_delete",
+      "tags": [
+        "sessions"
+      ]
+    },
+    {
+      "path": "/sessions/{session_id}/suggestion-events",
+      "method": "POST",
+      "operation_id": "record_suggestion_event_sessions__session_id__suggestion_events_post",
+      "tags": [
+        "suggestions"
+      ]
+    },
+    {
+      "path": "/skills",
+      "method": "GET",
+      "operation_id": "list_skills_skills_get",
+      "tags": [
+        "agents.skills"
+      ]
+    },
+    {
+      "path": "/storage-backends",
+      "method": "POST",
+      "operation_id": "create_storage_backend_storage_backends_post",
+      "tags": [
+        "storage-backends"
+      ]
+    },
+    {
+      "path": "/storage-backends",
+      "method": "GET",
+      "operation_id": "list_storage_backends_storage_backends_get",
+      "tags": [
+        "storage-backends"
+      ]
+    },
+    {
+      "path": "/storage-backends/test",
+      "method": "POST",
+      "operation_id": "test_storage_backend_config_storage_backends_test_post",
+      "tags": [
+        "storage-backends"
+      ]
+    },
+    {
+      "path": "/storage-backends/types",
+      "method": "GET",
+      "operation_id": "list_storage_provider_types_storage_backends_types_get",
+      "tags": [
+        "storage-backends"
+      ]
+    },
+    {
+      "path": "/storage-backends/{id}",
+      "method": "GET",
+      "operation_id": "get_storage_backend_storage_backends__id__get",
+      "tags": [
+        "storage-backends"
+      ]
+    },
+    {
+      "path": "/storage-backends/{id}",
+      "method": "PUT",
+      "operation_id": "update_storage_backend_storage_backends__id__put",
+      "tags": [
+        "storage-backends"
+      ]
+    },
+    {
+      "path": "/storage-backends/{id}",
+      "method": "DELETE",
+      "operation_id": "delete_storage_backend_storage_backends__id__delete",
+      "tags": [
+        "storage-backends"
+      ]
+    },
+    {
+      "path": "/storage-backends/{id}/default",
+      "method": "PUT",
+      "operation_id": "set_default_storage_backend_storage_backends__id__default_put",
+      "tags": [
+        "storage-backends"
+      ]
+    },
+    {
+      "path": "/storage-backends/{id}/test",
+      "method": "POST",
+      "operation_id": "test_storage_backend_by_id_storage_backends__id__test_post",
+      "tags": [
+        "storage-backends"
+      ]
+    },
+    {
+      "path": "/system/admin/audit-log",
+      "method": "GET",
+      "operation_id": "list_system_audit_log_system_admin_audit_log_get",
+      "tags": [
+        "system-admin"
+      ]
+    },
+    {
+      "path": "/system/admin/settings",
+      "method": "GET",
+      "operation_id": "list_settings_system_admin_settings_get",
+      "tags": [
+        "system-admin"
+      ]
+    },
+    {
+      "path": "/system/admin/settings/{key}",
+      "method": "GET",
+      "operation_id": "get_setting_system_admin_settings__key__get",
+      "tags": [
+        "system-admin"
+      ]
+    },
+    {
+      "path": "/system/admin/settings/{key}",
+      "method": "PUT",
+      "operation_id": "update_setting_system_admin_settings__key__put",
+      "tags": [
+        "system-admin"
+      ]
+    },
+    {
+      "path": "/system/admin/settings/{key}",
+      "method": "DELETE",
+      "operation_id": "reset_setting_system_admin_settings__key__delete",
+      "tags": [
+        "system-admin"
+      ]
+    },
+    {
+      "path": "/system/docreader/reconnect",
+      "method": "POST",
+      "operation_id": "reconnect_docreader_system_docreader_reconnect_post",
+      "tags": [
+        "system"
+      ]
+    },
+    {
+      "path": "/system/info",
+      "method": "GET",
+      "operation_id": "get_system_info_system_info_get",
+      "tags": [
+        "system"
+      ]
+    },
+    {
+      "path": "/system/parser-engines",
+      "method": "GET",
+      "operation_id": "list_parser_engines_system_parser_engines_get",
+      "tags": [
+        "system"
+      ]
+    },
+    {
+      "path": "/system/parser-engines/check",
+      "method": "POST",
+      "operation_id": "check_parser_engines_system_parser_engines_check_post",
+      "tags": [
+        "system"
+      ]
+    },
+    {
+      "path": "/system/storage-engine-check",
+      "method": "POST",
+      "operation_id": "check_storage_engine_system_storage_engine_check_post",
+      "tags": [
+        "system"
+      ]
+    },
+    {
+      "path": "/system/storage-engine-status",
+      "method": "GET",
+      "operation_id": "get_storage_engine_status_system_storage_engine_status_get",
+      "tags": [
+        "system"
+      ]
+    },
+    {
+      "path": "/tenants",
+      "method": "POST",
+      "operation_id": "create_tenant_tenants_post",
+      "tags": [
+        "tenants"
+      ]
+    },
+    {
+      "path": "/tenants",
+      "method": "GET",
+      "operation_id": "list_my_tenants_tenants_get",
+      "tags": [
+        "tenants"
+      ]
+    },
+    {
+      "path": "/tenants/all",
+      "method": "GET",
+      "operation_id": "list_all_tenants_tenants_all_get",
+      "tags": [
+        "tenants"
+      ]
+    },
+    {
+      "path": "/tenants/kv/{key}",
+      "method": "GET",
+      "operation_id": "get_tenant_kv_tenants_kv__key__get",
+      "tags": [
+        "tenants"
+      ]
+    },
+    {
+      "path": "/tenants/kv/{key}",
+      "method": "PUT",
+      "operation_id": "put_tenant_kv_tenants_kv__key__put",
+      "tags": [
+        "tenants"
+      ]
+    },
+    {
+      "path": "/tenants/search",
+      "method": "GET",
+      "operation_id": "search_tenants_tenants_search_get",
+      "tags": [
+        "tenants"
+      ]
+    },
+    {
+      "path": "/tenants/{tenant_id}",
+      "method": "GET",
+      "operation_id": "get_tenant_tenants__tenant_id__get",
+      "tags": [
+        "tenants"
+      ]
+    },
+    {
+      "path": "/tenants/{tenant_id}",
+      "method": "PUT",
+      "operation_id": "update_tenant_tenants__tenant_id__put",
+      "tags": [
+        "tenants"
+      ]
+    },
+    {
+      "path": "/tenants/{tenant_id}",
+      "method": "DELETE",
+      "operation_id": "delete_tenant_tenants__tenant_id__delete",
+      "tags": [
+        "tenants"
+      ]
+    },
+    {
+      "path": "/tenants/{tenant_id}/api-keys",
+      "method": "GET",
+      "operation_id": "list_api_keys_tenants__tenant_id__api_keys_get",
+      "tags": [
+        "tenants"
+      ]
+    },
+    {
+      "path": "/tenants/{tenant_id}/api-keys",
+      "method": "POST",
+      "operation_id": "create_api_key_tenants__tenant_id__api_keys_post",
+      "tags": [
+        "tenants"
+      ]
+    },
+    {
+      "path": "/tenants/{tenant_id}/api-keys/{key_id}",
+      "method": "DELETE",
+      "operation_id": "delete_api_key_tenants__tenant_id__api_keys__key_id__delete",
+      "tags": [
+        "tenants"
+      ]
+    },
+    {
+      "path": "/tenants/{tenant_id}/api-principal-config",
+      "method": "GET",
+      "operation_id": "get_api_principal_config_tenants__tenant_id__api_principal_config_get",
+      "tags": [
+        "tenants"
+      ]
+    },
+    {
+      "path": "/tenants/{tenant_id}/api-principal-config",
+      "method": "PUT",
+      "operation_id": "update_api_principal_config_tenants__tenant_id__api_principal_config_put",
+      "tags": [
+        "tenants"
+      ]
+    },
+    {
+      "path": "/user/favorites",
+      "method": "GET",
+      "operation_id": "list_favorites_user_favorites_get",
+      "tags": [
+        "user-favorites"
+      ]
+    },
+    {
+      "path": "/user/favorites",
+      "method": "POST",
+      "operation_id": "add_favorite_user_favorites_post",
+      "tags": [
+        "user-favorites"
+      ]
+    },
+    {
+      "path": "/user/favorites/{type}/{id}",
+      "method": "DELETE",
+      "operation_id": "remove_favorite_user_favorites__type___id__delete",
+      "tags": [
+        "user-favorites"
+      ]
+    },
+    {
+      "path": "/vector-stores",
+      "method": "POST",
+      "operation_id": "create_vector_store_vector_stores_post",
+      "tags": [
+        "vector-stores"
+      ]
+    },
+    {
+      "path": "/vector-stores",
+      "method": "GET",
+      "operation_id": "list_vector_stores_vector_stores_get",
+      "tags": [
+        "vector-stores"
+      ]
+    },
+    {
+      "path": "/vector-stores/test",
+      "method": "POST",
+      "operation_id": "test_vector_store_raw_vector_stores_test_post",
+      "tags": [
+        "vector-stores"
+      ]
+    },
+    {
+      "path": "/vector-stores/types",
+      "method": "GET",
+      "operation_id": "list_vector_store_types_vector_stores_types_get",
+      "tags": [
+        "vector-stores"
+      ]
+    },
+    {
+      "path": "/vector-stores/{store_id}",
+      "method": "GET",
+      "operation_id": "get_vector_store_vector_stores__store_id__get",
+      "tags": [
+        "vector-stores"
+      ]
+    },
+    {
+      "path": "/vector-stores/{store_id}",
+      "method": "PUT",
+      "operation_id": "update_vector_store_vector_stores__store_id__put",
+      "tags": [
+        "vector-stores"
+      ]
+    },
+    {
+      "path": "/vector-stores/{store_id}",
+      "method": "DELETE",
+      "operation_id": "delete_vector_store_vector_stores__store_id__delete",
+      "tags": [
+        "vector-stores"
+      ]
+    },
+    {
+      "path": "/vector-stores/{store_id}/test",
+      "method": "POST",
+      "operation_id": "test_vector_store_by_id_vector_stores__store_id__test_post",
+      "tags": [
+        "vector-stores"
+      ]
+    },
+    {
+      "path": "/web-search-providers",
+      "method": "POST",
+      "operation_id": "create_provider_web_search_providers_post",
+      "tags": [
+        "web-search"
+      ]
+    },
+    {
+      "path": "/web-search-providers",
+      "method": "GET",
+      "operation_id": "list_providers_web_search_providers_get",
+      "tags": [
+        "web-search"
+      ]
+    },
+    {
+      "path": "/web-search-providers/test",
+      "method": "POST",
+      "operation_id": "test_provider_raw_web_search_providers_test_post",
+      "tags": [
+        "web-search"
+      ]
+    },
+    {
+      "path": "/web-search-providers/types",
+      "method": "GET",
+      "operation_id": "list_provider_types_web_search_providers_types_get",
+      "tags": [
+        "web-search"
+      ]
+    },
+    {
+      "path": "/web-search-providers/{provider_id}",
+      "method": "GET",
+      "operation_id": "get_provider_web_search_providers__provider_id__get",
+      "tags": [
+        "web-search"
+      ]
+    },
+    {
+      "path": "/web-search-providers/{provider_id}",
+      "method": "PUT",
+      "operation_id": "update_provider_web_search_providers__provider_id__put",
+      "tags": [
+        "web-search"
+      ]
+    },
+    {
+      "path": "/web-search-providers/{provider_id}",
+      "method": "DELETE",
+      "operation_id": "delete_provider_web_search_providers__provider_id__delete",
+      "tags": [
+        "web-search"
+      ]
+    },
+    {
+      "path": "/web-search-providers/{provider_id}/test",
+      "method": "POST",
+      "operation_id": "test_provider_by_id_web_search_providers__provider_id__test_post",
+      "tags": [
+        "web-search"
+      ]
+    },
+    {
+      "path": "/web-search/providers",
+      "method": "GET",
+      "operation_id": "list_builtin_providers_web_search_providers_get",
+      "tags": [
+        "web-search"
+      ]
+    }
+  ]
+}
