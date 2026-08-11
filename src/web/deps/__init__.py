@@ -41,6 +41,27 @@ from src.web.deps.chunks import (
     get_chunk_revision_service,
     get_chunk_service,
 )
+from src.web.deps.embed_channels import (
+    EmbedChannelDep,
+    EmbedChannelServiceDep,
+    EmbedChatServiceDep,
+    EmbedChunkServiceDep,
+    EmbedMessageContextDep,
+    EmbedMessageServiceDep,
+    EmbedSessionDep,
+    EmbedSessionServiceDep,
+    EmbedWebhookDispatcherDep,
+    extract_embed_token,
+    get_embed_channel,
+    get_embed_channel_service,
+    get_embed_chat_service,
+    get_embed_chunk_service,
+    get_embed_message_context,
+    get_embed_message_service,
+    get_embed_session_service,
+    get_embed_webhook_dispatcher,
+    require_embed_session,
+)
 from src.web.deps.infra_datasources import (
     DataSourceServiceDep,
     get_datasource_service,
@@ -85,10 +106,6 @@ from src.web.deps.knowledge_bases import (
     KBServiceDep,
     get_kb_service,
 )
-from src.web.deps.organizations import (
-    OrganizationServiceDep,
-    get_organization_service,
-)
 from src.web.deps.knowledge_documents import (
     KnowledgeDocumentsDep,
     get_documents_orchestrator,
@@ -110,6 +127,10 @@ from src.web.deps.knowledge_wiki import (
     get_wiki_folder_service,
     get_wiki_lint_service,
     get_wiki_page_service,
+)
+from src.web.deps.organizations import (
+    OrganizationServiceDep,
+    get_organization_service,
 )
 from src.web.deps.rbac import (
     CrossTenantDep,
@@ -152,6 +173,15 @@ __all__ = [
     "CurrentUserContextDep",
     "CustomAgentServiceDep",
     "DataSourceServiceDep",
+    "EmbedChannelDep",
+    "EmbedChannelServiceDep",
+    "EmbedChatServiceDep",
+    "EmbedChunkServiceDep",
+    "EmbedMessageContextDep",
+    "EmbedMessageServiceDep",
+    "EmbedSessionDep",
+    "EmbedSessionServiceDep",
+    "EmbedWebhookDispatcherDep",
     "FAQImportRunnerDep",
     "FAQServiceDep",
     "FavoriteServiceDep",
@@ -191,6 +221,7 @@ __all__ = [
     "WikiFolderServiceDep",
     "WikiLintServiceDep",
     "WikiPageServiceDep",
+    "extract_embed_token",
     "get_async_session",
     "get_audit_log_service",
     "get_auth_service",
@@ -200,6 +231,14 @@ __all__ = [
     "get_custom_agent_service",
     "get_datasource_service",
     "get_documents_orchestrator",
+    "get_embed_channel",
+    "get_embed_channel_service",
+    "get_embed_chat_service",
+    "get_embed_chunk_service",
+    "get_embed_message_context",
+    "get_embed_message_service",
+    "get_embed_session_service",
+    "get_embed_webhook_dispatcher",
     "get_faq_import_runner",
     "get_faq_service",
     "get_favorite_service",
@@ -229,6 +268,7 @@ __all__ = [
     "get_wiki_folder_service",
     "get_wiki_lint_service",
     "get_wiki_page_service",
+    "require_embed_session",
     "require_tenant_id",
     "require_user_id",
 ]
