@@ -66,7 +66,6 @@ from src.web.deps.evaluation import (
     EvaluationServiceDep,
     get_evaluation_service,
 )
-)
 from src.web.deps.infra_datasources import (
     DataSourceServiceDep,
     get_datasource_service,
