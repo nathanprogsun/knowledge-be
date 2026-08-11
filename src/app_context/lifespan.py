@@ -56,6 +56,7 @@ from src.web.api.chat.messages.router import (
 )
 from src.web.api.chat.router import router as chat_router
 from src.web.api.chat.sessions.router import router as sessions_router
+from src.web.api.evaluation.router import router as evaluation_router
 from src.web.api.favorites.router import router as favorites_router
 from src.web.api.infra.datasources.router import router as datasources_router
 from src.web.api.infra.initialization.router import router as initialization_router
@@ -189,6 +190,7 @@ def create_app() -> FastAPI:
     application.include_router(chunker_router)
     application.include_router(chunks_router)
     application.include_router(datasources_router)
+    application.include_router(evaluation_router)
     application.include_router(faq_import_progress_router)
     application.include_router(faq_router)
     application.include_router(favorites_router)

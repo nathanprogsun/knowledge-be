@@ -67,6 +67,7 @@ _EXPECTED_ALL_ROUTES: set[str] = {
     "/datasource/{id}/resume",
     "/datasource/{id}/sync",
     "/datasource/{id}/validate",
+    "/evaluation",
     "/faq/import/progress/{task_id}",
     "/health",
     "/initialization/asr/check",
