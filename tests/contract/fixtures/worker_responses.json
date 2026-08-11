@@ -1,0 +1,377 @@
+{
+  "_comment": "Worker task wire shapes captured from the upstream Go task payload structs (internal/types/task.go, internal/types/datasource.go, internal/types/temporary_document.go, internal/application/service/extract.go and internal/application/service/wiki_ingest.go). Each tasks entry lists: go_type (the upstream task-type constant), go_struct (the upstream payload struct), fields (the business JSON field set the upstream payload carries — the upstream tracing-context lf_* fields and the initiator metadata are deliberately not modelled on the Python surface, so they are excluded from the comparison), required (the upstream fields serialized without omitempty), and result (the JSON keys the Python handler returns; empty for tasks whose core seam is not yet wired). Field name comparison is exact (no drift in either direction).",
+  "tasks": {
+    "chunk:extract": {
+      "go_type": "chunk:extract",
+      "go_struct": "ExtractChunkPayload",
+      "fields": ["tenant_id", "chunk_id", "model_id", "knowledge_id", "attempt", "chunk_index"],
+      "required": ["tenant_id", "chunk_id", "model_id"],
+      "result": ["skipped", "reason", "node_count", "relation_count"]
+    },
+    "datasource_sync": {
+      "go_type": "datasource:sync",
+      "go_struct": "DataSourceSyncPayload",
+      "fields": ["data_source_id", "tenant_id", "sync_log_id", "force_full", "max_items", "trigger"],
+      "required": ["data_source_id", "tenant_id", "sync_log_id", "force_full"],
+      "result": [
+        "id", "data_source_id", "tenant_id", "status", "started_at", "finished_at",
+        "items_total", "items_created", "items_updated", "items_deleted",
+        "items_skipped", "items_failed", "error_message", "result", "created_at",
+        "updated_at"
+      ]
+    },
+    "datatable:summary": {
+      "go_type": "datatable:summary",
+      "go_struct": "DataTableSummaryPayload",
+      "fields": ["tenant_id", "knowledge_id", "summary_model", "embedding_model"],
+      "required": ["tenant_id", "knowledge_id", "summary_model", "embedding_model"],
+      "result": ["knowledge_id", "summary_chunk_id", "column_chunk_id"]
+    },
+    "document_process": {
+      "go_type": "document:process",
+      "go_struct": "DocumentProcessPayload",
+      "fields": [
+        "request_id", "tenant_id", "knowledge_id", "knowledge_base_id",
+        "file_path", "file_name", "file_type", "url", "file_url", "passages",
+        "enable_multimodel", "enable_question_generation", "question_count",
+        "language", "attempt"
+      ],
+      "required": [
+        "request_id", "tenant_id", "knowledge_id", "knowledge_base_id",
+        "enable_multimodel", "enable_question_generation"
+      ],
+      "result": [
+        "parse_status", "enable_status", "summary_status", "storage_size",
+        "error_message", "text_chunk_count", "skipped"
+      ]
+    },
+    "faq:import": {
+      "go_type": "faq:import",
+      "go_struct": "FAQImportPayload",
+      "fields": [
+        "tenant_id", "task_id", "kb_id", "knowledge_id", "entries", "entries_url",
+        "entry_count", "mode", "dry_run", "enqueued_at", "instance_id"
+      ],
+      "required": ["tenant_id", "task_id", "kb_id", "mode", "dry_run", "enqueued_at"],
+      "result": []
+    },
+    "image_multimodal": {
+      "go_type": "image:multimodal",
+      "go_struct": "ImageMultimodalPayload",
+      "fields": [
+        "tenant_id", "knowledge_id", "knowledge_base_id", "chunk_id", "image_url",
+        "image_local_path", "enable_ocr", "enable_caption", "language",
+        "image_source_type", "attempt", "image_index"
+      ],
+      "required": [
+        "tenant_id", "knowledge_id", "knowledge_base_id", "chunk_id", "image_url",
+        "image_local_path", "enable_ocr", "enable_caption"
+      ],
+      "result": [
+        "ocr_text", "caption", "image_bytes", "chunks_created", "indexed",
+        "skipped", "read_error", "ocr_error", "caption_error", "vlm_model_id",
+        "ocr_chars", "caption_chars", "ocr_skipped"
+      ]
+    },
+    "index:delete": {
+      "go_type": "index:delete",
+      "go_struct": "IndexDeletePayload",
+      "fields": [
+        "tenant_id", "knowledge_base_id", "embedding_model_id", "kb_type",
+        "chunk_ids", "effective_engines", "vector_store_id"
+      ],
+      "required": [
+        "tenant_id", "knowledge_base_id", "embedding_model_id", "kb_type",
+        "chunk_ids", "effective_engines"
+      ],
+      "result": []
+    },
+    "kb:clone": {
+      "go_type": "kb:clone",
+      "go_struct": "KBClonePayload",
+      "fields": ["tenant_id", "task_id", "source_id", "target_id"],
+      "required": ["tenant_id", "task_id", "source_id", "target_id"],
+      "result": ["task_id", "source_id", "target_id", "status"]
+    },
+    "kb:delete": {
+      "go_type": "kb:delete",
+      "go_struct": "KBDeletePayload",
+      "fields": [
+        "tenant_id", "knowledge_base_id", "data_source_ids", "effective_engines",
+        "vector_store_id"
+      ],
+      "required": ["tenant_id", "knowledge_base_id", "effective_engines"],
+      "result": [
+        "knowledge_base_id", "knowledge_ids", "deleted_chunks", "deleted_knowledge",
+        "vector_store_id", "status"
+      ]
+    },
+    "knowledge:list_delete": {
+      "go_type": "knowledge:list_delete",
+      "go_struct": "KnowledgeListDeletePayload",
+      "fields": ["tenant_id", "knowledge_ids"],
+      "required": ["tenant_id", "knowledge_ids"],
+      "result": ["deleted"]
+    },
+    "knowledge:list_reparse": {
+      "go_type": "knowledge:list_reparse",
+      "go_struct": "KnowledgeListReparsePayload",
+      "fields": ["tenant_id", "knowledge_ids", "process_config"],
+      "required": ["tenant_id", "knowledge_ids"],
+      "result": ["submitted", "failed"]
+    },
+    "knowledge:move": {
+      "go_type": "knowledge:move",
+      "go_struct": "KnowledgeMovePayload",
+      "fields": [
+        "tenant_id", "task_id", "knowledge_ids", "source_kb_id", "target_kb_id", "mode"
+      ],
+      "required": [
+        "tenant_id", "task_id", "knowledge_ids", "source_kb_id", "target_kb_id", "mode"
+      ],
+      "result": ["processed", "failed"]
+    },
+    "knowledge:post_process": {
+      "go_type": "knowledge:post_process",
+      "go_struct": "KnowledgePostProcessPayload",
+      "fields": ["tenant_id", "knowledge_id", "knowledge_base_id", "language", "attempt"],
+      "required": ["tenant_id", "knowledge_id", "knowledge_base_id"],
+      "result": [
+        "skipped", "reason", "chunks_total", "enqueued_summary",
+        "enqueued_question", "enqueued_question_count", "enqueued_wiki",
+        "wiki_slot_owned", "enqueued_graph", "enqueued_graph_count"
+      ]
+    },
+    "manual_process": {
+      "go_type": "manual:process",
+      "go_struct": "ManualProcessPayload",
+      "fields": [
+        "request_id", "tenant_id", "knowledge_id", "knowledge_base_id", "content",
+        "need_cleanup"
+      ],
+      "required": [
+        "request_id", "tenant_id", "knowledge_id", "knowledge_base_id", "content",
+        "need_cleanup"
+      ],
+      "result": []
+    },
+    "question:generation": {
+      "go_type": "question:generation",
+      "go_struct": "QuestionGenerationPayload",
+      "fields": [
+        "tenant_id", "knowledge_base_id", "knowledge_id", "question_count",
+        "language", "attempt", "chunk_ids", "chunk_id", "batch_index",
+        "prev_chunk_id", "next_chunk_id"
+      ],
+      "required": ["tenant_id", "knowledge_base_id", "knowledge_id", "question_count"],
+      "result": []
+    },
+    "summary:generation": {
+      "go_type": "summary:generation",
+      "go_struct": "SummaryGenerationPayload",
+      "fields": [
+        "tenant_id", "knowledge_base_id", "knowledge_id", "language", "refresh",
+        "attempt"
+      ],
+      "required": ["tenant_id", "knowledge_base_id", "knowledge_id"],
+      "result": []
+    },
+    "temporary_document:process": {
+      "go_type": "temporary_document:process",
+      "go_struct": "TemporaryDocumentTaskPayload",
+      "fields": ["tenant_id", "document_id"],
+      "required": ["tenant_id", "document_id"],
+      "result": ["tenant_id", "document_id", "status"]
+    },
+    "wiki:finalize": {
+      "go_type": "wiki:finalize",
+      "go_struct": "WikiIngestPayload",
+      "fields": ["tenant_id", "knowledge_base_id", "language"],
+      "required": ["tenant_id", "knowledge_base_id"],
+      "result": []
+    },
+    "wiki:ingest": {
+      "go_type": "wiki:ingest",
+      "go_struct": "WikiIngestPayload",
+      "fields": ["tenant_id", "knowledge_base_id", "language"],
+      "required": ["tenant_id", "knowledge_base_id"],
+      "result": [
+        "pending_ops", "ingest_succeeded", "ingest_failed", "retract_handled",
+        "pages_affected", "follow_up_scheduled", "rate_limited"
+      ]
+    }
+  },
+  "samples": {
+    "chunk:extract": {
+      "tenant_id": 1,
+      "chunk_id": "chunk-1",
+      "model_id": "model-1",
+      "knowledge_id": "knowledge-1",
+      "attempt": 2,
+      "chunk_index": 3
+    },
+    "datasource_sync": {
+      "data_source_id": "ds-1",
+      "tenant_id": 1,
+      "sync_log_id": "sync-1",
+      "force_full": true,
+      "max_items": 100,
+      "trigger": "manual"
+    },
+    "datatable:summary": {
+      "tenant_id": 1,
+      "knowledge_id": "knowledge-1",
+      "summary_model": "model-1",
+      "embedding_model": "model-2"
+    },
+    "document_process": {
+      "request_id": "req-1",
+      "tenant_id": 1,
+      "knowledge_id": "knowledge-1",
+      "knowledge_base_id": "kb-1",
+      "file_path": "tenants/1/files/doc.pdf",
+      "file_name": "doc.pdf",
+      "file_type": "pdf",
+      "url": "",
+      "file_url": "",
+      "passages": ["paragraph one", "paragraph two"],
+      "enable_multimodel": true,
+      "enable_question_generation": true,
+      "question_count": 5,
+      "language": "en-US",
+      "attempt": 1
+    },
+    "faq:import": {
+      "tenant_id": 1,
+      "task_id": "task-1",
+      "kb_id": "kb-1",
+      "knowledge_id": "knowledge-1",
+      "entries": [
+        {
+          "standard_question": "how to reset?",
+          "similar_questions": ["reset steps"],
+          "negative_questions": [],
+          "answers": ["click the reset button"],
+          "answer_strategy": null,
+          "tag_id": 0,
+          "tag_name": "",
+          "is_enabled": true,
+          "is_recommended": false
+        }
+      ],
+      "entries_url": "",
+      "entry_count": 1,
+      "mode": "append",
+      "dry_run": false,
+      "enqueued_at": 1750000000,
+      "instance_id": "inst-1"
+    },
+    "image_multimodal": {
+      "tenant_id": 1,
+      "knowledge_id": "knowledge-1",
+      "knowledge_base_id": "kb-1",
+      "chunk_id": "chunk-1",
+      "image_url": "local://tenants/1/images/page1.png",
+      "image_local_path": "tenants/1/images/page1.png",
+      "enable_ocr": true,
+      "enable_caption": false,
+      "language": "zh-CN",
+      "image_source_type": "scanned_pdf",
+      "attempt": 1,
+      "image_index": 0
+    },
+    "index:delete": {
+      "tenant_id": 1,
+      "knowledge_base_id": "kb-1",
+      "embedding_model_id": "model-1",
+      "kb_type": "document",
+      "chunk_ids": ["chunk-1", "chunk-2"],
+      "effective_engines": [
+        {"retriever_engine_type": "pgvector", "retriever_type": "vector"}
+      ],
+      "vector_store_id": "store-1"
+    },
+    "kb:clone": {
+      "tenant_id": 1,
+      "task_id": "task-1",
+      "source_id": "kb-1",
+      "target_id": "kb-2"
+    },
+    "kb:delete": {
+      "tenant_id": 1,
+      "knowledge_base_id": "kb-1",
+      "data_source_ids": ["ds-1"],
+      "effective_engines": [
+        {"retriever_engine_type": "pgvector", "retriever_type": "vector"}
+      ],
+      "vector_store_id": "store-1"
+    },
+    "knowledge:list_delete": {
+      "tenant_id": 1,
+      "knowledge_ids": ["knowledge-1", "knowledge-2"]
+    },
+    "knowledge:list_reparse": {
+      "tenant_id": 1,
+      "knowledge_ids": ["knowledge-1", "knowledge-2"],
+      "process_config": {"enable_multimodel": true, "graph_enabled": false}
+    },
+    "knowledge:move": {
+      "tenant_id": 1,
+      "task_id": "task-1",
+      "knowledge_ids": ["knowledge-1"],
+      "source_kb_id": "kb-1",
+      "target_kb_id": "kb-2",
+      "mode": "reuse_vectors"
+    },
+    "knowledge:post_process": {
+      "tenant_id": 1,
+      "knowledge_id": "knowledge-1",
+      "knowledge_base_id": "kb-1",
+      "language": "en-US",
+      "attempt": 1
+    },
+    "manual_process": {
+      "request_id": "req-1",
+      "tenant_id": 1,
+      "knowledge_id": "knowledge-1",
+      "knowledge_base_id": "kb-1",
+      "content": "# cleaned markdown content",
+      "need_cleanup": false
+    },
+    "question:generation": {
+      "tenant_id": 1,
+      "knowledge_base_id": "kb-1",
+      "knowledge_id": "knowledge-1",
+      "question_count": 5,
+      "language": "en-US",
+      "attempt": 1,
+      "chunk_ids": ["chunk-1", "chunk-2"],
+      "chunk_id": "",
+      "batch_index": 0,
+      "prev_chunk_id": "",
+      "next_chunk_id": ""
+    },
+    "summary:generation": {
+      "tenant_id": 1,
+      "knowledge_base_id": "kb-1",
+      "knowledge_id": "knowledge-1",
+      "language": "en-US",
+      "refresh": false,
+      "attempt": 1
+    },
+    "temporary_document:process": {
+      "tenant_id": 1,
+      "document_id": "doc-1"
+    },
+    "wiki:finalize": {
+      "tenant_id": 1,
+      "knowledge_base_id": "kb-1",
+      "language": "en-US"
+    },
+    "wiki:ingest": {
+      "tenant_id": 1,
+      "knowledge_base_id": "kb-1",
+      "language": "en-US"
+    }
+  }
+}
