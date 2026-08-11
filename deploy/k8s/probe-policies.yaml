@@ -1,0 +1,58 @@
+# Probe and resilience policies for the knowledge-be workloads.
+# Apply independently of the Deployments so they can be maintained centrally.
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kb-api-pdb
+  labels:
+    app.kubernetes.io/name: knowledge-be
+    app.kubernetes.io/component: api
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: knowledge-be
+      app.kubernetes.io/component: api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kb-worker-pdb
+  labels:
+    app.kubernetes.io/name: knowledge-be
+    app.kubernetes.io/component: worker
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: knowledge-be
+      app.kubernetes.io/component: worker
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: kb-api-hpa
+  labels:
+    app.kubernetes.io/name: knowledge-be
+    app.kubernetes.io/component: api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: kb-api
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
