@@ -107,6 +107,7 @@ def pytest_configure(config: pytest.Config) -> None:
     """
     config.addinivalue_line("python_files", "stage4_contract.py")
     config.addinivalue_line("python_files", "stage5_contract.py")
+    config.addinivalue_line("python_files", "stage7_contract.py")
 
 
 @pytest.fixture(scope="session")
