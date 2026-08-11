@@ -48,6 +48,13 @@ from src.settings import get_settings
 from src.web.api.agents.router import router as agents_router
 from src.web.api.agents.skill_views import skill_router as skills_router
 from src.web.api.auth.router import router as auth_router
+from src.web.api.channels.embed.router import (
+    agents_router as embed_agents_router,
+)
+from src.web.api.channels.embed.router import (
+    public_router as embed_public_router,
+)
+from src.web.api.channels.embed.router import router as embed_router
 from src.web.api.chat.messages.router import (
     router as messages_router,
 )
@@ -190,6 +197,9 @@ def create_app() -> FastAPI:
     application.include_router(chunker_router)
     application.include_router(chunks_router)
     application.include_router(datasources_router)
+    application.include_router(embed_agents_router)
+    application.include_router(embed_public_router)
+    application.include_router(embed_router)
     application.include_router(evaluation_router)
     application.include_router(faq_import_progress_router)
     application.include_router(faq_router)
