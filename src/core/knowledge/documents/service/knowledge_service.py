@@ -43,8 +43,9 @@ from src.db.models.knowledge import Document
 
 _NOT_FOUND_CODE = "knowledge.not_found"
 
-# Pagination cap mirrors ``src.common.pagination.Pagination.page_size``.
-_MAX_PAGE_SIZE = 1000
+# Pagination cap mirrors ``src.common.pagination.Pagination.page_size``
+# and the upstream handler's ``maxListPageSize = 100`` constant.
+_MAX_PAGE_SIZE = 100
 
 # ``custom_metadata`` field rules mirror the upstream update validation.
 _MAX_CUSTOM_METADATA_FIELDS = 20
@@ -319,7 +320,7 @@ class KnowledgeService:
         """Return one page of the knowledge base's documents plus the total.
 
         ``page`` / ``page_size`` mirror the pagination contract (page
-        starts at 1, page size capped at 1000). A non-empty ``tag_ids``
+        starts at 1, page size capped at 100). A non-empty ``tag_ids``
         filter is rejected: tag-based listing belongs to the
         tag-relation layer, and silently ignoring the dimension would
         mislead callers.
@@ -338,7 +339,7 @@ class KnowledgeService:
         if page_size < 1 or page_size > _MAX_PAGE_SIZE:
             raise ValidationError(
                 code="knowledge.invalid_page_size",
-                message="page_size must be between 1 and 1000",
+                message="page_size must be between 1 and 100",
             )
         doc_filter = list_filter or DocumentListFilter()
         if doc_filter.tag_ids:

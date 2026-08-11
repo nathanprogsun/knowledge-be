@@ -69,8 +69,10 @@ DryRunField = Annotated[bool, Form(description="仅验证，不实际导入")]
 # UTF-8 BOM prepended to the CSV export for Excel compatibility.
 _CSV_BOM = b"\xef\xbb\xbf"
 
-#: Page-size cap shared by every FAQ list (the pagination contract).
-_MAX_PAGE_SIZE = 1000
+#: Page-size cap shared by every FAQ list. Mirrors the upstream handler's
+#: ``maxListPageSize = 100`` constant; values above 100 are rejected by the
+#: Pagination contract.
+_MAX_PAGE_SIZE = 100
 
 
 router = APIRouter(prefix="/knowledge-bases/{id}/faq", tags=["knowledge.faq"])

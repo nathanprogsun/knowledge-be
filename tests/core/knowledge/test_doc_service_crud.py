@@ -570,7 +570,7 @@ async def test_list_documents_paged_validates_pagination() -> None:
         await service.list_documents_paged(
             tenant_id=row.tenant_id,
             knowledge_base_id=row.knowledge_base_id,
-            page_size=1001,
+            page_size=101,
         )
     assert exc_info.value.code == "knowledge.invalid_page_size"
 

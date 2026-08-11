@@ -273,7 +273,7 @@ async def list_documents(
     service: KnowledgeServiceDep,
     tenant_id: _PrincipalTenant,
     page: int = Query(default=1, ge=1, description="页码"),
-    page_size: int = Query(default=20, ge=1, le=1000, description="每页数量"),
+    page_size: int = Query(default=20, ge=1, le=100, description="每页数量"),
     tag_ids: str = Query(default="", description="标签ID筛选，逗号分隔"),
     keyword: str | None = Query(default=None, description="关键词搜索"),
     file_type: str | None = Query(default=None, description="文件类型筛选"),
