@@ -11,8 +11,26 @@ side effect so that the default worker serves the full set.
 
 from __future__ import annotations
 
+from src.workers.tasks import chunk_extract  # noqa: F401
+from src.workers.tasks import datasource_sync  # noqa: F401
+from src.workers.tasks import datatable_summary  # noqa: F401
 from src.workers.tasks import document_process  # noqa: F401
+from src.workers.tasks import image_multimodal  # noqa: F401
+from src.workers.tasks import knowledge_post_process  # noqa: F401
 from src.workers.tasks import manual_process  # noqa: F401
+from src.workers.tasks import question_generation  # noqa: F401
+from src.workers.tasks import summary_generation  # noqa: F401
 from src.workers.tasks import temporary_document  # noqa: F401
 
-__all__ = ["document_process", "manual_process", "temporary_document"]
+__all__ = [
+    "chunk_extract",
+    "datasource_sync",
+    "datatable_summary",
+    "document_process",
+    "image_multimodal",
+    "knowledge_post_process",
+    "manual_process",
+    "question_generation",
+    "summary_generation",
+    "temporary_document",
+]
