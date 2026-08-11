@@ -41,6 +41,10 @@ from src.web.deps.chunks import (
     get_chunk_revision_service,
     get_chunk_service,
 )
+from src.web.deps.evaluation import (
+    EvaluationServiceDep,
+    get_evaluation_service,
+)
 from src.web.deps.infra_datasources import (
     DataSourceServiceDep,
     get_datasource_service,
@@ -85,10 +89,6 @@ from src.web.deps.knowledge_bases import (
     KBServiceDep,
     get_kb_service,
 )
-from src.web.deps.organizations import (
-    OrganizationServiceDep,
-    get_organization_service,
-)
 from src.web.deps.knowledge_documents import (
     KnowledgeDocumentsDep,
     get_documents_orchestrator,
@@ -110,6 +110,10 @@ from src.web.deps.knowledge_wiki import (
     get_wiki_folder_service,
     get_wiki_lint_service,
     get_wiki_page_service,
+)
+from src.web.deps.organizations import (
+    OrganizationServiceDep,
+    get_organization_service,
 )
 from src.web.deps.rbac import (
     CrossTenantDep,
@@ -152,6 +156,7 @@ __all__ = [
     "CurrentUserContextDep",
     "CustomAgentServiceDep",
     "DataSourceServiceDep",
+    "EvaluationServiceDep",
     "FAQImportRunnerDep",
     "FAQServiceDep",
     "FavoriteServiceDep",
@@ -200,6 +205,7 @@ __all__ = [
     "get_custom_agent_service",
     "get_datasource_service",
     "get_documents_orchestrator",
+    "get_evaluation_service",
     "get_faq_import_runner",
     "get_faq_service",
     "get_favorite_service",
