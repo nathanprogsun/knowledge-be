@@ -98,7 +98,16 @@ router.add_api_route(
 callback_router.add_api_route(
     "/callback/{channel_id}",
     im_callback,
-    methods=["GET", "POST"],
+    methods=["GET"],
+    operation_id="im_callback_get",
+    response_model=IMCallbackAckResponse,
+    response_model_exclude_none=True,
+)
+callback_router.add_api_route(
+    "/callback/{channel_id}",
+    im_callback,
+    methods=["POST"],
+    operation_id="im_callback_post",
     response_model=IMCallbackAckResponse,
     response_model_exclude_none=True,
 )
