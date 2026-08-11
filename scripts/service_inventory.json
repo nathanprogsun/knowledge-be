@@ -1,0 +1,126 @@
+{
+  "generated_at": "2026-08-11",
+  "total_services": 40,
+  "services": [
+    {
+      "name": "AgentShareService"
+    },
+    {
+      "name": "AuditLogService"
+    },
+    {
+      "name": "AuthService"
+    },
+    {
+      "name": "ChatService"
+    },
+    {
+      "name": "ChunkService"
+    },
+    {
+      "name": "CustomAgentService"
+    },
+    {
+      "name": "DataSourceService"
+    },
+    {
+      "name": "EmbedChannelService"
+    },
+    {
+      "name": "EmbeddingService"
+    },
+    {
+      "name": "EvaluationService"
+    },
+    {
+      "name": "FAQService"
+    },
+    {
+      "name": "IMChannelService"
+    },
+    {
+      "name": "InitializationService"
+    },
+    {
+      "name": "KBService"
+    },
+    {
+      "name": "KBShareService"
+    },
+    {
+      "name": "KnowledgeService"
+    },
+    {
+      "name": "MCPServiceService"
+    },
+    {
+      "name": "MessageService"
+    },
+    {
+      "name": "MessageSuggestionService"
+    },
+    {
+      "name": "ModelService"
+    },
+    {
+      "name": "OrganizationService"
+    },
+    {
+      "name": "PostProcessService"
+    },
+    {
+      "name": "RerankService"
+    },
+    {
+      "name": "SessionService"
+    },
+    {
+      "name": "StorageBackendService"
+    },
+    {
+      "name": "SystemSettingService"
+    },
+    {
+      "name": "TagService"
+    },
+    {
+      "name": "TenantAPIKeyService"
+    },
+    {
+      "name": "TenantInvitationService"
+    },
+    {
+      "name": "TenantKVService"
+    },
+    {
+      "name": "TenantMemberService"
+    },
+    {
+      "name": "TenantService"
+    },
+    {
+      "name": "UserResourceFavoriteService"
+    },
+    {
+      "name": "VectorStoreService"
+    },
+    {
+      "name": "WeKnoraCloudService"
+    },
+    {
+      "name": "WebSearchProviderService"
+    },
+    {
+      "name": "WebSearchSearchService"
+    },
+    {
+      "name": "WikiIngestService"
+    },
+    {
+      "name": "WikiLintService"
+    },
+    {
+      "name": "WikiPageService"
+    }
+  ]
+}
