@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kb-api-config
+  labels:
+    app.kubernetes.io/name: knowledge-be
+    app.kubernetes.io/component: api
+data:
+  ENVIRONMENT: "production"
+  APP_NAME: "knowledge-be"
+
+  # Database
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_NAME: "knowledge_be"
+  DB_DRIVER: "postgresql+asyncpg"
+  DB_POOL_SIZE: "10"
+  DB_MAX_OVERFLOW: "20"
+  DB_ECHO: "false"
+  DB_CONN_PREWARM: "true"
+
+  # JWT
+  JWT_ALGORITHM: "HS256"
+  JWT_EXPIRE_MINUTES: "10080"
+  REFRESH_TOKEN_EXPIRE_DAYS: "7"
+
+  # CORS
+  CORS_ALLOW_ORIGINS: '["*"]'
+
+  # Document Reader
+  DOCREADER_ADDR: "docreader:50051"
+  DOCREADER_TRANSPORT: "grpc"
+
+  # RBAC
+  RBAC_ENFORCED: "true"
+  CROSS_TENANT_ACCESS_ENABLED: "false"
+
+  # OIDC
+  OIDC_ENABLE: "false"
+  OIDC_SCOPES: '["openid","profile","email"]'
+  OIDC_USER_INFO_MAPPING_USERNAME: "name"
+  OIDC_USER_INFO_MAPPING_EMAIL: "email"
+
+  # Auth header names
+  AUTH_HEADER_USER_ID: "x-knowledge-user-id"
+  AUTH_HEADER_TENANT_ID: "x-knowledge-tenant-id"
+  AUTH_HEADER_ROLES: "x-knowledge-roles"
