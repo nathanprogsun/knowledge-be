@@ -74,6 +74,7 @@ class Tenant(TableModel):
     chat_history_config: JsonObject | None = None
     retrieval_config: JsonObject | None = None
     api_principal_config: JsonObject | None = None
+    api_key: str = Field(default="")
     created_at: datetime
     updated_at: datetime
     deleted_at: datetime | None = None
