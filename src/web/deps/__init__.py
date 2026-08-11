@@ -155,9 +155,11 @@ from src.web.deps.session import SessionDep, get_async_session
 from src.web.deps.system import (
     AuditLogServiceDep,
     FavoriteServiceDep,
+    SystemInfoServiceDep,
     SystemSettingServiceDep,
     get_audit_log_service,
     get_favorite_service,
+    get_system_info_service,
     get_system_setting_service,
 )
 from src.web.deps.tenants import (
@@ -223,6 +225,7 @@ __all__ = [
     "SkillsManagerDep",
     "StorageBackendServiceDep",
     "SystemAdminDep",
+    "SystemInfoServiceDep",
     "SystemSettingServiceDep",
     "TagServiceDep",
     "TenantAPIKeyServiceDep",

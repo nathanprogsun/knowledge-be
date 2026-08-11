@@ -8,6 +8,7 @@ and ``internal/handler/audit_log.go``:
 - ``PUT    /system/admin/settings/{key}``   — update a setting value
 - ``DELETE /system/admin/settings/{key}``   — reset a setting to ENV/default
 - ``GET    /system/admin/audit-log``        — system-scope audit feed
+- ``GET    /system/info``                   — public build + DB metadata
 
 Tenant-scoped audit-log endpoints (``GET /tenants/{id}/audit-log``) and
 KB activity (``GET /knowledge-bases/{id}/activity``) are not yet
@@ -18,6 +19,11 @@ Wire-shape conversion (``SystemSettingInfo`` → response model) lives in
 this module so the router stays declarative. The ``SystemAdmin`` guard
 is not yet wired; the endpoints are currently unauthenticated so the
 contract tests can exercise them.
+
+The ``GET /system/info`` route is intentionally public (no
+``AuthDep`` / ``SystemAdminDep``) — mirrors the upstream Go handler
+which serves the same data to the install wizard without requiring a
+logged-in principal.
 
 Query-parameter ``description`` strings are intentionally Chinese
 (mirrors the upstream Go swagger annotations). RUF001 flags the
@@ -35,16 +41,19 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.common.json import JsonObject, JsonValue
 from src.core.system.audit_service import AuditLogListResult
+from src.core.system.info_service import SystemInfoService, SystemInfoSnapshot
 from src.core.system.types import AuditLogInfo, SystemSettingInfo
 from src.web.deps import (
     AuditLogServiceDep,
     AuthDep,
     SystemAdminDep,
+    SystemInfoServiceDep,
     SystemSettingServiceDep,
     get_request_user_id,
 )
 
 router = APIRouter(prefix="/system/admin", tags=["system-admin"])
+info_router = APIRouter(prefix="/system", tags=["system"])
 
 
 # ── View models (wire shape) ─────────────────────────────────────────
@@ -68,6 +77,44 @@ class SystemSettingResponse(BaseModel):
     updated_at: datetime
     enum: list[str] = Field(default_factory=list)
     last_modified_by_name: str = ""
+
+
+class SystemInfoWireResponse(BaseModel):
+    """Wire shape for ``GET /system/info``.
+
+    Mirrors the upstream ``GetSystemInfoResponse`` struct — the
+    frozen ``SystemInfo`` contract in ``src/core.contracts.system``
+    holds the build-metadata fields, and the runtime fields the
+    upstream handler reports (``db_migration_error``, ``started_at``,
+    ``uptime_seconds``) are added inline so the wire payload stays
+    backward-compatible with the Go response without touching the
+    immutable contract shape.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool = True
+    data: SystemInfoWireData
+
+
+class SystemInfoWireData(BaseModel):
+    """Inner data shape for the system info envelope."""
+
+    model_config = ConfigDict(frozen=True)
+
+    version: str
+    edition: str
+    commit_id: str
+    build_time: datetime
+    go_version: str
+    keyword_index_engine: str
+    vector_store_engine: str
+    graph_database_engine: str
+    minio_enabled: bool
+    db_version: str
+    db_migration_error: str | None = None
+    started_at: datetime
+    uptime_seconds: int
 
 
 class UpdateSystemSettingRequest(BaseModel):
@@ -179,7 +226,55 @@ def _audit_list_to_response(result: AuditLogListResult) -> AuditLogListResponse:
     )
 
 
+# ── Conversion helpers ──────────────────────────────────────────────
+
+
+def _snapshot_to_response(snapshot: SystemInfoSnapshot) -> SystemInfoWireResponse:
+    """Project a service snapshot onto the ``/system/info`` wire shape.
+
+    Keeps the conversion in the router so the contract stays declarative
+    (mirrors the ``_setting_to_response`` pattern used by the admin
+    endpoints).
+    """
+    info = snapshot.info
+    return SystemInfoWireResponse(
+        success=True,
+        data=SystemInfoWireData(
+            version=info.version,
+            edition=info.edition,
+            commit_id=info.commit_id,
+            build_time=info.build_time,
+            go_version=info.go_version,
+            keyword_index_engine=info.keyword_index_engine,
+            vector_store_engine=info.vector_store_engine,
+            graph_database_engine=info.graph_database_engine,
+            minio_enabled=info.minio_enabled,
+            db_version=info.db_version,
+            db_migration_error=snapshot.db_migration_error,
+            started_at=snapshot.started_at,
+            uptime_seconds=snapshot.uptime_seconds,
+        ),
+    )
+
+
 # ── Endpoints ───────────────────────────────────────────────────────
+
+
+@info_router.get("/info", response_model=SystemInfoWireResponse)
+async def get_system_info(
+    info_svc: SystemInfoServiceDep,
+) -> SystemInfoWireResponse:
+    """Return build metadata, DB state, and process uptime.
+
+    Mirrors ``GET /system/info`` in the upstream Go handler — public
+    endpoint (no auth) so the install wizard can probe the deployment
+    before a tenant / user exists. The route reads the boot instant
+    from ``app.state.started_at`` (set during lifespan startup) and
+    queries ``alembic_version`` + ``SELECT version()`` on the request
+    session to populate ``db_version`` and ``db_migration_error``.
+    """
+    snapshot = await info_svc.get_info()
+    return _snapshot_to_response(snapshot)
 
 
 @router.get("/settings", response_model=list[SystemSettingResponse])
@@ -277,4 +372,4 @@ async def list_system_audit_log(
     return _audit_list_to_response(result)
 
 
-__all__ = ["router"]
+__all__ = ["info_router", "router"]

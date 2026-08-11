@@ -8,9 +8,10 @@ request's reads and writes share one transactional unit of work.
 
 from __future__ import annotations
 
-from typing import Annotated
+from datetime import datetime
+from typing import Annotated, cast
 
-from fastapi import Depends
+from fastapi import Depends, Request
 
 from src.core.system.audit_service import AuditLogService
 from src.core.system.factory import (
@@ -19,6 +20,7 @@ from src.core.system.factory import (
     build_system_setting_service,
 )
 from src.core.system.favorite_service import UserResourceFavoriteService
+from src.core.system.info_service import SystemInfoService
 from src.core.system.system_setting_service import SystemSettingService
 from src.web.deps.session import SessionDep
 
@@ -32,7 +34,7 @@ SystemSettingServiceDep = Annotated[SystemSettingService, Depends(get_system_set
 
 
 def get_audit_log_service(session: SessionDep) -> AuditLogService:
-    """Build a per-request ``AuditLogService`` on the shared session."""
+    """Build a per-request ``AuditLogService`` with a fresh repository."""
     return build_audit_log_service(session)
 
 
@@ -47,11 +49,31 @@ def get_favorite_service(session: SessionDep) -> UserResourceFavoriteService:
 FavoriteServiceDep = Annotated[UserResourceFavoriteService, Depends(get_favorite_service)]
 
 
+def get_system_info_service(
+    request: Request,
+    session: SessionDep,
+) -> SystemInfoService:
+    """Build a per-request ``SystemInfoService`` with the lifespan ``started_at``.
+
+    The boot instant is recorded on ``app.state.started_at`` during the
+    FastAPI lifespan startup. When the lifespan was bypassed (tests)
+    the attribute is ``None`` and the service falls back to ``now`` so
+    the uptime reads zero rather than raising.
+    """
+    started_at = cast("datetime | None", getattr(request.app.state, "started_at", None))
+    return SystemInfoService(session=session, started_at=started_at)
+
+
+SystemInfoServiceDep = Annotated[SystemInfoService, Depends(get_system_info_service)]
+
+
 __all__ = [
     "AuditLogServiceDep",
     "FavoriteServiceDep",
+    "SystemInfoServiceDep",
     "SystemSettingServiceDep",
     "get_audit_log_service",
     "get_favorite_service",
+    "get_system_info_service",
     "get_system_setting_service",
 ]
