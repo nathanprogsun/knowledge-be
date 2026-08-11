@@ -9,7 +9,7 @@ copy / duplicate endpoints additionally inject the shared ``AsyncSession``
 
 Uses the shared ``web_app`` fixture (header-based auth) and applies the
 service dep override on it; the real ``require_auth`` dep resolves the
-principal via the ``x-knowledge-*`` header trio.
+principal via the ``X-User-Id/X-Tenant-ID/X-Roles`` header trio.
 
 The load-bearing checks:
 

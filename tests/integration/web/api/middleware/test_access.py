@@ -2,7 +2,7 @@
 
 Covers :mod:`src.web.middleware.auth` end-to-end against the live
 ``require_auth`` dependency via :class:`fastapi.testclient.TestClient`.
-The integration-test rig sets the ``x-knowledge-*`` trio as a header
+The integration-test rig sets the ``X-User-Id/X-Tenant-ID/X-Roles`` trio as a header
 channel; this file pins the failure modes that rig must NOT silently
 allow:
 
@@ -27,7 +27,7 @@ from src.core.tenants.member_service import ROLE_OWNER
 
 
 def test_missing_knowledge_headers_returns_401(app) -> None:
-    """No x-knowledge-* headers and no Authorization -> 401.
+    """No X-User-Id/X-Tenant-ID/X-Roles headers and no Authorization -> 401.
 
     With no header trio and no Bearer token the dependency falls
     through to the ``UnauthorizedError`` raised at the bottom of
@@ -39,7 +39,7 @@ def test_missing_knowledge_headers_returns_401(app) -> None:
 
 
 def test_partial_tenant_header_only_returns_401(app) -> None:
-    """x-knowledge-tenant-id without x-knowledge-user-id -> 401.
+    """X-Tenant-ID without X-User-Id -> 401.
 
     ``_resolve_header_auth`` returns False when either header is
     missing; the request then has no Authorization header and no
@@ -48,13 +48,13 @@ def test_partial_tenant_header_only_returns_401(app) -> None:
     with TestClient(app=app) as client:
         response = client.get(
             "/tenants",
-            headers={"x-knowledge-tenant-id": "1"},
+            headers={"X-Tenant-ID": "1"},
         )
     assert response.status_code == 401, response.text
 
 
 def test_unknown_user_header_returns_401(app) -> None:
-    """x-knowledge-user-id referring to a non-existent row -> 401.
+    """X-User-Id referring to a non-existent row -> 401.
 
     The header channel raises :class:`UnauthorizedError` with code
     ``auth.user_not_found`` when ``UserRepository.find_by_id`` misses;
@@ -64,8 +64,8 @@ def test_unknown_user_header_returns_401(app) -> None:
         response = client.get(
             "/tenants",
             headers={
-                "x-knowledge-user-id": "usr-does-not-exist",
-                "x-knowledge-tenant-id": "1",
+                "X-User-Id": "usr-does-not-exist",
+                "X-Tenant-ID": "1",
             },
         )
     assert response.status_code == 401, response.text
@@ -97,8 +97,8 @@ def test_cross_tenant_user_header_is_a_known_blocker(
     assert other_tenant_id != admin_tenant_id
 
     headers = dict(authed_client.headers)
-    headers["x-knowledge-user-id"] = other_user_id
-    headers["x-knowledge-tenant-id"] = str(admin_tenant_id)
+    headers["X-User-Id"] = other_user_id
+    headers["X-Tenant-ID"] = str(admin_tenant_id)
 
     response = authed_client.get("/tenants", headers=headers)
     # Current behavior: passes the auth gate; the response lists the

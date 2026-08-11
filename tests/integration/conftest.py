@@ -3,7 +3,7 @@
 Provides a session-scoped real ``DatabaseEngine`` against the configured
 Postgres instance, a real FastAPI app with a manually-constructed
 ``LifeSpanService`` (so the real lifespan's OIDC / MCP startup is
-skipped), and an ``authed_client`` that sets the ``x-knowledge-*``
+skipped), and an ``authed_client`` that sets the ``X-User-Id/X-Tenant-ID/X-Roles``
 header trio so the real ``require_auth`` dependency runs end-to-end.
 
 The principal is a real ``User`` row minted by the ``make_user_org``
@@ -162,7 +162,7 @@ async def make_user_org(
     The user's ``tenant_id`` column is intentionally left ``None`` so
     it stays inside the ``INTEGER`` range regardless of the random id;
     the header-trust auth path resolves the active tenant from the
-    ``x-knowledge-tenant-id`` header anyway.
+    ``X-Tenant-ID`` header anyway.
     """
 
     async def _factory(
@@ -275,7 +275,7 @@ async def authed_client(
     app: FastAPI,
     admin_user: tuple[int, int],
 ) -> AsyncIterator[TestClient]:
-    """A ``TestClient`` that authenticates via the ``x-knowledge-*`` headers.
+    """A ``TestClient`` that authenticates via the ``X-User-Id/X-Tenant-ID/X-Roles`` headers.
 
     The headers are sourced from the freshly-minted ``admin_user`` so
     every test resolves a real ``User`` row + a real ``Tenant`` row
@@ -287,9 +287,9 @@ async def authed_client(
     with TestClient(app=app) as c:
         c.headers.update(
             {
-                "x-knowledge-user-id": user_id,
-                "x-knowledge-tenant-id": str(tenant_id),
-                "x-knowledge-roles": ROLE_OWNER,
+                "X-User-Id": user_id,
+                "X-Tenant-ID": str(tenant_id),
+                "X-Roles": ROLE_OWNER,
             }
         )
         yield c

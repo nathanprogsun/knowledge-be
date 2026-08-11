@@ -18,7 +18,7 @@ Endpoint coverage:
 | DELETE | /vector-stores/{id}           |
 | POST   | /vector-stores/{id}/test      |
 
-Auth: the authed client carries the ``x-knowledge-*`` header trio;
+Auth: the authed client carries the ``X-User-Id/X-Tenant-ID/X-Roles`` header trio;
 the unauthorised tests build a bare ``TestClient`` and assert the
 401 raised by the global ``require_auth`` dependency.
 """

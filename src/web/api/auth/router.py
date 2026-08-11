@@ -14,6 +14,8 @@ from src.core.contracts.auth import (
     ChangePasswordRequest,
     LoginRequest,
     LoginResponse,
+    MeCapabilities,
+    MeData,
     MeResponse,
     OIDCAuthorizeURLResponse,
     OIDCCallbackResponse,
@@ -77,7 +79,7 @@ async def login(
         success=True,
         message="Login successful",
         user=_user_info_to_auth_user(result.user),
-        active_tenant=None,
+        tenant=None,
         memberships=[],
         token=result.access_token,
         refresh_token=result.refresh_token,
@@ -139,7 +141,7 @@ async def register(
         success=True,
         message="Registration successful",
         user=_user_info_to_auth_user(result.user),
-        active_tenant=None,
+        tenant=None,
         memberships=[],
     )
 
@@ -150,14 +152,28 @@ async def me(
     auth_service: AuthServiceDep,
     authorization: str | None = Header(default=None),
 ) -> MeResponse:
-    """Return the authenticated user's profile and active tenant."""
+    """Return the authenticated user's profile, memberships, and tenant context.
+
+    Response is wrapped in ``data`` per Go's
+    ``internal/handler/auth.go`` ``GetMyInfo`` handler. Includes
+    ``tenant_required`` (true when the user has no active tenant yet)
+    and ``capabilities.can_create_tenant`` so the frontend can drive
+    the post-login redirect.
+    """
     token = _require_bearer(authorization)
-    info, _ = await auth_service.get_me(token=token)
+    info, _tenant_id = await auth_service.get_me(token=token)
+    tenant_required = info.tenant_id is None
     return MeResponse(
         success=True,
-        user=_user_info_to_auth_user(info),
-        active_tenant=None,
-        memberships=[],
+        data=MeData(
+            user=_user_info_to_auth_user(info),
+            tenant=None,
+            memberships=[],
+            tenant_required=tenant_required,
+            capabilities=MeCapabilities(
+                can_create_tenant=info.can_access_all_tenants,
+            ),
+        ),
     )
 
 
@@ -185,17 +201,21 @@ async def validate_token(
     auth_service: AuthServiceDep,
     authorization: str | None = Header(default=None),
 ) -> ValidateTokenResponse:
-    """Validate a Bearer access token."""
+    """Validate a Bearer access token.
+
+    On success the full ``user`` object is returned (mirrors Go's
+    ``ValidateToken`` handler in ``internal/handler/auth.go``); the
+    legacy ``{valid, user_id, tenant_id}`` minimal shape is dropped.
+    """
     token = _require_bearer(authorization)
     try:
-        info, tenant_id = await auth_service.validate_token(token=token)
+        info, _tenant_id = await auth_service.validate_token(token=token)
     except UnauthorizedError:
-        return ValidateTokenResponse(success=False, valid=False)
+        return ValidateTokenResponse(success=True, message="Token is invalid", user=None)
     return ValidateTokenResponse(
         success=True,
-        valid=True,
-        user_id=info.id,
-        tenant_id=tenant_id,
+        message="Token is valid",
+        user=_user_info_to_auth_user(info),
     )
 
 
@@ -246,15 +266,17 @@ async def oidc_callback(
             user=_empty_auth_user(),
             token="",
             refresh_token="",
+            is_new_user=False,
         )
     return OIDCCallbackResponse(
         success=True,
         message=result.message,
         user=_user_info_to_auth_user(result.user),
-        active_tenant=None,
+        tenant=None,
         memberships=[],
         token=result.access_token,
         refresh_token=result.refresh_token,
+        is_new_user=bool(getattr(result, "is_new_user", False)),
     )
 
 

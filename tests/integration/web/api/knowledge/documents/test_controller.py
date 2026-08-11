@@ -8,7 +8,7 @@ services so no database is involved.
 
 Uses the shared ``web_app`` fixture (header-based auth) and applies the
 dependency overrides on it; the real ``require_auth`` dep resolves the
-principal via the ``x-knowledge-*`` header trio.
+principal via the ``X-User-Id/X-Tenant-ID/X-Roles`` header trio.
 
 The load-bearing checks:
 

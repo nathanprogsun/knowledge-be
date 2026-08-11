@@ -107,9 +107,6 @@ def pytest_configure(config: pytest.Config) -> None:
     """
     config.addinivalue_line("python_files", "stage4_contract.py")
     config.addinivalue_line("python_files", "stage5_contract.py")
-    config.addinivalue_line("python_files", "stage6_contract.py")
-    config.addinivalue_line("python_files", "stage7_contract.py")
-    config.addinivalue_line("python_files", "stage8_contract.py")
 
 
 @pytest.fixture(scope="session")
@@ -173,7 +170,7 @@ async def make_user_org(
     ``tenant_members`` row binding the user to the tenant as owner. The
     user's ``tenant_id`` column is left ``None`` so it stays inside the
     INTEGER range regardless of the random tenant id; the header-trust
-    auth path resolves the active tenant from ``x-knowledge-tenant-id``.
+    auth path resolves the active tenant from ``X-Tenant-ID``.
     """
 
     async def _factory(
@@ -243,7 +240,8 @@ async def authed_client(
     app: FastAPI,
     admin_user: tuple[str, int],
 ) -> AsyncIterator[TestClient]:
-    """A ``TestClient`` that authenticates via the ``x-knowledge-*`` headers.
+    """A ``TestClient`` that authenticates via the ``X-User-Id`` /
+    ``X-Tenant-ID`` / ``X-Roles`` headers.
 
     The headers are sourced from the freshly-minted ``admin_user`` so
     every request resolves a real ``User`` row + a real ``Tenant`` row.
@@ -255,9 +253,9 @@ async def authed_client(
     with TestClient(app=app) as c:
         c.headers.update(
             {
-                "x-knowledge-user-id": user_id,
-                "x-knowledge-tenant-id": str(tenant_id),
-                "x-knowledge-roles": ROLE_OWNER,
+                "X-User-Id": user_id,
+                "X-Tenant-ID": str(tenant_id),
+                "X-Roles": ROLE_OWNER,
             }
         )
         yield c

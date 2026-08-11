@@ -154,9 +154,9 @@ def _authed_client(app: FastAPI, user_id: str, tenant_id: int) -> TestClient:
     client = TestClient(app=app)
     client.headers.update(
         {
-            "x-knowledge-user-id": user_id,
-            "x-knowledge-tenant-id": str(tenant_id),
-            "x-knowledge-roles": ROLE_OWNER,
+            "X-User-Id": user_id,
+            "X-Tenant-ID": str(tenant_id),
+            "X-Roles": ROLE_OWNER,
         }
     )
     return client

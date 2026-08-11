@@ -94,10 +94,11 @@ class Settings(BaseSettings):
     # HTTP header names used by the auth layer when a request does not
     # carry a JWT or API key (for example, internal service-to-service
     # calls that authenticate via headers rather than bearer tokens).
-    # Default values follow the "x-knowledge-*" naming convention.
-    auth_header_user_id: str = "x-knowledge-user-id"
-    auth_header_tenant_id: str = "x-knowledge-tenant-id"
-    auth_header_roles: str = "x-knowledge-roles"
+    # Defaults mirror the upstream contract (``X-Tenant-ID``,
+    # ``X-User-Id``, ``X-Roles``).
+    auth_header_user_id: str = "X-User-Id"
+    auth_header_tenant_id: str = "X-Tenant-ID"
+    auth_header_roles: str = "X-Roles"
 
     @computed_field  # type: ignore[prop-decorator]
     @property

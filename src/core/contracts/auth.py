@@ -66,18 +66,14 @@ class AuthUser(BaseModel):
 
 
 class RegisterResponse(BaseModel):
-    """Registration response containing the user, active tenant, and memberships.
-
-    ``active_tenant`` identifies the current tenant, while ``memberships``
-    carries the caller's role for each tenant they belong to.
-    """
+    """Registration response. Field names mirror Go's contract."""
 
     model_config = ConfigDict(frozen=True)
 
     success: bool
     message: str
     user: AuthUser
-    active_tenant: Tenant | None = Field(default=None)
+    tenant: Tenant | None = Field(default=None)
     memberships: list[Membership] = Field(default_factory=list)
 
 
@@ -89,7 +85,7 @@ class LoginResponse(BaseModel):
     success: bool
     message: str
     user: AuthUser
-    active_tenant: Tenant | None = Field(default=None)
+    tenant: Tenant | None = Field(default=None)
     memberships: list[Membership] = Field(default_factory=list)
     token: str
     refresh_token: str
@@ -98,8 +94,7 @@ class LoginResponse(BaseModel):
 class OIDCCallbackResponse(BaseModel):
     """OIDC callback response containing session tokens and tenant context.
 
-    It has the same shape as ``LoginResponse`` because both flows establish
-    an authenticated session.
+    Mirrors Go's ``OIDCCallbackResponse`` in ``internal/types/user.go``.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -107,10 +102,11 @@ class OIDCCallbackResponse(BaseModel):
     success: bool
     message: str
     user: AuthUser
-    active_tenant: Tenant | None = Field(default=None)
+    tenant: Tenant | None = Field(default=None)
     memberships: list[Membership] = Field(default_factory=list)
     token: str
     refresh_token: str
+    is_new_user: bool = False
 
 
 class RefreshTokenResponse(BaseModel):
@@ -140,21 +136,53 @@ class OIDCAuthorizeURLResponse(BaseModel):
 
 
 class ValidateTokenResponse(BaseModel):
+    """Token validation response. Returns the full user object on success.
+
+    Mirrors Go's ``internal/handler/auth.go`` ``ValidateToken`` which
+    emits ``{success, message, user}`` rather than the legacy
+    ``{valid, user_id, tenant_id}`` minimal shape.
+    """
+
     model_config = ConfigDict(frozen=True)
 
     success: bool
-    valid: bool
-    user_id: str | None = Field(default=None)
-    tenant_id: int | None = Field(default=None)
+    message: str | None = Field(default=None)
+    user: AuthUser | None = Field(default=None)
+
+
+class MeCapabilities(BaseModel):
+    """Capability flags attached to ``/auth/me`` responses."""
+
+    model_config = ConfigDict(frozen=True)
+
+    can_create_tenant: bool = False
+
+
+class MeData(BaseModel):
+    """The ``data`` envelope for ``/auth/me`` responses.
+
+    Mirrors Go's ``gin.H{"data": {...}}`` shape in
+    ``internal/handler/auth.go``: ``user``, ``tenant``, ``memberships``,
+    ``tenant_required`` (true when the user has no active tenant yet),
+    and ``capabilities``.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    user: AuthUser
+    tenant: Tenant | None = Field(default=None)
+    memberships: list[Membership] = Field(default_factory=list)
+    tenant_required: bool = False
+    capabilities: MeCapabilities = Field(default_factory=MeCapabilities)
 
 
 class MeResponse(BaseModel):
+    """``/auth/me`` response. The substantive payload is wrapped in ``data``."""
+
     model_config = ConfigDict(frozen=True)
 
     success: bool
-    user: AuthUser
-    active_tenant: Tenant | None = Field(default=None)
-    memberships: list[Membership] = Field(default_factory=list)
+    data: MeData
 
 
 __all__ = [
@@ -162,6 +190,8 @@ __all__ = [
     "ChangePasswordRequest",
     "LoginRequest",
     "LoginResponse",
+    "MeCapabilities",
+    "MeData",
     "MeResponse",
     "OIDCAuthorizeURLResponse",
     "OIDCCallbackResponse",

@@ -153,9 +153,9 @@ async def chat_client(
     client = TestClient(app=chat_app)
     client.headers.update(
         {
-            "x-knowledge-user-id": user_id,
-            "x-knowledge-tenant-id": str(tenant_id),
-            "x-knowledge-roles": ROLE_OWNER,
+            "X-User-Id": user_id,
+            "X-Tenant-ID": str(tenant_id),
+            "X-Roles": ROLE_OWNER,
         }
     )
     with client:

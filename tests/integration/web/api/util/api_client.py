@@ -9,7 +9,7 @@
   can reference the authenticated principal without re-parsing headers.
 - Raises :class:`APITestError` on any 4xx / 5xx response.
 
-The wrapped ``TestClient`` owns the ``x-knowledge-*`` header trio on its
+The wrapped ``TestClient`` owns the ``X-User-Id/X-Tenant-ID/X-Roles`` header trio on its
 own ``headers`` dict; per-request header overrides are merged on top by
 passing the ``headers`` keyword arg to each method.
 """
@@ -31,7 +31,7 @@ class APITestError(Exception):
 class APITestClient:
     """Typed sync wrapper around :class:`fastapi.testclient.TestClient`.
 
-    The wrapped ``TestClient`` carries the ``x-knowledge-*`` header trio
+    The wrapped ``TestClient`` carries the ``X-User-Id/X-Tenant-ID/X-Roles`` header trio
     on its own ``headers`` dict; ``default_user_id`` and
     ``default_organization_id`` are metadata fields so tests can reference
     the authenticated principal.

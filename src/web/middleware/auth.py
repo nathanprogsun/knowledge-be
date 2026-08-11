@@ -8,8 +8,8 @@ guards and API-key gate can read it:
   tenant + tenant role and stashes them on ``request.state``.
 - A valid ``X-API-Key`` resolves the API-key scope and stashes it on
   ``request.state`` (the API Key Gate authorizes the route afterwards).
-- Knowledge-prefixed headers (``x-knowledge-user-id`` /
-  ``x-knowledge-tenant-id`` / ``x-knowledge-roles``) resolve the
+- Internal headers (``X-User-Id`` /
+  ``X-Tenant-ID`` / ``X-Roles``) resolve the
   principal directly when no bearer or API key is present. This
   channel is used by the integration-test rig; it must not be
   reachable from a public gateway without a strict deploy-time gate.
@@ -167,9 +167,9 @@ async def _resolve_header_auth(
 
     Headers (all configurable via ``Settings``):
 
-    - ``x-knowledge-user-id`` - required, the user id
-    - ``x-knowledge-tenant-id`` - required, the active tenant id (int)
-    - ``x-knowledge-roles`` - optional, comma-separated role list; the
+    - ``X-User-Id`` - required, the user id
+    - ``X-Tenant-ID`` - required, the active tenant id (int)
+    - ``X-Roles`` - optional, comma-separated role list; the
       first role wins as the tenant role. Presence of ``system_admin``
       in the list grants platform-admin powers.
 

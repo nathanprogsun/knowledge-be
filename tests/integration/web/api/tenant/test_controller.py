@@ -8,11 +8,11 @@ database.
 
 Uses the shared ``web_app`` fixture (header-based auth) and applies
 the service dep override on it; the real ``require_auth`` dep resolves
-the principal via the ``x-knowledge-*`` header trio.
+the principal via the ``X-User-Id/X-Tenant-ID/X-Roles`` header trio.
 
 Note on tenant-id duality: the URL path uses literal ``/tenants/{id}``
 paths (the mock keys on the URL id, e.g. ``7``), while the
-``x-knowledge-tenant-id`` header carries ``1`` (the integration seed).
+``X-Tenant-ID`` header carries ``1`` (the integration seed).
 The header-based RBAC gate is a no-op shim, so the two coexist
 without conflict — the path id drives the repo lookup and the header
 id is only used to populate ``request.state``.

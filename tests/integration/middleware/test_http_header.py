@@ -7,7 +7,7 @@ observed here is the order the production app sees.
 
 The auth dependency tries channels in this order:
 
-1. The ``x-knowledge-*`` header trio (set by the integration-test rig).
+1. The ``X-User-Id/X-Tenant-ID/X-Roles`` header trio (set by the integration-test rig).
 2. ``Authorization: Bearer <jwt>``.
 3. ``X-API-Key``.
 
@@ -107,7 +107,7 @@ def test_jwt_with_header_resolves_via_header_channel(
 
     The request carries an Authorization Bearer for the OTHER org's
     user (different ``user_id`` and ``tenant_id``) AND the local
-    ``x-knowledge-*`` trio. Because ``require_auth`` checks headers
+    ``X-User-Id/X-Tenant-ID/X-Roles`` trio. Because ``require_auth`` checks headers
     before JWT, the principal resolved is the header principal; the
     response lists the local workspace (``admin_user``'s tenant), not
     the JWT's tenant.
@@ -141,7 +141,7 @@ def test_jwt_with_header_resolves_via_header_channel(
 
 
 def test_garbage_authorization_returns_401(app) -> None:
-    """A garbage Bearer token (no x-knowledge-* headers) -> 401.
+    """A garbage Bearer token (no X-User-Id/X-Tenant-ID/X-Roles headers) -> 401.
 
     With no header trio the dependency falls through to the JWT
     channel; the token's signature does not match the project

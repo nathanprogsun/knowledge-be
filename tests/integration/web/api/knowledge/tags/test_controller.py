@@ -8,7 +8,7 @@ involved.
 
 Uses the shared ``web_app`` fixture (header-based auth) and applies
 the tag-service dep override on it; the real ``require_auth`` dep
-resolves the principal via the ``x-knowledge-*`` header trio.
+resolves the principal via the ``X-User-Id/X-Tenant-ID/X-Roles`` header trio.
 
 The load-bearing checks:
 

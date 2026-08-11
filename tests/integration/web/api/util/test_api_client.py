@@ -1,7 +1,7 @@
 """Tests for the sync APITestClient wrapper.
 
 The tests build a tiny FastAPI app inline (endpoints that reflect the
-``x-knowledge-*`` headers and path params back as typed bodies) and
+``X-User-Id/X-Tenant-ID/X-Roles`` headers and path params back as typed bodies) and
 exercise all five HTTP methods through the sync APITestClient wrapper.
 """
 
@@ -111,13 +111,13 @@ def _make_api(
     user_id: str = _DEFAULT_USER_ID,
     tenant_id: int = _DEFAULT_TENANT_ID,
 ) -> Iterator[APITestClient]:
-    """Yield an APITestClient wrapping a TestClient with x-knowledge-* headers."""
+    """Yield an APITestClient wrapping a TestClient with X-User-Id/X-Tenant-ID/X-Roles headers."""
     app = _build_app()
     with TestClient(app=app) as tc:
         tc.headers.update(
             {
-                "x-knowledge-user-id": user_id,
-                "x-knowledge-tenant-id": str(tenant_id),
+                "X-User-Id": user_id,
+                "X-Tenant-ID": str(tenant_id),
             }
         )
         yield APITestClient(
@@ -187,7 +187,7 @@ def test_error_response_raises_api_test_error() -> None:
 def test_per_request_headers_override_client_defaults() -> None:
     with _make_api() as api:
         override_user = str(uuid4())
-        response = api.get("echo", headers={"x-knowledge-user-id": override_user})
+        response = api.get("echo", headers={"X-User-Id": override_user})
 
         assert response.status_code == 200
         assert response.json()["user_id"] == override_user

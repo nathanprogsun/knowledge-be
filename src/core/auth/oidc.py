@@ -141,7 +141,7 @@ class OIDCCallbackResult:
     ``success=False`` with a ``message`` is a legitimate non-error outcome
     (the bound user is disabled) returned rather than raised, so the web
     layer serialises the HTTP 200 ``{success:false, message}`` body.
-    ``active_tenant`` / ``memberships`` are intentionally absent; the web
+    ``tenant`` / ``memberships`` are intentionally absent; the web
     layer fills them with ``None`` / ``[]``.
     """
 

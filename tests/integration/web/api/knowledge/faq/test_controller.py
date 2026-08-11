@@ -18,7 +18,7 @@ Endpoint coverage:
 | GET    | /knowledge-bases/{id}/faq/entries/export     |
 | GET    | /faq/import/progress/{task_id}               |
 
-Auth: the authed client carries the ``x-knowledge-*`` header trio; the
+Auth: the authed client carries the ``X-User-Id/X-Tenant-ID/X-Roles`` header trio; the
 unauthorised tests build a bare ``TestClient`` and assert the 401 raised
 by the global ``require_auth`` dependency.
 """

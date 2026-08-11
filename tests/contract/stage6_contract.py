@@ -122,7 +122,7 @@ async def session_seed(authed_client: TestClient) -> SessionSeed:
         json={"title": "contract-session", "description": "contract fixture"},
     )
     assert response.status_code == 201, response.text
-    tenant_header = authed_client.headers.get("x-knowledge-tenant-id", "0")
+    tenant_header = authed_client.headers.get("X-Tenant-ID", "0")
     return SessionSeed(
         authed_client,
         int(tenant_header),
@@ -163,9 +163,9 @@ async def message_seed(
     client = TestClient(app=app)
     client.headers.update(
         {
-            "x-knowledge-user-id": user_id,
-            "x-knowledge-tenant-id": str(tenant_id),
-            "x-knowledge-roles": ROLE_OWNER,
+            "X-User-Id": user_id,
+            "X-Tenant-ID": str(tenant_id),
+            "X-Roles": ROLE_OWNER,
         }
     )
     with client:

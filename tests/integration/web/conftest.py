@@ -16,7 +16,7 @@ test file that still injects fake repositories via
    ``application.dependency_overrides[get_X_service] = ...``.
 
 The ``web_authed_client`` fixture wraps the app in a ``TestClient``
-with the ``x-knowledge-*`` header trio set from the same
+with the ``X-User-Id/X-Tenant-ID/X-Roles`` header trio set from the same
 ``admin_user`` used by the parent conftest's ``authed_client``.
 """
 
@@ -58,7 +58,7 @@ async def web_authed_client(
     web_app: FastAPI,
     admin_user: tuple[int, int],
 ) -> AsyncIterator[TestClient]:
-    """``TestClient`` with ``x-knowledge-*`` headers against ``web_app``.
+    """``TestClient`` with ``X-User-Id/X-Tenant-ID/X-Roles`` headers against ``web_app``.
 
     The headers are sourced from the freshly-minted ``admin_user`` so
     every web test resolves a real ``User`` row + a real ``Tenant``
@@ -70,9 +70,9 @@ async def web_authed_client(
     with TestClient(app=web_app) as c:
         c.headers.update(
             {
-                "x-knowledge-user-id": user_id,
-                "x-knowledge-tenant-id": str(tenant_id),
-                "x-knowledge-roles": ROLE_OWNER,
+                "X-User-Id": user_id,
+                "X-Tenant-ID": str(tenant_id),
+                "X-Roles": ROLE_OWNER,
             }
         )
         yield c
