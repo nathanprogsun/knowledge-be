@@ -148,4 +148,88 @@ class WikiFolder(TableModel):
     deleted_at: datetime | None = None
 
 
-__all__ = ["WikiFolder", "WikiIndexEntry", "WikiPage", "WikiPageLite"]
+class WikiPageIssue(TableModel):
+    """One row of the ``wiki_page_issues`` table.
+
+    User- or pipeline-reported defect against a generated wiki page.
+    ``issue_type`` is a small enum (``inaccurate`` / ``outdated`` /
+    ``broken_link`` / ``other``); ``suspected_knowledge_ids`` lists
+    source documents the LLM-pipeline believes likely caused the
+    issue and is nullable because not every issue has a known
+    culprit. ``status`` lifecycle: ``pending`` -> ``resolved`` /
+    ``dismissed``.
+
+    The row is soft-deleted (``deleted_at``) so a withdrawn report
+    can be hidden from the issue feed without losing history.
+    """
+
+    table: ClassVar[str] = "wiki_page_issues"
+    primary_keys: ClassVar[tuple[str, ...]] = ("id",)
+    json_columns: ClassVar[tuple[str, ...]] = ("suspected_knowledge_ids",)
+    # ``id`` is a caller-assigned UUID; the database never assigns columns.
+    db_generated_columns: ClassVar[tuple[str, ...]] = ()
+
+    id: str
+    tenant_id: int
+    knowledge_base_id: str
+    slug: str
+    issue_type: str
+    description: str
+    suspected_knowledge_ids: list[str] | None = None
+    status: str = "pending"
+    reported_by: str
+    created_at: datetime
+    updated_at: datetime
+    deleted_at: datetime | None = None
+
+
+class WikiPageRevision(TableModel):
+    """One row of the ``wiki_page_revisions`` table.
+
+    Immutable content snapshot of a superseded wiki page version.
+    The CURRENT version lives in ``wiki_pages``; when an edit
+    replaces version ``V``, the pre-edit state is inserted here as
+    ``(page_id, V)`` before the row is rewritten, so every
+    historical version stays diffable and revertable. The composite
+    unique index ``(page_id, version)`` keeps the
+    snapshot-then-update write path idempotent under retries.
+
+    No ``deleted_at``: revisions are append-only; reverting means
+    reading the desired version and copying it back into
+    ``wiki_pages``. No ``updated_at`` either: ``edited_at`` records
+    when the snapshot was authored, and revisions are immutable
+    once written.
+    """
+
+    table: ClassVar[str] = "wiki_page_revisions"
+    primary_keys: ClassVar[tuple[str, ...]] = ("id",)
+    json_columns: ClassVar[tuple[str, ...]] = ("aliases",)
+    # ``id`` is a caller-assigned UUID; the database never assigns columns.
+    db_generated_columns: ClassVar[tuple[str, ...]] = ()
+
+    id: str
+    tenant_id: int
+    knowledge_base_id: str
+    page_id: str
+    slug: str
+    version: int
+    title: str = ""
+    page_type: str = "summary"
+    status: str = "published"
+    content: str = ""
+    summary: str = ""
+    aliases: list[str] = Field(default_factory=list)
+    edit_source: str = ""
+    editor_id: str = ""
+    edited_at: datetime
+    created_at: datetime
+
+
+__all__ = [
+    "WikiFolder",
+    "WikiIndexEntry",
+    "WikiPage",
+    "WikiPageIssue",
+    "WikiPageLite",
+    "WikiPageRevision",
+]
