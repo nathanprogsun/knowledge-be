@@ -1,0 +1,383 @@
+{
+  "_comment": "Session/message wire shapes captured from the reference API handlers. Each contract name lists the JSON field set the upstream API emits for that object; each endpoint entry lists the HTTP status and the top-level response key set. Field name comparison is exact (no drift in either direction). The session list endpoint emits a flat {data: [...], total, page, page_size} shape; the single-session and message-list endpoints emit the standard {success, data: ...} envelope. The streaming vocabulary is shared with the chat/agent pipelines and references the upstream StreamResponse type.",
+  "contracts": {
+    "Session": [
+      "id", "title", "description", "tenant_id", "user_id", "is_pinned",
+      "pinned_at", "last_request_state", "created_at", "updated_at",
+      "deleted_at", "im_platform"
+    ],
+    "SessionListItem": [
+      "id", "title", "description", "tenant_id", "user_id", "is_pinned",
+      "pinned_at", "last_request_state", "created_at", "updated_at",
+      "deleted_at", "im_platform", "im_chat_id", "im_thread_id",
+      "im_user_id", "im_agent_id", "im_channel_id"
+    ],
+    "Message": [
+      "id", "session_id", "request_id", "content", "role",
+      "knowledge_references", "agent_steps", "mentioned_items", "images",
+      "attachments", "is_completed", "is_fallback", "agent_duration_ms",
+      "channel", "agent_id", "model_id", "knowledge_id", "created_at",
+      "updated_at", "deleted_at"
+    ],
+    "KnowledgeReference": [
+      "id", "content", "knowledge_id", "chunk_index", "knowledge_title",
+      "start_at", "end_at", "seq", "score", "match_type", "sub_chunk_id",
+      "metadata", "chunk_type", "parent_chunk_id", "image_info",
+      "knowledge_filename", "knowledge_source", "knowledge_channel",
+      "chunk_metadata", "matched_content", "knowledge_description",
+      "knowledge_custom_metadata", "knowledge_base_id"
+    ],
+    "MessageSearchHit": [
+      "request_id", "session_id", "session_title", "query_content",
+      "answer_content", "score", "match_type", "created_at"
+    ],
+    "MessageSearchResponse": ["items", "total"],
+    "ChatHistoryStats": [
+      "enabled", "embedding_model_id", "knowledge_base_id",
+      "knowledge_base_name", "indexed_message_count", "has_indexed_messages"
+    ],
+    "SuggestionQuestion": [
+      "id", "text", "category", "source", "knowledge_base_ids"
+    ],
+    "SuggestionSet": [
+      "id", "tenant_id", "session_id", "assistant_message_id", "agent_id",
+      "placement", "config_hash", "locale", "status", "allow_regenerate",
+      "suppression_reason", "questions", "model_id", "prompt_tokens",
+      "completion_tokens", "latency_ms", "error_code", "generated_at",
+      "created_at", "updated_at"
+    ],
+    "SessionEnvelope": ["success", "data"],
+    "SessionListEnvelope": ["success", "data", "total", "page", "page_size"],
+    "DeleteSessionResponse": ["success", "message"],
+    "PinSessionEnvelope": ["success", "is_pinned"],
+    "MessageLoadEnvelope": ["success", "data"],
+    "DeleteMessageResponse": ["success", "message"],
+    "SearchMessagesEnvelope": ["success", "data"],
+    "ChatHistoryStatsEnvelope": ["success", "data"],
+    "SuggestionEnvelope": ["success", "data"]
+  },
+  "requests": {
+    "CreateSessionRequest": ["title", "description"],
+    "UpdateSessionRequest": ["title", "description"],
+    "BatchDeleteSessionsRequest": ["ids", "delete_all"],
+    "LoadMessagesQuery": ["before_time", "limit"],
+    "SearchMessagesRequest": ["query", "mode", "limit", "session_ids"],
+    "GenerateTitleRequest": ["messages"],
+    "TitleGenMessage": ["role", "content"],
+    "StopGenerationRequest": ["message_id"],
+    "EnsureSuggestionsRequest": ["regenerate"],
+    "SuggestionEventRequest": ["suggestion_set_id", "question_id", "event_type"]
+  },
+  "endpoints": {
+    "POST /sessions": {
+      "status": 201,
+      "keys": ["success", "data"]
+    },
+    "GET /sessions/{id}": {
+      "status": 200,
+      "keys": ["success", "data"]
+    },
+    "GET /sessions": {
+      "status": 200,
+      "keys": ["success", "data", "total", "page", "page_size"]
+    },
+    "PUT /sessions/{id}": {
+      "status": 200,
+      "keys": ["success", "data"]
+    },
+    "DELETE /sessions/{id}": {
+      "status": 200,
+      "keys": ["success", "message"]
+    },
+    "DELETE /sessions/batch": {
+      "status": 200,
+      "keys": ["success", "message"]
+    },
+    "DELETE /sessions/{id}/messages": {
+      "status": 200,
+      "keys": ["success", "message"]
+    },
+    "POST /sessions/{id}/pin": {
+      "status": 200,
+      "keys": ["success", "is_pinned"]
+    },
+    "DELETE /sessions/{id}/pin": {
+      "status": 200,
+      "keys": ["success", "is_pinned"]
+    },
+    "POST /sessions/{id}/stop": {
+      "status": 200,
+      "keys": ["success", "message"]
+    },
+    "GET /messages/{session_id}/load": {
+      "status": 200,
+      "keys": ["success", "data"]
+    },
+    "DELETE /messages/{session_id}/{message_id}": {
+      "status": 200,
+      "keys": ["success", "message"]
+    },
+    "POST /messages/search": {
+      "status": 200,
+      "keys": ["success", "data"]
+    },
+    "GET /messages/chat-history-stats": {
+      "status": 200,
+      "keys": ["success", "data"]
+    },
+    "GET /sessions/{session_id}/messages/{message_id}/suggestions": {
+      "status": 200,
+      "keys": ["success", "data"]
+    },
+    "POST /sessions/{session_id}/messages/{message_id}/suggestions": {
+      "status": 200,
+      "keys": ["success", "data"]
+    },
+    "POST /sessions/{session_id}/messages/{message_id}/suggestions (generating)": {
+      "status": 202,
+      "keys": ["success", "data"]
+    },
+    "POST /sessions/{session_id}/suggestion-events": {
+      "status": 204,
+      "keys": []
+    }
+  },
+  "samples": {
+    "Session": {
+      "id": "sess-1",
+      "title": "Contract session",
+      "description": "",
+      "tenant_id": 100,
+      "user_id": "usr-1",
+      "is_pinned": false,
+      "pinned_at": null,
+      "created_at": "2026-08-01T00:00:00Z",
+      "updated_at": "2026-08-01T00:00:00Z",
+      "deleted_at": null,
+      "im_platform": null,
+      "im_chat_id": null,
+      "im_thread_id": null,
+      "im_user_id": null,
+      "im_agent_id": null,
+      "im_channel_id": null
+    },
+    "SessionListItem": {
+      "id": "sess-1",
+      "title": "Contract session",
+      "description": "",
+      "tenant_id": 100,
+      "user_id": "usr-1",
+      "is_pinned": false,
+      "pinned_at": null,
+      "created_at": "2026-08-01T00:00:00Z",
+      "updated_at": "2026-08-01T00:00:00Z",
+      "deleted_at": null,
+      "im_platform": null,
+      "im_chat_id": null,
+      "im_thread_id": null,
+      "im_user_id": null,
+      "im_agent_id": null,
+      "im_channel_id": null
+    },
+    "SessionEnvelope": {
+      "success": true,
+      "data": {
+        "id": "sess-1",
+        "title": "Contract session",
+        "description": "",
+        "tenant_id": 100,
+        "user_id": "usr-1",
+        "is_pinned": false,
+        "pinned_at": null,
+        "created_at": "2026-08-01T00:00:00Z",
+        "updated_at": "2026-08-01T00:00:00Z",
+        "deleted_at": null,
+        "im_platform": null,
+        "im_chat_id": null,
+        "im_thread_id": null,
+        "im_user_id": null,
+        "im_agent_id": null,
+        "im_channel_id": null
+      }
+    },
+    "SessionListEnvelope": {
+      "success": true,
+      "data": [
+        {
+          "id": "sess-1",
+          "title": "Contract session",
+          "description": "",
+          "tenant_id": 100,
+          "user_id": "usr-1",
+          "is_pinned": false,
+          "pinned_at": null,
+          "created_at": "2026-08-01T00:00:00Z",
+          "updated_at": "2026-08-01T00:00:00Z",
+          "deleted_at": null,
+          "im_platform": null,
+          "im_chat_id": null,
+          "im_thread_id": null,
+          "im_user_id": null,
+          "im_agent_id": null,
+          "im_channel_id": null
+        }
+      ],
+      "total": 1,
+      "page": 1,
+      "page_size": 20
+    },
+    "Message": {
+      "id": "msg-1",
+      "session_id": "sess-1",
+      "request_id": "req-1",
+      "content": "Hello",
+      "role": "user",
+      "knowledge_references": null,
+      "agent_steps": null,
+      "mentioned_items": null,
+      "images": null,
+      "is_completed": true,
+      "is_fallback": false,
+      "agent_duration_ms": null,
+      "channel": null,
+      "created_at": "2026-08-01T00:00:00Z",
+      "updated_at": "2026-08-01T00:00:00Z",
+      "deleted_at": null
+    },
+    "MessageSearchHit": {
+      "request_id": "req-1",
+      "session_id": "sess-1",
+      "session_title": "Contract session",
+      "query_content": "Hello",
+      "answer_content": "World",
+      "score": 0.95,
+      "match_type": "hybrid",
+      "created_at": "2026-08-01T00:00:00Z"
+    },
+    "MessageSearchResponse": {
+      "items": [
+        {
+          "request_id": "req-1",
+          "session_id": "sess-1",
+          "session_title": "Contract session",
+          "query_content": "Hello",
+          "answer_content": "World",
+          "score": 0.95,
+          "match_type": "hybrid",
+          "created_at": "2026-08-01T00:00:00Z"
+        }
+      ],
+      "total": 1
+    },
+    "ChatHistoryStats": {
+      "enabled": true,
+      "embedding_model_id": "emb-1",
+      "knowledge_base_id": "kb-1",
+      "knowledge_base_name": "Chat History",
+      "indexed_message_count": 42,
+      "has_indexed_messages": true
+    },
+    "SuggestionQuestion": {
+      "id": "q-1",
+      "text": "Tell me more",
+      "category": "deepen"
+    },
+    "SuggestionSet": {
+      "id": "set-1",
+      "session_id": "sess-1",
+      "assistant_message_id": "msg-1",
+      "position": "follow_up",
+      "status": "ready",
+      "language": "en-US",
+      "questions": [
+        {
+          "id": "q-1",
+          "text": "Tell me more",
+          "category": "deepen"
+        }
+      ],
+      "created_at": "2026-08-01T00:00:00Z",
+      "updated_at": "2026-08-01T00:00:00Z"
+    },
+    "MessageLoadEnvelope": {
+      "success": true,
+      "data": [
+        {
+          "id": "msg-1",
+          "session_id": "sess-1",
+          "request_id": "req-1",
+          "content": "Hello",
+          "role": "user",
+          "knowledge_references": null,
+          "agent_steps": null,
+          "mentioned_items": null,
+          "images": null,
+          "is_completed": true,
+          "is_fallback": false,
+          "agent_duration_ms": null,
+          "channel": null,
+          "created_at": "2026-08-01T00:00:00Z",
+          "updated_at": "2026-08-01T00:00:00Z",
+          "deleted_at": null
+        }
+      ]
+    },
+    "SearchMessagesEnvelope": {
+      "success": true,
+      "data": {
+        "items": [
+          {
+            "request_id": "req-1",
+            "session_id": "sess-1",
+            "session_title": "Contract session",
+            "query_content": "Hello",
+            "answer_content": "World",
+            "score": 0.95,
+            "match_type": "hybrid",
+            "created_at": "2026-08-01T00:00:00Z"
+          }
+        ],
+        "total": 1
+      }
+    },
+    "ChatHistoryStatsEnvelope": {
+      "success": true,
+      "data": {
+        "enabled": true,
+        "embedding_model_id": "emb-1",
+        "knowledge_base_id": "kb-1",
+        "knowledge_base_name": "Chat History",
+        "indexed_message_count": 42,
+        "has_indexed_messages": true
+      }
+    },
+    "SuggestionEnvelope": {
+      "success": true,
+      "data": {
+        "id": "set-1",
+        "session_id": "sess-1",
+        "assistant_message_id": "msg-1",
+        "position": "follow_up",
+        "status": "ready",
+        "language": "en-US",
+        "questions": [
+          {
+            "id": "q-1",
+            "text": "Tell me more",
+            "category": "deepen"
+          }
+        ],
+        "created_at": "2026-08-01T00:00:00Z",
+        "updated_at": "2026-08-01T00:00:00Z"
+      }
+    },
+    "DeleteSessionResponse": {
+      "success": true,
+      "message": "Session deleted successfully"
+    },
+    "PinSessionEnvelope": {
+      "success": true,
+      "is_pinned": true
+    }
+  }
+}
