@@ -28,7 +28,15 @@ class LoginRequest(BaseModel):
 
 
 class RefreshTokenRequest(BaseModel):
-    model_config = ConfigDict(frozen=True, populate_by_name=True)
+    """Body for ``POST /auth/refresh``.
+
+    Strict camelCase to match Go's
+    ``{RefreshToken string json:"refreshToken" binding:"required"}``.
+    The ``refresh_token`` snake_case form is rejected to keep the wire
+    contract identical on both sides.
+    """
+
+    model_config = ConfigDict(frozen=True)
 
     refresh_token: str = Field(alias="refreshToken")
 
@@ -78,14 +86,20 @@ class RegisterResponse(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    """Login response containing session tokens and tenant context."""
+    """Login response containing session tokens and tenant context.
+
+    The active tenant is the workspace whose ID is encoded in the
+    issued JWT; future requests are scoped to it until the client
+    calls /auth/switch-tenant. Field name mirrors Go's
+    ``LoginResponse`` (active_tenant, not tenant).
+    """
 
     model_config = ConfigDict(frozen=True)
 
     success: bool
     message: str
     user: AuthUser
-    tenant: Tenant | None = Field(default=None)
+    active_tenant: Tenant | None = Field(default=None)
     memberships: list[Membership] = Field(default_factory=list)
     token: str
     refresh_token: str
@@ -119,11 +133,19 @@ class RefreshTokenResponse(BaseModel):
 
 
 class OIDCMetaConfig(BaseModel):
+    """Body for ``GET /auth/oidc/config``.
+
+    Mirrors Go's ``OIDCConfigResponse`` — ``provider_display_name`` is
+    omitted (omitempty) when the OIDC provider is not configured, so
+    the field is ``Optional`` here and serialised as ``None`` when the
+    value is missing.
+    """
+
     model_config = ConfigDict(frozen=True)
 
     success: bool
     enabled: bool
-    provider_display_name: str
+    provider_display_name: str | None = None
 
 
 class OIDCAuthorizeURLResponse(BaseModel):

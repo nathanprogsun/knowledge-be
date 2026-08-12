@@ -8,7 +8,7 @@ and ``internal/handler/audit_log.go``:
 - ``PUT    /system/admin/settings/{key}``   — update a setting value
 - ``DELETE /system/admin/settings/{key}``   — reset a setting to ENV/default
 - ``GET    /system/admin/audit-log``        — system-scope audit feed
-- ``GET    /system/info``                   — public build + DB metadata
+- ``GET    /system/info``                   — build + DB metadata (Viewer-gated)
 
 Tenant-scoped audit-log endpoints (``GET /tenants/{id}/audit-log``) and
 KB activity (``GET /knowledge-bases/{id}/activity``) are not yet
@@ -16,14 +16,7 @@ implemented — they require RBAC middleware and the KB domain
 respectively.
 
 Wire-shape conversion (``SystemSettingInfo`` → response model) lives in
-this module so the router stays declarative. The ``SystemAdmin`` guard
-is not yet wired; the endpoints are currently unauthenticated so the
-contract tests can exercise them.
-
-The ``GET /system/info`` route is intentionally public (no
-``AuthDep`` / ``SystemAdminDep``) — mirrors the upstream Go handler
-which serves the same data to the install wizard without requiring a
-logged-in principal.
+this module so the router stays declarative.
 
 Query-parameter ``description`` strings are intentionally Chinese
 (mirrors the upstream Go swagger annotations). RUF001 flags the
@@ -41,11 +34,12 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.common.json import JsonObject, JsonValue
 from src.core.system.audit_service import AuditLogListResult
-from src.core.system.info_service import SystemInfoService, SystemInfoSnapshot
+from src.core.system.info_service import SystemInfoSnapshot
 from src.core.system.types import AuditLogInfo, SystemSettingInfo
 from src.web.deps import (
     AuditLogServiceDep,
     AuthDep,
+    RoleViewerDep,
     SystemAdminDep,
     SystemInfoServiceDep,
     SystemSettingServiceDep,
@@ -263,15 +257,19 @@ def _snapshot_to_response(snapshot: SystemInfoSnapshot) -> SystemInfoWireRespons
 @info_router.get("/info", response_model=SystemInfoWireResponse)
 async def get_system_info(
     info_svc: SystemInfoServiceDep,
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
 ) -> SystemInfoWireResponse:
     """Return build metadata, DB state, and process uptime.
 
-    Mirrors ``GET /system/info`` in the upstream Go handler — public
-    endpoint (no auth) so the install wizard can probe the deployment
-    before a tenant / user exists. The route reads the boot instant
-    from ``app.state.started_at`` (set during lifespan startup) and
-    queries ``alembic_version`` + ``SELECT version()`` on the request
-    session to populate ``db_version`` and ``db_migration_error``.
+    Mirrors ``GET /system/info`` in the upstream Go handler — gated by
+    ``g.Viewer()``: any authenticated principal with at least Viewer
+    role in a workspace may read it. Anonymous / tenant-less principals
+    are rejected with ``auth.missing_authentication`` /
+    ``rbac.insufficient_role``. The route reads the boot instant from
+    ``app.state.started_at`` (set during lifespan startup) and queries
+    ``alembic_version`` + ``SELECT version()`` on the request session
+    to populate ``db_version`` and ``db_migration_error``.
     """
     snapshot = await info_svc.get_info()
     return _snapshot_to_response(snapshot)

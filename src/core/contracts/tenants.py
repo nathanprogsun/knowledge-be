@@ -63,12 +63,20 @@ class Tenant(BaseModel):
 
 
 class TenantList(BaseModel):
+    """Paginated tenant listing.
+
+    Field names mirror Go's ``ListTenantsResponse`` / pagination
+    contract: ``data`` is the array of tenants (not ``items``);
+    ``total``, ``page``, ``page_size`` are siblings at the envelope
+    level.
+    """
+
     model_config = ConfigDict(frozen=True)
 
-    items: list[Tenant]
-    total: int | None = Field(default=None)
-    page: int | None = Field(default=None)
-    page_size: int | None = Field(default=None)
+    data: list[Tenant]
+    total: int = 0
+    page: int = 1
+    page_size: int = 20
 
 
 class CreateTenantRequest(BaseModel):

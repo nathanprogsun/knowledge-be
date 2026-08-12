@@ -79,7 +79,7 @@ async def login(
         success=True,
         message="Login successful",
         user=_user_info_to_auth_user(result.user),
-        tenant=None,
+        active_tenant=None,
         memberships=[],
         token=result.access_token,
         refresh_token=result.refresh_token,
@@ -224,12 +224,23 @@ async def validate_token(
 
 @router.get("/oidc/config", response_model=OIDCMetaConfig)
 async def oidc_config() -> OIDCMetaConfig:
-    """Return OIDC provider metadata."""
+    """Return OIDC provider metadata.
+
+    Mirrors Go's ``OIDCConfigResponse``: when OIDC is not enabled,
+    ``provider_display_name`` is omitted (Go's ``omitempty`` / Python
+    serialises ``None`` as ``null`` and we route the value through
+    ``None`` so the JSON shape matches).
+    """
     settings = get_settings()
+    display_name = (
+        settings.oidc_provider_display_name
+        if settings.oidc_enable and settings.oidc_provider_display_name
+        else None
+    )
     return OIDCMetaConfig(
         success=True,
         enabled=settings.oidc_enable,
-        provider_display_name=settings.oidc_provider_display_name,
+        provider_display_name=display_name,
     )
 
 

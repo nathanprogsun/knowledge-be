@@ -29,7 +29,11 @@ class TenantEnvelope(BaseModel):
 
 
 class TenantListEnvelope(BaseModel):
-    """``{"success": true, "data": {"items": [...]}}`` - list responses."""
+    """``{"success": true, "data": [...], "total": ..., "page": ..., "page_size": ...}``.
+
+    Mirrors the project's pagination shape: ``data`` carries the list
+    payload (not ``items``) and the pagination metadata are siblings.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -96,16 +100,18 @@ def tenant_list_envelope(
 ) -> TenantListEnvelope:
     """Wrap a tenant page in the success envelope.
 
-    ``total`` / ``page`` / ``page_size`` stay ``None`` for the unpaginated
-    list endpoint, which answers with ``items`` alone.
+    Field names mirror Go's pagination contract: ``data`` carries the
+    list payload; ``total`` / ``page`` / ``page_size`` are siblings
+    on the inner pagination object (defaults 0 / 1 / 20 for unpaginated
+    list endpoints so the wire shape stays uniform).
     """
     return TenantListEnvelope(
         success=True,
         data=TenantList(
-            items=[tenant_info_to_contract(info) for info in infos],
-            total=total,
-            page=page,
-            page_size=page_size,
+            data=[tenant_info_to_contract(info) for info in infos],
+            total=total or 0,
+            page=page or 1,
+            page_size=page_size or 20,
         ),
     )
 

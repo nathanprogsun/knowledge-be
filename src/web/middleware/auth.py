@@ -39,7 +39,6 @@ from src.web.deps.session import SessionDep
 # exact-match entries here must equal the registered route path.
 PUBLIC_PATHS: dict[str, set[str]] = {
     "/health": {"GET"},
-    "/system/info": {"GET"},
     "/auth/register": {"POST"},
     "/auth/login": {"POST"},
     "/auth/refresh": {"POST"},
