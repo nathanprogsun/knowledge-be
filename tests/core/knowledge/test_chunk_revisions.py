@@ -1,13 +1,17 @@
-"""Unit tests for chunk revision + generated-question domain logic.
+"""Unit and integration tests for chunk revision + generated-question logic.
 
-Covers the pure parts of ``src/core/knowledge/chunks``:
+Covers ``src/core/knowledge/chunks``:
 
-- ``ChunkRevision`` model defaults and the ``ChunkRevisionInfo``
-  projection (``map_from_db``).
-- the read-side queries (``list_chunk_revisions`` /
-  ``get_chunk_revision``) against a mocked repository.
-- the generated-question metadata helpers (bind/unbind, source id,
-  currency, parse/serialize).
+- the pure helpers: ``ChunkRevision`` model defaults, the
+  ``ChunkRevisionInfo`` projection, the read-side queries
+  (``list_chunk_revisions`` / ``get_chunk_revision``) against a mocked
+  repository, and the generated-question metadata helpers (bind/unbind,
+  source id, currency, parse/serialize).
+- the service-level operations (``revert_document_chunk``,
+  ``upsert_generated_question``, ``delete_generated_question``) against
+  mocked services and sync hooks.
+- integration tests against the real applied schema that exercise the
+  service operations end to end.
 
 The DB-backed repository behavior is exercised separately in
 ``tests/integration/db/dao/test_chunk_revisions_repository.py``.
@@ -15,33 +19,52 @@ The DB-backed repository behavior is exercised separately in
 
 from __future__ import annotations
 
+import itertools
+import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from random import randint
 from unittest.mock import AsyncMock
 
 import pytest
+import pytest_asyncio
+from faker import Faker
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.pool import NullPool
 
-from src.common.exception import NotFoundError, ValidationError
+from src.common.exception import ConflictError, NotFoundError, ValidationError
+from src.common.json import JsonObject
 from src.core.knowledge.chunks.questions import (
     DocumentChunkMetadata,
     GeneratedQuestion,
     bind_generated_question,
+    delete_generated_question,
     generated_question_source_id,
     get_question_strings,
     is_question_current,
     parse_document_metadata,
     unbind_generated_question,
+    upsert_generated_question,
 )
 from src.core.knowledge.chunks.revisions import (
     ChunkRevisionInfo,
     get_chunk_revision,
     list_chunk_revisions,
+    revert_document_chunk,
 )
+from src.core.knowledge.chunks.service.chunk_service import ChunkService
+from src.db.base import DatabaseEngine
+from src.db.dao.chunk_repository import ChunkRepository
 from src.db.dao.chunk_revision_repository import ChunkRevisionRepository
+from src.db.models.chunk import Chunk
 from src.db.models.chunk_revision import ChunkRevision
+from src.settings import get_settings, reset_settings_cache
 
 TENANT_ID = 7
 CHUNK_ID = "chunk-1"
 NOW = datetime(2026, 1, 1, tzinfo=UTC)
+_FAKER_SEED_MAX = 100_000_000
 
 
 def _revision(*, revision: int, **overrides: object) -> ChunkRevision:
@@ -344,3 +367,664 @@ def test_get_question_strings_returns_in_order() -> None:
     )
     assert get_question_strings(meta) == ["first", "second"]
     assert get_question_strings(None) == []
+
+
+# ── shared service-level test scaffolding ────────────────────────────
+
+
+def _chunk(
+    *,
+    tenant_id: int = TENANT_ID,
+    id: str | None = None,
+    content: str = "The quick brown fox jumps over the lazy dog.",
+    content_revision: int = 0,
+    metadata: JsonObject | None = None,
+    **overrides: object,
+) -> Chunk:
+    """Build a persisted-shape chunk row for seeding mocks / the DB."""
+    return Chunk.model_validate(
+        {
+            "id": id or f"chunk-{uuid.uuid4().hex[:12]}",
+            "tenant_id": tenant_id,
+            "knowledge_base_id": "kb-1",
+            "knowledge_id": "knowledge-1",
+            "content": content,
+            "chunk_index": 0,
+            "is_enabled": True,
+            "start_at": 0,
+            "end_at": len(content),
+            "chunk_type": "text",
+            "flags": 1,
+            "source_content": "",
+            "content_revision": content_revision,
+            "index_status": "ready",
+            "last_editor_id": "",
+            "metadata": metadata,
+            "created_at": NOW,
+            "updated_at": NOW,
+            "deleted_at": None,
+            **overrides,
+        }
+    )
+
+
+def _question_metadata(*questions: dict[str, object]) -> JsonObject:
+    """Build the stored ``generated_questions`` metadata payload."""
+    return {"generated_questions": list(questions)}
+
+
+class _Syncer:
+    """Stub index syncer that records calls and can fail."""
+
+    def __init__(self, *, error: Exception | None = None) -> None:
+        self.error = error
+        self.sync_calls: list[tuple[int, Chunk]] = []
+        self.delete_calls: list[tuple[int, str]] = []
+
+    async def sync_chunk(self, *, tenant_id: int, chunk: Chunk) -> None:
+        self.sync_calls.append((tenant_id, chunk))
+        if self.error is not None:
+            raise self.error
+
+    async def delete_question(self, *, tenant_id: int, source_id: str) -> None:
+        self.delete_calls.append((tenant_id, source_id))
+        if self.error is not None:
+            raise self.error
+
+
+def _mocked_question_service(chunk: Chunk) -> tuple[AsyncMock, list[Chunk]]:
+    """Return a mocked chunk service plus the chunks passed to ``update_chunk``."""
+    chunk_service = AsyncMock(spec=ChunkService)
+    chunk_service.get_chunk_by_id.return_value = chunk
+    persisted: list[Chunk] = []
+
+    async def _update(*, chunk: Chunk) -> Chunk:
+        persisted.append(chunk)
+        return chunk
+
+    chunk_service.update_chunk.side_effect = _update
+    return chunk_service, persisted
+
+
+# ── revert_document_chunk (service) ──────────────────────────────────
+
+
+async def test_revert_replays_snapshot_through_edit_pipeline() -> None:
+    snapshot = _revision(revision=0, content="original body")
+    edited = _chunk(id=CHUNK_ID, content="original body", content_revision=1)
+    revision_repo = AsyncMock(spec=ChunkRevisionRepository)
+    revision_repo.get_chunk_revision.return_value = snapshot
+    chunk_service = AsyncMock(spec=ChunkService)
+    chunk_service.update_document_chunk.return_value = edited
+
+    result = await revert_document_chunk(
+        revision_repo=revision_repo,
+        chunk_service=chunk_service,
+        tenant_id=TENANT_ID,
+        chunk_id=CHUNK_ID,
+        revision=0,
+        last_editor_id="editor-1",
+    )
+
+    assert result is edited
+    revision_repo.get_chunk_revision.assert_awaited_once_with(
+        tenant_id=TENANT_ID,
+        chunk_id=CHUNK_ID,
+        revision=0,
+    )
+    chunk_service.update_document_chunk.assert_awaited_once_with(
+        tenant_id=TENANT_ID,
+        chunk_id=CHUNK_ID,
+        content="original body",
+        is_enabled=True,
+        expected_revision=None,
+        last_editor_id="editor-1",
+    )
+
+
+async def test_revert_passes_explicit_expected_revision() -> None:
+    snapshot = _revision(revision=1, content="second body")
+    edited = _chunk(id=CHUNK_ID, content="second body", content_revision=3)
+    revision_repo = AsyncMock(spec=ChunkRevisionRepository)
+    revision_repo.get_chunk_revision.return_value = snapshot
+    chunk_service = AsyncMock(spec=ChunkService)
+    chunk_service.update_document_chunk.return_value = edited
+
+    await revert_document_chunk(
+        revision_repo=revision_repo,
+        chunk_service=chunk_service,
+        tenant_id=TENANT_ID,
+        chunk_id=CHUNK_ID,
+        revision=1,
+        expected_revision=2,
+        last_editor_id="editor-1",
+    )
+
+    chunk_service.update_document_chunk.assert_awaited_once_with(
+        tenant_id=TENANT_ID,
+        chunk_id=CHUNK_ID,
+        content="second body",
+        is_enabled=True,
+        expected_revision=2,
+        last_editor_id="editor-1",
+    )
+
+
+async def test_revert_raises_when_snapshot_absent() -> None:
+    revision_repo = AsyncMock(spec=ChunkRevisionRepository)
+    revision_repo.get_chunk_revision.return_value = None
+    chunk_service = AsyncMock(spec=ChunkService)
+
+    with pytest.raises(NotFoundError) as exc_info:
+        await revert_document_chunk(
+            revision_repo=revision_repo,
+            chunk_service=chunk_service,
+            tenant_id=TENANT_ID,
+            chunk_id=CHUNK_ID,
+            revision=99,
+            last_editor_id="editor-1",
+        )
+
+    assert exc_info.value.code == "chunk.revision_not_found"
+    chunk_service.update_document_chunk.assert_not_awaited()
+
+
+async def test_revert_propagates_edit_conflict() -> None:
+    snapshot = _revision(revision=0, content="original body")
+    revision_repo = AsyncMock(spec=ChunkRevisionRepository)
+    revision_repo.get_chunk_revision.return_value = snapshot
+    chunk_service = AsyncMock(spec=ChunkService)
+    chunk_service.update_document_chunk.side_effect = ConflictError(
+        code="chunk.revision_conflict",
+        message="chunk changed",
+    )
+
+    with pytest.raises(ConflictError) as exc_info:
+        await revert_document_chunk(
+            revision_repo=revision_repo,
+            chunk_service=chunk_service,
+            tenant_id=TENANT_ID,
+            chunk_id=CHUNK_ID,
+            revision=0,
+            expected_revision=1,
+            last_editor_id="editor-1",
+        )
+
+    assert exc_info.value.code == "chunk.revision_conflict"
+
+
+# ── upsert_generated_question (service) ──────────────────────────────
+
+
+async def test_upsert_appends_new_question_and_persists() -> None:
+    chunk = _chunk(id=CHUNK_ID, content_revision=2)
+    chunk_service, persisted = _mocked_question_service(chunk)
+
+    bound = await upsert_generated_question(
+        chunk_service=chunk_service,
+        tenant_id=TENANT_ID,
+        chunk_id=CHUNK_ID,
+        question="  what is the answer?  ",
+    )
+
+    assert bound.question == "what is the answer?"
+    assert bound.content_revision == 2
+    meta = parse_document_metadata(persisted[0].metadata)
+    assert meta is not None
+    assert [(q.id, q.question, q.content_revision) for q in meta.generated_questions] == [
+        (bound.id, "what is the answer?", 2)
+    ]
+    chunk_service.get_chunk_by_id.assert_awaited_once_with(tenant_id=TENANT_ID, id=CHUNK_ID)
+
+
+async def test_upsert_updates_existing_question_text() -> None:
+    chunk = _chunk(
+        id=CHUNK_ID,
+        content_revision=2,
+        metadata=_question_metadata({"id": "q-1", "question": "old text", "content_revision": 1}),
+    )
+    chunk_service, persisted = _mocked_question_service(chunk)
+
+    bound = await upsert_generated_question(
+        chunk_service=chunk_service,
+        tenant_id=TENANT_ID,
+        chunk_id=CHUNK_ID,
+        question_id="q-1",
+        question="new text",
+    )
+
+    assert bound.id == "q-1"
+    assert bound.question == "new text"
+    assert bound.content_revision == 2
+    meta = parse_document_metadata(persisted[0].metadata)
+    assert meta is not None
+    assert [(q.id, q.question, q.content_revision) for q in meta.generated_questions] == [
+        ("q-1", "new text", 2)
+    ]
+
+
+async def test_upsert_rejects_blank_question_before_chunk_lookup() -> None:
+    chunk_service = AsyncMock(spec=ChunkService)
+
+    with pytest.raises(ValidationError) as exc_info:
+        await upsert_generated_question(
+            chunk_service=chunk_service,
+            tenant_id=TENANT_ID,
+            chunk_id=CHUNK_ID,
+            question="   ",
+        )
+
+    assert exc_info.value.code == "chunk.question_empty"
+    chunk_service.get_chunk_by_id.assert_not_awaited()
+
+
+async def test_upsert_rejects_unknown_question_id() -> None:
+    chunk = _chunk(id=CHUNK_ID)
+    chunk_service, persisted = _mocked_question_service(chunk)
+
+    with pytest.raises(ValidationError) as exc_info:
+        await upsert_generated_question(
+            chunk_service=chunk_service,
+            tenant_id=TENANT_ID,
+            chunk_id=CHUNK_ID,
+            question_id="missing",
+            question="text",
+        )
+
+    assert exc_info.value.code == "chunk.question_not_found"
+    assert persisted == []
+
+
+async def test_upsert_raises_not_found_for_missing_chunk() -> None:
+    chunk_service = AsyncMock(spec=ChunkService)
+    chunk_service.get_chunk_by_id.side_effect = NotFoundError(
+        code="chunk.not_found",
+        message=f"chunk {CHUNK_ID} not found",
+    )
+
+    with pytest.raises(NotFoundError) as exc_info:
+        await upsert_generated_question(
+            chunk_service=chunk_service,
+            tenant_id=TENANT_ID,
+            chunk_id=CHUNK_ID,
+            question="text",
+        )
+
+    assert exc_info.value.code == "chunk.not_found"
+    chunk_service.update_chunk.assert_not_awaited()
+
+
+async def test_upsert_syncs_index_with_persisted_chunk() -> None:
+    chunk = _chunk(id=CHUNK_ID, content_revision=1)
+    chunk_service = AsyncMock(spec=ChunkService)
+    chunk_service.get_chunk_by_id.return_value = chunk
+    persisted = chunk.model_copy(update={"metadata": {"generated_questions": []}})
+    chunk_service.update_chunk.return_value = persisted
+    syncer = _Syncer()
+
+    await upsert_generated_question(
+        chunk_service=chunk_service,
+        tenant_id=TENANT_ID,
+        chunk_id=CHUNK_ID,
+        question="text",
+        syncer=syncer,
+    )
+
+    assert len(syncer.sync_calls) == 1
+    assert syncer.sync_calls[0][0] == TENANT_ID
+    assert syncer.sync_calls[0][1] is persisted
+
+
+async def test_upsert_propagates_index_sync_failure() -> None:
+    chunk = _chunk(id=CHUNK_ID)
+    chunk_service = AsyncMock(spec=ChunkService)
+    chunk_service.get_chunk_by_id.return_value = chunk
+    chunk_service.update_chunk.return_value = chunk
+    syncer = _Syncer(error=RuntimeError("vector store down"))
+
+    with pytest.raises(RuntimeError):
+        await upsert_generated_question(
+            chunk_service=chunk_service,
+            tenant_id=TENANT_ID,
+            chunk_id=CHUNK_ID,
+            question="text",
+            syncer=syncer,
+        )
+
+
+# ── delete_generated_question (service) ──────────────────────────────
+
+
+async def test_delete_removes_question_and_persists() -> None:
+    chunk = _chunk(
+        id=CHUNK_ID,
+        metadata=_question_metadata(
+            {"id": "q-1", "question": "a", "content_revision": 1},
+            {"id": "q-2", "question": "b", "content_revision": 1},
+        ),
+    )
+    chunk_service, persisted = _mocked_question_service(chunk)
+
+    await delete_generated_question(
+        chunk_service=chunk_service,
+        tenant_id=TENANT_ID,
+        chunk_id=CHUNK_ID,
+        question_id="q-1",
+    )
+
+    meta = parse_document_metadata(persisted[0].metadata)
+    assert meta is not None
+    assert [q.id for q in meta.generated_questions] == ["q-2"]
+
+
+async def test_delete_rejects_when_no_questions() -> None:
+    chunk = _chunk(id=CHUNK_ID)
+    chunk_service, persisted = _mocked_question_service(chunk)
+
+    with pytest.raises(ValidationError) as exc_info:
+        await delete_generated_question(
+            chunk_service=chunk_service,
+            tenant_id=TENANT_ID,
+            chunk_id=CHUNK_ID,
+            question_id="q-1",
+        )
+
+    assert exc_info.value.code == "chunk.no_questions"
+    assert persisted == []
+
+
+async def test_delete_rejects_unknown_question_id() -> None:
+    chunk = _chunk(
+        id=CHUNK_ID,
+        metadata=_question_metadata({"id": "q-1", "question": "a", "content_revision": 1}),
+    )
+    chunk_service, persisted = _mocked_question_service(chunk)
+
+    with pytest.raises(ValidationError) as exc_info:
+        await delete_generated_question(
+            chunk_service=chunk_service,
+            tenant_id=TENANT_ID,
+            chunk_id=CHUNK_ID,
+            question_id="missing",
+        )
+
+    assert exc_info.value.code == "chunk.question_not_found"
+    assert persisted == []
+
+
+async def test_delete_raises_not_found_for_missing_chunk() -> None:
+    chunk_service = AsyncMock(spec=ChunkService)
+    chunk_service.get_chunk_by_id.side_effect = NotFoundError(
+        code="chunk.not_found",
+        message=f"chunk {CHUNK_ID} not found",
+    )
+
+    with pytest.raises(NotFoundError) as exc_info:
+        await delete_generated_question(
+            chunk_service=chunk_service,
+            tenant_id=TENANT_ID,
+            chunk_id=CHUNK_ID,
+            question_id="q-1",
+        )
+
+    assert exc_info.value.code == "chunk.not_found"
+    chunk_service.update_chunk.assert_not_awaited()
+
+
+async def test_delete_drops_question_index_row() -> None:
+    chunk = _chunk(
+        id=CHUNK_ID,
+        metadata=_question_metadata({"id": "q-1", "question": "a", "content_revision": 1}),
+    )
+    chunk_service = AsyncMock(spec=ChunkService)
+    chunk_service.get_chunk_by_id.return_value = chunk
+    chunk_service.update_chunk.return_value = chunk
+    syncer = _Syncer()
+
+    await delete_generated_question(
+        chunk_service=chunk_service,
+        tenant_id=TENANT_ID,
+        chunk_id=CHUNK_ID,
+        question_id="q-1",
+        syncer=syncer,
+    )
+
+    assert syncer.delete_calls == [
+        (TENANT_ID, generated_question_source_id(CHUNK_ID, "q-1"))
+    ]
+    chunk_service.update_chunk.assert_awaited_once()
+
+
+async def test_delete_ignores_index_sync_failure() -> None:
+    chunk = _chunk(
+        id=CHUNK_ID,
+        metadata=_question_metadata({"id": "q-1", "question": "a", "content_revision": 1}),
+    )
+    chunk_service = AsyncMock(spec=ChunkService)
+    chunk_service.get_chunk_by_id.return_value = chunk
+    chunk_service.update_chunk.return_value = chunk
+    syncer = _Syncer(error=RuntimeError("vector store down"))
+
+    await delete_generated_question(
+        chunk_service=chunk_service,
+        tenant_id=TENANT_ID,
+        chunk_id=CHUNK_ID,
+        question_id="q-1",
+        syncer=syncer,
+    )
+
+    assert len(syncer.delete_calls) == 1
+    chunk_service.update_chunk.assert_awaited_once()
+
+
+# ── faker seeding (integration) ──────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+def faker_seed() -> None:
+    """Re-seed Faker per test for varied-but-reproducible generation."""
+    Faker.seed(randint(1, _FAKER_SEED_MAX))
+
+
+# ── Integration against the real schema ──────────────────────────────
+
+# The ``chunks.tenant_id`` column is a 32-bit INTEGER, so integration
+# rows need a 32-bit-safe unique id (the tenants table's 64-bit ids do
+# not fit).
+_tenant_counter = itertools.count(9_000_000)
+
+
+def _tenant_id() -> int:
+    """Return a unique 32-bit tenant id for the ``chunks`` table."""
+    return next(_tenant_counter)
+
+
+@pytest.fixture(scope="session")
+def _db_engine() -> DatabaseEngine:
+    """Session-scoped engine against the configured Postgres (NullPool)."""
+    reset_settings_cache()
+    settings = get_settings()
+    return DatabaseEngine(url=settings.database_url, poolclass=NullPool)
+
+
+@pytest_asyncio.fixture
+async def db_session(_db_engine: DatabaseEngine) -> AsyncIterator[AsyncSession]:
+    """Per-test session; skips the test when Postgres is unreachable."""
+    factory = async_sessionmaker(_db_engine.engine, expire_on_commit=False)
+    async with factory() as session:
+        try:
+            await session.execute(text("select 1"))
+        except Exception:
+            pytest.skip("integration Postgres is not reachable; set DATABASE_URL_OVERRIDE")
+        yield session
+        await session.rollback()
+
+
+async def test_integration_revert_replays_snapshot(db_session: AsyncSession) -> None:
+    tid = _tenant_id()
+    chunk_service = ChunkService(chunk_repo=ChunkRepository(db_session))
+    revision_repo = ChunkRevisionRepository(db_session)
+    created = await chunk_service.create_chunks(
+        chunks=[_chunk(tenant_id=tid, content="current body", content_revision=1)]
+    )
+    cid = created[0].id
+    await revision_repo.create(
+        ChunkRevision.model_validate(
+            {
+                "id": f"{cid}-rev-0",
+                "tenant_id": tid,
+                "knowledge_base_id": "kb-1",
+                "knowledge_id": "knowledge-1",
+                "chunk_id": cid,
+                "revision": 0,
+                "content": "historical body",
+                "is_enabled": True,
+                "editor_id": "editor-it-1",
+                "edit_source": "user",
+                "edited_at": NOW,
+                "created_at": NOW,
+            }
+        )
+    )
+    await db_session.commit()
+
+    reverted = await revert_document_chunk(
+        revision_repo=revision_repo,
+        chunk_service=chunk_service,
+        tenant_id=tid,
+        chunk_id=cid,
+        revision=0,
+        expected_revision=1,
+        last_editor_id="editor-it-2",
+    )
+
+    assert reverted.content == "historical body"
+    assert reverted.content_revision == 2
+    assert reverted.index_status == "ready"
+    reloaded = await ChunkRepository(db_session).get_by_id(tid, cid)
+    assert reloaded.content == "historical body"
+    assert reloaded.content_revision == 2
+
+
+async def test_integration_revert_raises_when_snapshot_absent(
+    db_session: AsyncSession,
+) -> None:
+    tid = _tenant_id()
+    chunk_service = ChunkService(chunk_repo=ChunkRepository(db_session))
+    created = await chunk_service.create_chunks(chunks=[_chunk(tenant_id=tid)])
+    cid = created[0].id
+
+    with pytest.raises(NotFoundError) as exc_info:
+        await revert_document_chunk(
+            revision_repo=ChunkRevisionRepository(db_session),
+            chunk_service=chunk_service,
+            tenant_id=tid,
+            chunk_id=cid,
+            revision=99,
+            last_editor_id="editor-it-1",
+        )
+
+    assert exc_info.value.code == "chunk.revision_not_found"
+
+
+async def test_integration_question_bind_unbind_round_trip(
+    db_session: AsyncSession,
+) -> None:
+    tid = _tenant_id()
+    chunk_service = ChunkService(chunk_repo=ChunkRepository(db_session))
+    created = await chunk_service.create_chunks(
+        chunks=[_chunk(tenant_id=tid, content_revision=2)]
+    )
+    cid = created[0].id
+
+    bound = await upsert_generated_question(
+        chunk_service=chunk_service,
+        tenant_id=tid,
+        chunk_id=cid,
+        question=Faker().sentence(),
+    )
+
+    meta = parse_document_metadata((await ChunkRepository(db_session).get_by_id(tid, cid)).metadata)
+    assert meta is not None
+    assert [q.id for q in meta.generated_questions] == [bound.id]
+    assert meta.generated_questions[0].content_revision == 2
+
+    updated = await upsert_generated_question(
+        chunk_service=chunk_service,
+        tenant_id=tid,
+        chunk_id=cid,
+        question_id=bound.id,
+        question="revised question",
+    )
+    assert updated.question == "revised question"
+
+    await delete_generated_question(
+        chunk_service=chunk_service,
+        tenant_id=tid,
+        chunk_id=cid,
+        question_id=bound.id,
+    )
+
+    meta = parse_document_metadata((await ChunkRepository(db_session).get_by_id(tid, cid)).metadata)
+    assert meta is None or meta.generated_questions == []
+
+
+async def test_integration_question_ops_validate(db_session: AsyncSession) -> None:
+    tid = _tenant_id()
+    chunk_service = ChunkService(chunk_repo=ChunkRepository(db_session))
+    missing = f"chunk-{uuid.uuid4().hex[:12]}"
+
+    with pytest.raises(ValidationError) as exc_info:
+        await upsert_generated_question(
+            chunk_service=chunk_service,
+            tenant_id=tid,
+            chunk_id=missing,
+            question="   ",
+        )
+    assert exc_info.value.code == "chunk.question_empty"
+
+    with pytest.raises(NotFoundError) as exc_info:
+        await upsert_generated_question(
+            chunk_service=chunk_service,
+            tenant_id=tid,
+            chunk_id=missing,
+            question="text",
+        )
+    assert exc_info.value.code == "chunk.not_found"
+
+    created = await chunk_service.create_chunks(chunks=[_chunk(tenant_id=tid)])
+    cid = created[0].id
+
+    with pytest.raises(ValidationError) as exc_info:
+        await delete_generated_question(
+            chunk_service=chunk_service,
+            tenant_id=tid,
+            chunk_id=cid,
+            question_id="q-1",
+        )
+    assert exc_info.value.code == "chunk.no_questions"
+
+    await upsert_generated_question(
+        chunk_service=chunk_service,
+        tenant_id=tid,
+        chunk_id=cid,
+        question="a question",
+    )
+
+    with pytest.raises(ValidationError) as exc_info:
+        await delete_generated_question(
+            chunk_service=chunk_service,
+            tenant_id=tid,
+            chunk_id=cid,
+            question_id="missing",
+        )
+    assert exc_info.value.code == "chunk.question_not_found"
+
+    with pytest.raises(NotFoundError) as exc_info:
+        await delete_generated_question(
+            chunk_service=chunk_service,
+            tenant_id=tid,
+            chunk_id=missing,
+            question_id="q-1",
+        )
+    assert exc_info.value.code == "chunk.not_found"

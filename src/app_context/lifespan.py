@@ -96,11 +96,8 @@ from src.web.api.knowledge.faq.router import router as faq_router
 from src.web.api.knowledge.tags.router import router as knowledge_tags_router
 from src.web.api.knowledge.wiki.router import router as wiki_router
 from src.web.api.knowledge_bases.router import router as knowledge_bases_router
-<<<<<<< HEAD
 from src.web.api.organizations.router import router as organizations_router
-=======
 from src.web.api.system.router import info_router as system_info_router
->>>>>>> feat/pr-150-system-info
 from src.web.api.system.router import router as system_router
 from src.web.api.system.service_views import router as system_service_router
 from src.web.api.tenants.router import router as tenants_router
@@ -236,11 +233,8 @@ def create_app() -> FastAPI:
     application.include_router(sessions_router)
     application.include_router(skills_router)
     application.include_router(storage_backends_router)
-<<<<<<< HEAD
     application.include_router(suggestion_router)
-=======
     application.include_router(system_info_router)
->>>>>>> feat/pr-150-system-info
     application.include_router(system_router)
     application.include_router(system_service_router)
     application.include_router(tenants_router)

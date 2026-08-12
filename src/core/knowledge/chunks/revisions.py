@@ -1,15 +1,16 @@
-"""Chunk revision history — domain types and read-side queries.
+"""Chunk revision history — domain types, reads, and the revert.
 
 Maps the revision-history half of the upstream chunk service
-(``ListChunkRevisions`` / ``GetChunkRevision``). ``ChunkRevisionInfo``
-is the service-side projection of a ``chunk_revisions`` row; reads are
-scoped by ``tenant_id`` so a caller can never see another workspace's
-history.
+(``ListChunkRevisions`` / ``GetChunkRevision`` / ``RevertDocumentChunk``).
+``ChunkRevisionInfo`` is the service-side projection of a
+``chunk_revisions`` row; reads are scoped by ``tenant_id`` so a caller
+can never see another workspace's history.
 
-Reverting a chunk replays a historical snapshot through the chunk edit
-pipeline, which needs the current-chunk repository and update service
-that land in an earlier wave; it is deferred here until those
-dependencies are merged.
+Reverting a chunk (``revert_document_chunk``) replays a historical
+snapshot through the guarded chunk-edit pipeline: it loads the snapshot
+and re-applies its content and enabled state via the chunk service, so
+the write stays revision-guarded and the retrieval index is settled by
+the edit path's sync hook.
 """
 
 from __future__ import annotations
@@ -20,7 +21,9 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict
 
 from src.common.exception import NotFoundError
+from src.core.knowledge.chunks.service.chunk_service import ChunkService
 from src.db.dao.chunk_revision_repository import ChunkRevisionRepository
+from src.db.models.chunk import Chunk
 from src.db.models.chunk_revision import ChunkRevision
 
 
@@ -112,9 +115,46 @@ class ChunkRevisionService:
         )
 
 
+async def revert_document_chunk(
+    *,
+    revision_repo: ChunkRevisionRepository,
+    chunk_service: ChunkService,
+    tenant_id: int,
+    chunk_id: str,
+    revision: int,
+    expected_revision: int | None = None,
+    last_editor_id: str,
+) -> Chunk:
+    """Replay a historical snapshot through the guarded edit pipeline.
+
+    Loads the requested snapshot (raising ``NotFoundError`` when absent),
+    then re-applies its content and enabled state via
+    :meth:`ChunkService.update_document_chunk` so the write is
+    revision-guarded and the retrieval index is settled by the edit
+    path's sync hook. ``expected_revision`` is optional: ``None`` lets
+    the edit path resolve the current revision, while an explicit value
+    rejects a revert that has been overtaken by a concurrent edit.
+    """
+    snapshot = await get_chunk_revision(
+        revision_repo,
+        tenant_id=tenant_id,
+        chunk_id=chunk_id,
+        revision=revision,
+    )
+    return await chunk_service.update_document_chunk(
+        tenant_id=tenant_id,
+        chunk_id=chunk_id,
+        content=snapshot.content,
+        is_enabled=snapshot.is_enabled,
+        expected_revision=expected_revision,
+        last_editor_id=last_editor_id,
+    )
+
+
 __all__ = [
     "ChunkRevisionInfo",
     "ChunkRevisionService",
     "get_chunk_revision",
     "list_chunk_revisions",
+    "revert_document_chunk",
 ]
