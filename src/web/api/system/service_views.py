@@ -49,6 +49,7 @@ from src.core.system.storage_allowlist import (
     build_storage_provider_statuses,
     supported_providers,
 )
+from src.web.deps import AuthDep, RoleViewerDep, SystemAdminDep
 
 router = APIRouter(prefix="/system", tags=["system"])
 
@@ -294,11 +295,16 @@ class SuccessResponse(BaseModel):
 
 
 @router.get("/info", response_model=SystemInfoResponse)
-async def get_system_info() -> SystemInfoResponse:
+async def get_system_info(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+) -> SystemInfoResponse:
     """Return system version, build info, and engine configuration.
 
-    The response is assembled from env-driven configuration — no DB or
-    transport dependency — so the settings page renders immediately.
+    Mirrors ``GET /system/info`` in the upstream Go handler — gated by
+    ``g.Viewer()``. The response is assembled from env-driven
+    configuration (no DB or transport dependency) so the settings page
+    renders immediately.
     """
     boot = _server_started_at()
     uptime_seconds = max(0, int((datetime.now(UTC) - boot).total_seconds()))
@@ -318,12 +324,18 @@ async def get_system_info() -> SystemInfoResponse:
 
 
 @router.get("/parser-engines", response_model=ParserEnginesResponse)
-async def list_parser_engines() -> ParserEnginesResponse:
+async def list_parser_engines(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+) -> ParserEnginesResponse:
     """Return the merged parser-engine list.
 
-    Local engines come from the ported registry; the remote docreader
-    engine discovery is a deferred seam (returns the local registry
-    only until the transport layer lands).
+    Mirrors ``GET /system/parser-engines`` in the upstream Go handler
+    — gated by ``g.Viewer()``: any authenticated principal with at
+    least Viewer role in a workspace may read it. Local engines come
+    from the ported registry; the remote docreader engine discovery
+    is a deferred seam (returns the local registry only until the
+    transport layer lands).
     """
     engines = list_all_engines(docreader_connected=False)
     return ParserEnginesResponse(
@@ -336,12 +348,17 @@ async def list_parser_engines() -> ParserEnginesResponse:
 
 
 @router.post("/parser-engines/check", response_model=ParserEnginesResponse)
-async def check_parser_engines(body: ParserEngineCheckRequest) -> ParserEnginesResponse:
+async def check_parser_engines(
+    body: ParserEngineCheckRequest,
+    _auth: AuthDep,
+    _admin: RoleAdminDep,
+) -> ParserEnginesResponse:
     """Check parser-engine availability under a candidate config.
 
-    The body mirrors the parser-engine configuration shape; availability
-    is resolved from configuration presence until the live probing
-    transport lands.
+    Mirrors ``POST /system/parser-engines/check`` in the upstream Go
+    handler — gated by ``g.Admin()``. The body mirrors the
+    parser-engine configuration shape; availability is resolved from
+    configuration presence until the live probing transport lands.
     """
     engines = list_all_engines(docreader_connected=False)
     return ParserEnginesResponse(
@@ -354,13 +371,18 @@ async def check_parser_engines(body: ParserEngineCheckRequest) -> ParserEnginesR
 
 
 @router.post("/docreader/reconnect", response_model=SuccessResponse)
-async def reconnect_docreader(body: ReconnectDocReaderRequest) -> SuccessResponse:
+async def reconnect_docreader(
+    body: ReconnectDocReaderRequest,
+    _auth: AuthDep,
+    _admin: RoleAdminDep,
+) -> SuccessResponse:
     """Reconnect the document reader to ``addr``.
 
-    ``addr`` must be non-blank and SSRF-safe (mirrors the upstream
-    validation). The live reconnection is a deferred seam — the
-    transport layer is not yet wired — so a valid request returns the
-    success envelope without a probe.
+    Mirrors ``POST /system/docreader/reconnect`` in the upstream Go
+    handler — gated by ``g.Admin()``. ``addr`` must be non-blank and
+    SSRF-safe (mirrors the upstream validation). The live reconnection
+    is a deferred seam — the transport layer is not yet wired — so a
+    valid request returns the success envelope without a probe.
     """
     addr = body.addr.strip()
     if not addr:
@@ -379,13 +401,18 @@ async def reconnect_docreader(body: ReconnectDocReaderRequest) -> SuccessRespons
 
 
 @router.get("/storage-engine-status", response_model=StorageEngineStatusResponse)
-async def get_storage_engine_status() -> StorageEngineStatusResponse:
+async def get_storage_engine_status(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+) -> StorageEngineStatusResponse:
     """Return storage provider availability.
 
-    ``local`` is unconditionally available; the object-storage providers
-    report availability from the environment signal (the tenant-scoped
-    storage-backend config is resolved by the storage domain). ``allowed``
-    reflects the ``STORAGE_ALLOW_LIST`` gate.
+    Mirrors ``GET /system/storage-engine-status`` in the upstream Go
+    handler — gated by ``g.Viewer()``. ``local`` is unconditionally
+    available; the object-storage providers report availability from
+    the environment signal (the tenant-scoped storage-backend config
+    is resolved by the storage domain). ``allowed`` reflects the
+    ``STORAGE_ALLOW_LIST`` gate.
     """
     engines = build_storage_provider_statuses()
     return StorageEngineStatusResponse(
@@ -399,14 +426,20 @@ async def get_storage_engine_status() -> StorageEngineStatusResponse:
 
 
 @router.post("/storage-engine-check", response_model=StorageEngineCheckResponse)
-async def check_storage_engine(body: StorageEngineCheckRequest) -> StorageEngineCheckResponse:
+async def check_storage_engine(
+    body: StorageEngineCheckRequest,
+    _auth: AuthDep,
+    _admin: RoleAdminDep,
+) -> StorageEngineCheckResponse:
     """Probe one storage provider's connectivity.
 
-    ``provider`` must name a supported storage engine; the live
-    connectivity probe is a deferred seam that lands with the
-    storage-backend transport layer. A supported provider yields the
-    success envelope with an explicit ``ok=false`` so the UI does not
-    mistake the deferred probe for a confirmed connection.
+    Mirrors ``POST /system/storage-engine-check`` in the upstream Go
+    handler — gated by ``g.Admin()``. ``provider`` must name a
+    supported storage engine; the live connectivity probe is a
+    deferred seam that lands with the storage-backend transport layer.
+    A supported provider yields the success envelope with an explicit
+    ``ok=false`` so the UI does not mistake the deferred probe for a
+    confirmed connection.
     """
     provider = body.provider.strip().lower()
     if provider not in set(supported_providers()):
