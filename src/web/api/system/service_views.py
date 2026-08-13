@@ -49,7 +49,7 @@ from src.core.system.storage_allowlist import (
     build_storage_provider_statuses,
     supported_providers,
 )
-from src.web.deps import AuthDep, RoleViewerDep, SystemAdminDep
+from src.web.deps import AuthDep, RoleAdminDep, RoleViewerDep, SystemAdminDep
 
 router = APIRouter(prefix="/system", tags=["system"])
 
@@ -349,9 +349,9 @@ async def list_parser_engines(
 
 @router.post("/parser-engines/check", response_model=ParserEnginesResponse)
 async def check_parser_engines(
-    body: ParserEngineCheckRequest,
     _auth: AuthDep,
     _admin: RoleAdminDep,
+    body: ParserEngineCheckRequest,
 ) -> ParserEnginesResponse:
     """Check parser-engine availability under a candidate config.
 
@@ -372,9 +372,9 @@ async def check_parser_engines(
 
 @router.post("/docreader/reconnect", response_model=SuccessResponse)
 async def reconnect_docreader(
-    body: ReconnectDocReaderRequest,
     _auth: AuthDep,
     _admin: RoleAdminDep,
+    body: ReconnectDocReaderRequest,
 ) -> SuccessResponse:
     """Reconnect the document reader to ``addr``.
 
@@ -427,9 +427,9 @@ async def get_storage_engine_status(
 
 @router.post("/storage-engine-check", response_model=StorageEngineCheckResponse)
 async def check_storage_engine(
-    body: StorageEngineCheckRequest,
     _auth: AuthDep,
     _admin: RoleAdminDep,
+    body: StorageEngineCheckRequest,
 ) -> StorageEngineCheckResponse:
     """Probe one storage provider's connectivity.
 
