@@ -118,7 +118,7 @@ def _assert_keys(actual: dict[str, object], expected: list[str], label: str) -> 
 async def session_seed(authed_client: TestClient) -> SessionSeed:
     """A session minted through the real service + database."""
     response = authed_client.post(
-        "/sessions",
+        "/api/v1/sessions",
         json={"title": "contract-session", "description": "contract fixture"},
     )
     assert response.status_code == 201, response.text
@@ -170,7 +170,7 @@ async def message_seed(
     )
     with client:
         response = client.post(
-            "/sessions",
+            "/api/v1/sessions",
             json={"title": "contract-msg-session", "description": ""},
         )
         assert response.status_code == 201, response.text
@@ -230,9 +230,9 @@ async def require_messages_table(_engine) -> None:
 
 def test_create_session_matches_reference(session_seed: SessionSeed) -> None:
     """POST /sessions answers 201 with the reference session envelope."""
-    status, keys = _endpoint_spec("POST", "/sessions")
+    status, keys = _endpoint_spec("POST", "/api/v1/sessions")
     response = session_seed.client.post(
-        "/sessions",
+        "/api/v1/sessions",
         json={"title": "create-contract", "description": ""},
     )
     assert response.status_code == status, response.text
@@ -248,8 +248,8 @@ def test_create_session_matches_reference(session_seed: SessionSeed) -> None:
 
 def test_get_session_matches_reference(session_seed: SessionSeed) -> None:
     """GET /sessions/{id} answers 200 with the reference session envelope."""
-    status, keys = _endpoint_spec("GET", "/sessions/{id}")
-    response = session_seed.client.get(f"/sessions/{session_seed.session_id}")
+    status, keys = _endpoint_spec("GET", "/api/v1/sessions/{id}")
+    response = session_seed.client.get(f"/api/v1/sessions/{session_seed.session_id}")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "GET /sessions/{id}")
@@ -265,8 +265,8 @@ def test_list_sessions_envelope_matches_reference(session_seed: SessionSeed) -> 
     paged payload). This assertion is the contract check — a divergence
     here is a reported finding.
     """
-    status, keys = _endpoint_spec("GET", "/sessions")
-    response = session_seed.client.get("/sessions")
+    status, keys = _endpoint_spec("GET", "/api/v1/sessions")
+    response = session_seed.client.get("/api/v1/sessions")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "GET /sessions")
@@ -274,7 +274,7 @@ def test_list_sessions_envelope_matches_reference(session_seed: SessionSeed) -> 
 
 def test_list_sessions_payload_conforms_to_view_model(session_seed: SessionSeed) -> None:
     """The list endpoint's ``data`` payload matches the view-model shape."""
-    response = session_seed.client.get("/sessions")
+    response = session_seed.client.get("/api/v1/sessions")
     assert response.status_code == 200, response.text
     body = response.json()
     assert isinstance(body, dict) and isinstance(body.get("data"), dict)
@@ -283,9 +283,9 @@ def test_list_sessions_payload_conforms_to_view_model(session_seed: SessionSeed)
 
 def test_update_session_matches_reference(session_seed: SessionSeed) -> None:
     """PUT /sessions/{id} answers 200 with the reference envelope."""
-    status, keys = _endpoint_spec("PUT", "/sessions/{id}")
+    status, keys = _endpoint_spec("PUT", "/api/v1/sessions/{id}")
     response = session_seed.client.put(
-        f"/sessions/{session_seed.session_id}",
+        f"/api/v1/sessions/{session_seed.session_id}",
         json={"title": "renamed", "description": "updated"},
     )
     assert response.status_code == status, response.text
@@ -296,8 +296,8 @@ def test_update_session_matches_reference(session_seed: SessionSeed) -> None:
 
 def test_delete_session_matches_reference(session_seed: SessionSeed) -> None:
     """DELETE /sessions/{id} answers 200 with the reference message envelope."""
-    status, keys = _endpoint_spec("DELETE", "/sessions/{id}")
-    response = session_seed.client.delete(f"/sessions/{session_seed.session_id}")
+    status, keys = _endpoint_spec("DELETE", "/api/v1/sessions/{id}")
+    response = session_seed.client.delete(f"/api/v1/sessions/{session_seed.session_id}")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "DELETE /sessions/{id}")
@@ -306,10 +306,10 @@ def test_delete_session_matches_reference(session_seed: SessionSeed) -> None:
 
 def test_batch_delete_sessions_matches_reference(session_seed: SessionSeed) -> None:
     """DELETE /sessions/batch answers 200 with the reference envelope."""
-    status, keys = _endpoint_spec("DELETE", "/sessions/batch")
+    status, keys = _endpoint_spec("DELETE", "/api/v1/sessions/batch")
     response = session_seed.client.request(
         "DELETE",
-        "/sessions/batch",
+        "/api/v1/sessions/batch",
         json={"ids": [session_seed.session_id], "delete_all": False},
     )
     assert response.status_code == status, response.text
@@ -321,16 +321,16 @@ def test_clear_session_messages_matches_reference(
     require_messages_table: None,
 ) -> None:
     """DELETE /sessions/{id}/messages answers 200 with the reference envelope."""
-    status, keys = _endpoint_spec("DELETE", "/sessions/{id}/messages")
-    response = session_seed.client.delete(f"/sessions/{session_seed.session_id}/messages")
+    status, keys = _endpoint_spec("DELETE", "/api/v1/sessions/{id}/messages")
+    response = session_seed.client.delete(f"/api/v1/sessions/{session_seed.session_id}/messages")
     assert response.status_code == status, response.text
     _assert_keys(response.json(), keys, "DELETE /sessions/{id}/messages")
 
 
 def test_pin_session_matches_reference(session_seed: SessionSeed) -> None:
     """POST /sessions/{id}/pin answers 200 with the reference pin envelope."""
-    status, keys = _endpoint_spec("POST", "/sessions/{id}/pin")
-    response = session_seed.client.post(f"/sessions/{session_seed.session_id}/pin")
+    status, keys = _endpoint_spec("POST", "/api/v1/sessions/{id}/pin")
+    response = session_seed.client.post(f"/api/v1/sessions/{session_seed.session_id}/pin")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "POST /sessions/{id}/pin")
@@ -339,9 +339,9 @@ def test_pin_session_matches_reference(session_seed: SessionSeed) -> None:
 
 def test_unpin_session_matches_reference(session_seed: SessionSeed) -> None:
     """DELETE /sessions/{id}/pin answers 200 with the reference pin envelope."""
-    session_seed.client.post(f"/sessions/{session_seed.session_id}/pin")
-    status, keys = _endpoint_spec("DELETE", "/sessions/{id}/pin")
-    response = session_seed.client.delete(f"/sessions/{session_seed.session_id}/pin")
+    session_seed.client.post(f"/api/v1/sessions/{session_seed.session_id}/pin")
+    status, keys = _endpoint_spec("DELETE", "/api/v1/sessions/{id}/pin")
+    response = session_seed.client.delete(f"/api/v1/sessions/{session_seed.session_id}/pin")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "DELETE /sessions/{id}/pin")
@@ -350,7 +350,7 @@ def test_unpin_session_matches_reference(session_seed: SessionSeed) -> None:
 
 def test_session_envelope_matches_contract(session_seed: SessionSeed) -> None:
     """The session object carries exactly the frozen contract's wire fields."""
-    response = session_seed.client.get(f"/sessions/{session_seed.session_id}")
+    response = session_seed.client.get(f"/api/v1/sessions/{session_seed.session_id}")
     assert response.status_code == 200, response.text
     inner = response.json()["data"]
     assert set(inner) == set(_model_wire_fields(contracts.Session)), (
@@ -365,8 +365,8 @@ def test_session_envelope_matches_contract(session_seed: SessionSeed) -> None:
 
 def test_load_messages_matches_reference(message_seed: MessageSeed) -> None:
     """GET /messages/{session_id}/load answers 200 with the reference envelope."""
-    status, keys = _endpoint_spec("GET", "/messages/{session_id}/load")
-    response = message_seed.client.get(f"/messages/{message_seed.session_id}/load")
+    status, keys = _endpoint_spec("GET", "/api/v1/messages/{session_id}/load")
+    response = message_seed.client.get(f"/api/v1/messages/{message_seed.session_id}/load")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "GET /messages/{session_id}/load")
@@ -377,9 +377,9 @@ def test_load_messages_matches_reference(message_seed: MessageSeed) -> None:
 
 def test_delete_message_matches_reference(message_seed: MessageSeed) -> None:
     """DELETE /messages/{session_id}/{message_id} answers 200 with the reference envelope."""
-    status, keys = _endpoint_spec("DELETE", "/messages/{session_id}/{message_id}")
+    status, keys = _endpoint_spec("DELETE", "/api/v1/messages/{session_id}/{message_id}")
     response = message_seed.client.delete(
-        f"/messages/{message_seed.session_id}/{message_seed.message_id}",
+        f"/api/v1/messages/{message_seed.session_id}/{message_seed.message_id}",
     )
     assert response.status_code == status, response.text
     body = response.json()
@@ -389,9 +389,9 @@ def test_delete_message_matches_reference(message_seed: MessageSeed) -> None:
 
 def test_search_messages_matches_reference(message_seed: MessageSeed) -> None:
     """POST /messages/search answers 200 with the reference search envelope."""
-    status, keys = _endpoint_spec("POST", "/messages/search")
+    status, keys = _endpoint_spec("POST", "/api/v1/messages/search")
     response = message_seed.client.post(
-        "/messages/search",
+        "/api/v1/messages/search",
         json={"query": "Hello", "mode": "keyword", "limit": 20},
     )
     assert response.status_code == status, response.text
@@ -402,8 +402,8 @@ def test_search_messages_matches_reference(message_seed: MessageSeed) -> None:
 
 def test_chat_history_stats_matches_reference(authed_client: TestClient) -> None:
     """GET /messages/chat-history-stats answers 200 with the reference envelope."""
-    status, keys = _endpoint_spec("GET", "/messages/chat-history-stats")
-    response = authed_client.get("/messages/chat-history-stats")
+    status, keys = _endpoint_spec("GET", "/api/v1/messages/chat-history-stats")
+    response = authed_client.get("/api/v1/messages/chat-history-stats")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "GET /messages/chat-history-stats")
@@ -469,10 +469,10 @@ def test_get_suggestions_matches_reference(message_seed: MessageSeed) -> None:
     try:
         status, keys = _endpoint_spec(
             "GET",
-            "/sessions/{session_id}/messages/{message_id}/suggestions",
+            "/api/v1/sessions/{session_id}/messages/{message_id}/suggestions",
         )
         response = message_seed.client.get(
-            f"/sessions/{message_seed.session_id}/messages/{message_seed.message_id}/suggestions"
+            f"/api/v1/sessions/{message_seed.session_id}/messages/{message_seed.message_id}/suggestions"
         )
         assert response.status_code == status, response.text
         body = response.json()
@@ -484,12 +484,12 @@ def test_get_suggestions_matches_reference(message_seed: MessageSeed) -> None:
 
 def test_record_suggestion_event_matches_reference(message_seed: MessageSeed) -> None:
     """POST /sessions/{session_id}/suggestion-events answers 204 with no body."""
-    status, keys = _endpoint_spec("POST", "/sessions/{session_id}/suggestion-events")
+    status, keys = _endpoint_spec("POST", "/api/v1/sessions/{session_id}/suggestion-events")
     assert not keys, (
         f"reference says 204 returns no body, fixture declares keys={keys}"
     )
     response = message_seed.client.post(
-        f"/sessions/{message_seed.session_id}/suggestion-events",
+        f"/api/v1/sessions/{message_seed.session_id}/suggestion-events",
         json={
             "suggestion_set_id": "set-1",
             "question_id": "q-1",

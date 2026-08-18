@@ -1,6 +1,6 @@
 """Sync wrappers around the live-MCP HTTP transport endpoints.
 
-The ``/sse``, ``/messages/``, and ``/mcp`` paths live outside the
+The ``/sse``, ``/api/v1/messages/``, and ``/mcp`` paths live outside the
 JSON-RPC ``/api/v1/mcp-services`` router — they are mounted by the
 live MCP connection manager — so they are exposed here rather than in
 ``mcp_api.py`` for clarity.
@@ -51,7 +51,7 @@ def post_mcp_message(
     Bypasses the APITestClient because this endpoint is registered
     outside the FastAPI app's normal ``url_path_for`` namespace.
     """
-    return test_client.post("/messages/", json=payload, headers=headers)
+    return test_client.post("/api/v1/messages/", json=payload, headers=headers)
 
 
 def post_mcp_rpc(

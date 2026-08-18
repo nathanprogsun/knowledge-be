@@ -34,7 +34,7 @@ def test_missing_knowledge_headers_returns_401(app) -> None:
     :func:`require_auth`.
     """
     with TestClient(app=app) as client:
-        response = client.get("/tenants")
+        response = client.get("/api/v1/tenants")
     assert response.status_code == 401, response.text
 
 
@@ -47,7 +47,7 @@ def test_partial_tenant_header_only_returns_401(app) -> None:
     """
     with TestClient(app=app) as client:
         response = client.get(
-            "/tenants",
+            "/api/v1/tenants",
             headers={"X-Tenant-ID": "1"},
         )
     assert response.status_code == 401, response.text
@@ -62,7 +62,7 @@ def test_unknown_user_header_returns_401(app) -> None:
     """
     with TestClient(app=app) as client:
         response = client.get(
-            "/tenants",
+            "/api/v1/tenants",
             headers={
                 "X-User-Id": "usr-does-not-exist",
                 "X-Tenant-ID": "1",
@@ -100,7 +100,7 @@ def test_cross_tenant_user_header_is_a_known_blocker(
     headers["X-User-Id"] = other_user_id
     headers["X-Tenant-ID"] = str(admin_tenant_id)
 
-    response = authed_client.get("/tenants", headers=headers)
+    response = authed_client.get("/api/v1/tenants", headers=headers)
     # Current behavior: passes the auth gate; the response lists the
     # header principal's ACTUAL memberships (the other org's tenant),
     # not the header's tenant.

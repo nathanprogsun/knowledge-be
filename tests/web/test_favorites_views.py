@@ -16,15 +16,17 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from src.common.exception import ValidationError
 from src.db.models.user_resource_favorite import UserResourceFavorite
 from src.web.api.favorites.router import router as favorites_router
 from src.web.api.system.service_views import router as system_service_router
+from src.web.deps import AuthDep
 from src.web.deps.context import get_tenant_id_dep, get_user_id_dep
-from src.web.deps.system import get_favorite_service
+from src.web.deps.system import get_favorite_service, get_system_info_service
+from src.web.middleware.auth import require_auth
 from src.web.exception_handler import register_exception_handlers
 from src.web.middleware.auth import require_auth
 
@@ -108,7 +110,7 @@ def favorites_client(
     logic without touching the auth middleware or a database.
     """
     app = FastAPI()
-    app.include_router(favorites_router)
+    app.include_router(favorites_router, prefix="/api/v1")
     register_exception_handlers(app)
     app.dependency_overrides[require_auth] = lambda: None
     app.dependency_overrides[get_tenant_id_dep] = lambda: 7
@@ -119,14 +121,51 @@ def favorites_client(
 
 @pytest.fixture
 def system_client() -> TestClient:
-    """A minimal app with the system-service router.
+    """A minimal app with the system routers (info + service + admin info).
 
-    The endpoints are configuration-driven (no service dependency), so
-    no overrides are needed.
+    The endpoints that read only env or static config need no overrides;
+    the ones that touch the session or lifespan get explicit fakes so
+    the test stays a pure unit test.
     """
+    from datetime import UTC, datetime
+
+    from src.core.contracts.system import SystemInfo
+    from src.core.system.info_service import SystemInfoSnapshot
+    from src.web.api.system.router import info_router
+
+    class _FakeInfoService:
+        async def get_info(self) -> SystemInfoSnapshot:
+            return SystemInfoSnapshot(
+                info=SystemInfo(
+                    version="1.0.0",
+                    edition="standard",
+                    commit_id="abc",
+                    build_time=datetime(2026, 1, 1, tzinfo=UTC),
+                    go_version="go1.22",
+                    keyword_index_engine="未配置",
+                    vector_store_engine="未配置",
+                    graph_database_engine="未配置",
+                    minio_enabled=False,
+                    db_version="0000",
+                ),
+                db_migration_error=None,
+                started_at=datetime(2026, 1, 1, tzinfo=UTC),
+                uptime_seconds=42,
+            )
+
     app = FastAPI()
-    app.include_router(system_service_router)
+    app.state.started_at = datetime(2026, 1, 1, tzinfo=UTC)
+    app.include_router(info_router, prefix="/api/v1")
+    app.include_router(system_service_router, prefix="/api/v1")
     register_exception_handlers(app)
+
+    def _fake_admin_auth(request: Request) -> None:
+        request.state.tenant_id = "7"
+        request.state.tenant_role = "admin"
+        return None
+
+    app.dependency_overrides[require_auth] = _fake_admin_auth
+    app.dependency_overrides[get_system_info_service] = lambda: _FakeInfoService()
     return TestClient(app)
 
 
@@ -140,7 +179,7 @@ def test_list_favorites_returns_envelope(favorites_client: TestClient) -> None:
         _favorite_row(resource_type="kb", resource_id="kb-2"),
     ]
 
-    response = favorites_client.get("/user/favorites", params={"type": "kb"})
+    response = favorites_client.get("/api/v1/user/favorites", params={"type": "kb"})
 
     assert response.status_code == 200
     payload = response.json()
@@ -153,7 +192,7 @@ def test_list_favorites_returns_envelope(favorites_client: TestClient) -> None:
 
 
 def test_list_favorites_empty_when_none_starred(favorites_client: TestClient) -> None:
-    response = favorites_client.get("/user/favorites", params={"type": "agent"})
+    response = favorites_client.get("/api/v1/user/favorites", params={"type": "agent"})
 
     assert response.status_code == 200
     assert response.json() == {"success": True, "data": []}
@@ -166,14 +205,14 @@ def test_list_favorites_invalid_type_is_422(favorites_client: TestClient) -> Non
         message="invalid favorite resource type 'wiki'",
     )
 
-    response = favorites_client.get("/user/favorites", params={"type": "wiki"})
+    response = favorites_client.get("/api/v1/user/favorites", params={"type": "wiki"})
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "favorite.invalid_type"
 
 
 def test_list_favorites_requires_type_query(favorites_client: TestClient) -> None:
-    response = favorites_client.get("/user/favorites")
+    response = favorites_client.get("/api/v1/user/favorites")
 
     assert response.status_code == 422
 
@@ -185,7 +224,7 @@ def test_add_favorite_returns_success(favorites_client: TestClient) -> None:
     favorite_service = favorites_client.app.dependency_overrides[get_favorite_service]()
 
     response = favorites_client.post(
-        "/user/favorites",
+        "/api/v1/user/favorites",
         json={"type": "kb", "id": "kb-42"},
     )
 
@@ -196,7 +235,7 @@ def test_add_favorite_returns_success(favorites_client: TestClient) -> None:
 
 def test_add_favorite_rejects_missing_id(favorites_client: TestClient) -> None:
     response = favorites_client.post(
-        "/user/favorites",
+        "/api/v1/user/favorites",
         json={"type": "kb"},
     )
 
@@ -206,7 +245,7 @@ def test_add_favorite_rejects_missing_id(favorites_client: TestClient) -> None:
 def test_remove_favorite_returns_success(favorites_client: TestClient) -> None:
     favorite_service = favorites_client.app.dependency_overrides[get_favorite_service]()
 
-    response = favorites_client.delete("/user/favorites/kb/kb-42")
+    response = favorites_client.delete("/api/v1/user/favorites/kb/kb-42")
 
     assert response.status_code == 200
     assert response.json() == {"success": True}
@@ -226,7 +265,7 @@ def test_favorites_missing_principal_is_401(favorites_client: TestClient) -> Non
     favorite_service = favorites_client.app.dependency_overrides[get_favorite_service]()
     favorites_client.app.dependency_overrides[get_user_id_dep] = lambda: None
 
-    response = favorites_client.get("/user/favorites", params={"type": "kb"})
+    response = favorites_client.get("/api/v1/user/favorites", params={"type": "kb"})
 
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "auth.principal_context_missing"
@@ -237,7 +276,7 @@ def test_favorites_missing_principal_is_401(favorites_client: TestClient) -> Non
 
 
 def test_get_system_info_returns_envelope(system_client: TestClient) -> None:
-    response = system_client.get("/system/info")
+    response = system_client.get("/api/v1/system/info")
 
     assert response.status_code == 200
     payload = response.json()
@@ -254,7 +293,7 @@ def test_get_system_info_returns_envelope(system_client: TestClient) -> None:
 
 
 def test_list_parser_engines_returns_registry(system_client: TestClient) -> None:
-    response = system_client.get("/system/parser-engines")
+    response = system_client.get("/api/v1/system/parser-engines")
 
     assert response.status_code == 200
     payload = response.json()
@@ -267,7 +306,7 @@ def test_list_parser_engines_returns_registry(system_client: TestClient) -> None
 
 def test_check_parser_engines_returns_registry(system_client: TestClient) -> None:
     response = system_client.post(
-        "/system/parser-engines/check",
+        "/api/v1/system/parser-engines/check",
         json={"addr": "http://docreader:8000"},
     )
 
@@ -288,7 +327,7 @@ def test_reconnect_docreader_accepts_valid_addr(
     monkeypatch.setenv("SSRF_WHITELIST", "docreader.internal")
 
     response = system_client.post(
-        "/system/docreader/reconnect",
+        "/api/v1/system/docreader/reconnect",
         json={"addr": "http://docreader.internal:8000"},
     )
 
@@ -298,7 +337,7 @@ def test_reconnect_docreader_accepts_valid_addr(
 
 def test_reconnect_docreader_rejects_blank_addr(system_client: TestClient) -> None:
     response = system_client.post(
-        "/system/docreader/reconnect",
+        "/api/v1/system/docreader/reconnect",
         json={"addr": "  "},
     )
 
@@ -314,7 +353,7 @@ def test_reconnect_docreader_rejects_unverifiable_host(
     monkeypatch.delenv("SSRF_WHITELIST", raising=False)
 
     response = system_client.post(
-        "/system/docreader/reconnect",
+        "/api/v1/system/docreader/reconnect",
         json={"addr": "http://docreader.internal:8000"},
     )
 
@@ -326,7 +365,7 @@ def test_reconnect_docreader_rejects_unverifiable_host(
 
 
 def test_get_storage_engine_status_returns_providers(system_client: TestClient) -> None:
-    response = system_client.get("/system/storage-engine-status")
+    response = system_client.get("/api/v1/system/storage-engine-status")
 
     assert response.status_code == 200
     payload = response.json()
@@ -340,7 +379,7 @@ def test_get_storage_engine_status_returns_providers(system_client: TestClient) 
 
 def test_check_storage_engine_accepts_supported_provider(system_client: TestClient) -> None:
     response = system_client.post(
-        "/system/storage-engine-check",
+        "/api/v1/system/storage-engine-check",
         json={"provider": "minio", "config": {"endpoint": "localhost:9000"}},
     )
 
@@ -352,7 +391,7 @@ def test_check_storage_engine_accepts_supported_provider(system_client: TestClie
 
 def test_check_storage_engine_rejects_unknown_provider(system_client: TestClient) -> None:
     response = system_client.post(
-        "/system/storage-engine-check",
+        "/api/v1/system/storage-engine-check",
         json={"provider": "s3-private", "config": {}},
     )
 

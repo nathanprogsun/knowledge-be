@@ -253,7 +253,7 @@ async def test_list_provider_types_returns_registered_providers(
     client: TestClient,
 ) -> None:
     """The /types endpoint surfaces the static provider-type registry."""
-    resp = client.get("/web-search-providers/types")
+    resp = client.get("/api/v1/web-search-providers/types")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -282,7 +282,7 @@ async def test_create_returns_201_with_id_and_masked_api_key(
 ) -> None:
     """The create endpoint returns the wrapped envelope; api_key masked."""
     resp = client.post(
-        "/web-search-providers",
+        "/api/v1/web-search-providers",
         json=_create_body(),
     )
 
@@ -313,7 +313,7 @@ async def test_create_rejects_unknown_provider_type_with_422(
     # the real ``WebSearchProviderService`` validation path by using a
     # provider id that the registry does not carry.
     resp = client.post(
-        "/web-search-providers",
+        "/api/v1/web-search-providers",
         json=_create_body(provider="not_a_real_provider"),
     )
     # The fake service does not enforce provider-id allowlisting, so
@@ -327,7 +327,7 @@ async def test_create_rejects_unknown_provider_type_with_422(
 async def test_create_rejects_blank_name_with_422(client: TestClient) -> None:
     """A blank name is rejected at the Pydantic request-body boundary."""
     resp = client.post(
-        "/web-search-providers",
+        "/api/v1/web-search-providers",
         json=_create_body(name="   "),
     )
     assert resp.status_code == 422
@@ -340,13 +340,13 @@ async def test_list_returns_tenant_scoped_providers(
     client: TestClient,
 ) -> None:
     """The list endpoint returns the tenant's providers."""
-    client.post("/web-search-providers", json=_create_body(name="bing-a"))
+    client.post("/api/v1/web-search-providers", json=_create_body(name="bing-a"))
     client.post(
-        "/web-search-providers",
+        "/api/v1/web-search-providers",
         json=_create_body(name="bing-b", provider="google", parameters={"api_key": "k", "cx": "c"}),
     )
 
-    resp = client.get("/web-search-providers")
+    resp = client.get("/api/v1/web-search-providers")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -362,10 +362,10 @@ async def test_get_returns_envelope_for_existing_provider(
     client: TestClient,
 ) -> None:
     """The get endpoint returns the requested provider."""
-    created = client.post("/web-search-providers", json=_create_body(name="bing-get"))
+    created = client.post("/api/v1/web-search-providers", json=_create_body(name="bing-get"))
     provider_id = created.json()["data"]["id"]
 
-    resp = client.get(f"/web-search-providers/{provider_id}")
+    resp = client.get(f"/api/v1/web-search-providers/{provider_id}")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -375,7 +375,7 @@ async def test_get_returns_envelope_for_existing_provider(
 
 async def test_get_unknown_provider_returns_error_status(client: TestClient) -> None:
     """An unknown id returns 404 (the service raises NotFoundError)."""
-    resp = client.get("/web-search-providers/does-not-exist")
+    resp = client.get("/api/v1/web-search-providers/does-not-exist")
     assert resp.status_code in (404, 422)
 
 
@@ -384,11 +384,11 @@ async def test_get_unknown_provider_returns_error_status(client: TestClient) -> 
 
 async def test_update_renames_the_provider(client: TestClient) -> None:
     """The put endpoint mutates the supplied fields."""
-    created = client.post("/web-search-providers", json=_create_body(name="bing-old"))
+    created = client.post("/api/v1/web-search-providers", json=_create_body(name="bing-old"))
     provider_id = created.json()["data"]["id"]
 
     resp = client.put(
-        f"/web-search-providers/{provider_id}",
+        f"/api/v1/web-search-providers/{provider_id}",
         json={"name": "bing-new", "description": "renamed"},
     )
 
@@ -401,7 +401,7 @@ async def test_update_renames_the_provider(client: TestClient) -> None:
 async def test_update_unknown_provider_returns_error_status(client: TestClient) -> None:
     """Updating an unknown id yields 404/422 from the service error."""
     resp = client.put(
-        "/web-search-providers/missing",
+        "/api/v1/web-search-providers/missing",
         json={"name": "renamed"},
     )
     assert resp.status_code in (404, 422)
@@ -412,10 +412,10 @@ async def test_update_unknown_provider_returns_error_status(client: TestClient) 
 
 async def test_delete_returns_success_ack(client: TestClient) -> None:
     """A successful delete returns the success envelope."""
-    created = client.post("/web-search-providers", json=_create_body(name="bing-del"))
+    created = client.post("/api/v1/web-search-providers", json=_create_body(name="bing-del"))
     provider_id = created.json()["data"]["id"]
 
-    resp = client.delete(f"/web-search-providers/{provider_id}")
+    resp = client.delete(f"/api/v1/web-search-providers/{provider_id}")
 
     assert resp.status_code == 200
     assert resp.json() == {"success": True}
@@ -423,7 +423,7 @@ async def test_delete_returns_success_ack(client: TestClient) -> None:
 
 async def test_delete_unknown_provider_returns_error_status(client: TestClient) -> None:
     """Deleting an unknown id yields 404/422."""
-    resp = client.delete("/web-search-providers/missing")
+    resp = client.delete("/api/v1/web-search-providers/missing")
     assert resp.status_code in (404, 422)
 
 
@@ -433,7 +433,7 @@ async def test_delete_unknown_provider_returns_error_status(client: TestClient) 
 async def test_test_raw_returns_success_ack(client: TestClient) -> None:
     """The raw test endpoint returns the success ack when service succeeds."""
     resp = client.post(
-        "/web-search-providers/test",
+        "/api/v1/web-search-providers/test",
         json={
             "provider": "bing",
             "parameters": {"api_key": "k"},
@@ -449,10 +449,10 @@ async def test_test_raw_returns_success_ack(client: TestClient) -> None:
 
 async def test_test_by_id_returns_success_ack(client: TestClient) -> None:
     """The by-id test endpoint returns the success ack when service succeeds."""
-    created = client.post("/web-search-providers", json=_create_body(name="bing-probe"))
+    created = client.post("/api/v1/web-search-providers", json=_create_body(name="bing-probe"))
     provider_id = created.json()["data"]["id"]
 
-    resp = client.post(f"/web-search-providers/{provider_id}/test")
+    resp = client.post(f"/api/v1/web-search-providers/{provider_id}/test")
 
     assert resp.status_code == 200
     assert resp.json() == {"success": True}
@@ -463,7 +463,7 @@ async def test_test_by_id_returns_success_ack(client: TestClient) -> None:
 
 async def test_list_builtin_providers_returns_catalog(client: TestClient) -> None:
     """The system-level catalog endpoint returns the builtin provider list."""
-    resp = client.get("/web-search/providers")
+    resp = client.get("/api/v1/web-search/providers")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -480,13 +480,13 @@ async def test_list_builtin_providers_returns_catalog(client: TestClient) -> Non
 
 async def test_unauthed_request_returns_401(anon_client: TestClient) -> None:
     """A read without the header trio is rejected with 401."""
-    resp = anon_client.get("/web-search-providers/types")
+    resp = anon_client.get("/api/v1/web-search-providers/types")
     assert resp.status_code == 401
 
 
 async def test_unauthed_post_returns_401(anon_client: TestClient) -> None:
     """Writes also require the header trio."""
-    resp = anon_client.post("/web-search-providers", json=_create_body(name="x"))
+    resp = anon_client.post("/api/v1/web-search-providers", json=_create_body(name="x"))
     assert resp.status_code == 401
 
 

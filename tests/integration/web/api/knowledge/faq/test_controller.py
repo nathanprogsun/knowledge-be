@@ -390,7 +390,7 @@ async def test_list_returns_page_in_envelope(
 ) -> None:
     """The list endpoint returns the paginated entries inside the envelope."""
     fake_faq_service.seed(_entry(1, "问题一"), _entry(2, "问题二"))
-    resp = client.get(f"/knowledge-bases/{_KB_ID}/faq/entries?page=1&page_size=10")
+    resp = client.get(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries?page=1&page_size=10")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -405,7 +405,7 @@ async def test_list_passes_keyword_and_pagination(
     fake_faq_service: _FakeFAQService,
 ) -> None:
     """The keyword / page / page_size query params reach the service."""
-    client.get(f"/knowledge-bases/{_KB_ID}/faq/entries?keyword=密码&page=2&page_size=5")
+    client.get(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries?keyword=密码&page=2&page_size=5")
     method, kwargs = fake_faq_service.calls[-1]
     assert method == "list_entries"
     assert kwargs["keyword"] == "密码"
@@ -415,21 +415,21 @@ async def test_list_passes_keyword_and_pagination(
 
 async def test_list_rejects_unsupported_tag_filter(client: TestClient) -> None:
     """A non-empty ``tag_id`` filter is refused rather than silently dropped."""
-    resp = client.get(f"/knowledge-bases/{_KB_ID}/faq/entries?tag_id=3")
+    resp = client.get(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries?tag_id=3")
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "faq.tag_filter_unsupported"
 
 
 async def test_list_rejects_unsupported_search_field(client: TestClient) -> None:
     """A non-empty ``search_field`` is refused by the merged service."""
-    resp = client.get(f"/knowledge-bases/{_KB_ID}/faq/entries?search_field=answers")
+    resp = client.get(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries?search_field=answers")
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "faq.search_field_unsupported"
 
 
 async def test_list_rejects_invalid_page_size(client: TestClient) -> None:
     """A page size outside the pagination bounds is a 422."""
-    resp = client.get(f"/knowledge-bases/{_KB_ID}/faq/entries?page_size=0")
+    resp = client.get(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries?page_size=0")
     assert resp.status_code == 422
 
 
@@ -442,7 +442,7 @@ async def test_get_returns_entry_in_envelope(
 ) -> None:
     """The get endpoint returns the requested entry."""
     fake_faq_service.seed(_entry(7, "问题七", answers=["答案七"]))
-    resp = client.get(f"/knowledge-bases/{_KB_ID}/faq/entries/7")
+    resp = client.get(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries/7")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -452,7 +452,7 @@ async def test_get_returns_entry_in_envelope(
 
 async def test_get_unknown_entry_returns_404(client: TestClient) -> None:
     """An unknown entry id reads as not-found."""
-    resp = client.get(f"/knowledge-bases/{_KB_ID}/faq/entries/999")
+    resp = client.get(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries/999")
     assert resp.status_code == 404
     body = resp.json()
     assert body["success"] is False
@@ -468,7 +468,7 @@ async def test_create_returns_created_entry(
     fake_faq_service: _FakeFAQService,
 ) -> None:
     """A valid body creates the entry under the resolved FAQ container."""
-    resp = client.post(f"/knowledge-bases/{_KB_ID}/faq/entry", json=default_create_faq_request)
+    resp = client.post(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entry", json=default_create_faq_request)
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -483,7 +483,7 @@ async def test_create_resolves_faq_container(
     fake_faq_service: _FakeFAQService,
 ) -> None:
     """The view resolves the FAQ container before calling the service."""
-    client.post(f"/knowledge-bases/{_KB_ID}/faq/entry", json=default_create_faq_request)
+    client.post(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entry", json=default_create_faq_request)
     method, kwargs = fake_faq_service.calls[-1]
     assert method == "create_entry"
     assert kwargs["knowledge_id"] == "knowledge-faq-1"
@@ -496,14 +496,14 @@ async def test_create_without_faq_container_returns_422(
 ) -> None:
     """A knowledge base with no FAQ document cannot take a write."""
     fake_knowledge_service.has_container = False
-    resp = client.post(f"/knowledge-bases/{_KB_ID}/faq/entry", json=default_create_faq_request)
+    resp = client.post(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entry", json=default_create_faq_request)
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "faq.knowledge_container_missing"
 
 
 async def test_create_rejects_missing_standard_question(client: TestClient) -> None:
     """A body without ``standard_question`` is rejected by validation."""
-    resp = client.post(f"/knowledge-bases/{_KB_ID}/faq/entry", json={"answers": ["答案"]})
+    resp = client.post(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entry", json={"answers": ["答案"]})
     assert resp.status_code == 422
 
 
@@ -517,7 +517,7 @@ async def test_update_returns_updated_entry(
     """The put endpoint mutates the entry's content."""
     fake_faq_service.seed(_entry(5, "旧问题", answers=["旧答案"]))
     resp = client.put(
-        f"/knowledge-bases/{_KB_ID}/faq/entries/5",
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries/5",
         json={"standard_question": "新问题", "answers": ["新答案"]},
     )
     assert resp.status_code == 200
@@ -529,7 +529,7 @@ async def test_update_returns_updated_entry(
 async def test_update_unknown_entry_returns_404(client: TestClient) -> None:
     """Updating an unknown id yields not-found."""
     resp = client.put(
-        f"/knowledge-bases/{_KB_ID}/faq/entries/99",
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries/99",
         json={"standard_question": "问题", "answers": ["答案"]},
     )
     assert resp.status_code == 404
@@ -544,7 +544,7 @@ async def test_delete_returns_ack(
 ) -> None:
     """A successful batch delete returns the success ack."""
     fake_faq_service.seed(_entry(1, "问题一"), _entry(2, "问题二"))
-    resp = client.request("DELETE", f"/knowledge-bases/{_KB_ID}/faq/entries", json={"ids": [1, 2]})
+    resp = client.request("DELETE", f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries", json={"ids": [1, 2]})
     assert resp.status_code == 200
     assert resp.json() == {"success": True}
     assert 1 not in fake_faq_service.rows
@@ -553,14 +553,14 @@ async def test_delete_returns_ack(
 
 async def test_delete_with_unknown_id_returns_404(client: TestClient) -> None:
     """A batch containing a foreign or unknown id fails the whole batch."""
-    resp = client.request("DELETE", f"/knowledge-bases/{_KB_ID}/faq/entries", json={"ids": [1, 2]})
+    resp = client.request("DELETE", f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries", json={"ids": [1, 2]})
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "faq.not_found"
 
 
 async def test_delete_rejects_missing_ids(client: TestClient) -> None:
     """A body without ``ids`` is rejected by validation."""
-    resp = client.request("DELETE", f"/knowledge-bases/{_KB_ID}/faq/entries", json={})
+    resp = client.request("DELETE", f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries", json={})
     assert resp.status_code == 422
 
 
@@ -570,7 +570,7 @@ async def test_delete_rejects_missing_ids(client: TestClient) -> None:
 async def test_import_runs_pipeline_and_returns_progress(client: TestClient) -> None:
     """A file upload runs the import and returns a completed progress."""
     resp = client.post(
-        f"/knowledge-bases/{_KB_ID}/faq/entries",
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries",
         files={"file": ("faq.csv", _FAQ_CSV, "text/csv")},
         data={"mode": "append"},
     )
@@ -589,7 +589,7 @@ async def test_import_dry_run_is_reported(
 ) -> None:
     """The ``dry_run`` switch is forwarded to the import pipeline."""
     resp = client.post(
-        f"/knowledge-bases/{_KB_ID}/faq/entries",
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries",
         files={"file": ("faq.csv", _FAQ_CSV, "text/csv")},
         data={"dry_run": "true"},
     )
@@ -603,7 +603,7 @@ async def test_import_dry_run_is_reported(
 async def test_import_rejects_invalid_mode(client: TestClient) -> None:
     """A mode outside append / replace is refused."""
     resp = client.post(
-        f"/knowledge-bases/{_KB_ID}/faq/entries",
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries",
         files={"file": ("faq.csv", _FAQ_CSV, "text/csv")},
         data={"mode": "merge"},
     )
@@ -618,7 +618,7 @@ async def test_import_without_container_returns_422(
     """Import needs a FAQ container to persist into."""
     fake_knowledge_service.has_container = False
     resp = client.post(
-        f"/knowledge-bases/{_KB_ID}/faq/entries",
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries",
         files={"file": ("faq.csv", _FAQ_CSV, "text/csv")},
     )
     assert resp.status_code == 422
@@ -627,7 +627,7 @@ async def test_import_without_container_returns_422(
 
 async def test_import_requires_file(client: TestClient) -> None:
     """The import endpoint demands a file part."""
-    resp = client.post(f"/knowledge-bases/{_KB_ID}/faq/entries")
+    resp = client.post(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries")
     assert resp.status_code == 422
 
 
@@ -642,7 +642,7 @@ async def test_export_csv_matches_import_template(
     fake_faq_service.seed(
         _entry(1, "标准问一", answers=["答案一"], tag_name="分类一", similar_questions=["相似问"])
     )
-    resp = client.get(f"/knowledge-bases/{_KB_ID}/faq/entries/export")
+    resp = client.get(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries/export")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("text/csv")
     assert "attachment; filename=faq_export.csv" in resp.headers["content-disposition"]
@@ -661,7 +661,7 @@ async def test_export_json_returns_payload_array(
     fake_faq_service.seed(
         _entry(1, "标准问一", answers=["答案一"], tag_name="分类一", is_recommended=True)
     )
-    resp = client.get(f"/knowledge-bases/{_KB_ID}/faq/entries/export?format=json")
+    resp = client.get(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries/export?format=json")
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("application/json")
     data = resp.json()
@@ -675,7 +675,7 @@ async def test_export_empty_knowledge_base_returns_header_only(
     client: TestClient,
 ) -> None:
     """An empty knowledge base exports the CSV header row only."""
-    resp = client.get(f"/knowledge-bases/{_KB_ID}/faq/entries/export")
+    resp = client.get(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries/export")
     assert resp.status_code == 200
     text = resp.content.decode("utf-8-sig")
     assert text.strip().endswith("可被推荐)")
@@ -683,7 +683,7 @@ async def test_export_empty_knowledge_base_returns_header_only(
 
 async def test_export_rejects_unknown_format(client: TestClient) -> None:
     """An unknown export format is refused."""
-    resp = client.get(f"/knowledge-bases/{_KB_ID}/faq/entries/export?format=xml")
+    resp = client.get(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries/export?format=xml")
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "faq.invalid_export_format"
 
@@ -694,12 +694,12 @@ async def test_export_rejects_unknown_format(client: TestClient) -> None:
 async def test_import_progress_roundtrip(client: TestClient) -> None:
     """An import task started in this workspace can be polled back."""
     started = client.post(
-        f"/knowledge-bases/{_KB_ID}/faq/entries",
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries",
         files={"file": ("faq.csv", _FAQ_CSV, "text/csv")},
     )
     task_id = started.json()["data"]["task_id"]
 
-    resp = client.get(f"/faq/import/progress/{task_id}")
+    resp = client.get(f"/api/v1/faq/import/progress/{task_id}")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -715,7 +715,7 @@ async def test_import_progress_unknown_task_returns_404(
     """A well-formed task id that was never started reads as not-found."""
     _user_id, tenant_id = admin_user
     task_id = generate_task_id(tenant_id=tenant_id)
-    resp = client.get(f"/faq/import/progress/{task_id}")
+    resp = client.get(f"/api/v1/faq/import/progress/{task_id}")
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "faq.import_task_not_found"
 
@@ -723,14 +723,14 @@ async def test_import_progress_unknown_task_returns_404(
 async def test_import_progress_cross_tenant_returns_404(client: TestClient) -> None:
     """A task from another workspace is hidden as not-found."""
     task_id = generate_task_id(tenant_id=999999)
-    resp = client.get(f"/faq/import/progress/{task_id}")
+    resp = client.get(f"/api/v1/faq/import/progress/{task_id}")
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "faq.task_not_found"
 
 
 async def test_import_progress_invalid_task_id_returns_422(client: TestClient) -> None:
     """A task id that cannot carry a tenant is a client error."""
-    resp = client.get("/faq/import/progress/not-a-task-id")
+    resp = client.get("/api/v1/faq/import/progress/not-a-task-id")
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "faq.invalid_task_id"
 
@@ -740,14 +740,14 @@ async def test_import_progress_invalid_task_id_returns_422(client: TestClient) -
 
 async def test_unauthed_read_returns_401(anon_client: TestClient) -> None:
     """A request without the header trio is rejected by the auth gate."""
-    resp = anon_client.get(f"/knowledge-bases/{_KB_ID}/faq/entries")
+    resp = anon_client.get(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries")
     assert resp.status_code == 401
 
 
 async def test_unauthed_write_returns_401(anon_client: TestClient) -> None:
     """Writes also require the header trio."""
     resp = anon_client.post(
-        f"/knowledge-bases/{_KB_ID}/faq/entry",
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entry",
         json={"standard_question": "问题", "answers": ["答案"]},
     )
     assert resp.status_code == 401

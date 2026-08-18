@@ -261,8 +261,6 @@ class SharedKnowledgeBaseListItem(BaseModel):
     permission: str
     source_tenant_id: int
     shared_at: datetime
-    shared_by_user_id: str | None = Field(default=None)
-    shared_by_username: str | None = Field(default=None)
     is_mine: bool | None = Field(default=False)
     source_from_agent: JsonObject | None = Field(default=None)
 
@@ -322,6 +320,7 @@ class SharedAgentListItem(BaseModel):
     shared_at: datetime
     shared_by_user_id: str | None = Field(default=None)
     shared_by_username: str | None = Field(default=None)
+    web_search_ready: bool = Field(default=False)
     disabled_by_me: bool | None = Field(default=False)
     is_mine: bool | None = Field(default=False)
 
@@ -331,6 +330,13 @@ class SharedAgentListResponse(BaseModel):
 
     items: list[SharedAgentListItem]
     total: int
+
+
+class SetSharedAgentDisabledRequest(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    agent_id: str
+    disabled: bool
 
 
 __all__ = [
@@ -360,6 +366,7 @@ __all__ = [
     "SearchUsersQuery",
     "SearchUsersResponse",
     "SearchUsersResponseItem",
+    "SetSharedAgentDisabledRequest",
     "SharedAgentListItem",
     "SharedAgentListResponse",
     "SharedKnowledgeBaseListItem",

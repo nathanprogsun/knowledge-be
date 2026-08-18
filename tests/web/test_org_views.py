@@ -216,7 +216,7 @@ def client() -> TestClient:
     _holder["tenant"] = _happy_path_tenant_service()
     application = FastAPI()
     register_exception_handlers(application)
-    application.include_router(router)
+    application.include_router(router, prefix="/api/v1")
     application.dependency_overrides[require_auth] = _fake_auth
     application.dependency_overrides[get_organization_service] = _get_org_service
     application.dependency_overrides[get_tenant_service] = _get_tenant_service
@@ -239,7 +239,7 @@ def tenant_service(client: TestClient) -> AsyncMock:
 def test_create_organization_returns_envelope_with_201(client: TestClient) -> None:
     """POST /organizations returns 201 and the success envelope."""
     response = client.post(
-        "/organizations",
+        "/api/v1/organizations",
         json={"name": "New Org", "description": "d", "member_limit": 25},
     )
     assert response.status_code == 201
@@ -263,20 +263,20 @@ def test_create_organization_propagates_validation_error(client: TestClient) -> 
         code="organization.invite_validity_invalid",
         message="invalid",
     )
-    response = client.post("/organizations", json={"name": "x"})
+    response = client.post("/api/v1/organizations", json={"name": "x"})
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "organization.invite_validity_invalid"
 
 
 def test_create_organization_requires_name(client: TestClient) -> None:
     """Missing the required ``name`` yields 422 from request validation."""
-    response = client.post("/organizations", json={})
+    response = client.post("/api/v1/organizations", json={})
     assert response.status_code == 422
 
 
 def test_list_my_organizations_returns_envelope(client: TestClient) -> None:
     """GET /organizations returns the list envelope with items + total."""
-    response = client.get("/organizations")
+    response = client.get("/api/v1/organizations")
     assert response.status_code == 200
     body = response.json()
     assert body["success"] is True
@@ -289,7 +289,7 @@ def test_list_my_organizations_returns_envelope(client: TestClient) -> None:
 
 def test_get_organization_returns_envelope(client: TestClient) -> None:
     """GET /organizations/{id} returns one enriched org."""
-    response = client.get("/organizations/org-1")
+    response = client.get("/api/v1/organizations/org-1")
     assert response.status_code == 200
     body = response.json()
     assert body["data"]["id"] == "org-1"
@@ -302,14 +302,14 @@ def test_get_organization_private_not_member_returns_404(client: TestClient) -> 
         code="organization.tenant_not_member",
         message="not a member",
     )
-    response = client.get("/organizations/org-1")
+    response = client.get("/api/v1/organizations/org-1")
     assert response.status_code == 404
 
 
 def test_update_organization_returns_envelope(client: TestClient) -> None:
     """PUT /organizations/{id} returns the updated org envelope."""
     response = client.put(
-        "/organizations/org-1",
+        "/api/v1/organizations/org-1",
         json={"name": "Renamed", "require_approval": True},
     )
     assert response.status_code == 200
@@ -319,7 +319,7 @@ def test_update_organization_returns_envelope(client: TestClient) -> None:
 
 def test_delete_organization_returns_ack(client: TestClient) -> None:
     """DELETE /organizations/{id} returns the success + message ack."""
-    response = client.delete("/organizations/org-1")
+    response = client.delete("/api/v1/organizations/org-1")
     assert response.status_code == 200
     body = response.json()
     assert body == {"success": True, "message": "Organization deleted successfully"}
@@ -330,7 +330,7 @@ def test_delete_organization_returns_ack(client: TestClient) -> None:
 
 def test_generate_invite_code_returns_envelope(client: TestClient) -> None:
     """POST /{id}/invite-code wraps the fresh code in the success envelope."""
-    response = client.post("/organizations/org-1/invite-code")
+    response = client.post("/api/v1/organizations/org-1/invite-code")
     assert response.status_code == 200
     body = response.json()
     assert body == {"success": True, "data": {"invite_code": "aabbccdd00112233"}}
@@ -338,7 +338,7 @@ def test_generate_invite_code_returns_envelope(client: TestClient) -> None:
 
 def test_leave_organization_returns_ack(client: TestClient) -> None:
     """POST /{id}/leave returns the success + message ack."""
-    response = client.post("/organizations/org-1/leave")
+    response = client.post("/api/v1/organizations/org-1/leave")
     assert response.status_code == 200
     body = response.json()
     assert body == {"success": True, "message": "Left organization successfully"}
@@ -351,14 +351,14 @@ def test_leave_organization_owner_conflict_returns_409(client: TestClient) -> No
         code="organization.cannot_remove_owner",
         message="cannot remove organization owner tenant",
     )
-    response = client.post("/organizations/org-1/leave")
+    response = client.post("/api/v1/organizations/org-1/leave")
     assert response.status_code == 409
 
 
 def test_request_role_upgrade_returns_envelope(client: TestClient) -> None:
     """POST /{id}/request-upgrade returns the join-request envelope."""
     response = client.post(
-        "/organizations/org-1/request-upgrade",
+        "/api/v1/organizations/org-1/request-upgrade",
         json={"requested_role": "editor", "message": "please"},
     )
     assert response.status_code == 200
@@ -373,7 +373,7 @@ def test_request_role_upgrade_returns_envelope(client: TestClient) -> None:
 
 def test_list_members_returns_envelope(client: TestClient) -> None:
     """GET /{id}/members returns the member list envelope."""
-    response = client.get("/organizations/org-1/members")
+    response = client.get("/api/v1/organizations/org-1/members")
     assert response.status_code == 200
     body = response.json()
     assert body["data"]["total"] == 1
@@ -387,14 +387,14 @@ def test_list_members_non_member_returns_403(client: TestClient) -> None:
         code="organization.tenant_not_member",
         message="not a member",
     )
-    response = client.get("/organizations/org-1/members")
+    response = client.get("/api/v1/organizations/org-1/members")
     assert response.status_code == 403
 
 
 def test_update_member_role_returns_ack(client: TestClient) -> None:
     """PUT /{id}/members/{tenant_id} returns the success + message ack."""
     response = client.put(
-        "/organizations/org-1/members/77",
+        "/api/v1/organizations/org-1/members/77",
         json={"role": "editor"},
     )
     assert response.status_code == 200
@@ -404,7 +404,7 @@ def test_update_member_role_returns_ack(client: TestClient) -> None:
 
 def test_remove_member_returns_ack(client: TestClient) -> None:
     """DELETE /{id}/members/{tenant_id} returns the success + message ack."""
-    response = client.delete("/organizations/org-1/members/77")
+    response = client.delete("/api/v1/organizations/org-1/members/77")
     assert response.status_code == 200
     assert response.json() == {
         "success": True,
@@ -417,7 +417,7 @@ def test_remove_member_returns_ack(client: TestClient) -> None:
 
 def test_list_join_requests_returns_envelope(client: TestClient) -> None:
     """GET /{id}/join-requests returns the request list envelope."""
-    response = client.get("/organizations/org-1/join-requests")
+    response = client.get("/api/v1/organizations/org-1/join-requests")
     assert response.status_code == 200
     body = response.json()
     assert body["data"]["total"] == 1
@@ -427,14 +427,14 @@ def test_list_join_requests_returns_envelope(client: TestClient) -> None:
 def test_list_join_requests_non_admin_returns_403(client: TestClient) -> None:
     """Non-admin caller gets 403."""
     org_service(client).is_tenant_org_admin.return_value = False
-    response = client.get("/organizations/org-1/join-requests")
+    response = client.get("/api/v1/organizations/org-1/join-requests")
     assert response.status_code == 403
 
 
 def test_review_join_request_returns_ack(client: TestClient) -> None:
     """PUT /{id}/join-requests/{request_id}/review returns the success ack."""
     response = client.put(
-        "/organizations/org-1/join-requests/req-1/review",
+        "/api/v1/organizations/org-1/join-requests/req-1/review",
         json={"approved": True, "role": "editor", "message": "welcome"},
     )
     assert response.status_code == 200
@@ -445,7 +445,7 @@ def test_review_join_request_returns_ack(client: TestClient) -> None:
 def test_review_join_request_invalid_role_returns_422(client: TestClient) -> None:
     """Invalid role on review is rejected by the router."""
     response = client.put(
-        "/organizations/org-1/join-requests/req-1/review",
+        "/api/v1/organizations/org-1/join-requests/req-1/review",
         json={"approved": True, "role": "bogus"},
     )
     assert response.status_code == 422
@@ -456,7 +456,7 @@ def test_review_join_request_invalid_role_returns_422(client: TestClient) -> Non
 
 def test_preview_by_invite_code_returns_envelope(client: TestClient) -> None:
     """GET /preview/{code} returns the preview envelope."""
-    response = client.get("/organizations/preview/abc12345")
+    response = client.get("/api/v1/organizations/preview/abc12345")
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["id"] == "org-1"
@@ -468,7 +468,7 @@ def test_preview_by_invite_code_returns_envelope(client: TestClient) -> None:
 
 def test_join_by_invite_code_returns_envelope(client: TestClient) -> None:
     """POST /join returns the org envelope on successful join."""
-    response = client.post("/organizations/join", json={"invite_code": "abc12345"})
+    response = client.post("/api/v1/organizations/join", json={"invite_code": "abc12345"})
     assert response.status_code == 200
     assert response.json()["data"]["id"] == "org-1"
 
@@ -484,7 +484,7 @@ def test_submit_join_request_returns_envelope(client: TestClient) -> None:
         message="tenant not member",
     )
     response = client.post(
-        "/organizations/join-request",
+        "/api/v1/organizations/join-request",
         json={"invite_code": "abc12345", "message": "hi", "role": "editor"},
     )
     assert response.status_code == 200
@@ -495,7 +495,7 @@ def test_submit_join_request_returns_envelope(client: TestClient) -> None:
 def test_submit_join_request_not_required_returns_422(client: TestClient) -> None:
     """Submitting to a no-approval org is rejected with a 422."""
     response = client.post(
-        "/organizations/join-request",
+        "/api/v1/organizations/join-request",
         json={"invite_code": "abc12345"},
     )
     assert response.status_code == 422
@@ -505,7 +505,7 @@ def test_submit_join_request_not_required_returns_422(client: TestClient) -> Non
 def test_join_by_organization_id_returns_envelope(client: TestClient) -> None:
     """POST /join-by-id returns the org envelope."""
     response = client.post(
-        "/organizations/join-by-id",
+        "/api/v1/organizations/join-by-id",
         json={"organization_id": "org-1", "role": "viewer"},
     )
     assert response.status_code == 200
@@ -514,7 +514,7 @@ def test_join_by_organization_id_returns_envelope(client: TestClient) -> None:
 
 def test_search_organizations_returns_envelope(client: TestClient) -> None:
     """GET /search returns the search envelope with items + total."""
-    response = client.get("/organizations/search?q=acme&limit=5")
+    response = client.get("/api/v1/organizations/search?q=acme&limit=5")
     assert response.status_code == 200
     body = response.json()
     assert body["data"]["total"] == 1
@@ -525,7 +525,7 @@ def test_search_organizations_invalid_limit_falls_back_to_default(
     client: TestClient,
 ) -> None:
     """Invalid limit values fall back to the default of 20."""
-    response = client.get("/organizations/search?q=acme&limit=0")
+    response = client.get("/api/v1/organizations/search?q=acme&limit=0")
     assert response.status_code == 200
     org_service(client).search_searchable_organizations.assert_awaited_with(
         tenant_id=_TENANT, query="acme", limit=20
@@ -537,7 +537,7 @@ def test_search_organizations_invalid_limit_falls_back_to_default(
 
 def test_search_tenants_for_invite_returns_envelope(client: TestClient) -> None:
     """GET /{id}/search-tenants returns the candidate envelope."""
-    response = client.get("/organizations/org-1/search-tenants?q=work&limit=5")
+    response = client.get("/api/v1/organizations/org-1/search-tenants?q=work&limit=5")
     assert response.status_code == 200
     data = response.json()["data"]
     assert isinstance(data, list)
@@ -547,7 +547,7 @@ def test_search_tenants_for_invite_returns_envelope(client: TestClient) -> None:
 
 def test_search_tenants_for_invite_empty_query_returns_empty(client: TestClient) -> None:
     """Empty query returns an empty list."""
-    response = client.get("/organizations/org-1/search-tenants?q=")
+    response = client.get("/api/v1/organizations/org-1/search-tenants?q=")
     assert response.status_code == 200
     assert response.json()["data"] == []
 
@@ -555,13 +555,13 @@ def test_search_tenants_for_invite_empty_query_returns_empty(client: TestClient)
 def test_search_tenants_for_invite_non_admin_returns_403(client: TestClient) -> None:
     """Non-admin caller is rejected."""
     org_service(client).is_tenant_org_admin.return_value = False
-    response = client.get("/organizations/org-1/search-tenants?q=work")
+    response = client.get("/api/v1/organizations/org-1/search-tenants?q=work")
     assert response.status_code == 403
 
 
 def test_search_users_for_invite_alias(client: TestClient) -> None:
     """The /search-users alias forwards to /search-tenants."""
-    response = client.get("/organizations/org-1/search-users?q=work")
+    response = client.get("/api/v1/organizations/org-1/search-users?q=work")
     assert response.status_code == 200
     assert response.json()["data"][0]["tenant_id"] == 99
 
@@ -569,7 +569,7 @@ def test_search_users_for_invite_alias(client: TestClient) -> None:
 def test_invite_member_returns_ack(client: TestClient) -> None:
     """POST /{id}/invite adds a workspace and returns the ack."""
     response = client.post(
-        "/organizations/org-1/invite",
+        "/api/v1/organizations/org-1/invite",
         json={
             "tenant_id": 99,
             "representative_user_id": _USER,
@@ -583,7 +583,7 @@ def test_invite_member_returns_ack(client: TestClient) -> None:
 def test_invite_member_invalid_role_returns_422(client: TestClient) -> None:
     """Invalid role on invite is rejected by the router."""
     response = client.post(
-        "/organizations/org-1/invite",
+        "/api/v1/organizations/org-1/invite",
         json={"tenant_id": 99, "role": "bogus"},
     )
     assert response.status_code == 422
@@ -592,7 +592,7 @@ def test_invite_member_invalid_role_returns_422(client: TestClient) -> None:
 def test_invite_member_missing_target_returns_422(client: TestClient) -> None:
     """Missing both tenant_id and user_id yields 422."""
     response = client.post(
-        "/organizations/org-1/invite",
+        "/api/v1/organizations/org-1/invite",
         json={"role": "editor"},
     )
     assert response.status_code == 422
@@ -601,7 +601,7 @@ def test_invite_member_missing_target_returns_422(client: TestClient) -> None:
 def test_invite_member_legacy_user_only_returns_422(client: TestClient) -> None:
     """Legacy user-only path needs a user service (deferred seam)."""
     response = client.post(
-        "/organizations/org-1/invite",
+        "/api/v1/organizations/org-1/invite",
         json={"user_id": "u-1", "role": "editor"},
     )
     assert response.status_code == 422
@@ -610,7 +610,7 @@ def test_invite_member_legacy_user_only_returns_422(client: TestClient) -> None:
 def test_invite_member_already_member_returns_422(client: TestClient) -> None:
     """Inviting an existing member is rejected with 422."""
     response = client.post(
-        "/organizations/org-1/invite",
+        "/api/v1/organizations/org-1/invite",
         json={"tenant_id": _TENANT, "role": "viewer"},
     )
     assert response.status_code == 422
@@ -622,14 +622,14 @@ def test_invite_member_already_member_returns_422(client: TestClient) -> None:
 
 def test_search_path_does_not_capture_id(client: TestClient) -> None:
     """/search is matched before /{id}; the org service is not consulted."""
-    response = client.get("/organizations/search?q=acme")
+    response = client.get("/api/v1/organizations/search?q=acme")
     assert response.status_code == 200
     org_service(client).get_organization.assert_not_awaited()
 
 
 def test_preview_path_does_not_capture_id(client: TestClient) -> None:
     """/preview/{code} is matched before /{id}; org service not consulted."""
-    response = client.get("/organizations/preview/abc12345")
+    response = client.get("/api/v1/organizations/preview/abc12345")
     assert response.status_code == 200
     org_service(client).get_organization.assert_not_awaited()
 
@@ -648,5 +648,5 @@ def test_missing_tenant_context_returns_401(client: TestClient) -> None:
 
     app = client.app
     app.dependency_overrides[require_auth] = _no_tenant_auth
-    response = client.get("/organizations")
+    response = client.get("/api/v1/organizations")
     assert response.status_code == 401

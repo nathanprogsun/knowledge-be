@@ -1,6 +1,6 @@
 """IM-channel HTTP endpoints — channel CRUD, toggle, and the platform callback.
 
-Registered by the app factory. Three routers mirror the upstream route
+Registered by the app factory. Four routers mirror the upstream route
 split:
 
 - ``callback_router`` — ``/im/callback/{channel_id}`` (GET + POST), the
@@ -11,15 +11,17 @@ split:
   list) — admin for mutations, viewer for reads.
 - ``router`` — ``/im-channels`` (list-all / update / delete / toggle) —
   viewer for reads, admin for mutations.
-
-The WeChat QR-code login flow (``/wechat/qrcode``) is a separate
-surface wired by a later PR.
+- ``wechat_router`` — ``/wechat/qrcode`` (+ ``/status``) — the WeChat
+  scan-to-bind login flow. The upstream flow depends on the WeChat
+  platform service; this build reports the feature as unconfigured
+  rather than fabricating a QR payload.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
+from src.common.exception import ExternalServiceError
 from src.web.api.channels.im.views import (
     IMCallbackAckResponse,
     IMChannelEnvelope,
@@ -43,6 +45,7 @@ _AUTH_VIEWER = [Depends(require_auth), Depends(make_role_dep("viewer"))]
 
 agents_router = APIRouter(prefix="/agents", tags=["im-channels"])
 router = APIRouter(prefix="/im-channels", tags=["im-channels"])
+wechat_router = APIRouter(prefix="/wechat", tags=["im-wechat"])
 callback_router = APIRouter(prefix="/im", tags=["im-callback"])
 
 # ── Agent-scoped channel CRUD ──────────────────────────────────────────
@@ -112,8 +115,36 @@ callback_router.add_api_route(
     response_model_exclude_none=True,
 )
 
+
+# ── WeChat scan-to-bind login ─────────────────────────────────────────
+
+
+@wechat_router.post("/qrcode", dependencies=_AUTH_VIEWER)
+async def wechat_get_qrcode() -> None:
+    """Request a WeChat login QR code.
+
+    The upstream flow talks to the WeChat platform service; this build
+    has no such integration, so the feature reports itself as
+    unconfigured instead of returning a fabricated payload.
+    """
+    raise ExternalServiceError(
+        code="wechat.qrcode_unavailable",
+        message="WeChat QR login is not configured in this deployment",
+    )
+
+
+@wechat_router.post("/qrcode/status", dependencies=_AUTH_VIEWER)
+async def wechat_poll_qrcode_status() -> None:
+    """Poll a WeChat QR code's scan status (unconfigured in this build)."""
+    raise ExternalServiceError(
+        code="wechat.qrcode_unavailable",
+        message="WeChat QR login is not configured in this deployment",
+    )
+
+
 __all__ = [
     "agents_router",
     "callback_router",
     "router",
+    "wechat_router",
 ]

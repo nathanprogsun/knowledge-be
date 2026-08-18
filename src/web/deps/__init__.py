@@ -66,6 +66,12 @@ from src.web.deps.evaluation import (
     EvaluationServiceDep,
     get_evaluation_service,
 )
+from src.web.deps.im_channels import (
+    IMChannelServiceDep,
+    IMCommandRegistryDep,
+    get_im_channel_service,
+    get_im_command_registry,
+)
 from src.web.deps.infra_datasources import (
     DataSourceServiceDep,
     get_datasource_service,
@@ -101,12 +107,6 @@ from src.web.deps.infra_vector_stores import (
 from src.web.deps.infra_web_search import (
     WebSearchProviderServiceDep,
     get_web_search_provider_service,
-)
-from src.web.deps.im_channels import (
-    IMChannelServiceDep,
-    IMCommandRegistryDep,
-    get_im_channel_service,
-    get_im_command_registry,
 )
 from src.web.deps.knowledge import (
     KnowledgeServiceDep,
@@ -155,10 +155,12 @@ from src.web.deps.session import SessionDep, get_async_session
 from src.web.deps.system import (
     AuditLogServiceDep,
     FavoriteServiceDep,
+    SystemAdminServiceDep,
     SystemInfoServiceDep,
     SystemSettingServiceDep,
     get_audit_log_service,
     get_favorite_service,
+    get_system_admin_service,
     get_system_info_service,
     get_system_setting_service,
 )
@@ -198,12 +200,12 @@ __all__ = [
     "FAQImportRunnerDep",
     "FAQServiceDep",
     "FavoriteServiceDep",
+    "IMChannelServiceDep",
+    "IMCommandRegistryDep",
     "InitializationServiceDep",
     "KBServiceDep",
     "KnowledgeDocumentsDep",
     "KnowledgeServiceDep",
-    "IMChannelServiceDep",
-    "IMCommandRegistryDep",
     "MCPServiceDep",
     "MessageContextDep",
     "MessageServiceDep",
@@ -225,6 +227,7 @@ __all__ = [
     "SkillsManagerDep",
     "StorageBackendServiceDep",
     "SystemAdminDep",
+    "SystemAdminServiceDep",
     "SystemInfoServiceDep",
     "SystemSettingServiceDep",
     "TagServiceDep",
@@ -259,11 +262,11 @@ __all__ = [
     "get_faq_import_runner",
     "get_faq_service",
     "get_favorite_service",
+    "get_im_channel_service",
+    "get_im_command_registry",
     "get_initialization_service",
     "get_kb_service",
     "get_knowledge_service",
-    "get_im_channel_service",
-    "get_im_command_registry",
     "get_mcp_service",
     "get_message_context",
     "get_message_service",
@@ -276,6 +279,8 @@ __all__ = [
     "get_session_service",
     "get_skills_manager",
     "get_storage_backend_service",
+    "get_system_admin_service",
+    "get_system_info_service",
     "get_system_setting_service",
     "get_tag_service",
     "get_tenant_api_key_service",

@@ -39,6 +39,20 @@ class NotFoundError(ApplicationError):
     message = "Resource not found"
 
 
+class GoneError(NotFoundError):
+    """Resource used to exist but is no longer available (HTTP 410).
+
+    Mirrors the upstream contract for expired / revoked invitation
+    links: ``POST /auth/invitations/lookup`` and
+    ``POST /auth/register-by-invite`` collapse unknown, expired, and
+    revoked tokens into a single 410 so a stolen token's failure mode
+    does not leak which slot it occupied.
+    """
+
+    code = "not_found"
+    message = "Resource is gone"
+
+
 class ConflictError(ApplicationError):
     code = "conflict"
     message = "Resource conflict"
@@ -90,6 +104,7 @@ __all__ = [
     "ConflictError",
     "DataError",
     "ExternalServiceError",
+    "GoneError",
     "NotFoundError",
     "PermissionDeniedError",
     "StorageBackendError",

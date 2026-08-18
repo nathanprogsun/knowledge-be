@@ -18,11 +18,11 @@ async def test_authed_client_reaches_an_authenticated_endpoint(
 ) -> None:
     """The header-auth channel resolves the seeded user and returns 2xx.
 
-    Hits ``/storage-backends/types`` (AuthDep + RoleViewerDep gated)
+    Hits ``/api/v1/storage-backends/types`` (AuthDep + RoleViewerDep gated)
     which only reads the principal from ``request.state`` populated by
     the header-trust branch - no Bearer token required.
     """
-    resp = authed_client.get("/storage-backends/types")
+    resp = authed_client.get("/api/v1/storage-backends/types")
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["success"] is True

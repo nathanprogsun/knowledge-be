@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import secrets
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Header, Query
+from fastapi import APIRouter, Header, Query, Request
 from pydantic import BaseModel, ConfigDict
 
-from src.common.exception import UnauthorizedError, ValidationError
-from src.core.auth.types import UserInfo
+from src.common.exception import GoneError, NotFoundError, UnauthorizedError, ValidationError
+from src.core.auth.types import UserInfo, UserPreferences
 from src.core.contracts.auth import (
+    AuthConfigResponse,
     AuthUser,
     ChangePasswordRequest,
+    InvitationLookupRequest,
+    InvitationLookupResponse,
+    InviteLookup,
     LoginRequest,
     LoginResponse,
     MeCapabilities,
@@ -22,14 +27,31 @@ from src.core.contracts.auth import (
     OIDCMetaConfig,
     RefreshTokenRequest,
     RefreshTokenResponse,
+    RegisterByInviteRequest,
     RegisterRequest,
     RegisterResponse,
+    UpdatePreferencesRequest,
+    UpdatePreferencesResponse,
     ValidateTokenResponse,
 )
+from src.core.contracts.tenants import Membership
+from src.core.tenants.service import TenantService
+from src.core.tenants.types import MembershipInfo
 from src.settings import get_settings
+from src.web.api.tenants.views import TenantEnvelope, tenant_info_to_contract
 from src.web.deps import AuthDep, AuthServiceDep, OidcServiceDep
+from src.web.deps.system import SystemSettingServiceDep
+from src.web.deps.tenants import (
+    TenantInvitationServiceDep,
+    TenantMemberServiceDep,
+    TenantServiceDep,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+#: Default account bootstrapped by the Lite auto-setup flow (mirrors the
+#: upstream contract's ``admin@weknora.local``).
+AUTO_SETUP_DEFAULT_EMAIL = "admin@weknora.local"
 
 
 # ── View models (inline; not contracts because they're trivial wrappers) ──
@@ -150,28 +172,46 @@ async def register(
 async def me(
     _auth: AuthDep,
     auth_service: AuthServiceDep,
+    member_service: TenantMemberServiceDep,
+    tenant_service: TenantServiceDep,
+    request: Request,
     authorization: str | None = Header(default=None),
 ) -> MeResponse:
     """Return the authenticated user's profile, memberships, and tenant context.
 
     Response is wrapped in ``data`` per Go's
-    ``internal/handler/auth.go`` ``GetMyInfo`` handler. Includes
-    ``tenant_required`` (true when the user has no active tenant yet)
-    and ``capabilities.can_create_tenant`` so the frontend can drive
-    the post-login redirect.
+    ``internal/handler/auth.go`` ``GetMyInfo`` handler. Includes the
+    *active* tenant (the one the auth middleware resolved against the
+    X-Tenant-ID header, falling back to the user's home tenant), the
+    user's memberships (so the frontend can restore ``currentTenantRole``
+    on page refresh), ``tenant_required``, and ``capabilities``.
     """
     token = _require_bearer(authorization)
     info, _tenant_id = await auth_service.get_me(token=token)
-    tenant_required = info.tenant_id is None
+    active_tenant_id = int(request.state.tenant_id or 0)
+    if active_tenant_id <= 0:
+        active_tenant_id = info.tenant_id or 0
+    tenant = None
+    if active_tenant_id > 0:
+        try:
+            tenant = tenant_info_to_contract(
+                await tenant_service.get_tenant(active_tenant_id),
+            )
+        except NotFoundError:
+            tenant = None
+    memberships = await _memberships_to_contract(
+        await member_service.list_by_user(info.id),
+        tenant_service,
+    )
     return MeResponse(
         success=True,
         data=MeData(
             user=_user_info_to_auth_user(info),
-            tenant=None,
-            memberships=[],
-            tenant_required=tenant_required,
+            tenant=tenant,
+            memberships=memberships,
+            tenant_required=tenant is None,
             capabilities=MeCapabilities(
-                can_create_tenant=info.can_access_all_tenants,
+                can_create_tenant=info.can_access_all_tenants or tenant is None,
             ),
         ),
     )
@@ -291,9 +331,216 @@ async def oidc_callback(
     )
 
 
+# ── Registration-mode config / Lite auto-setup ────────────────────────
+
+
+@router.get("/config", response_model=AuthConfigResponse)
+async def auth_config(
+    system_setting_service: SystemSettingServiceDep,
+) -> AuthConfigResponse:
+    """Return the public registration mode (no auth).
+
+    Mirrors Go's ``GetAuthConfig``: the frontend reads it on app load
+    to decide whether to show the Register tab. Only ``registration_mode``
+    is exposed; other config stays internal.
+    """
+    mode = await system_setting_service.get_string(
+        "auth.registration_mode",
+        "",
+        "self_serve",
+    )
+    return AuthConfigResponse(success=True, registration_mode=mode)
+
+
+@router.post("/auto-setup", response_model=LoginResponse)
+async def auto_setup(
+    auth_service: AuthServiceDep,
+    tenant_service: TenantServiceDep,
+    member_service: TenantMemberServiceDep,
+) -> LoginResponse:
+    """Lite-mode transparent bootstrap: create the default user/workspace
+    on first boot, then just sign them in on every subsequent boot.
+
+    Mirrors Go's ``AutoSetup``: idempotent — the default account is
+    created once, and later calls reuse it and mint a fresh token pair.
+    """
+    user_row = await auth_service.get_user_row_by_email(AUTO_SETUP_DEFAULT_EMAIL)
+    if user_row is None:
+        user_row = await auth_service.create_user(
+            username=f"user_{secrets.token_hex(4)}",
+            email=AUTO_SETUP_DEFAULT_EMAIL,
+            password=secrets.token_urlsafe(24),
+        )
+    if user_row.tenant_id is None:
+        tenant_info = await tenant_service.create_tenant(name=user_row.username)
+        await member_service.ensure_owner(
+            user_id=user_row.id,
+            tenant_id=tenant_info.id,
+        )
+        user_row = await auth_service.update_home_tenant(
+            user_id=user_row.id,
+            tenant_id=tenant_info.id,
+        )
+    result = await auth_service.mint_pair_for_user_row(user_row)
+    tenant = await tenant_service.get_tenant(user_row.tenant_id)
+    memberships = await _memberships_to_contract(
+        await member_service.list_by_user(user_row.id),
+        tenant_service,
+    )
+    return LoginResponse(
+        success=True,
+        message="Auto-setup successful",
+        user=_user_info_to_auth_user(result.user),
+        active_tenant=tenant_info_to_contract(tenant),
+        memberships=memberships,
+        token=result.access_token,
+        refresh_token=result.refresh_token,
+    )
+
+
+@router.get("/tenant", response_model=TenantEnvelope)
+async def current_tenant(
+    _auth: AuthDep,
+    tenant_service: TenantServiceDep,
+    request: Request,
+) -> TenantEnvelope:
+    """Return the authenticated user's active workspace."""
+    tenant_id = int(request.state.tenant_id or 0)
+    if tenant_id <= 0:
+        raise NotFoundError(
+            code="tenant.not_found",
+            message="No active tenant",
+        )
+    tenant = await tenant_service.get_tenant(tenant_id)
+    return TenantEnvelope(success=True, data=tenant_info_to_contract(tenant))
+
+
+@router.put("/me/preferences", response_model=UpdatePreferencesResponse)
+async def update_my_preferences(
+    _auth: AuthDep,
+    body: UpdatePreferencesRequest,
+    auth_service: AuthServiceDep,
+    authorization: str | None = Header(default=None),
+) -> UpdatePreferencesResponse:
+    """PATCH-merge the current user's preferences."""
+    token = _require_bearer(authorization)
+    info, _ = await auth_service.get_me(token=token)
+    prefs = await auth_service.update_my_preferences(
+        user_id=info.id,
+        patch=UserPreferences(last_active_tenant_id=body.last_active_tenant_id),
+    )
+    return UpdatePreferencesResponse(success=True, data=prefs.model_dump(mode="json"))
+
+
+# ── Share-link registration ───────────────────────────────────────────
+
+
+@router.post("/invitations/lookup", response_model=InvitationLookupResponse)
+async def invitation_lookup(
+    body: InvitationLookupRequest,
+    invitation_service: TenantInvitationServiceDep,
+    tenant_service: TenantServiceDep,
+) -> InvitationLookupResponse:
+    """Resolve a share-link token into the registration-page context.
+
+    No auth. Invalid / expired / revoked tokens collapse to a single
+    410 so a stolen token's failure mode does not leak which slot it
+    occupied.
+    """
+    try:
+        invite = await invitation_service.lookup_by_token(body.token)
+    except NotFoundError as exc:
+        raise GoneError(
+            message="Invitation link is invalid or has been revoked",
+        ) from exc
+    tenant_name: str | None = None
+    try:
+        tenant = await tenant_service.get_tenant(invite.tenant_id)
+        tenant_name = tenant.name
+    except NotFoundError:
+        pass
+    return InvitationLookupResponse(
+        success=True,
+        data=InviteLookup(
+            tenant_id=invite.tenant_id,
+            tenant_name=tenant_name,
+            role=invite.role,
+            expires_at=invite.expires_at,
+        ),
+    )
+
+
+@router.post("/register-by-invite", response_model=LoginResponse, status_code=201)
+async def register_by_invite(
+    body: RegisterByInviteRequest,
+    auth_service: AuthServiceDep,
+    invitation_service: TenantInvitationServiceDep,
+    tenant_service: TenantServiceDep,
+    member_service: TenantMemberServiceDep,
+) -> LoginResponse:
+    """Complete registration via a share-link token.
+
+    The invitee supplies their own email — the token is the
+    authorisation, not an identity lock. Not subject to the
+    invite-only gate: the token IS the authorisation.
+    """
+    try:
+        invite = await invitation_service.lookup_by_token(body.token)
+    except NotFoundError as exc:
+        raise GoneError(
+            message="Invitation link is invalid or has been revoked",
+        ) from exc
+    user_row = await auth_service.create_user(
+        username=body.username,
+        email=body.email,
+        password=body.password,
+    )
+    user_row = await auth_service.update_home_tenant(
+        user_id=user_row.id,
+        tenant_id=invite.tenant_id,
+    )
+    await invitation_service.accept_by_token(body.token, user_id=user_row.id)
+    result = await auth_service.mint_pair_for_user_row(user_row)
+    tenant = await tenant_service.get_tenant(user_row.tenant_id)
+    memberships = await _memberships_to_contract(
+        await member_service.list_by_user(user_row.id),
+        tenant_service,
+    )
+    return LoginResponse(
+        success=True,
+        message="Registration successful",
+        user=_user_info_to_auth_user(result.user),
+        active_tenant=tenant_info_to_contract(tenant),
+        memberships=memberships,
+        token=result.access_token,
+        refresh_token=result.refresh_token,
+    )
+
+
+async def _memberships_to_contract(
+    memberships: list[MembershipInfo],
+    tenant_service: TenantService,
+) -> list[Membership]:
+    """Hydrate membership rows with tenant names into the wire contract."""
+    result: list[Membership] = []
+    for membership in memberships:
+        tenant_name = ""
+        try:
+            tenant = await tenant_service.get_tenant(membership.tenant_id)
+            tenant_name = tenant.name
+        except NotFoundError:
+            pass
+        result.append(
+            Membership(
+                tenant_id=membership.tenant_id,
+                tenant_name=tenant_name,
+                role=membership.role,
+            ),
+        )
+    return result
+
+
 # ── Local error helpers (avoid circular import with exception_handler) ──
-
-
 def _require_bearer(authorization: str | None) -> str:
     """Return the Bearer token, or raise a 422-style validation error."""
     if not authorization:

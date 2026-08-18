@@ -90,7 +90,7 @@ def test_header_only_resolves_principal(
     caller's workspace.
     """
     _user_id, tenant_id = admin_user
-    response = authed_client.get("/tenants")
+    response = authed_client.get("/api/v1/tenants")
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["success"] is True
@@ -130,7 +130,7 @@ def test_jwt_with_header_resolves_via_header_channel(
     headers = dict(authed_client.headers)
     headers["Authorization"] = f"Bearer {token}"
 
-    response = authed_client.get("/tenants", headers=headers)
+    response = authed_client.get("/api/v1/tenants", headers=headers)
     assert response.status_code == 200, response.text
     payload = response.json()
     tenant_ids = [t["id"] for t in payload["data"]["items"]]
@@ -152,7 +152,7 @@ def test_garbage_authorization_returns_401(app) -> None:
 
     with TestClient(app=app) as client:
         response = client.get(
-            "/tenants",
+            "/api/v1/tenants",
             headers={"Authorization": "Bearer not-a-real-token"},
         )
     assert response.status_code == 401, response.text
@@ -186,7 +186,7 @@ def test_jwt_with_bad_iss_returns_401(
 
     with TestClient(app=app) as client:
         response = client.get(
-            "/tenants",
+            "/api/v1/tenants",
             headers={"Authorization": f"Bearer {token}"},
         )
     assert response.status_code == 401, response.text

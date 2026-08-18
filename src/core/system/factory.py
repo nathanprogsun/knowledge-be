@@ -8,12 +8,28 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.system.admin_service import SystemAdminService
 from src.core.system.audit_service import AuditLogService
 from src.core.system.favorite_service import UserResourceFavoriteService
 from src.core.system.system_setting_service import SystemSettingService
 from src.db.dao.audit_log_repository import AuditLogRepository
+from src.db.dao.auth_tokens_repository import AuthTokenRepository
 from src.db.dao.system_setting_repository import SystemSettingRepository
 from src.db.dao.user_resource_favorite_repository import UserResourceFavoriteRepository
+from src.db.dao.users_repository import UserRepository
+
+
+def build_system_admin_service(session: AsyncSession) -> SystemAdminService:
+    """Per-request ``SystemAdminService`` with fresh repos.
+
+    The three repositories share the request session so a promote /
+    revoke / password reset and its audit row land in one transaction.
+    """
+    return SystemAdminService(
+        users_repo=UserRepository(session),
+        tokens_repo=AuthTokenRepository(session),
+        audit_repo=AuditLogRepository(session),
+    )
 
 
 def build_system_setting_service(session: AsyncSession) -> SystemSettingService:
@@ -48,5 +64,6 @@ def build_favorite_service(session: AsyncSession) -> UserResourceFavoriteService
 __all__ = [
     "build_audit_log_service",
     "build_favorite_service",
+    "build_system_admin_service",
     "build_system_setting_service",
 ]

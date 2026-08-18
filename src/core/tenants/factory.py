@@ -9,10 +9,12 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.tenants.api_key_service import TenantAPIKeyService
+from src.core.tenants.invitation_service import TenantInvitationService
 from src.core.tenants.kv_service import TenantKVService
 from src.core.tenants.member_service import TenantMemberService
 from src.core.tenants.service import TenantService
 from src.db.dao.tenant_api_keys_repository import TenantAPIKeyRepository
+from src.db.dao.tenant_invitations_repository import TenantInvitationRepository
 from src.db.dao.tenant_kv_repository import TenantKVRepository
 from src.db.dao.tenant_members_repository import TenantMemberRepository
 from src.db.dao.tenants_repository import TenantRepository
@@ -41,8 +43,17 @@ def build_tenant_member_service(session: AsyncSession) -> TenantMemberService:
     return TenantMemberService(members_repo=TenantMemberRepository(session))
 
 
+def build_tenant_invitation_service(session: AsyncSession) -> TenantInvitationService:
+    """Per-request ``TenantInvitationService`` with fresh repositories."""
+    return TenantInvitationService(
+        invitations_repo=TenantInvitationRepository(session),
+        member_service=TenantMemberService(members_repo=TenantMemberRepository(session)),
+    )
+
+
 __all__ = [
     "build_tenant_api_key_service",
+    "build_tenant_invitation_service",
     "build_tenant_kv_service",
     "build_tenant_member_service",
     "build_tenant_service",

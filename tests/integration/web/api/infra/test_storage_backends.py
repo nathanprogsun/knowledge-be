@@ -250,7 +250,7 @@ def _seed(
 
 async def test_list_provider_types_returns_the_allowed_set(client: TestClient) -> None:
     """The /types endpoint returns the providers from the allow-list."""
-    resp = client.get("/storage-backends/types")
+    resp = client.get("/api/v1/storage-backends/types")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -268,7 +268,7 @@ async def test_create_returns_201_with_the_created_backend(
 ) -> None:
     """A create call returns the wrapped envelope and persists the row."""
     resp = client.post(
-        "/storage-backends",
+        "/api/v1/storage-backends",
         json={"name": "Primary MinIO", "provider": "minio", "config": _MINIO_BODY_CONFIG},
     )
 
@@ -288,7 +288,7 @@ async def test_create_returns_201_with_the_created_backend(
 async def test_create_rejects_an_unsupported_provider_with_422(client: TestClient) -> None:
     """An unsupported provider fails validation with 422."""
     resp = client.post(
-        "/storage-backends",
+        "/api/v1/storage-backends",
         json={"name": "Nope", "provider": "dropbox", "config": _MINIO_BODY_CONFIG},
     )
 
@@ -298,7 +298,7 @@ async def test_create_rejects_an_unsupported_provider_with_422(client: TestClien
 async def test_create_rejects_blank_name_with_422(client: TestClient) -> None:
     """A blank name fails validation with 422."""
     resp = client.post(
-        "/storage-backends",
+        "/api/v1/storage-backends",
         json={"name": "   ", "provider": "minio", "config": _MINIO_BODY_CONFIG},
     )
 
@@ -318,7 +318,7 @@ async def test_list_returns_tenant_scoped_backends_in_envelope(
     _seed(repo, id="backend-2", name="B", tenant_id=admin_user[1])
     repo.default_backend_ids[admin_user[1]] = "backend-2"
 
-    resp = client.get("/storage-backends")
+    resp = client.get("/api/v1/storage-backends")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -341,7 +341,7 @@ async def test_get_returns_backend_with_masked_credentials(
     """A get for an existing id returns the wrapped backend, creds masked."""
     _seed(repo, tenant_id=admin_user[1])
 
-    resp = client.get("/storage-backends/backend-1")
+    resp = client.get("/api/v1/storage-backends/backend-1")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -353,7 +353,7 @@ async def test_get_missing_backend_returns_404(
     client: TestClient,
 ) -> None:
     """An unknown id is rejected with 404."""
-    resp = client.get("/storage-backends/ghost")
+    resp = client.get("/api/v1/storage-backends/ghost")
 
     assert resp.status_code == 404
 
@@ -373,7 +373,7 @@ async def test_update_renames_and_preserves_redacted_secrets(
     masked["secret_access_key"] = REDACTED_SECRET_PLACEHOLDER
 
     resp = client.put(
-        "/storage-backends/backend-1",
+        "/api/v1/storage-backends/backend-1",
         json={"name": "Renamed", "config": masked},
     )
 
@@ -386,7 +386,7 @@ async def test_update_renames_and_preserves_redacted_secrets(
 
 async def test_update_missing_backend_returns_404(client: TestClient) -> None:
     """Updating an unknown id returns 404."""
-    resp = client.put("/storage-backends/ghost", json={"name": "X"})
+    resp = client.put("/api/v1/storage-backends/ghost", json={"name": "X"})
     assert resp.status_code == 404
 
 
@@ -401,7 +401,7 @@ async def test_delete_returns_success_and_soft_deletes(
     """A successful delete returns the ack envelope and clears the row."""
     _seed(repo, tenant_id=admin_user[1])
 
-    resp = client.delete("/storage-backends/backend-1")
+    resp = client.delete("/api/v1/storage-backends/backend-1")
 
     assert resp.status_code == 200
     assert resp.json() == {"success": True}
@@ -410,7 +410,7 @@ async def test_delete_returns_success_and_soft_deletes(
 
 async def test_delete_missing_backend_returns_404(client: TestClient) -> None:
     """Deleting an unknown id returns 404."""
-    resp = client.delete("/storage-backends/ghost")
+    resp = client.delete("/api/v1/storage-backends/ghost")
     assert resp.status_code == 404
 
 
@@ -420,7 +420,7 @@ async def test_delete_missing_backend_returns_404(client: TestClient) -> None:
 async def test_test_raw_returns_success_envelope(client: TestClient) -> None:
     """A raw probe returns 200 with ``success=true``."""
     resp = client.post(
-        "/storage-backends/test",
+        "/api/v1/storage-backends/test",
         json={"name": "Probe", "provider": "minio", "config": _MINIO_BODY_CONFIG},
     )
 
@@ -450,7 +450,7 @@ async def test_test_raw_reports_probe_failure_inside_envelope(
     )
 
     resp = client.post(
-        "/storage-backends/test",
+        "/api/v1/storage-backends/test",
         json={"name": "Probe", "provider": "minio", "config": _MINIO_BODY_CONFIG},
     )
 
@@ -471,7 +471,7 @@ async def test_test_by_id_returns_success_envelope(
     """The by-id probe surfaces ``success=true``."""
     _seed(repo, tenant_id=admin_user[1])
 
-    resp = client.post("/storage-backends/backend-1/test")
+    resp = client.post("/api/v1/storage-backends/backend-1/test")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -480,7 +480,7 @@ async def test_test_by_id_returns_success_envelope(
 
 async def test_test_by_id_missing_returns_404(client: TestClient) -> None:
     """Probing an unknown id returns 404."""
-    resp = client.post("/storage-backends/ghost/test")
+    resp = client.post("/api/v1/storage-backends/ghost/test")
     assert resp.status_code == 404
 
 
@@ -495,7 +495,7 @@ async def test_set_default_returns_ack_and_records_default(
     """Setting the workspace default returns the ack envelope."""
     _seed(repo, tenant_id=admin_user[1])
 
-    resp = client.put("/storage-backends/backend-1/default")
+    resp = client.put("/api/v1/storage-backends/backend-1/default")
 
     assert resp.status_code == 200
     assert resp.json() == {"success": True}
@@ -504,7 +504,7 @@ async def test_set_default_returns_ack_and_records_default(
 
 async def test_set_default_missing_backend_returns_404(client: TestClient) -> None:
     """Setting the default to an unknown id returns 404."""
-    resp = client.put("/storage-backends/ghost/default")
+    resp = client.put("/api/v1/storage-backends/ghost/default")
     assert resp.status_code == 404
 
 
@@ -513,14 +513,14 @@ async def test_set_default_missing_backend_returns_404(client: TestClient) -> No
 
 async def test_unauthed_request_returns_401(anon_client: TestClient) -> None:
     """A read without the header trio is rejected with 401."""
-    resp = anon_client.get("/storage-backends")
+    resp = anon_client.get("/api/v1/storage-backends")
     assert resp.status_code == 401
 
 
 async def test_unauthed_post_returns_401(anon_client: TestClient) -> None:
     """Writes also require the header trio."""
     resp = anon_client.post(
-        "/storage-backends",
+        "/api/v1/storage-backends",
         json={"name": "X", "provider": "minio", "config": _MINIO_BODY_CONFIG},
     )
     assert resp.status_code == 401

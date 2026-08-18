@@ -2,201 +2,514 @@
   "_comment": "Knowledge-domain wire shapes captured from the reference API documentation and the upstream handler fixtures. Each contract name lists the JSON field set the upstream API emits for that object; each endpoint entry lists the HTTP status and the top-level response key set. Field name comparison is exact (no drift in either direction).",
   "contracts": {
     "KnowledgeBase": [
-      "id", "name", "description", "type", "is_temporary", "tenant_id",
-      "creator_id", "creator_name", "chunking_config", "image_processing_config",
-      "embedding_model_id", "summary_model_id", "vlm_config", "asr_config",
-      "storage_provider_config", "storage_backend_id", "storage_config",
-      "extract_config", "faq_config", "question_generation_config", "wiki_config",
-      "indexing_strategy", "vector_store_id", "vector_store_name",
-      "vector_store_source", "vector_store_engine_type", "vector_store_status",
-      "is_pinned", "pinned_at", "knowledge_count", "chunk_count",
-      "processing_count", "is_processing", "share_count", "my_permission",
-      "capabilities", "created_at", "updated_at", "deleted_at"
+      "id",
+      "name",
+      "description",
+      "type",
+      "is_temporary",
+      "tenant_id",
+      "creator_id",
+      "creator_name",
+      "chunking_config",
+      "image_processing_config",
+      "embedding_model_id",
+      "summary_model_id",
+      "vlm_config",
+      "asr_config",
+      "storage_provider_config",
+      "storage_backend_id",
+      "storage_config",
+      "extract_config",
+      "faq_config",
+      "question_generation_config",
+      "wiki_config",
+      "indexing_strategy",
+      "vector_store_id",
+      "vector_store_name",
+      "vector_store_source",
+      "vector_store_engine_type",
+      "vector_store_status",
+      "is_pinned",
+      "pinned_at",
+      "knowledge_count",
+      "chunk_count",
+      "processing_count",
+      "is_processing",
+      "share_count",
+      "my_permission",
+      "capabilities",
+      "created_at",
+      "updated_at",
+      "deleted_at"
     ],
     "Knowledge": [
-      "id", "tenant_id", "knowledge_base_id", "type", "title", "description",
-      "source", "channel", "tag_id", "summary_status", "parse_status",
-      "enable_status", "embedding_model_id", "file_name", "file_type",
-      "file_size", "file_hash", "file_path", "storage_size", "metadata",
-      "created_at", "updated_at", "processed_at", "error_message", "deleted_at"
+      "id",
+      "tenant_id",
+      "knowledge_base_id",
+      "type",
+      "title",
+      "description",
+      "source",
+      "channel",
+      "tag_id",
+      "summary_status",
+      "parse_status",
+      "enable_status",
+      "embedding_model_id",
+      "file_name",
+      "file_type",
+      "file_size",
+      "file_hash",
+      "file_path",
+      "storage_size",
+      "metadata",
+      "created_at",
+      "updated_at",
+      "processed_at",
+      "error_message",
+      "deleted_at"
     ],
     "Chunk": [
-      "id", "tenant_id", "knowledge_id", "knowledge_base_id", "tag_id",
-      "content", "chunk_index", "is_enabled", "status", "start_at", "end_at",
-      "pre_chunk_id", "next_chunk_id", "chunk_type", "parent_chunk_id",
-      "relation_chunks", "indirect_relation_chunks", "metadata", "content_hash",
-      "image_info", "created_at", "updated_at", "deleted_at"
+      "id",
+      "tenant_id",
+      "knowledge_id",
+      "knowledge_base_id",
+      "tag_id",
+      "content",
+      "chunk_index",
+      "is_enabled",
+      "status",
+      "start_at",
+      "end_at",
+      "pre_chunk_id",
+      "next_chunk_id",
+      "chunk_type",
+      "parent_chunk_id",
+      "relation_chunks",
+      "indirect_relation_chunks",
+      "metadata",
+      "content_hash",
+      "image_info",
+      "created_at",
+      "updated_at",
+      "deleted_at"
     ],
     "Tag": [
-      "id", "tenant_id", "knowledge_base_id", "name", "color", "sort_order",
-      "knowledge_count", "chunk_count", "created_at", "updated_at"
+      "id",
+      "tenant_id",
+      "knowledge_base_id",
+      "name",
+      "color",
+      "sort_order",
+      "knowledge_count",
+      "chunk_count",
+      "created_at",
+      "updated_at"
     ],
-    "TagList": ["total", "page", "page_size", "data"],
+    "TagList": [
+      "total",
+      "page",
+      "page_size",
+      "data"
+    ],
     "FAQEntry": [
-      "id", "chunk_id", "knowledge_id", "knowledge_base_id", "tag_id",
-      "tag_name", "is_enabled", "is_recommended", "standard_question",
-      "similar_questions", "negative_questions", "answers", "answer_strategy",
-      "index_mode", "chunk_type", "score", "match_type", "matched_question",
-      "created_at", "updated_at"
+      "id",
+      "chunk_id",
+      "knowledge_id",
+      "knowledge_base_id",
+      "tag_id",
+      "tag_name",
+      "is_enabled",
+      "is_recommended",
+      "standard_question",
+      "similar_questions",
+      "negative_questions",
+      "answers",
+      "answer_strategy",
+      "index_mode",
+      "chunk_type",
+      "score",
+      "match_type",
+      "matched_question",
+      "created_at",
+      "updated_at"
     ],
-    "FAQEntryListResponse": ["total", "page", "page_size", "data"],
+    "FAQEntryListResponse": [
+      "total",
+      "page",
+      "page_size",
+      "data"
+    ],
     "WikiPageView": [
-      "id", "tenant_id", "knowledge_base_id", "slug", "title", "page_type",
-      "status", "content", "summary", "aliases", "parent_slug", "folder_id",
-      "category_path", "wiki_path", "depth", "sort_order", "source_refs",
-      "chunk_refs", "in_links", "out_links", "page_metadata", "version",
-      "last_edit_source", "last_editor_id", "created_at", "updated_at",
+      "id",
+      "tenant_id",
+      "knowledge_base_id",
+      "slug",
+      "title",
+      "page_type",
+      "status",
+      "content",
+      "summary",
+      "aliases",
+      "parent_slug",
+      "folder_id",
+      "category_path",
+      "wiki_path",
+      "depth",
+      "sort_order",
+      "source_refs",
+      "chunk_refs",
+      "in_links",
+      "out_links",
+      "page_metadata",
+      "version",
+      "last_edit_source",
+      "last_editor_id",
+      "created_at",
+      "updated_at",
       "deleted_at"
     ],
     "WikiFolderView": [
-      "id", "tenant_id", "knowledge_base_id", "parent_id", "name", "path",
-      "depth", "sort_order", "created_at", "updated_at", "deleted_at"
+      "id",
+      "tenant_id",
+      "knowledge_base_id",
+      "parent_id",
+      "name",
+      "path",
+      "depth",
+      "sort_order",
+      "created_at",
+      "updated_at",
+      "deleted_at"
     ],
     "WikiFolderNodeView": [
-      "id", "tenant_id", "knowledge_base_id", "parent_id", "name", "path",
-      "depth", "sort_order", "created_at", "updated_at", "deleted_at",
-      "page_count", "has_children"
+      "id",
+      "tenant_id",
+      "knowledge_base_id",
+      "parent_id",
+      "name",
+      "path",
+      "depth",
+      "sort_order",
+      "created_at",
+      "updated_at",
+      "deleted_at",
+      "page_count",
+      "has_children"
     ],
     "WikiStats": [
-      "total_pages", "pages_by_type", "total_links", "orphan_count",
-      "recent_updates", "pending_tasks", "pending_issues", "is_active"
+      "total_pages",
+      "pages_by_type",
+      "total_links",
+      "orphan_count",
+      "recent_updates",
+      "pending_tasks",
+      "pending_issues",
+      "is_active"
     ],
-    "WikiPageListData": ["pages", "total", "page", "page_size", "total_pages"],
-    "WikiFolderListData": ["parent_id", "folders"],
-    "WikiSearchData": ["pages"]
+    "WikiPageListData": [
+      "pages",
+      "total",
+      "page",
+      "page_size",
+      "total_pages"
+    ],
+    "WikiFolderListData": [
+      "parent_id",
+      "folders"
+    ],
+    "WikiSearchData": [
+      "pages"
+    ]
   },
   "requests": {
     "CreateKnowledgeBaseRequest": [
-      "name", "description", "type", "is_temporary", "chunking_config",
-      "image_processing_config", "embedding_model_id", "summary_model_id",
-      "vlm_config", "asr_config", "storage_provider_config", "storage_config",
-      "extract_config", "faq_config", "question_generation_config",
+      "name",
+      "description",
+      "type",
+      "is_temporary",
+      "chunking_config",
+      "image_processing_config",
+      "embedding_model_id",
+      "summary_model_id",
+      "vlm_config",
+      "asr_config",
+      "storage_provider_config",
+      "storage_config",
+      "extract_config",
+      "faq_config",
+      "question_generation_config",
       "vector_store_id"
     ],
-    "UpdateKnowledgeBaseRequest": ["name", "description", "config"],
-    "CreateManualKnowledgeRequest": ["title", "content", "status", "tag_id", "channel"],
-    "CreateKnowledgeFromURLRequest": [
-      "url", "file_name", "file_type", "enable_multimodel", "title", "tag_id",
+    "UpdateKnowledgeBaseRequest": [
+      "name",
+      "description",
+      "config"
+    ],
+    "CreateManualKnowledgeRequest": [
+      "title",
+      "content",
+      "status",
+      "tag_id",
       "channel"
     ],
-    "UpdateKnowledgeRequest": ["title", "description", "tag_id", "enable_status"],
-    "CreateTagRequest": ["name", "color", "sort_order"],
-    "UpdateTagRequest": ["name", "color", "sort_order"],
+    "CreateKnowledgeFromURLRequest": [
+      "url",
+      "file_name",
+      "file_type",
+      "enable_multimodel",
+      "title",
+      "tag_id",
+      "channel"
+    ],
+    "UpdateKnowledgeRequest": [
+      "title",
+      "description",
+      "tag_id",
+      "enable_status"
+    ],
+    "CreateTagRequest": [
+      "name",
+      "color",
+      "sort_order"
+    ],
+    "UpdateTagRequest": [
+      "name",
+      "color",
+      "sort_order"
+    ],
     "FAQEntryPayload": [
-      "id", "standard_question", "similar_questions", "negative_questions",
-      "answers", "answer_strategy", "tag_id", "tag_name", "is_enabled",
+      "id",
+      "standard_question",
+      "similar_questions",
+      "negative_questions",
+      "answers",
+      "answer_strategy",
+      "tag_id",
+      "tag_name",
+      "is_enabled",
       "is_recommended"
     ],
-    "FAQBatchDeleteRequest": ["ids"],
-    "FAQBatchUpsertPayload": ["entries", "mode", "knowledge_id", "task_id", "dry_run"],
+    "FAQBatchDeleteRequest": [
+      "ids"
+    ],
+    "FAQBatchUpsertPayload": [
+      "entries",
+      "mode",
+      "knowledge_id",
+      "task_id",
+      "dry_run"
+    ],
     "HybridSearchRequest": [
-      "query_text", "vector_threshold", "keyword_threshold", "match_count",
-      "disable_keywords_match", "disable_vector_match", "knowledge_ids",
-      "tag_ids", "only_recommended", "knowledge_base_ids",
+      "query_text",
+      "vector_threshold",
+      "keyword_threshold",
+      "match_count",
+      "disable_keywords_match",
+      "disable_vector_match",
+      "knowledge_ids",
+      "tag_ids",
+      "only_recommended",
+      "knowledge_base_ids",
       "skip_context_enrichment"
     ],
-    "KnowledgeCopyRequest": ["source_id", "target_id", "task_id"],
+    "KnowledgeCopyRequest": [
+      "source_id",
+      "target_id",
+      "task_id"
+    ],
     "WebUpdateChunkRequest": [
-      "content", "chunk_index", "is_enabled", "start_at", "end_at", "image_info"
+      "content",
+      "chunk_index",
+      "is_enabled",
+      "start_at",
+      "end_at",
+      "image_info"
     ]
   },
   "endpoints": {
-    "POST /knowledge-bases": {
+    "POST /api/v1/knowledge-bases": {
       "status": 201,
-      "keys": ["success", "data"]
-    },
-    "GET /knowledge-bases": {
-      "status": 200,
-      "keys": ["success", "data"]
-    },
-    "GET /knowledge-bases/{id}": {
-      "status": 200,
-      "keys": ["success", "data"]
-    },
-    "POST /knowledge-bases/{id}/knowledge/manual": {
-      "status": 200,
-      "keys": ["success", "data"]
-    },
-    "GET /knowledge-bases/{id}/knowledge": {
-      "status": 200,
-      "keys": ["success", "total", "page", "page_size", "data"]
-    },
-    "GET /knowledge/{id}": {
-      "status": 200,
-      "keys": ["success", "data"]
-    },
-    "PUT /knowledge/{id}": {
-      "status": 200,
-      "keys": ["success", "message", "data"]
-    },
-    "GET /chunks/{knowledge_id}": {
-      "status": 200,
-      "keys": ["success", "total", "page", "page_size", "data"]
-    },
-    "GET /chunks/by-id/{id}": {
-      "status": 200,
-      "keys": ["success", "data"]
-    },
-    "PUT /chunks/{knowledge_id}/{id}": {
-      "status": 200,
-      "keys": ["success", "data"]
-    },
-    "DELETE /chunks/{knowledge_id}/{id}": {
-      "status": 200,
-      "keys": ["success", "message"]
-    },
-    "POST /knowledge-bases/{id}/tags": {
-      "status": 200,
-      "keys": ["success", "data"]
-    },
-    "GET /knowledge-bases/{id}/tags": {
-      "status": 200,
-      "keys": ["success", "data"]
-    },
-    "PUT /knowledge-bases/{id}/tags/{tag_id}": {
-      "status": 200,
-      "keys": ["success", "data"]
-    },
-    "DELETE /knowledge-bases/{id}/tags/{tag_id}": {
-      "status": 200,
-      "keys": ["success"]
-    },
-    "GET /knowledge-bases/{id}/faq/entries": {
-      "status": 200,
-      "keys": ["success", "data"]
-    },
-    "POST /knowledge-bases/{id}/faq/entry": {
-      "status": 200,
-      "keys": ["success", "data"]
-    },
-    "GET /knowledge-bases/{id}/faq/entries/{entry_id}": {
-      "status": 200,
-      "keys": ["success", "data"]
-    },
-    "GET /knowledgebase/{kb_id}/wiki/pages": {
-      "status": 200,
-      "keys": ["pages", "total", "page", "page_size", "total_pages"]
-    },
-    "GET /knowledgebase/{kb_id}/wiki/folders": {
-      "status": 200,
-      "keys": ["parent_id", "folders"]
-    },
-    "GET /knowledgebase/{kb_id}/wiki/stats": {
-      "status": 200,
       "keys": [
-        "total_pages", "pages_by_type", "total_links", "orphan_count",
-        "recent_updates", "pending_tasks", "pending_issues", "is_active"
+        "success",
+        "data"
       ]
     },
-    "GET /knowledgebase/{kb_id}/wiki/search": {
+    "GET /api/v1/knowledge-bases": {
       "status": 200,
-      "keys": ["pages"]
+      "keys": [
+        "success",
+        "data"
+      ]
     },
-    "POST /knowledgebase/{kb_id}/wiki/folders": {
+    "GET /api/v1/knowledge-bases/{id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "POST /api/v1/knowledge-bases/{id}/knowledge/manual": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/knowledge-bases/{id}/knowledge": {
+      "status": 200,
+      "keys": [
+        "success",
+        "total",
+        "page",
+        "page_size",
+        "data"
+      ]
+    },
+    "GET /api/v1/knowledge/{id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "PUT /api/v1/knowledge/{id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "message",
+        "data"
+      ]
+    },
+    "GET /api/v1/chunks/{knowledge_id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "total",
+        "page",
+        "page_size",
+        "data"
+      ]
+    },
+    "GET /api/v1/chunks/by-id/{id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "PUT /api/v1/chunks/{knowledge_id}/{id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "DELETE /api/v1/chunks/{knowledge_id}/{id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "message"
+      ]
+    },
+    "POST /api/v1/knowledge-bases/{id}/tags": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/knowledge-bases/{id}/tags": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "PUT /api/v1/knowledge-bases/{id}/tags/{tag_id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "DELETE /api/v1/knowledge-bases/{id}/tags/{tag_id}": {
+      "status": 200,
+      "keys": [
+        "success"
+      ]
+    },
+    "GET /api/v1/knowledge-bases/{id}/faq/entries": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "POST /api/v1/knowledge-bases/{id}/faq/entry": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/knowledge-bases/{id}/faq/entries/{entry_id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/knowledgebase/{kb_id}/wiki/pages": {
+      "status": 200,
+      "keys": [
+        "pages",
+        "total",
+        "page",
+        "page_size",
+        "total_pages"
+      ]
+    },
+    "GET /api/v1/knowledgebase/{kb_id}/wiki/folders": {
+      "status": 200,
+      "keys": [
+        "parent_id",
+        "folders"
+      ]
+    },
+    "GET /api/v1/knowledgebase/{kb_id}/wiki/stats": {
+      "status": 200,
+      "keys": [
+        "total_pages",
+        "pages_by_type",
+        "total_links",
+        "orphan_count",
+        "recent_updates",
+        "pending_tasks",
+        "pending_issues",
+        "is_active"
+      ]
+    },
+    "GET /api/v1/knowledgebase/{kb_id}/wiki/search": {
+      "status": 200,
+      "keys": [
+        "pages"
+      ]
+    },
+    "POST /api/v1/knowledgebase/{kb_id}/wiki/folders": {
       "status": 201,
       "keys": [
-        "id", "tenant_id", "knowledge_base_id", "parent_id", "name", "path",
-        "depth", "sort_order", "created_at", "updated_at", "deleted_at"
+        "id",
+        "tenant_id",
+        "knowledge_base_id",
+        "parent_id",
+        "name",
+        "path",
+        "depth",
+        "sort_order",
+        "created_at",
+        "updated_at",
+        "deleted_at"
       ]
     }
   }

@@ -117,13 +117,100 @@ class CloneKnowledgeRequest(BaseModel):
     target_kb_id: str
 
 
+class BatchDeleteRequest(BaseModel):
+    """``{"kb_id": "...", "ids": [...]}`` - batch-delete body."""
+
+    model_config = ConfigDict(frozen=True)
+
+    kb_id: str
+    ids: list[str] = Field(default_factory=list)
+
+
+class BatchReparseRequest(BaseModel):
+    """``{"kb_id": "...", "ids": [...], "process_config": {...}}`` - batch-reparse body."""
+
+    model_config = ConfigDict(frozen=True)
+
+    kb_id: str
+    ids: list[str] = Field(default_factory=list)
+    process_config: JsonObject | None = Field(default=None)
+
+
+class BatchDeleteData(BaseModel):
+    """``{"task_id": "...", "deleted_count": N}`` - batch-delete ack payload."""
+
+    model_config = ConfigDict(frozen=True)
+
+    task_id: str
+    deleted_count: int
+
+
+class BatchReparseData(BaseModel):
+    """``{"task_id": "...", "reparse_count": N}`` - batch-reparse ack payload."""
+
+    model_config = ConfigDict(frozen=True)
+
+    task_id: str
+    reparse_count: int
+
+
+class BatchDeleteEnvelope(BaseModel):
+    """``{"success": true, "message": "...", "data": {...}}`` - batch-delete submission."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    message: str
+    data: BatchDeleteData
+
+
+class BatchReparseEnvelope(BaseModel):
+    """``{"success": true, "message": "...", "data": {...}}`` - batch-reparse submission."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    message: str
+    data: BatchReparseData
+
+
+class KnowledgeTagBatchUpdateRequest(BaseModel):
+    """``{"updates": {knowledge_id: [tag_id, ...]}, "kb_id": "..."}`` - batch tag bindings.
+
+    ``kb_id`` is optional; when absent the authorized knowledge base is
+    inferred from the first updated document, mirroring the upstream
+    shared-knowledge-base resolution.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    updates: dict[str, list[str]] = Field(default_factory=dict)
+    kb_id: str | None = Field(default=None)
+
+
+class KnowledgeTagBatchEnvelope(BaseModel):
+    """``{"success": true}`` - batch tag update acknowledgement."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+
+
 __all__ = [
+    "BatchDeleteData",
+    "BatchDeleteEnvelope",
+    "BatchDeleteRequest",
+    "BatchReparseData",
+    "BatchReparseEnvelope",
+    "BatchReparseRequest",
     "CloneKnowledgeRequest",
     "CreatePassageKnowledgeRequest",
     "DeleteEnvelope",
     "DeleteResult",
     "KnowledgeEnvelope",
     "KnowledgeListEnvelope",
+    "KnowledgeTagBatchEnvelope",
+    "KnowledgeTagBatchUpdateRequest",
     "KnowledgeTaskEnvelope",
     "KnowledgeUpdatedEnvelope",
     "MoveEnvelope",

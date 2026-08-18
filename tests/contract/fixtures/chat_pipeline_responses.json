@@ -2,123 +2,293 @@
   "_comment": "Chat/agent wire shapes captured from the reference API fixtures and the merged web-layer wire models. Each contract name lists the JSON field set the reference emits for that object; each endpoint entry lists the HTTP status and the top-level response key set. The two QA endpoints stream Server-Sent Events whose frames carry the StreamResponse field set (always-present id / response_type / content / done plus the optional slots). Field name comparison is exact (no drift in either direction).",
   "contracts": {
     "StreamResponse": [
-      "id", "response_type", "content", "done", "knowledge_references",
-      "session_id", "assistant_message_id", "tool_calls", "data", "usage",
+      "id",
+      "response_type",
+      "content",
+      "done",
+      "knowledge_references",
+      "session_id",
+      "assistant_message_id",
+      "tool_calls",
+      "data",
+      "usage",
       "finish_reason"
     ],
     "SearchResult": [
-      "id", "content", "knowledge_id", "chunk_index", "knowledge_title",
-      "start_at", "end_at", "seq", "score", "match_type", "sub_chunk_id",
-      "metadata", "chunk_type", "parent_chunk_id", "image_info",
-      "knowledge_filename", "knowledge_source", "knowledge_channel",
-      "chunk_metadata", "matched_content", "knowledge_description",
-      "knowledge_custom_metadata", "knowledge_base_id"
+      "id",
+      "content",
+      "knowledge_id",
+      "chunk_index",
+      "knowledge_title",
+      "start_at",
+      "end_at",
+      "seq",
+      "score",
+      "match_type",
+      "sub_chunk_id",
+      "metadata",
+      "chunk_type",
+      "parent_chunk_id",
+      "image_info",
+      "knowledge_filename",
+      "knowledge_source",
+      "knowledge_channel",
+      "chunk_metadata",
+      "matched_content",
+      "knowledge_description",
+      "knowledge_custom_metadata",
+      "knowledge_base_id"
     ],
-    "SearchKnowledgeEnvelope": ["success", "data"],
+    "SearchKnowledgeEnvelope": [
+      "success",
+      "data"
+    ],
     "Agent": [
-      "id", "name", "description", "avatar", "is_builtin", "tenant_id",
-      "created_by", "config", "created_at", "updated_at", "deleted_at"
+      "id",
+      "name",
+      "description",
+      "avatar",
+      "is_builtin",
+      "tenant_id",
+      "created_by",
+      "config",
+      "created_at",
+      "updated_at",
+      "deleted_at"
     ],
-    "AgentEnvelope": ["success", "data"],
-    "AgentListEnvelope": ["success", "data", "disabled_own_agent_ids"],
-    "DeleteAgentResponse": ["success", "message"],
+    "AgentEnvelope": [
+      "success",
+      "data"
+    ],
+    "AgentListEnvelope": [
+      "success",
+      "data",
+      "disabled_own_agent_ids"
+    ],
+    "DeleteAgentResponse": [
+      "success",
+      "message"
+    ],
     "AgentPlaceholderGroup": [
-      "all", "system_prompt", "agent_system_prompt", "context_template",
-      "rewrite_system_prompt", "rewrite_prompt", "fallback_prompt"
+      "all",
+      "system_prompt",
+      "agent_system_prompt",
+      "context_template",
+      "rewrite_system_prompt",
+      "rewrite_prompt",
+      "fallback_prompt"
     ],
-    "SuggestedQuestionsData": ["questions"],
-    "SuggestedQuestionsEnvelope": ["success", "data"],
-    "TypePresetsEnvelope": ["success", "data"],
-    "SkillInfoResponse": ["name", "description"],
-    "SkillListEnvelope": ["success", "data", "skills_available"]
+    "SuggestedQuestionsData": [
+      "questions"
+    ],
+    "SuggestedQuestionsEnvelope": [
+      "success",
+      "data"
+    ],
+    "TypePresetsEnvelope": [
+      "success",
+      "data"
+    ],
+    "SkillInfoResponse": [
+      "name",
+      "description"
+    ],
+    "SkillListEnvelope": [
+      "success",
+      "data",
+      "skills_available"
+    ]
   },
   "requests": {
     "CreateKnowledgeQARequest": [
-      "query", "knowledge_base_ids", "knowledge_ids", "agent_enabled",
-      "agent_id", "agent_source_tenant_id", "web_search_enabled",
-      "summary_model_id", "mcp_service_ids", "skill_names", "tag_ids",
-      "mentioned_items", "disable_title", "images", "attachment_uploads",
-      "attachment_ids", "channel", "suggestion_attribution"
+      "query",
+      "knowledge_base_ids",
+      "knowledge_ids",
+      "agent_enabled",
+      "agent_id",
+      "agent_source_tenant_id",
+      "web_search_enabled",
+      "summary_model_id",
+      "mcp_service_ids",
+      "skill_names",
+      "tag_ids",
+      "mentioned_items",
+      "disable_title",
+      "images",
+      "attachment_uploads",
+      "attachment_ids",
+      "channel",
+      "suggestion_attribution"
     ],
     "SearchKnowledgeRequest": [
-      "query", "knowledge_base_id", "knowledge_base_ids", "knowledge_ids",
-      "tag_ids", "mentioned_items"
+      "query",
+      "knowledge_base_id",
+      "knowledge_base_ids",
+      "knowledge_ids",
+      "tag_ids",
+      "mentioned_items"
     ],
     "MentionedItemRequest": [
-      "id", "name", "type", "kb_type", "kb_id", "kb_name", "service_id",
+      "id",
+      "name",
+      "type",
+      "kb_type",
+      "kb_id",
+      "kb_name",
+      "service_id",
       "skill_name"
     ],
-    "ImageAttachment": ["data", "url", "caption"],
-    "AttachmentUpload": ["data", "file_name", "file_size"],
-    "SuggestionAttribution": ["suggestion_set_id", "question_id"],
-    "CreateAgentRequest": ["name", "description", "avatar", "config"],
-    "UpdateAgentRequest": ["name", "description", "avatar", "config"]
+    "ImageAttachment": [
+      "data",
+      "url",
+      "caption"
+    ],
+    "AttachmentUpload": [
+      "data",
+      "file_name",
+      "file_size"
+    ],
+    "SuggestionAttribution": [
+      "suggestion_set_id",
+      "question_id"
+    ],
+    "CreateAgentRequest": [
+      "name",
+      "description",
+      "avatar",
+      "config"
+    ],
+    "UpdateAgentRequest": [
+      "name",
+      "description",
+      "avatar",
+      "config"
+    ]
   },
   "stream_response_types": [
-    "answer", "references", "thinking", "tool_call", "tool_result",
-    "error", "reflection", "session_title", "agent_query", "complete",
+    "answer",
+    "references",
+    "thinking",
+    "tool_call",
+    "tool_result",
+    "error",
+    "reflection",
+    "session_title",
+    "agent_query",
+    "complete",
     "stop"
   ],
   "endpoints": {
-    "POST /knowledge-chat/{session_id}": {
+    "POST /api/v1/knowledge-chat/{session_id}": {
       "status": 200,
       "keys": [
-        "id", "response_type", "content", "done", "knowledge_references",
-        "session_id", "assistant_message_id", "tool_calls", "data", "usage",
+        "id",
+        "response_type",
+        "content",
+        "done",
+        "knowledge_references",
+        "session_id",
+        "assistant_message_id",
+        "tool_calls",
+        "data",
+        "usage",
         "finish_reason"
       ]
     },
     "POST /agent-chat/{session_id}": {
       "status": 200,
       "keys": [
-        "id", "response_type", "content", "done", "knowledge_references",
-        "session_id", "assistant_message_id", "tool_calls", "data", "usage",
+        "id",
+        "response_type",
+        "content",
+        "done",
+        "knowledge_references",
+        "session_id",
+        "assistant_message_id",
+        "tool_calls",
+        "data",
+        "usage",
         "finish_reason"
       ]
     },
-    "POST /knowledge-search": {
+    "POST /api/v1/knowledge-search": {
       "status": 200,
-      "keys": ["success", "data"]
+      "keys": [
+        "success",
+        "data"
+      ]
     },
-    "GET /agents/placeholders": {
+    "GET /api/v1/agents/placeholders": {
       "status": 200,
-      "keys": ["success", "data"]
+      "keys": [
+        "success",
+        "data"
+      ]
     },
-    "GET /agents/type-presets": {
+    "GET /api/v1/agents/type-presets": {
       "status": 200,
-      "keys": ["success", "data"]
+      "keys": [
+        "success",
+        "data"
+      ]
     },
-    "POST /agents": {
+    "POST /api/v1/agents": {
       "status": 201,
-      "keys": ["success", "data"]
+      "keys": [
+        "success",
+        "data"
+      ]
     },
-    "GET /agents": {
+    "GET /api/v1/agents": {
       "status": 200,
-      "keys": ["success", "data", "disabled_own_agent_ids"]
+      "keys": [
+        "success",
+        "data",
+        "disabled_own_agent_ids"
+      ]
     },
-    "GET /agents/{id}": {
+    "GET /api/v1/agents/{id}": {
       "status": 200,
-      "keys": ["success", "data"]
+      "keys": [
+        "success",
+        "data"
+      ]
     },
-    "PUT /agents/{id}": {
+    "PUT /api/v1/agents/{id}": {
       "status": 200,
-      "keys": ["success", "data"]
+      "keys": [
+        "success",
+        "data"
+      ]
     },
-    "DELETE /agents/{id}": {
+    "DELETE /api/v1/agents/{id}": {
       "status": 200,
-      "keys": ["success", "message"]
+      "keys": [
+        "success",
+        "message"
+      ]
     },
-    "POST /agents/{id}/copy": {
+    "POST /api/v1/agents/{id}/copy": {
       "status": 201,
-      "keys": ["success", "data"]
+      "keys": [
+        "success",
+        "data"
+      ]
     },
-    "GET /agents/{id}/suggested-questions": {
+    "GET /api/v1/agents/{id}/suggested-questions": {
       "status": 200,
-      "keys": ["success", "data"]
+      "keys": [
+        "success",
+        "data"
+      ]
     },
-    "GET /skills": {
+    "GET /api/v1/skills": {
       "status": 200,
-      "keys": ["success", "data", "skills_available"]
+      "keys": [
+        "success",
+        "data",
+        "skills_available"
+      ]
     }
   },
   "samples": {
@@ -303,7 +473,11 @@
             "enabled": false,
             "mode": "hybrid",
             "count": 3,
-            "categories": ["clarify", "deepen", "action"],
+            "categories": [
+              "clarify",
+              "deepen",
+              "action"
+            ],
             "max_context_turns": 2,
             "suppress_on_fallback": true,
             "suppress_when_answer_asks_question": true,

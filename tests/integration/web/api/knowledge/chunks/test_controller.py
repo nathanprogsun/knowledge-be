@@ -265,31 +265,31 @@ def _revision(
 
 # Upstream's RegisterChunkRoutes, verbatim.
 EXPECTED_ROUTES: set[tuple[str, str]] = {
-    ("GET", "/chunks/{knowledge_id}"),
-    ("GET", "/chunks/by-id/{id}"),
-    ("GET", "/chunks/{knowledge_id}/{id}/revisions"),
-    ("DELETE", "/chunks/{knowledge_id}/{id}"),
-    ("DELETE", "/chunks/{knowledge_id}"),
-    ("PUT", "/chunks/{knowledge_id}/{id}"),
-    ("POST", "/chunks/{knowledge_id}/{id}/revert"),
-    ("DELETE", "/chunks/by-id/{id}/questions"),
-    ("PUT", "/chunks/by-id/{id}/questions"),
-    ("POST", "/chunks/by-id/{id}/questions/regenerate"),
+    ("GET", "/api/v1/chunks/{knowledge_id}"),
+    ("GET", "/api/v1/chunks/by-id/{id}"),
+    ("GET", "/api/v1/chunks/{knowledge_id}/{id}/revisions"),
+    ("DELETE", "/api/v1/chunks/{knowledge_id}/{id}"),
+    ("DELETE", "/api/v1/chunks/{knowledge_id}"),
+    ("PUT", "/api/v1/chunks/{knowledge_id}/{id}"),
+    ("POST", "/api/v1/chunks/{knowledge_id}/{id}/revert"),
+    ("DELETE", "/api/v1/chunks/by-id/{id}/questions"),
+    ("PUT", "/api/v1/chunks/by-id/{id}/questions"),
+    ("POST", "/api/v1/chunks/by-id/{id}/questions/regenerate"),
 }
 
 # Reads are Viewer+; every mutation is Admin+ (closest role-level
 # approximation of the upstream KB-owner-or-Admin gate).
 EXPECTED_ROLES: dict[tuple[str, str], str] = {
-    ("GET", "/chunks/{knowledge_id}"): "viewer",
-    ("GET", "/chunks/by-id/{id}"): "viewer",
-    ("GET", "/chunks/{knowledge_id}/{id}/revisions"): "viewer",
-    ("DELETE", "/chunks/{knowledge_id}/{id}"): "admin",
-    ("DELETE", "/chunks/{knowledge_id}"): "admin",
-    ("PUT", "/chunks/{knowledge_id}/{id}"): "admin",
-    ("POST", "/chunks/{knowledge_id}/{id}/revert"): "admin",
-    ("DELETE", "/chunks/by-id/{id}/questions"): "admin",
-    ("PUT", "/chunks/by-id/{id}/questions"): "admin",
-    ("POST", "/chunks/by-id/{id}/questions/regenerate"): "admin",
+    ("GET", "/api/v1/chunks/{knowledge_id}"): "viewer",
+    ("GET", "/api/v1/chunks/by-id/{id}"): "viewer",
+    ("GET", "/api/v1/chunks/{knowledge_id}/{id}/revisions"): "viewer",
+    ("DELETE", "/api/v1/chunks/{knowledge_id}/{id}"): "admin",
+    ("DELETE", "/api/v1/chunks/{knowledge_id}"): "admin",
+    ("PUT", "/api/v1/chunks/{knowledge_id}/{id}"): "admin",
+    ("POST", "/api/v1/chunks/{knowledge_id}/{id}/revert"): "admin",
+    ("DELETE", "/api/v1/chunks/by-id/{id}/questions"): "admin",
+    ("PUT", "/api/v1/chunks/by-id/{id}/questions"): "admin",
+    ("POST", "/api/v1/chunks/by-id/{id}/questions/regenerate"): "admin",
 }
 
 
@@ -354,7 +354,7 @@ async def test_get_chunk_by_id_only_returns_chunk(
 ) -> None:
     chunk_service._rows[CHUNK_ID] = _chunk()  # type: ignore[attr-defined]
 
-    resp = client.get(f"/chunks/by-id/{CHUNK_ID}")
+    resp = client.get(f"/api/v1/chunks/by-id/{CHUNK_ID}")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -365,7 +365,7 @@ async def test_get_chunk_by_id_only_returns_chunk(
 
 
 async def test_get_chunk_by_id_only_missing_returns_404(client: TestClient) -> None:
-    resp = client.get("/chunks/by-id/nope")
+    resp = client.get("/api/v1/chunks/by-id/nope")
 
     assert resp.status_code == 404
     assert resp.json()["success"] is False
@@ -385,7 +385,7 @@ async def test_list_chunks_returns_paged_envelope(
             chunk_index=i,
         )
 
-    resp = client.get(f"/chunks/{KNOWLEDGE_ID}")
+    resp = client.get(f"/api/v1/chunks/{KNOWLEDGE_ID}")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -407,7 +407,7 @@ async def test_list_chunks_respects_page_bounds(
             chunk_index=i,
         )
 
-    resp = client.get(f"/chunks/{KNOWLEDGE_ID}", params={"page": 2, "page_size": 2})
+    resp = client.get(f"/api/v1/chunks/{KNOWLEDGE_ID}", params={"page": 2, "page_size": 2})
 
     assert resp.status_code == 200
     body = resp.json()
@@ -423,7 +423,7 @@ async def test_list_chunks_clamps_page_size(
 ) -> None:
     chunk_service._rows[CHUNK_ID] = _chunk()  # type: ignore[attr-defined]
 
-    resp = client.get(f"/chunks/{KNOWLEDGE_ID}", params={"page_size": 500})
+    resp = client.get(f"/api/v1/chunks/{KNOWLEDGE_ID}", params={"page_size": 500})
 
     assert resp.status_code == 200
     assert resp.json()["page_size"] == 100
@@ -439,7 +439,7 @@ async def test_list_chunks_filters_chunk_type(
         chunk_type="image_caption",
     )
 
-    resp = client.get(f"/chunks/{KNOWLEDGE_ID}", params={"chunk_type": "image_caption"})
+    resp = client.get(f"/api/v1/chunks/{KNOWLEDGE_ID}", params={"chunk_type": "image_caption"})
 
     assert resp.status_code == 200
     body = resp.json()
@@ -454,7 +454,7 @@ async def test_list_chunks_excludes_other_tenants(
     chunk_service._rows["mine"] = _chunk(id="mine")  # type: ignore[attr-defined]
     chunk_service._rows["theirs"] = _chunk(id="theirs", tenant_id=99)  # type: ignore[attr-defined]
 
-    resp = client.get(f"/chunks/{KNOWLEDGE_ID}")
+    resp = client.get(f"/api/v1/chunks/{KNOWLEDGE_ID}")
 
     assert resp.status_code == 200
     assert [c["id"] for c in resp.json()["data"]] == ["mine"]
@@ -472,7 +472,7 @@ async def test_list_revisions_returns_history_newest_first(
     revision_service._revisions[(CHUNK_ID, 1)] = _revision(revision=1)  # type: ignore[attr-defined]
     revision_service._revisions[(CHUNK_ID, 2)] = _revision(revision=2)  # type: ignore[attr-defined]
 
-    resp = client.get(f"/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}/revisions")
+    resp = client.get(f"/api/v1/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}/revisions")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -481,7 +481,7 @@ async def test_list_revisions_returns_history_newest_first(
 
 
 async def test_list_revisions_unknown_chunk_returns_404(client: TestClient) -> None:
-    resp = client.get(f"/chunks/{KNOWLEDGE_ID}/nope/revisions")
+    resp = client.get(f"/api/v1/chunks/{KNOWLEDGE_ID}/nope/revisions")
 
     assert resp.status_code == 404
 
@@ -492,7 +492,7 @@ async def test_list_revisions_foreign_knowledge_returns_403(
 ) -> None:
     chunk_service._rows[CHUNK_ID] = _chunk(knowledge_id="other-knowledge")  # type: ignore[attr-defined]
 
-    resp = client.get(f"/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}/revisions")
+    resp = client.get(f"/api/v1/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}/revisions")
 
     assert resp.status_code == 403
 
@@ -509,7 +509,7 @@ async def test_update_chunk_returns_updated(
     body = dict(default_create_chunk_request)
     body["content"] = "updated body"
 
-    resp = client.put(f"/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}", json=body)
+    resp = client.put(f"/api/v1/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}", json=body)
 
     assert resp.status_code == 200
     data = resp.json()["data"]
@@ -523,7 +523,7 @@ async def test_update_chunk_empty_body_keeps_values(
 ) -> None:
     chunk_service._rows[CHUNK_ID] = _chunk()  # type: ignore[attr-defined]
 
-    resp = client.put(f"/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}", json={})
+    resp = client.put(f"/api/v1/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}", json={})
 
     assert resp.status_code == 200
     assert resp.json()["data"]["content"] == "original content"
@@ -536,7 +536,7 @@ async def test_update_chunk_revision_conflict_returns_409(
     chunk_service._rows[CHUNK_ID] = _chunk(content_revision=2)  # type: ignore[attr-defined]
 
     resp = client.put(
-        f"/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}",
+        f"/api/v1/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}",
         json={"content": "x", "expected_revision": 1},
     )
 
@@ -544,7 +544,7 @@ async def test_update_chunk_revision_conflict_returns_409(
 
 
 async def test_update_chunk_missing_returns_404(client: TestClient) -> None:
-    resp = client.put(f"/chunks/{KNOWLEDGE_ID}/nope", json={"content": "x"})
+    resp = client.put(f"/api/v1/chunks/{KNOWLEDGE_ID}/nope", json={"content": "x"})
 
     assert resp.status_code == 404
 
@@ -555,7 +555,7 @@ async def test_update_chunk_foreign_knowledge_returns_403(
 ) -> None:
     chunk_service._rows[CHUNK_ID] = _chunk(knowledge_id="other-knowledge")  # type: ignore[attr-defined]
 
-    resp = client.put(f"/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}", json={"content": "x"})
+    resp = client.put(f"/api/v1/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}", json={"content": "x"})
 
     assert resp.status_code == 403
 
@@ -569,7 +569,7 @@ async def test_delete_chunk_returns_ack_and_soft_deletes(
 ) -> None:
     chunk_service._rows[CHUNK_ID] = _chunk()  # type: ignore[attr-defined]
 
-    resp = client.delete(f"/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}")
+    resp = client.delete(f"/api/v1/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}")
 
     assert resp.status_code == 200
     assert resp.json() == {"success": True, "message": "Chunk deleted"}
@@ -577,7 +577,7 @@ async def test_delete_chunk_returns_ack_and_soft_deletes(
 
 
 async def test_delete_chunk_missing_returns_404(client: TestClient) -> None:
-    resp = client.delete(f"/chunks/{KNOWLEDGE_ID}/nope")
+    resp = client.delete(f"/api/v1/chunks/{KNOWLEDGE_ID}/nope")
 
     assert resp.status_code == 404
 
@@ -592,7 +592,7 @@ async def test_delete_chunks_by_knowledge_returns_ack(
     chunk_service._rows["c1"] = _chunk(id="c1")  # type: ignore[attr-defined]
     chunk_service._rows["c2"] = _chunk(id="c2")  # type: ignore[attr-defined]
 
-    resp = client.delete(f"/chunks/{KNOWLEDGE_ID}")
+    resp = client.delete(f"/api/v1/chunks/{KNOWLEDGE_ID}")
 
     assert resp.status_code == 200
     assert resp.json() == {"success": True, "message": "All chunks under knowledge deleted"}
@@ -612,7 +612,7 @@ async def test_revert_chunk_replays_snapshot(
         content="snapshot content",
     )
 
-    resp = client.post(f"/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}/revert", json={"revision": 1})
+    resp = client.post(f"/api/v1/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}/revert", json={"revision": 1})
 
     assert resp.status_code == 200
     data = resp.json()["data"]
@@ -626,7 +626,7 @@ async def test_revert_chunk_negative_revision_returns_422(
 ) -> None:
     chunk_service._rows[CHUNK_ID] = _chunk()  # type: ignore[attr-defined]
 
-    resp = client.post(f"/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}/revert", json={"revision": -1})
+    resp = client.post(f"/api/v1/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}/revert", json={"revision": -1})
 
     assert resp.status_code == 422
 
@@ -637,7 +637,7 @@ async def test_revert_chunk_unknown_revision_returns_404(
 ) -> None:
     chunk_service._rows[CHUNK_ID] = _chunk(content_revision=1)  # type: ignore[attr-defined]
 
-    resp = client.post(f"/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}/revert", json={"revision": 9})
+    resp = client.post(f"/api/v1/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}/revert", json={"revision": 9})
 
     assert resp.status_code == 404
 
@@ -648,7 +648,7 @@ async def test_revert_chunk_foreign_knowledge_returns_403(
 ) -> None:
     chunk_service._rows[CHUNK_ID] = _chunk(knowledge_id="other-knowledge")  # type: ignore[attr-defined]
 
-    resp = client.post(f"/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}/revert", json={"revision": 0})
+    resp = client.post(f"/api/v1/chunks/{KNOWLEDGE_ID}/{CHUNK_ID}/revert", json={"revision": 0})
 
     assert resp.status_code == 403
 
@@ -663,7 +663,7 @@ async def test_upsert_question_appends_new(
     chunk_service._rows[CHUNK_ID] = _chunk()  # type: ignore[attr-defined]
 
     resp = client.put(
-        f"/chunks/by-id/{CHUNK_ID}/questions",
+        f"/api/v1/chunks/by-id/{CHUNK_ID}/questions",
         json={"question": "What is a chunk?"},
     )
 
@@ -691,7 +691,7 @@ async def test_upsert_question_replaces_known_id(
     )
 
     resp = client.put(
-        f"/chunks/by-id/{CHUNK_ID}/questions",
+        f"/api/v1/chunks/by-id/{CHUNK_ID}/questions",
         json={"question_id": "q-1", "question": "new"},
     )
 
@@ -708,7 +708,7 @@ async def test_upsert_question_blank_text_returns_422(
 ) -> None:
     chunk_service._rows[CHUNK_ID] = _chunk()  # type: ignore[attr-defined]
 
-    resp = client.put(f"/chunks/by-id/{CHUNK_ID}/questions", json={"question": "   "})
+    resp = client.put(f"/api/v1/chunks/by-id/{CHUNK_ID}/questions", json={"question": "   "})
 
     assert resp.status_code == 422
 
@@ -725,7 +725,7 @@ async def test_upsert_question_unknown_id_returns_422(
     )
 
     resp = client.put(
-        f"/chunks/by-id/{CHUNK_ID}/questions",
+        f"/api/v1/chunks/by-id/{CHUNK_ID}/questions",
         json={"question_id": "q-unknown", "question": "x"},
     )
 
@@ -733,7 +733,7 @@ async def test_upsert_question_unknown_id_returns_422(
 
 
 async def test_upsert_question_missing_chunk_returns_404(client: TestClient) -> None:
-    resp = client.put("/chunks/by-id/nope/questions", json={"question": "x"})
+    resp = client.put("/api/v1/chunks/by-id/nope/questions", json={"question": "x"})
 
     assert resp.status_code == 404
 
@@ -754,7 +754,7 @@ async def test_delete_question_returns_ack_and_removes(
 
     resp = client.request(
         "DELETE",
-        f"/chunks/by-id/{CHUNK_ID}/questions",
+        f"/api/v1/chunks/by-id/{CHUNK_ID}/questions",
         json={"question_id": "q-1"},
     )
 
@@ -775,7 +775,7 @@ async def test_delete_question_no_questions_returns_422(
 
     resp = client.request(
         "DELETE",
-        f"/chunks/by-id/{CHUNK_ID}/questions",
+        f"/api/v1/chunks/by-id/{CHUNK_ID}/questions",
         json={"question_id": "q-1"},
     )
 
@@ -795,7 +795,7 @@ async def test_delete_question_unknown_id_returns_422(
 
     resp = client.request(
         "DELETE",
-        f"/chunks/by-id/{CHUNK_ID}/questions",
+        f"/api/v1/chunks/by-id/{CHUNK_ID}/questions",
         json={"question_id": "q-unknown"},
     )
 
@@ -805,7 +805,7 @@ async def test_delete_question_unknown_id_returns_422(
 async def test_delete_question_missing_chunk_returns_404(client: TestClient) -> None:
     resp = client.request(
         "DELETE",
-        "/chunks/by-id/nope/questions",
+        "/api/v1/chunks/by-id/nope/questions",
         json={"question_id": "q-1"},
     )
 
@@ -821,7 +821,7 @@ async def test_regenerate_questions_returns_empty_list(
 ) -> None:
     chunk_service._rows[CHUNK_ID] = _chunk()  # type: ignore[attr-defined]
 
-    resp = client.post(f"/chunks/by-id/{CHUNK_ID}/questions/regenerate")
+    resp = client.post(f"/api/v1/chunks/by-id/{CHUNK_ID}/questions/regenerate")
 
     assert resp.status_code == 200
     assert resp.json() == {"success": True, "data": []}
@@ -833,12 +833,12 @@ async def test_regenerate_questions_non_text_returns_422(
 ) -> None:
     chunk_service._rows[CHUNK_ID] = _chunk(chunk_type="image_caption")  # type: ignore[attr-defined]
 
-    resp = client.post(f"/chunks/by-id/{CHUNK_ID}/questions/regenerate")
+    resp = client.post(f"/api/v1/chunks/by-id/{CHUNK_ID}/questions/regenerate")
 
     assert resp.status_code == 422
 
 
 async def test_regenerate_questions_missing_chunk_returns_404(client: TestClient) -> None:
-    resp = client.post("/chunks/by-id/nope/questions/regenerate")
+    resp = client.post("/api/v1/chunks/by-id/nope/questions/regenerate")
 
     assert resp.status_code == 404

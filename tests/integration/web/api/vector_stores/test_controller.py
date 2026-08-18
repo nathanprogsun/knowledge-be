@@ -144,7 +144,7 @@ def client(app: FastAPI, web_authed_client: TestClient) -> TestClient:
 
 async def test_list_types_returns_seven_engines(client: TestClient) -> None:
     """The types endpoint returns the seven supported engine types."""
-    resp = client.get("/vector-stores/types")
+    resp = client.get("/api/v1/vector-stores/types")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -166,7 +166,7 @@ async def test_list_types_returns_seven_engines(client: TestClient) -> None:
 async def test_test_raw_returns_success(client: TestClient) -> None:
     """A valid raw config yields a success response with empty version."""
     resp = client.post(
-        "/vector-stores/test",
+        "/api/v1/vector-stores/test",
         json={"engine_type": "elasticsearch", "connection_config": {"addr": "http://es:9200"}},
     )
     assert resp.status_code == 200
@@ -184,7 +184,7 @@ async def test_create_vector_store_returns_envelope(
 ) -> None:
     """A create call returns the wrapped envelope with masked credentials."""
     resp = client.post(
-        "/vector-stores",
+        "/api/v1/vector-stores",
         json={
             "name": "es-hot",
             "engine_type": "elasticsearch",
@@ -212,14 +212,14 @@ async def test_list_stores_returns_db_rows(
 ) -> None:
     """The list endpoint returns the DB-managed rows."""
     client.post(
-        "/vector-stores",
+        "/api/v1/vector-stores",
         json={
             "name": "es-a",
             "engine_type": "elasticsearch",
             "connection_config": {"addr": "http://es-a:9200"},
         },
     )
-    resp = client.get("/vector-stores")
+    resp = client.get("/api/v1/vector-stores")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -236,7 +236,7 @@ async def test_list_stores_synthesises_env_entries(
 ) -> None:
     """Setting ``RETRIEVE_DRIVER`` surfaces an env-store virtual entry."""
     monkeypatch.setenv("RETRIEVE_DRIVER", "postgres")
-    resp = client.get("/vector-stores")
+    resp = client.get("/api/v1/vector-stores")
     assert resp.status_code == 200
     body = resp.json()
     data = body["data"]
@@ -252,7 +252,7 @@ async def test_list_stores_synthesises_env_entries(
 async def test_get_store_returns_envelope(client: TestClient) -> None:
     """The get endpoint returns the wrapped store after a create."""
     create_resp = client.post(
-        "/vector-stores",
+        "/api/v1/vector-stores",
         json={
             "name": "es-get",
             "engine_type": "elasticsearch",
@@ -260,7 +260,7 @@ async def test_get_store_returns_envelope(client: TestClient) -> None:
         },
     )
     store_id = create_resp.json()["data"]["id"]
-    resp = client.get(f"/vector-stores/{store_id}")
+    resp = client.get(f"/api/v1/vector-stores/{store_id}")
     assert resp.status_code == 200
     body = resp.json()
     assert body["data"]["id"] == store_id
@@ -270,7 +270,7 @@ async def test_get_unknown_store_returns_404(
     client: TestClient,
 ) -> None:
     """An unknown id is rejected with a 404-style status code."""
-    resp = client.get("/vector-stores/missing")
+    resp = client.get("/api/v1/vector-stores/missing")
     # ValidationError is mapped to 422 by the exception handler.
     assert resp.status_code in (404, 422)
 
@@ -281,7 +281,7 @@ async def test_get_env_store_returns_envelope(
 ) -> None:
     """An env-store id resolves without touching the service."""
     monkeypatch.setenv("RETRIEVE_DRIVER", "qdrant")
-    resp = client.get("/vector-stores/__env_qdrant__")
+    resp = client.get("/api/v1/vector-stores/__env_qdrant__")
     assert resp.status_code == 200
     body = resp.json()
     assert body["data"]["id"] == "__env_qdrant__"
@@ -297,7 +297,7 @@ async def test_update_store_renames(
 ) -> None:
     """The put endpoint only mutates the ``name`` field."""
     create_resp = client.post(
-        "/vector-stores",
+        "/api/v1/vector-stores",
         json={
             "name": "es-old",
             "engine_type": "elasticsearch",
@@ -306,7 +306,7 @@ async def test_update_store_renames(
     )
     store_id = create_resp.json()["data"]["id"]
     resp = client.put(
-        f"/vector-stores/{store_id}",
+        f"/api/v1/vector-stores/{store_id}",
         json={"name": "es-new"},
     )
     assert resp.status_code == 200
@@ -321,7 +321,7 @@ async def test_update_env_store_rejected(
     """Env-store ids cannot be updated."""
     monkeypatch.setenv("RETRIEVE_DRIVER", "qdrant")
     resp = client.put(
-        "/vector-stores/__env_qdrant__",
+        "/api/v1/vector-stores/__env_qdrant__",
         json={"name": "renamed"},
     )
     # ValidationError is mapped to 422.
@@ -336,7 +336,7 @@ async def test_delete_store_soft_deletes(
 ) -> None:
     """A successful delete returns the success envelope."""
     create_resp = client.post(
-        "/vector-stores",
+        "/api/v1/vector-stores",
         json={
             "name": "es-del",
             "engine_type": "elasticsearch",
@@ -344,12 +344,12 @@ async def test_delete_store_soft_deletes(
         },
     )
     store_id = create_resp.json()["data"]["id"]
-    resp = client.delete(f"/vector-stores/{store_id}")
+    resp = client.delete(f"/api/v1/vector-stores/{store_id}")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
     # The follow-up get returns a 422 / 404 — the row is invisible to reads.
-    follow = client.get(f"/vector-stores/{store_id}")
+    follow = client.get(f"/api/v1/vector-stores/{store_id}")
     assert follow.status_code in (404, 422)
 
 
@@ -359,7 +359,7 @@ async def test_delete_env_store_rejected(
 ) -> None:
     """Env-store ids cannot be deleted."""
     monkeypatch.setenv("RETRIEVE_DRIVER", "qdrant")
-    resp = client.delete("/vector-stores/__env_qdrant__")
+    resp = client.delete("/api/v1/vector-stores/__env_qdrant__")
     assert resp.status_code in (400, 422)
 
 
@@ -371,7 +371,7 @@ async def test_test_by_id_runs_probe(
 ) -> None:
     """The by-id test endpoint surfaces the probe's success response."""
     create_resp = client.post(
-        "/vector-stores",
+        "/api/v1/vector-stores",
         json={
             "name": "es-probe",
             "engine_type": "elasticsearch",
@@ -379,7 +379,7 @@ async def test_test_by_id_runs_probe(
         },
     )
     store_id = create_resp.json()["data"]["id"]
-    resp = client.post(f"/vector-stores/{store_id}/test")
+    resp = client.post(f"/api/v1/vector-stores/{store_id}/test")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -391,7 +391,7 @@ async def test_test_env_store_runs_probe(
 ) -> None:
     """The by-id test endpoint probes env-store entries directly."""
     monkeypatch.setenv("RETRIEVE_DRIVER", "qdrant")
-    resp = client.post("/vector-stores/__env_qdrant__/test")
+    resp = client.post("/api/v1/vector-stores/__env_qdrant__/test")
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True

@@ -17,6 +17,8 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.core.agents.types import CustomAgentInfo
+from src.core.knowledge.knowledge_bases.types import KnowledgeBaseInfo
 from src.db.models.organization import (
     JOIN_REQUEST_STATUS_APPROVED,
     JOIN_REQUEST_STATUS_PENDING,
@@ -119,6 +121,49 @@ class OrganizationJoinRequestInfo(BaseModel):
         return cls.model_validate(db.model_dump(exclude=set(_JOIN_REQUEST_EXCLUDE_COLUMNS)))
 
 
+class SharedKnowledgeBaseInfo(BaseModel):
+    """Service-side projection of one shared knowledge base row.
+
+    ``permission`` is the effective permission after the org-role cap
+    and the caller's tenant-role ceiling; ``knowledge_base`` carries the
+    source-tenant row with its count enrichment. ``org_name`` is the
+    organization the share landed in.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    knowledge_base: KnowledgeBaseInfo
+    share_id: str
+    organization_id: str
+    org_name: str = ""
+    permission: str
+    source_tenant_id: int
+    shared_at: datetime
+
+
+class SharedAgentInfo(BaseModel):
+    """Service-side projection of one shared agent row.
+
+    ``permission`` is the effective permission after the same cap;
+    ``web_search_ready`` is resolved against the source workspace and
+    ``disabled_by_me`` records the caller's own hide preference.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    agent: CustomAgentInfo
+    share_id: str
+    organization_id: str
+    org_name: str = ""
+    permission: str
+    source_tenant_id: int
+    shared_at: datetime
+    shared_by_user_id: str = ""
+    shared_by_username: str = ""
+    web_search_ready: bool = False
+    disabled_by_me: bool = False
+
+
 __all__ = [
     "JOIN_REQUEST_STATUS_APPROVED",
     "JOIN_REQUEST_STATUS_PENDING",
@@ -131,4 +176,6 @@ __all__ = [
     "OrganizationInfo",
     "OrganizationJoinRequestInfo",
     "OrganizationMemberInfo",
+    "SharedAgentInfo",
+    "SharedKnowledgeBaseInfo",
 ]

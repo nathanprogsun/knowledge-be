@@ -2,153 +2,567 @@
   "_comment": "Organization + embed + IM wire shapes captured from the reference Go handlers (OrganizationResponse / embedChannelResponse / IMChannelSummary in internal/types). Each contract name lists the JSON field set the reference emits for that object; each request body lists the reference field set for that create / update body; each endpoint entry lists the HTTP status and the top-level response key set the reference handler returns. Field name comparison is exact (no drift in either direction). Where the Python port drifts from the reference shape (Organization.owner_tenant_id missing; JoinRequestRecord.reviewed_at missing; OrgMember representative_user_id / tenant_name missing; IM endpoints wrap the reference data with an extra success key), the drift surfaces as an invariant or envelope assertion failure and is the contract finding.",
   "contracts": {
     "Organization": [
-      "id", "name", "description", "avatar", "owner_id", "owner_tenant_id",
-      "invite_code", "invite_code_expires_at", "invite_code_validity_days",
-      "require_approval", "searchable", "member_limit", "member_count",
-      "share_count", "agent_share_count", "pending_join_request_count",
-      "is_owner", "my_role", "has_pending_upgrade", "created_at", "updated_at"
+      "id",
+      "name",
+      "description",
+      "avatar",
+      "owner_id",
+      "owner_tenant_id",
+      "invite_code",
+      "invite_code_expires_at",
+      "invite_code_validity_days",
+      "require_approval",
+      "searchable",
+      "member_limit",
+      "member_count",
+      "share_count",
+      "agent_share_count",
+      "pending_join_request_count",
+      "is_owner",
+      "my_role",
+      "has_pending_upgrade",
+      "created_at",
+      "updated_at"
     ],
     "OrganizationPreview": [
-      "id", "name", "description", "avatar", "member_count", "share_count",
-      "agent_share_count", "is_already_member", "require_approval",
+      "id",
+      "name",
+      "description",
+      "avatar",
+      "member_count",
+      "share_count",
+      "agent_share_count",
+      "is_already_member",
+      "require_approval",
       "created_at"
     ],
-    "OrganizationList": ["organizations", "total", "resource_counts"],
-    "SearchOrganizationsResponse": ["organizations", "total"],
+    "OrganizationList": [
+      "organizations",
+      "total",
+      "resource_counts"
+    ],
+    "SearchOrganizationsResponse": [
+      "organizations",
+      "total"
+    ],
     "JoinRequestRecord": [
-      "id", "user_id", "username", "email", "message", "request_type",
-      "prev_role", "requested_role", "status", "created_at", "reviewed_at"
+      "id",
+      "user_id",
+      "username",
+      "email",
+      "message",
+      "request_type",
+      "prev_role",
+      "requested_role",
+      "status",
+      "created_at",
+      "reviewed_at"
     ],
-    "JoinRequestListResponse": ["requests", "total"],
+    "JoinRequestListResponse": [
+      "requests",
+      "total"
+    ],
     "OrgMember": [
-      "id", "user_id", "representative_user_id", "username", "email", "avatar",
-      "role", "tenant_id", "tenant_name", "joined_at"
+      "id",
+      "user_id",
+      "representative_user_id",
+      "username",
+      "email",
+      "avatar",
+      "role",
+      "tenant_id",
+      "tenant_name",
+      "joined_at"
     ],
-    "OrgMemberListResponse": ["members", "total"],
-    "RegenerateInviteCodeResponse": ["invite_code"],
+    "OrgMemberListResponse": [
+      "members",
+      "total"
+    ],
+    "RegenerateInviteCodeResponse": [
+      "invite_code"
+    ],
     "KnowledgeBaseShare": [
-      "id", "knowledge_base_id", "knowledge_base_name", "knowledge_base_type",
-      "knowledge_count", "chunk_count", "organization_id", "organization_name",
-      "shared_by_user_id", "shared_by_username", "source_tenant_id",
-      "permission", "my_role_in_org", "my_permission", "created_at",
+      "id",
+      "knowledge_base_id",
+      "knowledge_base_name",
+      "knowledge_base_type",
+      "knowledge_count",
+      "chunk_count",
+      "organization_id",
+      "organization_name",
+      "shared_by_user_id",
+      "shared_by_username",
+      "source_tenant_id",
+      "permission",
+      "my_role_in_org",
+      "my_permission",
+      "created_at",
       "require_approval"
     ],
-    "KnowledgeBaseShareListResponse": ["shares", "total"],
+    "KnowledgeBaseShareListResponse": [
+      "shares",
+      "total"
+    ],
     "SharedKnowledgeBaseListItem": [
-      "knowledge_base", "share_id", "organization_id", "org_name",
-      "permission", "source_tenant_id", "shared_at", "is_mine",
+      "knowledge_base",
+      "share_id",
+      "organization_id",
+      "org_name",
+      "permission",
+      "source_tenant_id",
+      "shared_at",
+      "is_mine",
       "source_from_agent"
     ],
     "AgentShare": [
-      "id", "agent_id", "agent_name", "agent_avatar", "organization_id",
-      "organization_name", "shared_by_user_id", "shared_by_username",
-      "source_tenant_id", "permission", "my_role_in_org", "my_permission",
-      "scope_kb", "scope_kb_count", "scope_web_search", "scope_mcp",
-      "scope_mcp_count", "created_at"
+      "id",
+      "agent_id",
+      "agent_name",
+      "agent_avatar",
+      "organization_id",
+      "organization_name",
+      "shared_by_user_id",
+      "shared_by_username",
+      "source_tenant_id",
+      "permission",
+      "my_role_in_org",
+      "my_permission",
+      "scope_kb",
+      "scope_kb_count",
+      "scope_web_search",
+      "scope_mcp",
+      "scope_mcp_count",
+      "created_at"
     ],
-    "AgentShareListResponse": ["shares", "total"],
+    "AgentShareListResponse": [
+      "shares",
+      "total"
+    ],
     "SharedAgentListItem": [
-      "agent", "share_id", "organization_id", "org_name", "permission",
-      "source_tenant_id", "shared_at", "shared_by_user_id",
-      "shared_by_username", "web_search_ready", "disabled_by_me", "is_mine"
+      "agent",
+      "share_id",
+      "organization_id",
+      "org_name",
+      "permission",
+      "source_tenant_id",
+      "shared_at",
+      "shared_by_user_id",
+      "shared_by_username",
+      "web_search_ready",
+      "disabled_by_me",
+      "is_mine"
     ],
     "TenantInviteCandidate": [
-      "tenant_id", "tenant_name", "representative_user_id",
-      "representative_username", "representative_email",
+      "tenant_id",
+      "tenant_name",
+      "representative_user_id",
+      "representative_username",
+      "representative_email",
       "representative_avatar"
     ],
     "EmbedChannelRecord": [
-      "id", "tenant_id", "agent_id", "name", "enabled", "allowed_origins",
-      "welcome_message", "rate_limit_per_minute", "rate_limit_per_day",
-      "primary_color", "page_title", "header_title_mode",
-      "show_suggested_questions", "widget_position", "allow_web_search",
-      "allow_file_upload", "default_locale", "webhook_url",
-      "has_webhook_secret", "created_at", "updated_at", "publish_token"
+      "id",
+      "tenant_id",
+      "agent_id",
+      "name",
+      "enabled",
+      "allowed_origins",
+      "welcome_message",
+      "rate_limit_per_minute",
+      "rate_limit_per_day",
+      "primary_color",
+      "page_title",
+      "header_title_mode",
+      "show_suggested_questions",
+      "widget_position",
+      "allow_web_search",
+      "allow_file_upload",
+      "default_locale",
+      "webhook_url",
+      "has_webhook_secret",
+      "created_at",
+      "updated_at",
+      "publish_token"
     ],
     "EmbedPublicConfig": [
-      "channel_id", "name", "display_title", "knowledge_base_ids", "agent_id",
-      "agent_name", "agent_avatar", "welcome_message", "primary_color",
-      "page_title", "header_title_mode", "show_suggested_questions",
-      "allowed_origins", "widget_position", "allow_web_search",
-      "allow_file_upload", "agent_web_search_enabled",
-      "agent_image_upload_enabled", "default_locale"
+      "channel_id",
+      "name",
+      "display_title",
+      "knowledge_base_ids",
+      "agent_id",
+      "agent_name",
+      "agent_avatar",
+      "welcome_message",
+      "primary_color",
+      "page_title",
+      "header_title_mode",
+      "show_suggested_questions",
+      "allowed_origins",
+      "widget_position",
+      "allow_web_search",
+      "allow_file_upload",
+      "agent_web_search_enabled",
+      "agent_image_upload_enabled",
+      "default_locale"
     ],
     "IMChannelRecord": [
-      "id", "tenant_id", "agent_id", "platform", "name", "enabled", "mode",
-      "output_mode", "knowledge_base_id", "bot_identity", "session_mode",
-      "credentials_configured", "created_at", "updated_at"
+      "id",
+      "tenant_id",
+      "agent_id",
+      "platform",
+      "name",
+      "enabled",
+      "mode",
+      "output_mode",
+      "knowledge_base_id",
+      "bot_identity",
+      "session_mode",
+      "credentials_configured",
+      "created_at",
+      "updated_at"
     ]
   },
   "requests": {
     "CreateOrganizationRequest": [
-      "name", "description", "avatar", "invite_code_validity_days",
+      "name",
+      "description",
+      "avatar",
+      "invite_code_validity_days",
       "member_limit"
     ],
     "UpdateOrganizationRequest": [
-      "name", "description", "avatar", "require_approval", "searchable",
-      "invite_code_validity_days", "member_limit"
+      "name",
+      "description",
+      "avatar",
+      "require_approval",
+      "searchable",
+      "invite_code_validity_days",
+      "member_limit"
     ],
-    "JoinOrganizationByCodeRequest": ["invite_code"],
-    "JoinRequestRequest": ["invite_code", "message", "role"],
-    "JoinRequestByIDRequest": ["organization_id", "message", "role"],
-    "ReviewJoinRequestRequest": ["approved", "message", "role"],
-    "RequestRoleUpgradeRequest": ["requested_role", "message"],
-    "UpdateMemberRoleRequest": ["role"],
-    "CreateKnowledgeBaseShareRequest": ["organization_id", "permission"],
-    "UpdateKnowledgeBaseShareRequest": ["permission"],
-    "CreateAgentShareRequest": ["organization_id", "permission"],
+    "JoinOrganizationByCodeRequest": [
+      "invite_code"
+    ],
+    "JoinRequestRequest": [
+      "invite_code",
+      "message",
+      "role"
+    ],
+    "JoinRequestByIDRequest": [
+      "organization_id",
+      "message",
+      "role"
+    ],
+    "ReviewJoinRequestRequest": [
+      "approved",
+      "message",
+      "role"
+    ],
+    "RequestRoleUpgradeRequest": [
+      "requested_role",
+      "message"
+    ],
+    "UpdateMemberRoleRequest": [
+      "role"
+    ],
+    "CreateKnowledgeBaseShareRequest": [
+      "organization_id",
+      "permission"
+    ],
+    "UpdateKnowledgeBaseShareRequest": [
+      "permission"
+    ],
+    "CreateAgentShareRequest": [
+      "organization_id",
+      "permission"
+    ],
     "EmbedChannelRequest": [
-      "name", "enabled", "allowed_origins", "welcome_message",
-      "rate_limit_per_minute", "rate_limit_per_day", "primary_color",
-      "page_title", "header_title_mode", "show_suggested_questions",
-      "widget_position", "allow_web_search", "allow_file_upload",
-      "default_locale", "webhook_url", "webhook_secret", "agent_id"
+      "name",
+      "enabled",
+      "allowed_origins",
+      "welcome_message",
+      "rate_limit_per_minute",
+      "rate_limit_per_day",
+      "primary_color",
+      "page_title",
+      "header_title_mode",
+      "show_suggested_questions",
+      "widget_position",
+      "allow_web_search",
+      "allow_file_upload",
+      "default_locale",
+      "webhook_url",
+      "webhook_secret",
+      "agent_id"
     ],
     "IMChannelCreateRequest": [
-      "platform", "name", "mode", "output_mode", "knowledge_base_id",
-      "credentials", "enabled"
+      "platform",
+      "name",
+      "mode",
+      "output_mode",
+      "knowledge_base_id",
+      "credentials",
+      "enabled"
     ],
     "IMChannelUpdateRequest": [
-      "name", "mode", "output_mode", "knowledge_base_id", "credentials",
-      "enabled", "agent_id"
+      "name",
+      "mode",
+      "output_mode",
+      "knowledge_base_id",
+      "credentials",
+      "enabled",
+      "agent_id"
     ]
   },
   "endpoints": {
-    "POST /organizations": {"status": 201, "keys": ["success", "data"]},
-    "GET /organizations": {"status": 200, "keys": ["success", "data"]},
-    "GET /organizations/search": {"status": 200, "keys": ["success", "data"]},
-    "GET /organizations/preview/{code}": {"status": 200, "keys": ["success", "data"]},
-    "POST /organizations/join": {"status": 200, "keys": ["success", "data"]},
-    "POST /organizations/join-request": {"status": 200, "keys": ["success", "data"]},
-    "POST /organizations/join-by-id": {"status": 200, "keys": ["success", "data"]},
-    "GET /organizations/{id}": {"status": 200, "keys": ["success", "data"]},
-    "PUT /organizations/{id}": {"status": 200, "keys": ["success", "data"]},
-    "DELETE /organizations/{id}": {"status": 200, "keys": ["success", "message"]},
-    "POST /organizations/{id}/invite-code": {"status": 200, "keys": ["success", "data"]},
-    "POST /organizations/{id}/leave": {"status": 200, "keys": ["success", "message"]},
-    "POST /organizations/{id}/request-upgrade": {"status": 200, "keys": ["success", "data"]},
-    "GET /organizations/{id}/members": {"status": 200, "keys": ["success", "data"]},
-    "PUT /organizations/{id}/members/{tenant_id}": {"status": 200, "keys": ["success", "message"]},
-    "DELETE /organizations/{id}/members/{tenant_id}": {"status": 200, "keys": ["success", "message"]},
-    "GET /organizations/{id}/join-requests": {"status": 200, "keys": ["success", "data"]},
-    "PUT /organizations/{id}/join-requests/{request_id}": {"status": 200, "keys": ["success", "message"]},
-    "GET /organizations/{id}/search-tenants": {"status": 200, "keys": ["success", "data"]},
-    "GET /organizations/{id}/search-users": {"status": 200, "keys": ["success", "data"]},
-    "POST /organizations/{id}/invite": {"status": 200, "keys": ["success", "message"]},
-    "POST /agents/{agent_id}/embed-channels": {"status": 201, "keys": ["success", "data"]},
-    "GET /agents/{agent_id}/embed-channels": {"status": 200, "keys": ["success", "data"]},
-    "GET /embed-channels": {"status": 200, "keys": ["success", "data"]},
-    "GET /embed-channels/{channel_id}": {"status": 200, "keys": ["success", "data"]},
-    "PUT /embed-channels/{channel_id}": {"status": 200, "keys": ["success", "data"]},
-    "DELETE /embed-channels/{channel_id}": {"status": 200, "keys": ["success"]},
-    "POST /embed-channels/{channel_id}/rotate-token": {"status": 200, "keys": ["success", "data"]},
-    "GET /embed-channels/{channel_id}/stats": {"status": 200, "keys": ["success", "data"]},
-    "GET /embed/{channel_id}/config": {"status": 200, "keys": ["success", "data"]},
-    "POST /agents/{agent_id}/im-channels": {"status": 200, "keys": ["success", "data"]},
-    "GET /agents/{agent_id}/im-channels": {"status": 200, "keys": ["success", "data"]},
-    "GET /im-channels": {"status": 200, "keys": ["success", "data"]},
-    "PUT /im-channels/{channel_id}": {"status": 200, "keys": ["success", "data"]},
-    "DELETE /im-channels/{channel_id}": {"status": 200, "keys": ["success"]},
-    "POST /im-channels/{channel_id}/toggle": {"status": 200, "keys": ["success", "data"]}
+    "POST /api/v1/organizations": {
+      "status": 201,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/organizations": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/organizations/search": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/organizations/preview/{code}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "POST /api/v1/organizations/join": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "POST /api/v1/organizations/join-request": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "POST /api/v1/organizations/join-by-id": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/organizations/{id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "PUT /api/v1/organizations/{id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "DELETE /api/v1/organizations/{id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "message"
+      ]
+    },
+    "POST /api/v1/organizations/{id}/invite-code": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "POST /api/v1/organizations/{id}/leave": {
+      "status": 200,
+      "keys": [
+        "success",
+        "message"
+      ]
+    },
+    "POST /api/v1/organizations/{id}/request-upgrade": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/organizations/{id}/members": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "PUT /api/v1/organizations/{id}/members/{tenant_id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "message"
+      ]
+    },
+    "DELETE /api/v1/organizations/{id}/members/{tenant_id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "message"
+      ]
+    },
+    "GET /api/v1/organizations/{id}/join-requests": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "PUT /api/v1/organizations/{id}/join-requests/{request_id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "message"
+      ]
+    },
+    "GET /api/v1/organizations/{id}/search-tenants": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/organizations/{id}/search-users": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "POST /api/v1/organizations/{id}/invite": {
+      "status": 200,
+      "keys": [
+        "success",
+        "message"
+      ]
+    },
+    "POST /api/v1/agents/{agent_id}/embed-channels": {
+      "status": 201,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/agents/{agent_id}/embed-channels": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/embed-channels": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/embed-channels/{channel_id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "PUT /api/v1/embed-channels/{channel_id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "DELETE /api/v1/embed-channels/{channel_id}": {
+      "status": 200,
+      "keys": [
+        "success"
+      ]
+    },
+    "POST /api/v1/embed-channels/{channel_id}/rotate-token": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/embed-channels/{channel_id}/stats": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/embed/{channel_id}/config": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "POST /api/v1/agents/{agent_id}/im-channels": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/agents/{agent_id}/im-channels": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "GET /api/v1/im-channels": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "PUT /api/v1/im-channels/{channel_id}": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    },
+    "DELETE /api/v1/im-channels/{channel_id}": {
+      "status": 200,
+      "keys": [
+        "success"
+      ]
+    },
+    "POST /api/v1/im-channels/{channel_id}/toggle": {
+      "status": 200,
+      "keys": [
+        "success",
+        "data"
+      ]
+    }
   }
 }

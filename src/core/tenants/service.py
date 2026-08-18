@@ -135,6 +135,7 @@ class TenantService:
         retriever_engines: JsonObject | list[JsonObject] | None = None,
         storage_quota: int | None = None,
         status: str | None = None,
+        credentials: JsonObject | None = None,
     ) -> TenantInfo:
         """Patch the supplied columns and stamp ``updated_at``.
 
@@ -148,6 +149,7 @@ class TenantService:
             retriever_engines=retriever_engines,
             storage_quota=storage_quota,
             status=status,
+            credentials=credentials,
         )
         columns["updated_at"] = datetime.now(UTC)
         row = await self._tenants_repo.update_by_primary_key({"id": tenant_id}, columns)
@@ -167,6 +169,7 @@ class TenantService:
         retriever_engines: JsonObject | list[JsonObject] | None,
         storage_quota: int | None,
         status: str | None,
+        credentials: JsonObject | None = None,
     ) -> BindParams:
         """Collect the supplied columns, validating the ones with rules."""
         columns: BindParams = {}
@@ -184,6 +187,8 @@ class TenantService:
             columns["business"] = business
         if retriever_engines is not None:
             columns["retriever_engines"] = cast(JsonValue, retriever_engines)
+        if credentials is not None:
+            columns["credentials"] = cast(JsonValue, credentials)
         if storage_quota is not None:
             columns["storage_quota"] = storage_quota
         if status is not None:

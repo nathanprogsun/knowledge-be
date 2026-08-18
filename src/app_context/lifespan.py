@@ -63,6 +63,7 @@ from src.web.api.channels.im.router import (
     callback_router as im_callback_router,
 )
 from src.web.api.channels.im.router import router as im_router
+from src.web.api.channels.im.router import wechat_router as im_wechat_router
 from src.web.api.chat.messages.router import (
     router as messages_router,
 )
@@ -73,8 +74,12 @@ from src.web.api.chat.router import router as chat_router
 from src.web.api.chat.sessions.router import router as sessions_router
 from src.web.api.evaluation.router import router as evaluation_router
 from src.web.api.favorites.router import router as favorites_router
+from src.web.api.files.router import bare_files_router, kb_files_router
 from src.web.api.infra.datasources.router import router as datasources_router
 from src.web.api.infra.initialization.router import router as initialization_router
+from src.web.api.infra.mcp_services.oauth_callback_router import (
+    router as mcp_oauth_callback_router,
+)
 from src.web.api.infra.mcp_services.router import router as mcp_services_router
 from src.web.api.infra.models.router import router as models_router
 from src.web.api.infra.storage_backends.router import router as storage_backends_router
@@ -96,11 +101,17 @@ from src.web.api.knowledge.faq.router import router as faq_router
 from src.web.api.knowledge.tags.router import router as knowledge_tags_router
 from src.web.api.knowledge.wiki.router import router as wiki_router
 from src.web.api.knowledge_bases.router import router as knowledge_bases_router
+from src.web.api.me.router import router as me_router
 from src.web.api.organizations.router import router as organizations_router
+from src.web.api.organizations.shared_router import (
+    router as shared_resources_router,
+)
+from src.web.api.system.admin_views import router as system_admin_router
 from src.web.api.system.router import info_router as system_info_router
 from src.web.api.system.router import router as system_router
 from src.web.api.system.service_views import router as system_service_router
 from src.web.api.tenants.router import router as tenants_router
+from src.web.api.weknoracloud.router import router as weknoracloud_router
 from src.web.exception_handler import register_exception_handlers
 
 
@@ -206,43 +217,62 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(application)
 
-    application.include_router(agents_router)
-    application.include_router(auth_router)
-    application.include_router(chat_router)
-    application.include_router(chunker_router)
-    application.include_router(chunks_router)
-    application.include_router(datasources_router)
-    application.include_router(embed_agents_router)
-    application.include_router(embed_public_router)
-    application.include_router(embed_router)
-    application.include_router(evaluation_router)
-    application.include_router(faq_import_progress_router)
-    application.include_router(faq_router)
-    application.include_router(favorites_router)
-    application.include_router(im_agents_router)
-    application.include_router(im_callback_router)
-    application.include_router(im_router)
-    application.include_router(initialization_router)
-    application.include_router(knowledge_bases_router)
-    application.include_router(kb_documents_router)
-    application.include_router(knowledge_tags_router)
-    application.include_router(mcp_services_router)
-    application.include_router(messages_router)
-    application.include_router(models_router)
-    application.include_router(organizations_router)
-    application.include_router(sessions_router)
-    application.include_router(skills_router)
-    application.include_router(storage_backends_router)
-    application.include_router(suggestion_router)
-    application.include_router(system_info_router)
-    application.include_router(system_router)
-    application.include_router(system_service_router)
-    application.include_router(tenants_router)
-    application.include_router(vector_stores_router)
-    application.include_router(web_search_catalog_router)
-    application.include_router(web_search_router)
-    application.include_router(documents_router)
-    application.include_router(wiki_router)
+    # All API routes live under /api/v1, matching the upstream contract
+    # (the frontend and nginx proxy send /api/v1/... unchanged). /health
+    # stays bare below for infra probes.
+    api_v1_prefix = "/api/v1"
+    api_routers = [
+        agents_router,
+        auth_router,
+        chat_router,
+        chunker_router,
+        chunks_router,
+        datasources_router,
+        embed_agents_router,
+        embed_public_router,
+        embed_router,
+        evaluation_router,
+        faq_import_progress_router,
+        faq_router,
+        favorites_router,
+        im_agents_router,
+        im_callback_router,
+        im_router,
+        im_wechat_router,
+        initialization_router,
+        kb_files_router,
+        knowledge_bases_router,
+        kb_documents_router,
+        knowledge_tags_router,
+        mcp_services_router,
+        mcp_oauth_callback_router,
+        me_router,
+        messages_router,
+        models_router,
+        organizations_router,
+        sessions_router,
+        shared_resources_router,
+        skills_router,
+        storage_backends_router,
+        suggestion_router,
+        system_admin_router,
+        system_info_router,
+        system_router,
+        system_service_router,
+        tenants_router,
+        vector_stores_router,
+        weknoracloud_router,
+        web_search_catalog_router,
+        web_search_router,
+        documents_router,
+        wiki_router,
+    ]
+    for router in api_routers:
+        application.include_router(router, prefix=api_v1_prefix)
+
+    # The tenant-scoped storage proxy lives outside /api/v1 so nginx and
+    # the dev proxy forward /files unchanged (same as the upstream layout).
+    application.include_router(bare_files_router)
 
     @application.get("/health", tags=["meta"])
     async def health() -> dict[str, str]:

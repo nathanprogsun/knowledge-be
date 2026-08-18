@@ -296,7 +296,7 @@ async def test_list_tools_returns_upstream_tools_over_http_streamable(
     with respx.mock(assert_all_called=False) as router:
         route = router.post("/mcp").mock(side_effect=_echo)
 
-        resp = client.get("/mcp-services/svc-live/tools")
+        resp = client.get("/api/v1/mcp-services/svc-live/tools")
 
     assert resp.status_code == 200
     tools = resp.json()["data"]
@@ -324,7 +324,7 @@ async def test_list_tools_does_not_silently_succeed_when_upstream_fails(
 
     with respx.mock(assert_all_called=False) as router:
         route = router.post("/mcp").respond(502, text="bad gateway")
-        resp = client.get("/mcp-services/svc-broken/tools")
+        resp = client.get("/api/v1/mcp-services/svc-broken/tools")
 
     assert route.call_count >= 1
     assert resp.status_code == 200
@@ -347,9 +347,9 @@ async def test_list_tools_uses_sse_transport_when_configured(
         sse_route = router.get("/sse").respond(
             200,
             headers={"content-type": "text/event-stream"},
-            content=_sse_body([("endpoint", "/messages")]),
+            content=_sse_body([("endpoint", "/api/v1/messages")]),
         )
-        post_route = router.post("/messages").respond(202, content=b"")
+        post_route = router.post("/api/v1/messages").respond(202, content=b"")
         post_route.mock(
             return_value=httpx.Response(
                 200,
@@ -358,7 +358,7 @@ async def test_list_tools_uses_sse_transport_when_configured(
             ),
         )
         try:
-            resp = client.get("/mcp-services/svc-sse/tools")
+            resp = client.get("/api/v1/mcp-services/svc-sse/tools")
         except Exception:
             # The SSE mock doesn't reliably drive the streaming
             # round-trip; the route still exercised the live path.
@@ -384,7 +384,7 @@ async def test_oauth_authorize_url_still_returns_legacy_shape(
         url="https://mcp.example.com",
     )
     resp = client.post(
-        "/mcp-services/svc-oauth/oauth/authorize-url",
+        "/api/v1/mcp-services/svc-oauth/oauth/authorize-url",
         json={
             "redirect_uri": "https://app.example.com/oauth/callback",
             "frontend_redirect": "/",

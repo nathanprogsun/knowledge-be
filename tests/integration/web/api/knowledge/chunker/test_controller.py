@@ -37,11 +37,11 @@ def test_router_declares_exactly_the_upstream_routes() -> None:
         path = getattr(route, "path", "")
         for method in methods:
             found.add((method, path))
-    assert found == {("POST", "/chunker/preview")}
+    assert found == {("POST", "/api/v1/chunker/preview")}
 
 
 def test_endpoint_declares_auth_and_viewer_gates() -> None:
-    route = next(r for r in router.routes if getattr(r, "path", "") == "/chunker/preview")
+    route = next(r for r in router.routes if getattr(r, "path", "") == "/api/v1/chunker/preview")
     deps = [d.call for d in getattr(route, "dependant", None).dependencies]  # type: ignore[union-attr]
     assert require_auth in deps  # type: ignore[attr-defined]
 
@@ -66,7 +66,7 @@ def test_role_gate_helper_is_the_shared_rbac_dependency() -> None:
 
 
 async def test_preview_returns_chunks_with_diagnostics(client: TestClient) -> None:
-    resp = client.post("/chunker/preview", json={"text": "Hello world. " * 20})
+    resp = client.post("/api/v1/chunker/preview", json={"text": "Hello world. " * 20})
 
     assert resp.status_code == 200
     body = resp.json()
@@ -84,7 +84,7 @@ async def test_preview_returns_chunks_with_diagnostics(client: TestClient) -> No
 
 async def test_preview_honours_chunking_config(client: TestClient) -> None:
     resp = client.post(
-        "/chunker/preview",
+        "/api/v1/chunker/preview",
         json={
             "text": ("A short paragraph of text. " * 5 + "\n\n") * 8,
             "chunking_config": {"chunk_size": 40, "chunk_overlap": 10},
@@ -98,7 +98,7 @@ async def test_preview_honours_chunking_config(client: TestClient) -> None:
 
 
 async def test_preview_blank_text_returns_400(client: TestClient) -> None:
-    resp = client.post("/chunker/preview", json={"text": "   "})
+    resp = client.post("/api/v1/chunker/preview", json={"text": "   "})
 
     assert resp.status_code == 400
     body = resp.json()
@@ -107,7 +107,7 @@ async def test_preview_blank_text_returns_400(client: TestClient) -> None:
 
 
 async def test_preview_oversized_text_returns_413(client: TestClient) -> None:
-    resp = client.post("/chunker/preview", json={"text": "x" * (MAX_PREVIEW_CHARS + 1)})
+    resp = client.post("/api/v1/chunker/preview", json={"text": "x" * (MAX_PREVIEW_CHARS + 1)})
 
     assert resp.status_code == 413
     body = resp.json()
@@ -117,12 +117,12 @@ async def test_preview_oversized_text_returns_413(client: TestClient) -> None:
 
 
 async def test_preview_missing_text_returns_422(client: TestClient) -> None:
-    resp = client.post("/chunker/preview", json={"chunking_config": {}})
+    resp = client.post("/api/v1/chunker/preview", json={"chunking_config": {}})
 
     assert resp.status_code == 422
 
 
 async def test_preview_non_string_text_returns_422(client: TestClient) -> None:
-    resp = client.post("/chunker/preview", json={"text": 123})
+    resp = client.post("/api/v1/chunker/preview", json={"text": 123})
 
     assert resp.status_code == 422

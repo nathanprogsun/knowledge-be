@@ -285,40 +285,40 @@ def _log(*, id: str = "log-1", data_source_id: str = "ds-1", status: str = "succ
 
 # Go's RegisterDataSourceRoutes, verbatim.
 EXPECTED_ROUTES: set[tuple[str, str]] = {
-    ("GET", "/datasource/types"),
-    ("POST", "/datasource/validate-credentials"),
-    ("POST", "/datasource"),
-    ("GET", "/datasource"),
-    ("GET", "/datasource/{id}"),
-    ("PUT", "/datasource/{id}"),
-    ("DELETE", "/datasource/{id}"),
-    ("POST", "/datasource/{id}/validate"),
-    ("GET", "/datasource/{id}/resources"),
-    ("POST", "/datasource/{id}/resource-ancestors"),
-    ("POST", "/datasource/{id}/sync"),
-    ("POST", "/datasource/{id}/pause"),
-    ("POST", "/datasource/{id}/resume"),
-    ("GET", "/datasource/{id}/logs"),
-    ("GET", "/datasource/logs/{log_id}"),
+    ("GET", "/api/v1/datasource/types"),
+    ("POST", "/api/v1/datasource/validate-credentials"),
+    ("POST", "/api/v1/datasource"),
+    ("GET", "/api/v1/datasource"),
+    ("GET", "/api/v1/datasource/{id}"),
+    ("PUT", "/api/v1/datasource/{id}"),
+    ("DELETE", "/api/v1/datasource/{id}"),
+    ("POST", "/api/v1/datasource/{id}/validate"),
+    ("GET", "/api/v1/datasource/{id}/resources"),
+    ("POST", "/api/v1/datasource/{id}/resource-ancestors"),
+    ("POST", "/api/v1/datasource/{id}/sync"),
+    ("POST", "/api/v1/datasource/{id}/pause"),
+    ("POST", "/api/v1/datasource/{id}/resume"),
+    ("GET", "/api/v1/datasource/{id}/logs"),
+    ("GET", "/api/v1/datasource/logs/{log_id}"),
 }
 
 # Reads are Viewer+; everything touching credentials or content is Admin+.
 EXPECTED_ROLES: dict[tuple[str, str], str] = {
-    ("GET", "/datasource/types"): "viewer",
-    ("POST", "/datasource/validate-credentials"): "admin",
-    ("POST", "/datasource"): "admin",
-    ("GET", "/datasource"): "viewer",
-    ("GET", "/datasource/{id}"): "viewer",
-    ("PUT", "/datasource/{id}"): "admin",
-    ("DELETE", "/datasource/{id}"): "admin",
-    ("POST", "/datasource/{id}/validate"): "admin",
-    ("GET", "/datasource/{id}/resources"): "admin",
-    ("POST", "/datasource/{id}/resource-ancestors"): "admin",
-    ("POST", "/datasource/{id}/sync"): "admin",
-    ("POST", "/datasource/{id}/pause"): "admin",
-    ("POST", "/datasource/{id}/resume"): "admin",
-    ("GET", "/datasource/{id}/logs"): "viewer",
-    ("GET", "/datasource/logs/{log_id}"): "viewer",
+    ("GET", "/api/v1/datasource/types"): "viewer",
+    ("POST", "/api/v1/datasource/validate-credentials"): "admin",
+    ("POST", "/api/v1/datasource"): "admin",
+    ("GET", "/api/v1/datasource"): "viewer",
+    ("GET", "/api/v1/datasource/{id}"): "viewer",
+    ("PUT", "/api/v1/datasource/{id}"): "admin",
+    ("DELETE", "/api/v1/datasource/{id}"): "admin",
+    ("POST", "/api/v1/datasource/{id}/validate"): "admin",
+    ("GET", "/api/v1/datasource/{id}/resources"): "admin",
+    ("POST", "/api/v1/datasource/{id}/resource-ancestors"): "admin",
+    ("POST", "/api/v1/datasource/{id}/sync"): "admin",
+    ("POST", "/api/v1/datasource/{id}/pause"): "admin",
+    ("POST", "/api/v1/datasource/{id}/resume"): "admin",
+    ("GET", "/api/v1/datasource/{id}/logs"): "viewer",
+    ("GET", "/api/v1/datasource/logs/{log_id}"): "viewer",
 }
 
 
@@ -380,7 +380,7 @@ def test_role_gate_helper_is_the_shared_rbac_dependency() -> None:
 
 
 async def test_list_types_returns_all_connectors_sorted(client: TestClient) -> None:
-    resp = client.get("/datasource/types")
+    resp = client.get("/api/v1/datasource/types")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -395,7 +395,7 @@ async def test_list_types_returns_all_connectors_sorted(client: TestClient) -> N
 
 async def test_validate_credentials_returns_connected(client: TestClient) -> None:
     resp = client.post(
-        "/datasource/validate-credentials",
+        "/api/v1/datasource/validate-credentials",
         json={"type": "notion", "credentials": {"api_key": "k"}},
     )
 
@@ -405,7 +405,7 @@ async def test_validate_credentials_returns_connected(client: TestClient) -> Non
 
 async def test_validate_credentials_unknown_type_returns_404(client: TestClient) -> None:
     resp = client.post(
-        "/datasource/validate-credentials",
+        "/api/v1/datasource/validate-credentials",
         json={"type": "nope", "credentials": {}},
     )
 
@@ -413,7 +413,7 @@ async def test_validate_credentials_unknown_type_returns_404(client: TestClient)
 
 
 async def test_validate_credentials_requires_body_fields(client: TestClient) -> None:
-    resp = client.post("/datasource/validate-credentials", json={"type": "notion"})
+    resp = client.post("/api/v1/datasource/validate-credentials", json={"type": "notion"})
 
     assert resp.status_code == 422
 
@@ -425,7 +425,7 @@ async def test_validate_credentials_upstream_failure_returns_502(
     connector.validate_error = unreachable_error()
 
     resp = client.post(
-        "/datasource/validate-credentials",
+        "/api/v1/datasource/validate-credentials",
         json={"type": "notion", "credentials": {"api_key": "bad"}},
     )
 
@@ -437,7 +437,7 @@ async def test_validate_credentials_upstream_failure_returns_502(
 
 async def test_create_returns_201_and_entity(client: TestClient) -> None:
     resp = client.post(
-        "/datasource",
+        "/api/v1/datasource",
         json={"knowledge_base_id": KB_ID, "name": "notion sync", "type": "notion"},
     )
 
@@ -451,7 +451,7 @@ async def test_create_returns_201_and_entity(client: TestClient) -> None:
 
 async def test_create_response_reports_credential_presence_only(client: TestClient) -> None:
     resp = client.post(
-        "/datasource",
+        "/api/v1/datasource",
         json={
             "knowledge_base_id": KB_ID,
             "name": "notion sync",
@@ -468,7 +468,7 @@ async def test_create_response_reports_credential_presence_only(client: TestClie
 
 async def test_create_rejects_unknown_type_with_404(client: TestClient) -> None:
     resp = client.post(
-        "/datasource",
+        "/api/v1/datasource",
         json={"knowledge_base_id": KB_ID, "name": "x", "type": "nope"},
     )
 
@@ -476,7 +476,7 @@ async def test_create_rejects_unknown_type_with_404(client: TestClient) -> None:
 
 
 async def test_create_rejects_missing_required_fields(client: TestClient) -> None:
-    resp = client.post("/datasource", json={"name": "x"})
+    resp = client.post("/api/v1/datasource", json={"name": "x"})
 
     assert resp.status_code == 422
 
@@ -491,7 +491,7 @@ async def test_list_returns_kb_sources(
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = client.get("/datasource", params={"kb_id": KB_ID})
+    resp = client.get("/api/v1/datasource", params={"kb_id": KB_ID})
 
     assert resp.status_code == 200
     assert [d["id"] for d in resp.json()] == ["ds-1"]
@@ -507,13 +507,13 @@ async def test_list_excludes_other_tenants(
     rows[mine.id] = mine
     rows[theirs.id] = theirs
 
-    resp = client.get("/datasource", params={"kb_id": KB_ID})
+    resp = client.get("/api/v1/datasource", params={"kb_id": KB_ID})
 
     assert [d["id"] for d in resp.json()] == ["ds-mine"]
 
 
 async def test_list_without_kb_id_returns_422(client: TestClient) -> None:
-    resp = client.get("/datasource")
+    resp = client.get("/api/v1/datasource")
 
     assert resp.status_code == 422
 
@@ -531,7 +531,7 @@ async def test_get_returns_entity_with_latest_sync_log(
     ds_repo._items_synced[row.id] = 11  # type: ignore[attr-defined]
     sync_log_repo._rows["log-1"] = _log()  # type: ignore[attr-defined]
 
-    resp = client.get(f"/datasource/{row.id}")
+    resp = client.get(f"/api/v1/datasource/{row.id}")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -540,7 +540,7 @@ async def test_get_returns_entity_with_latest_sync_log(
 
 
 async def test_get_missing_returns_404(client: TestClient) -> None:
-    resp = client.get("/datasource/nope")
+    resp = client.get("/api/v1/datasource/nope")
 
     assert resp.status_code == 404
 
@@ -552,7 +552,7 @@ async def test_get_cross_tenant_returns_404(
     row = _row(tenant_id=99)
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = client.get(f"/datasource/{row.id}")
+    resp = client.get(f"/api/v1/datasource/{row.id}")
 
     # 404 not 403: a 403 would confirm the id exists.
     assert resp.status_code == 404
@@ -568,7 +568,7 @@ async def test_update_patches_name(
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = client.put(f"/datasource/{row.id}", json={"name": "renamed"})
+    resp = client.put(f"/api/v1/datasource/{row.id}", json={"name": "renamed"})
 
     assert resp.status_code == 200
     assert resp.json()["name"] == "renamed"
@@ -582,7 +582,7 @@ async def test_update_cannot_overwrite_credentials(
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = client.put(
-        f"/datasource/{row.id}",
+        f"/api/v1/datasource/{row.id}",
         json={"config": {"credentials": {"api_key": "attacker"}}},
     )
 
@@ -593,7 +593,7 @@ async def test_update_cannot_overwrite_credentials(
 
 
 async def test_update_missing_returns_404(client: TestClient) -> None:
-    resp = client.put("/datasource/nope", json={"name": "x"})
+    resp = client.put("/api/v1/datasource/nope", json={"name": "x"})
 
     assert resp.status_code == 404
 
@@ -608,14 +608,14 @@ async def test_delete_returns_204_and_soft_deletes(
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = client.delete(f"/datasource/{row.id}")
+    resp = client.delete(f"/api/v1/datasource/{row.id}")
 
     assert resp.status_code == 204
     assert ds_repo._rows[row.id].deleted_at is not None  # type: ignore[attr-defined]
 
 
 async def test_delete_missing_returns_404(client: TestClient) -> None:
-    resp = client.delete("/datasource/nope")
+    resp = client.delete("/api/v1/datasource/nope")
 
     assert resp.status_code == 404
 
@@ -630,7 +630,7 @@ async def test_validate_connection_returns_connected(
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = client.post(f"/datasource/{row.id}/validate")
+    resp = client.post(f"/api/v1/datasource/{row.id}/validate")
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "connected"}
@@ -645,7 +645,7 @@ async def test_validate_connection_failure_records_error_state(
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
     connector.validate_error = unreachable_error("token expired")
 
-    resp = client.post(f"/datasource/{row.id}/validate")
+    resp = client.post(f"/api/v1/datasource/{row.id}/validate")
 
     assert resp.status_code == 502
     stored = ds_repo._rows[row.id]  # type: ignore[attr-defined]
@@ -669,7 +669,7 @@ async def test_list_resources_returns_connector_output(
         Resource(external_id="page-1", name="Page", type="page", has_children=True)
     ]
 
-    resp = client.get(f"/datasource/{row.id}/resources")
+    resp = client.get(f"/api/v1/datasource/{row.id}/resources")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -685,7 +685,7 @@ async def test_list_resources_forwards_parent_id(
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = client.get(f"/datasource/{row.id}/resources", params={"parent_id": "root-9"})
+    resp = client.get(f"/api/v1/datasource/{row.id}/resources", params={"parent_id": "root-9"})
 
     assert resp.status_code == 200
     assert connector.list_resources_calls == ["root-9"]
@@ -704,7 +704,7 @@ async def test_resolve_ancestors_returns_ancestor_list(
     connector.ancestors = ["root-1", "mid-2"]
 
     resp = client.post(
-        f"/datasource/{row.id}/resource-ancestors",
+        f"/api/v1/datasource/{row.id}/resource-ancestors",
         json={"resource_ids": ["leaf-3"]},
     )
 
@@ -720,7 +720,7 @@ async def test_resolve_ancestors_empty_request_returns_empty(
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
     resp = client.post(
-        f"/datasource/{row.id}/resource-ancestors",
+        f"/api/v1/datasource/{row.id}/resource-ancestors",
         json={"resource_ids": []},
     )
 
@@ -738,7 +738,7 @@ async def test_manual_sync_returns_running_log(
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = client.post(f"/datasource/{row.id}/sync")
+    resp = client.post(f"/api/v1/datasource/{row.id}/sync")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -753,7 +753,7 @@ async def test_manual_sync_on_unsyncable_source_returns_422(
     row = _row(status="deleted")
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = client.post(f"/datasource/{row.id}/sync")
+    resp = client.post(f"/api/v1/datasource/{row.id}/sync")
 
     assert resp.status_code == 422
 
@@ -768,7 +768,7 @@ async def test_pause_returns_paused(
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = client.post(f"/datasource/{row.id}/pause")
+    resp = client.post(f"/api/v1/datasource/{row.id}/pause")
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "paused"}
@@ -782,7 +782,7 @@ async def test_resume_returns_active(
     row = _row(status="paused")
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = client.post(f"/datasource/{row.id}/resume")
+    resp = client.post(f"/api/v1/datasource/{row.id}/resume")
 
     assert resp.status_code == 200
     assert resp.json() == {"status": "active"}
@@ -801,7 +801,7 @@ async def test_list_sync_logs_returns_history(
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
     sync_log_repo._rows["log-1"] = _log()  # type: ignore[attr-defined]
 
-    resp = client.get(f"/datasource/{row.id}/logs")
+    resp = client.get(f"/api/v1/datasource/{row.id}/logs")
 
     assert resp.status_code == 200
     assert [entry["id"] for entry in resp.json()] == ["log-1"]
@@ -814,7 +814,7 @@ async def test_list_sync_logs_rejects_oversized_limit(
     row = _row()
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = client.get(f"/datasource/{row.id}/logs", params={"limit": 5000})
+    resp = client.get(f"/api/v1/datasource/{row.id}/logs", params={"limit": 5000})
 
     assert resp.status_code == 422
 
@@ -828,14 +828,14 @@ async def test_get_sync_log_returns_entry(
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
     sync_log_repo._rows["log-1"] = _log()  # type: ignore[attr-defined]
 
-    resp = client.get("/datasource/logs/log-1")
+    resp = client.get("/api/v1/datasource/logs/log-1")
 
     assert resp.status_code == 200
     assert resp.json()["id"] == "log-1"
 
 
 async def test_get_sync_log_missing_returns_404(client: TestClient) -> None:
-    resp = client.get("/datasource/logs/nope")
+    resp = client.get("/api/v1/datasource/logs/nope")
 
     assert resp.status_code == 404
 
@@ -848,7 +848,7 @@ async def test_sync_log_route_is_not_shadowed_by_id_route(
     row = _row(id="logs")
     ds_repo._rows[row.id] = row  # type: ignore[attr-defined]
 
-    resp = client.get("/datasource/logs/nope")
+    resp = client.get("/api/v1/datasource/logs/nope")
 
     assert resp.status_code == 404
     assert "sync log" in resp.text.lower()
@@ -873,11 +873,11 @@ async def test_sync_result_tally_visible_through_log_endpoint(
     ]
     service._ingestor = RecordingIngestor(updates={"b"})
 
-    opened = client.post(f"/datasource/{row.id}/sync")
+    opened = client.post(f"/api/v1/datasource/{row.id}/sync")
     log_id = opened.json()["id"]
     await service.process_sync(data_source_id=row.id, sync_log_id=log_id)
 
-    resp = client.get(f"/datasource/logs/{log_id}")
+    resp = client.get(f"/api/v1/datasource/logs/{log_id}")
 
     assert resp.status_code == 200
     body = resp.json()

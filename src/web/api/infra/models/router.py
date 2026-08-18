@@ -12,7 +12,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
-from src.common.exception import ValidationError
+from src.common.exception import NotFoundError, ValidationError
 from src.common.json import JsonValue
 from src.core.contracts.infra import (
     CreateModelRequest,
@@ -37,6 +37,7 @@ from src.web.deps import (
 )
 from src.web.deps.context import get_is_system_admin_dep, get_tenant_id_dep
 from src.web.deps.infra_models import ModelServiceDep
+from src.web.deps.tenants import TenantServiceDep
 
 # Function-arg-style principal dep aliases.
 _PrincipalTenant = Annotated[int, Depends(get_tenant_id_dep)]
@@ -49,6 +50,9 @@ router = APIRouter(prefix="/models", tags=["models"])
 # protects the debug probe from runaway input sizes.
 _DEBUG_MAX_INPUT_BYTES = 64 * 1024
 
+#: Key under ``tenants.credentials`` that holds the cloud credentials.
+_WCN_CLOUD_CREDENTIALS_KEY = "weknoracloud"
+
 
 def _require_tenant(tenant_id: int) -> int:
     """Return the resolved workspace id, or raise when missing."""
@@ -58,6 +62,41 @@ def _require_tenant(tenant_id: int) -> int:
             message="No active workspace in request context",
         )
     return tenant_id
+
+
+# ── Cloud status ────────────────────────────────────────────────────
+
+
+@router.get("/weknoracloud/status")
+async def weknoracloud_status(
+    _auth: AuthDep,
+    _role: RoleViewerDep,
+    tenant_id: _PrincipalTenant,
+    tenant_service: TenantServiceDep,
+) -> dict[str, object]:
+    """Check whether the workspace's cloud credentials are healthy.
+
+    Mirrors the upstream contract: no credentials → ``has_models`` /
+    ``needs_reinit`` both false; credentials whose secret failed to
+    decrypt → re-init required; otherwise healthy.
+    """
+    tenant = None
+    try:
+        tenant = await tenant_service.get_tenant(tenant_id)
+    except NotFoundError:
+        return {"has_models": False, "needs_reinit": False}
+    creds = (tenant.credentials or {}).get(_WCN_CLOUD_CREDENTIALS_KEY)
+    if not creds:
+        return {"has_models": False, "needs_reinit": False}
+    app_secret = str(creds.get("app_secret") or "")
+    if app_secret.startswith("enc:v1:"):
+        return {
+            "has_models": True,
+            "needs_reinit": True,
+            "reason": "云端凭证解密失败（服务重启后加密密钥已变更），请重新填写 APPID 和 APPSECRET",
+        }
+    return {"has_models": True, "needs_reinit": False}
+
 
 
 # ── Provider catalog ────────────────────────────────────────────────

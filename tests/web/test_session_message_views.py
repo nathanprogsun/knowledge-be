@@ -151,9 +151,9 @@ def _build_app(**service_overrides: object) -> FastAPI:
 
     app = FastAPI()
     register_exception_handlers(app)
-    app.include_router(sessions_router)
-    app.include_router(messages_router)
-    app.include_router(suggestion_router)
+    app.include_router(sessions_router, prefix="/api/v1")
+    app.include_router(messages_router, prefix="/api/v1")
+    app.include_router(suggestion_router, prefix="/api/v1")
     app.dependency_overrides[require_auth] = _noop_auth
     _noop_role_gates(app)
     if "session_service" in service_overrides:
@@ -189,7 +189,7 @@ def test_create_session_returns_201_envelope() -> None:
 
     with _client(app) as client:
         response = client.post(
-            "/sessions",
+            "/api/v1/sessions",
             json={"title": "new chat", "description": "d"},
         )
 
@@ -212,7 +212,7 @@ def test_get_session_returns_envelope() -> None:
     app = _build_app(session_service=fake)
 
     with _client(app) as client:
-        response = client.get("/sessions/sess-1")
+        response = client.get("/api/v1/sessions/sess-1")
 
     assert response.status_code == 200
     body = response.json()
@@ -229,7 +229,7 @@ def test_get_session_maps_not_found_to_404() -> None:
     app = _build_app(session_service=fake)
 
     with _client(app) as client:
-        response = client.get("/sessions/missing")
+        response = client.get("/api/v1/sessions/missing")
 
     assert response.status_code == 404
     body = response.json()
@@ -242,7 +242,7 @@ def test_get_session_rejects_empty_id() -> None:
     app = _build_app(session_service=fake)
 
     with _client(app) as client:
-        response = client.get("/sessions/%20")
+        response = client.get("/api/v1/sessions/%20")
 
     assert response.status_code == 422
 
@@ -260,7 +260,7 @@ def test_list_sessions_returns_paged_envelope() -> None:
     app = _build_app(session_service=fake)
 
     with _client(app) as client:
-        response = client.get("/sessions?page=2&page_size=10&keyword=AI")
+        response = client.get("/api/v1/sessions?page=2&page_size=10&keyword=AI")
 
     assert response.status_code == 200
     body = response.json()
@@ -284,7 +284,7 @@ def test_update_session_returns_stored_row() -> None:
 
     with _client(app) as client:
         response = client.put(
-            "/sessions/sess-1",
+            "/api/v1/sessions/sess-1",
             json={"title": "renamed", "description": "new desc"},
         )
 
@@ -302,7 +302,7 @@ def test_delete_session_returns_message() -> None:
     app = _build_app(session_service=fake)
 
     with _client(app) as client:
-        response = client.delete("/sessions/sess-1")
+        response = client.delete("/api/v1/sessions/sess-1")
 
     assert response.status_code == 200
     body = response.json()
@@ -317,7 +317,7 @@ def test_delete_session_unknown_returns_404() -> None:
     app = _build_app(session_service=fake)
 
     with _client(app) as client:
-        response = client.delete("/sessions/missing")
+        response = client.delete("/api/v1/sessions/missing")
 
     assert response.status_code == 404
 
@@ -330,7 +330,7 @@ def test_batch_delete_with_ids() -> None:
     with _client(app) as client:
         response = client.request(
             "DELETE",
-            "/sessions/batch",
+            "/api/v1/sessions/batch",
             json={"ids": ["sess-1", "sess-2"], "delete_all": False},
         )
 
@@ -347,7 +347,7 @@ def test_batch_delete_with_delete_all() -> None:
     with _client(app) as client:
         response = client.request(
             "DELETE",
-            "/sessions/batch",
+            "/api/v1/sessions/batch",
             json={"delete_all": True},
         )
 
@@ -362,7 +362,7 @@ def test_batch_delete_rejects_empty_ids() -> None:
 
     with _client(app) as client:
         response = client.request(
-            "DELETE", "/sessions/batch", json={"ids": []}
+            "DELETE", "/api/v1/sessions/batch", json={"ids": []}
         )
 
     assert response.status_code == 422
@@ -374,8 +374,8 @@ def test_pin_and_unpin_session() -> None:
     app = _build_app(session_service=fake)
 
     with _client(app) as client:
-        pin_response = client.post("/sessions/sess-1/pin")
-        unpin_response = client.delete("/sessions/sess-1/pin")
+        pin_response = client.post("/api/v1/sessions/sess-1/pin")
+        unpin_response = client.delete("/api/v1/sessions/sess-1/pin")
 
     assert pin_response.status_code == 200
     assert pin_response.json() == {"success": True, "is_pinned": True}
@@ -391,7 +391,7 @@ def test_pin_unknown_session_returns_404() -> None:
     app = _build_app(session_service=fake)
 
     with _client(app) as client:
-        response = client.post("/sessions/missing/pin")
+        response = client.post("/api/v1/sessions/missing/pin")
 
     assert response.status_code == 404
 
@@ -402,7 +402,7 @@ def test_clear_session_messages() -> None:
     app = _build_app(message_service=fake)
 
     with _client(app) as client:
-        response = client.delete("/sessions/sess-1/messages")
+        response = client.delete("/api/v1/sessions/sess-1/messages")
 
     assert response.status_code == 200
     assert (
@@ -422,7 +422,7 @@ def test_load_messages_returns_recent_by_default() -> None:
     app = _build_app(message_service=fake)
 
     with _client(app) as client:
-        response = client.get("/messages/sess-1/load")
+        response = client.get("/api/v1/messages/sess-1/load")
 
     assert response.status_code == 200
     body = response.json()
@@ -441,7 +441,7 @@ def test_load_messages_respects_limit_query() -> None:
     app = _build_app(message_service=fake)
 
     with _client(app) as client:
-        response = client.get("/messages/sess-1/load?limit=5")
+        response = client.get("/api/v1/messages/sess-1/load?limit=5")
 
     assert response.status_code == 200
     assert fake.get_recent_messages_by_session.await_args.args[2] == 5
@@ -457,7 +457,7 @@ def test_load_messages_with_before_time() -> None:
     cursor = (datetime.now(UTC) - timedelta(days=1)).isoformat()
     with _client(app) as client:
         response = client.get(
-            f"/messages/sess-1/load?before_time={quote(cursor)}"
+            f"/api/v1/messages/sess-1/load?before_time={quote(cursor)}"
         )
 
     assert response.status_code == 200
@@ -472,7 +472,7 @@ def test_load_messages_rejects_bad_before_time() -> None:
 
     with _client(app) as client:
         response = client.get(
-            "/messages/sess-1/load?before_time=not-a-time"
+            "/api/v1/messages/sess-1/load?before_time=not-a-time"
         )
 
     assert response.status_code == 422
@@ -484,7 +484,7 @@ def test_delete_message_returns_ack() -> None:
     app = _build_app(message_service=fake)
 
     with _client(app) as client:
-        response = client.delete("/messages/sess-1/msg-1")
+        response = client.delete("/api/v1/messages/sess-1/msg-1")
 
     assert response.status_code == 200
     assert response.json()["message"] == "Message deleted successfully"
@@ -499,7 +499,7 @@ def test_delete_message_unknown_returns_404() -> None:
     app = _build_app(message_service=fake)
 
     with _client(app) as client:
-        response = client.delete("/messages/sess-1/missing")
+        response = client.delete("/api/v1/messages/sess-1/missing")
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "message.not_found"
@@ -516,7 +516,7 @@ def test_search_messages_returns_envelope() -> None:
 
     with _client(app) as client:
         response = client.post(
-            "/messages/search",
+            "/api/v1/messages/search",
             json={"query": "彗星", "mode": "hybrid", "limit": 10},
         )
 
@@ -536,7 +536,7 @@ def test_search_messages_rejects_invalid_mode() -> None:
 
     with _client(app) as client:
         response = client.post(
-            "/messages/search",
+            "/api/v1/messages/search",
             json={"query": "q", "mode": "bogus"},
         )
 
@@ -551,7 +551,7 @@ def test_chat_history_stats_returns_envelope() -> None:
     app = _build_app(message_service=fake)
 
     with _client(app) as client:
-        response = client.get("/messages/chat-history-stats")
+        response = client.get("/api/v1/messages/chat-history-stats")
 
     assert response.status_code == 200
     body = response.json()
@@ -570,7 +570,7 @@ def test_get_suggestions_returns_null_when_absent() -> None:
 
     with _client(app) as client:
         response = client.get(
-            "/sessions/sess-1/messages/msg-1/suggestions"
+            "/api/v1/sessions/sess-1/messages/msg-1/suggestions"
         )
 
     assert response.status_code == 200
@@ -586,7 +586,7 @@ def test_get_suggestions_returns_set() -> None:
 
     with _client(app) as client:
         response = client.get(
-            "/sessions/sess-1/messages/msg-1/suggestions"
+            "/api/v1/sessions/sess-1/messages/msg-1/suggestions"
         )
 
     assert response.status_code == 200
@@ -604,7 +604,7 @@ def test_ensure_suggestions_returns_200_for_ready() -> None:
 
     with _client(app) as client:
         response = client.post(
-            "/sessions/sess-1/messages/msg-1/suggestions",
+            "/api/v1/sessions/sess-1/messages/msg-1/suggestions",
             json={"regenerate": True},
         )
 
@@ -622,7 +622,7 @@ def test_ensure_suggestions_returns_202_for_generating() -> None:
 
     with _client(app) as client:
         response = client.post(
-            "/sessions/sess-1/messages/msg-1/suggestions"
+            "/api/v1/sessions/sess-1/messages/msg-1/suggestions"
         )
 
     assert response.status_code == 202
@@ -635,7 +635,7 @@ def test_record_suggestion_event_returns_204() -> None:
 
     with _client(app) as client:
         response = client.post(
-            "/sessions/sess-1/suggestion-events",
+            "/api/v1/sessions/sess-1/suggestion-events",
             json={
                 "suggestion_set_id": "set-1",
                 "question_id": "q-1",
@@ -662,7 +662,7 @@ def test_search_messages_maps_service_validation_to_422() -> None:
     app = _build_app(message_service=fake)
 
     with _client(app) as client:
-        response = client.post("/messages/search", json={"query": ""})
+        response = client.post("/api/v1/messages/search", json={"query": ""})
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "message.search_query_required"

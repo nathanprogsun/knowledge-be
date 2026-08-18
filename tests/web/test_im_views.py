@@ -264,8 +264,8 @@ def admin_client(im_service: _FakeIMService) -> TestClient:
 
     app = FastAPI()
     register_exception_handlers(app)
-    app.include_router(agents_router)
-    app.include_router(router)
+    app.include_router(agents_router, prefix="/api/v1")
+    app.include_router(router, prefix="/api/v1")
     app.dependency_overrides[require_auth] = _make_fake_auth("admin")
     app.dependency_overrides[get_im_channel_service] = _get_service
     return TestClient(app)
@@ -288,7 +288,7 @@ def callback_client(
 
     app = FastAPI()
     register_exception_handlers(app)
-    app.include_router(callback_router)
+    app.include_router(callback_router, prefix="/api/v1")
     app.dependency_overrides[get_im_channel_service] = _get_service
     app.dependency_overrides[get_im_command_registry] = _get_registry
     return TestClient(app)
@@ -497,7 +497,7 @@ def test_search_formats_results() -> None:
 
 def test_admin_create_returns_200_with_record(admin_client: TestClient) -> None:
     response = admin_client.post(
-        f"/agents/{_AGENT_ID}/im-channels",
+        f"/api/v1/agents/{_AGENT_ID}/im-channels",
         json={"platform": "slack", "name": "Support Bot"},
     )
 
@@ -515,7 +515,7 @@ def test_admin_create_passes_request_to_service(admin_client: TestClient) -> Non
     im_service = admin_client.app.dependency_overrides[get_im_channel_service]()
 
     response = admin_client.post(
-        f"/agents/{_AGENT_ID}/im-channels",
+        f"/api/v1/agents/{_AGENT_ID}/im-channels",
         json={"platform": "feishu", "credentials": {"app_id": "x"}},
     )
 
@@ -538,7 +538,7 @@ def test_admin_create_rejects_unsupported_platform(
     )
 
     response = admin_client.post(
-        f"/agents/{_AGENT_ID}/im-channels",
+        f"/api/v1/agents/{_AGENT_ID}/im-channels",
         json={"platform": "discord"},
     )
 
@@ -553,7 +553,7 @@ def test_admin_list_by_agent_returns_envelope(admin_client: TestClient) -> None:
         _channel_info(name="B"),
     ]
 
-    response = admin_client.get(f"/agents/{_AGENT_ID}/im-channels")
+    response = admin_client.get(f"/api/v1/agents/{_AGENT_ID}/im-channels")
 
     assert response.status_code == 200
     data = response.json()["data"]
@@ -565,7 +565,7 @@ def test_admin_list_all_returns_envelope(admin_client: TestClient) -> None:
     im_service = admin_client.app.dependency_overrides[get_im_channel_service]()
     im_service.list_by_tenant = [_channel_info()]
 
-    response = admin_client.get("/im-channels")
+    response = admin_client.get("/api/v1/im-channels")
 
     assert response.status_code == 200
     assert len(response.json()["data"]) == 1
@@ -576,7 +576,7 @@ def test_admin_update_returns_updated_record(admin_client: TestClient) -> None:
     im_service.update_result = _channel_info(name="Renamed")
 
     response = admin_client.put(
-        f"/im-channels/{_CHANNEL_ID}",
+        f"/api/v1/im-channels/{_CHANNEL_ID}",
         json={"name": "Renamed"},
     )
 
@@ -593,7 +593,7 @@ def test_admin_update_rejects_agent_transfer(admin_client: TestClient) -> None:
     im_service.channel = _channel_info(agent_id=_AGENT_ID)
 
     response = admin_client.put(
-        f"/im-channels/{_CHANNEL_ID}",
+        f"/api/v1/im-channels/{_CHANNEL_ID}",
         json={"agent_id": "agent-2"},
     )
 
@@ -608,7 +608,7 @@ def test_admin_update_accepts_unchanged_agent_id(admin_client: TestClient) -> No
     im_service.update_result = _channel_info(name="Renamed")
 
     response = admin_client.put(
-        f"/im-channels/{_CHANNEL_ID}",
+        f"/api/v1/im-channels/{_CHANNEL_ID}",
         json={"agent_id": _AGENT_ID, "name": "Renamed"},
     )
 
@@ -619,7 +619,7 @@ def test_admin_update_accepts_unchanged_agent_id(admin_client: TestClient) -> No
 def test_admin_delete_returns_success(admin_client: TestClient) -> None:
     im_service = admin_client.app.dependency_overrides[get_im_channel_service]()
 
-    response = admin_client.delete(f"/im-channels/{_CHANNEL_ID}")
+    response = admin_client.delete(f"/api/v1/im-channels/{_CHANNEL_ID}")
 
     assert response.status_code == 200
     assert response.json() == {"success": True}
@@ -630,7 +630,7 @@ def test_admin_toggle_returns_updated_record(admin_client: TestClient) -> None:
     im_service = admin_client.app.dependency_overrides[get_im_channel_service]()
     im_service.toggle_result = _channel_info(enabled=False)
 
-    response = admin_client.post(f"/im-channels/{_CHANNEL_ID}/toggle")
+    response = admin_client.post(f"/api/v1/im-channels/{_CHANNEL_ID}/toggle")
 
     assert response.status_code == 200
     assert response.json()["data"]["enabled"] is False
@@ -640,7 +640,7 @@ def test_admin_toggle_returns_updated_record(admin_client: TestClient) -> None:
 def test_admin_missing_tenant_context_is_401(admin_client: TestClient) -> None:
     admin_client.app.dependency_overrides[get_tenant_id_dep] = lambda: 0
 
-    response = admin_client.get("/im-channels")
+    response = admin_client.get("/api/v1/im-channels")
 
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "im.tenant_context_missing"
@@ -650,14 +650,14 @@ def test_admin_viewer_can_list_but_not_mutate() -> None:
     im_service = _FakeIMService()
     app = FastAPI()
     register_exception_handlers(app)
-    app.include_router(agents_router)
-    app.include_router(router)
+    app.include_router(agents_router, prefix="/api/v1")
+    app.include_router(router, prefix="/api/v1")
     app.dependency_overrides[require_auth] = _make_fake_auth("viewer")
     app.dependency_overrides[get_im_channel_service] = lambda: im_service
     client = TestClient(app)
 
-    assert client.get(f"/agents/{_AGENT_ID}/im-channels").status_code == 200
-    assert client.post(f"/agents/{_AGENT_ID}/im-channels", json={"platform": "slack"}).status_code == 403
+    assert client.get(f"/api/v1/agents/{_AGENT_ID}/im-channels").status_code == 200
+    assert client.post(f"/api/v1/agents/{_AGENT_ID}/im-channels", json={"platform": "slack"}).status_code == 403
 
 
 # ── Callback: verification / parsing / ack ────────────────────────────
@@ -669,7 +669,7 @@ def test_callback_url_verification_ack(callback_client: TestClient) -> None:
     adapter.url_verification = True
     im_service.adapter = adapter
 
-    response = callback_client.post(f"/im/callback/{_CHANNEL_ID}", content=b"{}")
+    response = callback_client.post(f"/api/v1/im/callback/{_CHANNEL_ID}", content=b"{}")
 
     assert response.status_code == 200
     assert response.json() == {"success": True}
@@ -685,7 +685,7 @@ def test_callback_verification_failure_is_403(callback_client: TestClient) -> No
     )
     im_service.adapter = adapter
 
-    response = callback_client.post(f"/im/callback/{_CHANNEL_ID}", content=b"{}")
+    response = callback_client.post(f"/api/v1/im/callback/{_CHANNEL_ID}", content=b"{}")
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "im.verify_failed"
@@ -697,7 +697,7 @@ def test_callback_parse_failure_is_422(callback_client: TestClient) -> None:
     adapter.parse_error = ValueError("bad payload")
     im_service.adapter = adapter
 
-    response = callback_client.post(f"/im/callback/{_CHANNEL_ID}", content=b"{}")
+    response = callback_client.post(f"/api/v1/im/callback/{_CHANNEL_ID}", content=b"{}")
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "im.parse_failed"
@@ -709,7 +709,7 @@ def test_callback_non_message_event_ack(callback_client: TestClient) -> None:
     adapter.parsed = None
     im_service.adapter = adapter
 
-    response = callback_client.post(f"/im/callback/{_CHANNEL_ID}", content=b"{}")
+    response = callback_client.post(f"/api/v1/im/callback/{_CHANNEL_ID}", content=b"{}")
 
     assert response.status_code == 200
     assert response.json() == {"success": True}
@@ -723,7 +723,7 @@ def test_callback_channel_not_found_is_404(callback_client: TestClient) -> None:
         message="im channel missing not found",
     )
 
-    response = callback_client.post("/im/callback/missing", content=b"{}")
+    response = callback_client.post("/api/v1/im/callback/missing", content=b"{}")
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "im.channel_not_found"
@@ -736,7 +736,7 @@ def test_callback_channel_disabled_is_502(callback_client: TestClient) -> None:
         message="channel is disabled",
     )
 
-    response = callback_client.post(f"/im/callback/{_CHANNEL_ID}", content=b"{}")
+    response = callback_client.post(f"/api/v1/im/callback/{_CHANNEL_ID}", content=b"{}")
 
     assert response.status_code == 502
     assert response.json()["error"]["code"] == "im.channel_disabled"
@@ -749,7 +749,7 @@ def test_callback_yunzhijia_ack_shape(callback_client: TestClient) -> None:
     adapter.parsed = None
     im_service.adapter = adapter
 
-    response = callback_client.post(f"/im/callback/{_CHANNEL_ID}", content=b"{}")
+    response = callback_client.post(f"/api/v1/im/callback/{_CHANNEL_ID}", content=b"{}")
 
     assert response.status_code == 200
     assert response.json() == {
@@ -767,7 +767,7 @@ def test_callback_dispatches_help_command(callback_client: TestClient) -> None:
     adapter.parsed = _incoming(content="/help")
     im_service.adapter = adapter
 
-    response = callback_client.post(f"/im/callback/{_CHANNEL_ID}", content=b"{}")
+    response = callback_client.post(f"/api/v1/im/callback/{_CHANNEL_ID}", content=b"{}")
 
     assert response.status_code == 200
     assert response.json() == {"success": True}
@@ -784,7 +784,7 @@ def test_callback_unknown_command_gets_help_hint(callback_client: TestClient) ->
     adapter.parsed = _incoming(content="/nope")
     im_service.adapter = adapter
 
-    response = callback_client.post(f"/im/callback/{_CHANNEL_ID}", content=b"{}")
+    response = callback_client.post(f"/api/v1/im/callback/{_CHANNEL_ID}", content=b"{}")
 
     assert response.status_code == 200
     assert len(adapter.sent) == 1
@@ -800,7 +800,7 @@ def test_callback_non_command_message_is_acked_without_reply(
     adapter.parsed = _incoming(content="hello there")
     im_service.adapter = adapter
 
-    response = callback_client.post(f"/im/callback/{_CHANNEL_ID}", content=b"{}")
+    response = callback_client.post(f"/api/v1/im/callback/{_CHANNEL_ID}", content=b"{}")
 
     assert response.status_code == 200
     assert response.json() == {"success": True}
@@ -815,7 +815,7 @@ def test_callback_clear_command_requests_action_and_replies(
     adapter.parsed = _incoming(content="/clear")
     im_service.adapter = adapter
 
-    response = callback_client.post(f"/im/callback/{_CHANNEL_ID}", content=b"{}")
+    response = callback_client.post(f"/api/v1/im/callback/{_CHANNEL_ID}", content=b"{}")
 
     assert response.status_code == 200
     assert len(adapter.sent) == 1
@@ -833,7 +833,7 @@ def test_callback_routes_require_no_auth_dependency(
     fail with a missing dependency override.
     """
     assert require_auth not in callback_client.app.dependency_overrides
-    response = callback_client.get(f"/im/callback/{_CHANNEL_ID}")
+    response = callback_client.get(f"/api/v1/im/callback/{_CHANNEL_ID}")
     assert response.status_code == 200
 
 

@@ -31,7 +31,6 @@ Query-parameter ``description`` strings are intentionally Chinese
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
 
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field
@@ -53,86 +52,7 @@ from src.web.deps import AuthDep, RoleAdminDep, RoleViewerDep, SystemAdminDep
 
 router = APIRouter(prefix="/system", tags=["system"])
 
-# ── Process start timestamp (RFC3339, UTC) ───────────────────────────
-# Mirrors Go's ``runtime.ServerStartedAt()``: recorded once at import so
-# uptime reports seconds since the server process booted. Overridable in
-# tests via ``_server_started_at``.
-
-_SERVER_STARTED_AT: datetime = datetime.now(UTC)
-
-_UNCONFIGURED = "未配置"
-
-
-def _server_started_at() -> datetime:
-    """Return the process boot time (UTC)."""
-    return _SERVER_STARTED_AT
-
-
 # ── Env-driven engine detection (system.go helpers) ───────────────────
-
-
-def _parse_retrieve_driver() -> list[str]:
-    """Split the ``RETRIEVE_DRIVER`` value into trimmed driver names."""
-    raw = os.getenv("RETRIEVE_DRIVER", "")
-    return [segment.strip() for segment in raw.split(",") if segment.strip()]
-
-
-def _keyword_index_engine() -> str:
-    """Return the keyword-capable engine names from ``RETRIEVE_DRIVER``.
-
-    Mirrors ``getKeywordIndexEngine``: drivers known to support keyword
-    retrieval are joined into the display string; an unset or all-vector
-    driver list yields ``未配置``. The retriever-capability mapping is
-    the ported subset used by the document summary feature.
-    """
-    drivers = _parse_retrieve_driver()
-    keyword_capable = []
-    for driver in drivers:
-        if driver in {
-            "bleve",
-            "elasticsearch",
-            "milvus",
-            "tencent_vectordb",
-            "doris",
-        }:
-            keyword_capable.append(driver)
-    return ", ".join(keyword_capable) if keyword_capable else _UNCONFIGURED
-
-
-def _vector_store_engine() -> str:
-    """Return the vector store engine name.
-
-    Mirrors ``getVectorStoreEngine``: the configured vector-database
-    driver wins, falling back to ``RETRIEVE_DRIVER`` drivers that
-    support vector retrieval, then ``未配置``.
-    """
-    configured = os.getenv("VECTOR_DATABASE_DRIVER", "").strip()
-    if configured:
-        return configured
-    drivers = _parse_retrieve_driver()
-    vector_capable = []
-    for driver in drivers:
-        if driver in {
-            "milvus",
-            "tencent_vectordb",
-            "doris",
-            "elasticsearch",
-            "postgres",
-            "sqlite",
-        }:
-            vector_capable.append(driver)
-    return ", ".join(vector_capable) if vector_capable else _UNCONFIGURED
-
-
-def _graph_database_engine() -> str:
-    """Return ``neo4j`` when enabled, else ``未配置``.
-
-    Mirrors ``getGraphDatabaseEngine``: ``NEO4J_ENABLE=true`` is the
-    single switch that turns the graph database on.
-    """
-    if (os.getenv("NEO4J_ENABLE") or "").lower() == "true":
-        return "neo4j"
-    return _UNCONFIGURED
 
 
 def _minio_enabled() -> bool:
@@ -149,41 +69,6 @@ def _minio_enabled() -> bool:
 
 
 # ── View models (wire shape) ─────────────────────────────────────────
-
-
-class SystemInfoData(BaseModel):
-    """``data`` payload of ``GET /system/info``.
-
-    Mirrors the upstream ``GetSystemInfoResponse``. Build metadata is
-    compile-time injected in Go; the Python port reads the same shape
-    from env vars (``APP_VERSION`` / ``APP_EDITION`` / ``COMMIT_ID`` /
-    ``BUILD_TIME``), defaulting to ``unknown`` like the Go side.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    version: str = "unknown"
-    edition: str = "standard"
-    commit_id: str = "unknown"
-    build_time: str = "unknown"
-    go_version: str = ""
-    keyword_index_engine: str = _UNCONFIGURED
-    vector_store_engine: str = _UNCONFIGURED
-    graph_database_engine: str = _UNCONFIGURED
-    minio_enabled: bool = False
-    db_version: str = ""
-    db_migration_error: str = ""
-    started_at: str = ""
-    uptime_seconds: int = 0
-
-
-class SystemInfoResponse(BaseModel):
-    """``{"success": true, "data": SystemInfoData}``."""
-
-    model_config = ConfigDict(frozen=True)
-
-    success: bool
-    data: SystemInfoData
 
 
 class ParserEnginesResponse(BaseModel):
@@ -292,35 +177,6 @@ class SuccessResponse(BaseModel):
 
 
 # ── Endpoints ────────────────────────────────────────────────────────
-
-
-@router.get("/info", response_model=SystemInfoResponse)
-async def get_system_info(
-    _auth: AuthDep,
-    _viewer: RoleViewerDep,
-) -> SystemInfoResponse:
-    """Return system version, build info, and engine configuration.
-
-    Mirrors ``GET /system/info`` in the upstream Go handler — gated by
-    ``g.Viewer()``. The response is assembled from env-driven
-    configuration (no DB or transport dependency) so the settings page
-    renders immediately.
-    """
-    boot = _server_started_at()
-    uptime_seconds = max(0, int((datetime.now(UTC) - boot).total_seconds()))
-    data = SystemInfoData(
-        version=os.getenv("APP_VERSION", "unknown"),
-        edition=os.getenv("APP_EDITION", "standard"),
-        commit_id=os.getenv("COMMIT_ID", "unknown"),
-        build_time=os.getenv("BUILD_TIME", "unknown"),
-        keyword_index_engine=_keyword_index_engine(),
-        vector_store_engine=_vector_store_engine(),
-        graph_database_engine=_graph_database_engine(),
-        minio_enabled=_minio_enabled(),
-        started_at=boot.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        uptime_seconds=uptime_seconds,
-    )
-    return SystemInfoResponse(success=True, data=data)
 
 
 @router.get("/parser-engines", response_model=ParserEnginesResponse)

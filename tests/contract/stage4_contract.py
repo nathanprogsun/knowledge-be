@@ -174,7 +174,7 @@ async def kb_seed(
     client = authed_client
     _user_id, tenant_id = admin_user
     response = client.post(
-        "/knowledge-bases",
+        "/api/v1/knowledge-bases",
         json={"name": "contract-kb", "type": "document"},
     )
     assert response.status_code == 201, response.text
@@ -185,7 +185,7 @@ async def kb_seed(
 async def knowledge_seed(kb_seed: KBSeed) -> KnowledgeSeed:
     """A manual knowledge item under the seeded knowledge base."""
     response = kb_seed.client.post(
-        f"/knowledge-bases/{kb_seed.kb_id}/knowledge/manual",
+        f"/api/v1/knowledge-bases/{kb_seed.kb_id}/knowledge/manual",
         json={"title": "contract-doc", "content": "# contract", "status": "draft"},
     )
     assert response.status_code == 200, response.text
@@ -213,13 +213,13 @@ async def chunk_seed(
     client = _authed_client(app, user_id, tenant_id)
     with client:
         response = client.post(
-            "/knowledge-bases",
+            "/api/v1/knowledge-bases",
             json={"name": "contract-chunk-kb", "type": "document"},
         )
         assert response.status_code == 201, response.text
         kb_id = response.json()["data"]["id"]
         response = client.post(
-            f"/knowledge-bases/{kb_id}/knowledge/manual",
+            f"/api/v1/knowledge-bases/{kb_id}/knowledge/manual",
             json={"title": "chunk-doc", "content": "# chunk", "status": "draft"},
         )
         assert response.status_code == 200, response.text
@@ -256,7 +256,7 @@ async def chunk_seed(
 async def tag_seed(kb_seed: KBSeed) -> TagSeed:
     """A tag under the seeded knowledge base."""
     response = kb_seed.client.post(
-        f"/knowledge-bases/{kb_seed.kb_id}/tags",
+        f"/api/v1/knowledge-bases/{kb_seed.kb_id}/tags",
         json={"name": "contract-tag", "color": "#1890ff", "sort_order": 1},
     )
     assert response.status_code == 200, response.text
@@ -277,7 +277,7 @@ async def faq_seed(
     """A FAQ knowledge base with a FAQ container and one entry."""
     client = authed_client
     _user_id, tenant_id = admin_user
-    response = client.post("/knowledge-bases", json={"name": "contract-faq", "type": "faq"})
+    response = client.post("/api/v1/knowledge-bases", json={"name": "contract-faq", "type": "faq"})
     assert response.status_code == 201, response.text
     kb_id = response.json()["data"]["id"]
 
@@ -295,7 +295,7 @@ async def faq_seed(
         await session.commit()
 
     response = client.post(
-        f"/knowledge-bases/{kb_id}/faq/entry",
+        f"/api/v1/knowledge-bases/{kb_id}/faq/entry",
         json={
             "standard_question": "how to reset?",
             "answers": ["click the reset button"],
@@ -315,11 +315,11 @@ async def wiki_seed(
     """A wiki-enabled knowledge base (document type, wiki pipeline on)."""
     client = authed_client
     _user_id, tenant_id = admin_user
-    response = client.post("/knowledge-bases", json={"name": "contract-wiki", "type": "document"})
+    response = client.post("/api/v1/knowledge-bases", json={"name": "contract-wiki", "type": "document"})
     assert response.status_code == 201, response.text
     kb_id = response.json()["data"]["id"]
     response = client.put(
-        f"/knowledge-bases/{kb_id}",
+        f"/api/v1/knowledge-bases/{kb_id}",
         json={
             "name": "contract-wiki",
             "config": {
@@ -340,9 +340,9 @@ async def wiki_seed(
 
 
 def test_create_knowledge_base(kb_seed: KBSeed) -> None:
-    spec = _endpoint_spec("POST", "/knowledge-bases")
+    spec = _endpoint_spec("POST", "/api/v1/knowledge-bases")
     response = kb_seed.client.post(
-        "/knowledge-bases",
+        "/api/v1/knowledge-bases",
         json={"name": "contract-kb-create", "type": "document"},
     )
     assert response.status_code == spec[0], response.text
@@ -352,8 +352,8 @@ def test_create_knowledge_base(kb_seed: KBSeed) -> None:
 
 
 def test_get_knowledge_base(kb_seed: KBSeed) -> None:
-    spec = _endpoint_spec("GET", "/knowledge-bases/{id}")
-    response = kb_seed.client.get(f"/knowledge-bases/{kb_seed.kb_id}")
+    spec = _endpoint_spec("GET", "/api/v1/knowledge-bases/{id}")
+    response = kb_seed.client.get(f"/api/v1/knowledge-bases/{kb_seed.kb_id}")
     assert response.status_code == spec[0], response.text
     body = response.json()
     _assert_keys(body, spec[1], "GET /knowledge-bases/{id}")
@@ -367,7 +367,7 @@ def test_knowledge_base_wire_field_set_matches_reference(kb_seed: KBSeed) -> Non
     knowledge-base object; the current contract has no such field. This
     assertion is the contract check — a divergence here is a finding.
     """
-    response = kb_seed.client.get(f"/knowledge-bases/{kb_seed.kb_id}")
+    response = kb_seed.client.get(f"/api/v1/knowledge-bases/{kb_seed.kb_id}")
     assert response.status_code == 200, response.text
     _assert_keys(
         response.json()["data"], _contract_fields("KnowledgeBase"), "GET /knowledge-bases/{id} data"
@@ -375,8 +375,8 @@ def test_knowledge_base_wire_field_set_matches_reference(kb_seed: KBSeed) -> Non
 
 
 def test_list_knowledge_bases(kb_seed: KBSeed) -> None:
-    spec = _endpoint_spec("GET", "/knowledge-bases")
-    response = kb_seed.client.get("/knowledge-bases")
+    spec = _endpoint_spec("GET", "/api/v1/knowledge-bases")
+    response = kb_seed.client.get("/api/v1/knowledge-bases")
     assert response.status_code == spec[0], response.text
     body = response.json()
     _assert_keys(body, spec[1], "GET /knowledge-bases")
@@ -389,9 +389,9 @@ def test_list_knowledge_bases(kb_seed: KBSeed) -> None:
 
 
 def test_create_manual_knowledge(kb_seed: KBSeed) -> None:
-    spec = _endpoint_spec("POST", "/knowledge-bases/{id}/knowledge/manual")
+    spec = _endpoint_spec("POST", "/api/v1/knowledge-bases/{id}/knowledge/manual")
     response = kb_seed.client.post(
-        f"/knowledge-bases/{kb_seed.kb_id}/knowledge/manual",
+        f"/api/v1/knowledge-bases/{kb_seed.kb_id}/knowledge/manual",
         json={"title": "manual-create", "content": "# manual", "status": "draft"},
     )
     assert response.status_code == spec[0], response.text
@@ -405,8 +405,8 @@ def test_create_manual_knowledge(kb_seed: KBSeed) -> None:
 
 
 def test_list_knowledge(knowledge_seed: KnowledgeSeed) -> None:
-    spec = _endpoint_spec("GET", "/knowledge-bases/{id}/knowledge")
-    response = knowledge_seed.client.get(f"/knowledge-bases/{knowledge_seed.kb_id}/knowledge")
+    spec = _endpoint_spec("GET", "/api/v1/knowledge-bases/{id}/knowledge")
+    response = knowledge_seed.client.get(f"/api/v1/knowledge-bases/{knowledge_seed.kb_id}/knowledge")
     assert response.status_code == spec[0], response.text
     body = response.json()
     _assert_keys(body, spec[1], "GET /knowledge-bases/{id}/knowledge")
@@ -416,8 +416,8 @@ def test_list_knowledge(knowledge_seed: KnowledgeSeed) -> None:
 
 
 def test_get_knowledge(knowledge_seed: KnowledgeSeed) -> None:
-    spec = _endpoint_spec("GET", "/knowledge/{id}")
-    response = knowledge_seed.client.get(f"/knowledge/{knowledge_seed.knowledge_id}")
+    spec = _endpoint_spec("GET", "/api/v1/knowledge/{id}")
+    response = knowledge_seed.client.get(f"/api/v1/knowledge/{knowledge_seed.knowledge_id}")
     assert response.status_code == spec[0], response.text
     body = response.json()
     _assert_keys(body, spec[1], "GET /knowledge/{id}")
@@ -425,9 +425,9 @@ def test_get_knowledge(knowledge_seed: KnowledgeSeed) -> None:
 
 
 def test_update_knowledge(knowledge_seed: KnowledgeSeed) -> None:
-    spec = _endpoint_spec("PUT", "/knowledge/{id}")
+    spec = _endpoint_spec("PUT", "/api/v1/knowledge/{id}")
     response = knowledge_seed.client.put(
-        f"/knowledge/{knowledge_seed.knowledge_id}",
+        f"/api/v1/knowledge/{knowledge_seed.knowledge_id}",
         json={"title": "renamed", "description": "updated"},
     )
     assert response.status_code == spec[0], response.text
@@ -444,8 +444,8 @@ def test_update_knowledge(knowledge_seed: KnowledgeSeed) -> None:
 
 
 def test_list_chunks(chunk_seed: ChunkSeed) -> None:
-    spec = _endpoint_spec("GET", "/chunks/{knowledge_id}")
-    response = chunk_seed.client.get(f"/chunks/{chunk_seed.knowledge_id}")
+    spec = _endpoint_spec("GET", "/api/v1/chunks/{knowledge_id}")
+    response = chunk_seed.client.get(f"/api/v1/chunks/{chunk_seed.knowledge_id}")
     assert response.status_code == spec[0], response.text
     body = response.json()
     _assert_keys(body, spec[1], "GET /chunks/{knowledge_id}")
@@ -455,8 +455,8 @@ def test_list_chunks(chunk_seed: ChunkSeed) -> None:
 
 
 def test_get_chunk_by_id(chunk_seed: ChunkSeed) -> None:
-    spec = _endpoint_spec("GET", "/chunks/by-id/{id}")
-    response = chunk_seed.client.get(f"/chunks/by-id/{chunk_seed.chunk_id}")
+    spec = _endpoint_spec("GET", "/api/v1/chunks/by-id/{id}")
+    response = chunk_seed.client.get(f"/api/v1/chunks/by-id/{chunk_seed.chunk_id}")
     assert response.status_code == spec[0], response.text
     body = response.json()
     _assert_keys(body, spec[1], "GET /chunks/by-id/{id}")
@@ -464,9 +464,9 @@ def test_get_chunk_by_id(chunk_seed: ChunkSeed) -> None:
 
 
 def test_update_chunk(chunk_seed: ChunkSeed) -> None:
-    spec = _endpoint_spec("PUT", "/chunks/{knowledge_id}/{id}")
+    spec = _endpoint_spec("PUT", "/api/v1/chunks/{knowledge_id}/{id}")
     response = chunk_seed.client.put(
-        f"/chunks/{chunk_seed.knowledge_id}/{chunk_seed.chunk_id}",
+        f"/api/v1/chunks/{chunk_seed.knowledge_id}/{chunk_seed.chunk_id}",
         json={"content": "updated content", "is_enabled": True},
     )
     assert response.status_code == spec[0], response.text
@@ -476,8 +476,8 @@ def test_update_chunk(chunk_seed: ChunkSeed) -> None:
 
 
 def test_delete_chunk(chunk_seed: ChunkSeed) -> None:
-    spec = _endpoint_spec("DELETE", "/chunks/{knowledge_id}/{id}")
-    response = chunk_seed.client.delete(f"/chunks/{chunk_seed.knowledge_id}/{chunk_seed.chunk_id}")
+    spec = _endpoint_spec("DELETE", "/api/v1/chunks/{knowledge_id}/{id}")
+    response = chunk_seed.client.delete(f"/api/v1/chunks/{chunk_seed.knowledge_id}/{chunk_seed.chunk_id}")
     assert response.status_code == spec[0], response.text
     body = response.json()
     _assert_keys(body, spec[1], "DELETE /chunks/{knowledge_id}/{id}")
@@ -487,9 +487,9 @@ def test_delete_chunk(chunk_seed: ChunkSeed) -> None:
 
 
 def test_create_tag(kb_seed: KBSeed) -> None:
-    spec = _endpoint_spec("POST", "/knowledge-bases/{id}/tags")
+    spec = _endpoint_spec("POST", "/api/v1/knowledge-bases/{id}/tags")
     response = kb_seed.client.post(
-        f"/knowledge-bases/{kb_seed.kb_id}/tags",
+        f"/api/v1/knowledge-bases/{kb_seed.kb_id}/tags",
         json={"name": "tag-create", "color": "#1890ff", "sort_order": 2},
     )
     assert response.status_code == spec[0], response.text
@@ -503,12 +503,12 @@ def test_create_tag(kb_seed: KBSeed) -> None:
 
 
 def test_list_tags(kb_seed: KBSeed) -> None:
-    spec = _endpoint_spec("GET", "/knowledge-bases/{id}/tags")
+    spec = _endpoint_spec("GET", "/api/v1/knowledge-bases/{id}/tags")
     kb_seed.client.post(
-        f"/knowledge-bases/{kb_seed.kb_id}/tags",
+        f"/api/v1/knowledge-bases/{kb_seed.kb_id}/tags",
         json={"name": "tag-a", "color": "#1890ff", "sort_order": 1},
     )
-    response = kb_seed.client.get(f"/knowledge-bases/{kb_seed.kb_id}/tags")
+    response = kb_seed.client.get(f"/api/v1/knowledge-bases/{kb_seed.kb_id}/tags")
     assert response.status_code == spec[0], response.text
     body = response.json()
     _assert_keys(body, spec[1], "GET /knowledge-bases/{id}/tags")
@@ -520,9 +520,9 @@ def test_list_tags(kb_seed: KBSeed) -> None:
 
 
 def test_update_tag(tag_seed: TagSeed) -> None:
-    spec = _endpoint_spec("PUT", "/knowledge-bases/{id}/tags/{tag_id}")
+    spec = _endpoint_spec("PUT", "/api/v1/knowledge-bases/{id}/tags/{tag_id}")
     response = tag_seed.client.put(
-        f"/knowledge-bases/{tag_seed.kb_id}/tags/{tag_seed.tag_id}",
+        f"/api/v1/knowledge-bases/{tag_seed.kb_id}/tags/{tag_seed.tag_id}",
         json={"name": "tag-renamed", "color": "#52c41a"},
     )
     assert response.status_code == spec[0], response.text
@@ -532,8 +532,8 @@ def test_update_tag(tag_seed: TagSeed) -> None:
 
 
 def test_delete_tag(tag_seed: TagSeed) -> None:
-    spec = _endpoint_spec("DELETE", "/knowledge-bases/{id}/tags/{tag_id}")
-    response = tag_seed.client.delete(f"/knowledge-bases/{tag_seed.kb_id}/tags/{tag_seed.tag_id}")
+    spec = _endpoint_spec("DELETE", "/api/v1/knowledge-bases/{id}/tags/{tag_id}")
+    response = tag_seed.client.delete(f"/api/v1/knowledge-bases/{tag_seed.kb_id}/tags/{tag_seed.tag_id}")
     assert response.status_code == spec[0], response.text
     body = response.json()
     _assert_keys(body, spec[1], "DELETE /knowledge-bases/{id}/tags/{tag_id}")
@@ -543,8 +543,8 @@ def test_delete_tag(tag_seed: TagSeed) -> None:
 
 
 def test_list_faq_entries(faq_seed: FAQSeed) -> None:
-    spec = _endpoint_spec("GET", "/knowledge-bases/{id}/faq/entries")
-    response = faq_seed.client.get(f"/knowledge-bases/{faq_seed.kb_id}/faq/entries")
+    spec = _endpoint_spec("GET", "/api/v1/knowledge-bases/{id}/faq/entries")
+    response = faq_seed.client.get(f"/api/v1/knowledge-bases/{faq_seed.kb_id}/faq/entries")
     assert response.status_code == spec[0], response.text
     body = response.json()
     _assert_keys(body, spec[1], "GET /knowledge-bases/{id}/faq/entries")
@@ -556,9 +556,9 @@ def test_list_faq_entries(faq_seed: FAQSeed) -> None:
 
 
 def test_create_faq_entry(faq_seed: FAQSeed) -> None:
-    spec = _endpoint_spec("POST", "/knowledge-bases/{id}/faq/entry")
+    spec = _endpoint_spec("POST", "/api/v1/knowledge-bases/{id}/faq/entry")
     response = faq_seed.client.post(
-        f"/knowledge-bases/{faq_seed.kb_id}/faq/entry",
+        f"/api/v1/knowledge-bases/{faq_seed.kb_id}/faq/entry",
         json={
             "standard_question": "how to install?",
             "answers": ["run the installer"],
@@ -576,9 +576,9 @@ def test_create_faq_entry(faq_seed: FAQSeed) -> None:
 
 
 def test_get_faq_entry(faq_seed: FAQSeed) -> None:
-    spec = _endpoint_spec("GET", "/knowledge-bases/{id}/faq/entries/{entry_id}")
+    spec = _endpoint_spec("GET", "/api/v1/knowledge-bases/{id}/faq/entries/{entry_id}")
     response = faq_seed.client.get(
-        f"/knowledge-bases/{faq_seed.kb_id}/faq/entries/{faq_seed.entry_id}"
+        f"/api/v1/knowledge-bases/{faq_seed.kb_id}/faq/entries/{faq_seed.entry_id}"
     )
     assert response.status_code == spec[0], response.text
     body = response.json()
@@ -600,14 +600,14 @@ def test_wiki_payloads_conform_to_view_models(wiki_seed: WikiSeed) -> None:
     are verified even if the envelope comparison reports a deviation.
     """
     client, kb_id = wiki_seed.client, wiki_seed.kb_id
-    base = f"/knowledgebase/{kb_id}/wiki"
+    base = f"/api/v1/knowledgebase/{kb_id}/wiki"
 
     response = client.get(f"{base}/pages")
     assert response.status_code == 200, response.text
     _assert_payload(
         response.json()["data"],
         wiki_views.WikiPageListData,
-        "GET /knowledgebase/{kb_id}/wiki/pages",
+        "GET /api/v1/knowledgebase/{kb_id}/wiki/pages",
     )
 
     response = client.get(f"{base}/folders")
@@ -615,7 +615,7 @@ def test_wiki_payloads_conform_to_view_models(wiki_seed: WikiSeed) -> None:
     _assert_payload(
         response.json()["data"],
         wiki_views.WikiFolderListData,
-        "GET /knowledgebase/{kb_id}/wiki/folders",
+        "GET /api/v1/knowledgebase/{kb_id}/wiki/folders",
     )
 
     response = client.get(f"{base}/stats")
@@ -623,7 +623,7 @@ def test_wiki_payloads_conform_to_view_models(wiki_seed: WikiSeed) -> None:
     _assert_payload(
         response.json()["data"],
         wiki_views.WikiStats,
-        "GET /knowledgebase/{kb_id}/wiki/stats",
+        "GET /api/v1/knowledgebase/{kb_id}/wiki/stats",
     )
 
     response = client.get(f"{base}/search", params={"q": "hello"})
@@ -631,7 +631,7 @@ def test_wiki_payloads_conform_to_view_models(wiki_seed: WikiSeed) -> None:
     _assert_payload(
         response.json()["data"],
         wiki_views.WikiSearchData,
-        "GET /knowledgebase/{kb_id}/wiki/search",
+        "GET /api/v1/knowledgebase/{kb_id}/wiki/search",
     )
 
     response = client.post(f"{base}/folders", json={"name": "dir-a"})
@@ -639,7 +639,7 @@ def test_wiki_payloads_conform_to_view_models(wiki_seed: WikiSeed) -> None:
     _assert_payload(
         response.json()["data"],
         wiki_views.WikiFolderView,
-        "POST /knowledgebase/{kb_id}/wiki/folders",
+        "POST /api/v1/knowledgebase/{kb_id}/wiki/folders",
     )
 
 
@@ -652,14 +652,14 @@ def test_wiki_response_envelopes_match_reference(wiki_seed: WikiSeed) -> None:
     contract check — a divergence here is a reported finding.
     """
     client, kb_id = wiki_seed.client, wiki_seed.kb_id
-    base = f"/knowledgebase/{kb_id}/wiki"
+    base = f"/api/v1/knowledgebase/{kb_id}/wiki"
 
     probes = (
-        ("GET", f"{base}/pages", "GET /knowledgebase/{kb_id}/wiki/pages"),
-        ("GET", f"{base}/folders", "GET /knowledgebase/{kb_id}/wiki/folders"),
-        ("GET", f"{base}/stats", "GET /knowledgebase/{kb_id}/wiki/stats"),
-        ("GET", f"{base}/search", "GET /knowledgebase/{kb_id}/wiki/search"),
-        ("POST", f"{base}/folders", "POST /knowledgebase/{kb_id}/wiki/folders"),
+        ("GET", f"{base}/pages", "GET /api/v1/knowledgebase/{kb_id}/wiki/pages"),
+        ("GET", f"{base}/folders", "GET /api/v1/knowledgebase/{kb_id}/wiki/folders"),
+        ("GET", f"{base}/stats", "GET /api/v1/knowledgebase/{kb_id}/wiki/stats"),
+        ("GET", f"{base}/search", "GET /api/v1/knowledgebase/{kb_id}/wiki/search"),
+        ("POST", f"{base}/folders", "POST /api/v1/knowledgebase/{kb_id}/wiki/folders"),
     )
     for method, url, label in probes:
         response = client.request(method, url, json={"name": "dir-b"} if method == "POST" else None)

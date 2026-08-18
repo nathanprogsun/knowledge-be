@@ -29,6 +29,7 @@ from src.web.deps import (
     get_auth_service,
     get_system_setting_service,
 )
+from src.web.deps.tenants import get_tenant_member_service, get_tenant_service
 from src.web.middleware.auth import require_auth
 from tests.integration.conftest import _noop_lifespan
 
@@ -162,6 +163,21 @@ def app(
         users_repo=fake_users,  # type: ignore[arg-type]
         tokens_repo=fake_tokens,  # type: ignore[arg-type]
     )
+
+    class _FakeMemberService:
+        async def list_by_user(self, user_id: str) -> list:  # type: ignore[no-untyped-def]
+            return []
+
+    class _FakeTenantService:
+        async def get_tenant(self, tenant_id: int):  # type: ignore[no-untyped-def]
+            raise NotFoundError(
+                code="tenant.not_found",
+                message="tenant not found",
+            )
+
+    application.dependency_overrides[get_tenant_member_service] = lambda: _FakeMemberService()
+    application.dependency_overrides[get_tenant_service] = lambda: _FakeTenantService()
+
     application.dependency_overrides[get_system_setting_service] = lambda: SystemSettingService(
         settings_repo=_FakeSettingRepo(),  # type: ignore[arg-type]
         audit_repo=_FakeAuditRepo(),  # type: ignore[arg-type]
@@ -199,7 +215,7 @@ def _seed_user(repo: _FakeUserRepo, *, is_system_admin: bool = False) -> User:
 
 
 async def _token(client: TestClient, email: str = "alice@example.com") -> str:
-    resp = client.post("/auth/login", json={"email": email, "password": "correct-horse"})
+    resp = client.post("/api/v1/auth/login", json={"email": email, "password": "correct-horse"})
     assert resp.status_code == 200
     return str(resp.json()["token"])
 
@@ -211,7 +227,7 @@ async def test_protected_endpoint_requires_auth(
     client: TestClient, fake_users: _FakeUserRepo
 ) -> None:
     _seed_user(fake_users)
-    resp = client.get("/auth/me")
+    resp = client.get("/api/v1/auth/me")
     assert resp.status_code == 401
     assert resp.json()["error"]["code"] == "auth.missing_authentication"
 
@@ -220,14 +236,14 @@ async def test_protected_endpoint_invalid_token(
     client: TestClient, fake_users: _FakeUserRepo
 ) -> None:
     _seed_user(fake_users)
-    resp = client.get("/auth/me", headers={"Authorization": "Bearer garbage"})
+    resp = client.get("/api/v1/auth/me", headers={"Authorization": "Bearer garbage"})
     assert resp.status_code == 401
 
 
 async def test_public_endpoint_bypasses_auth(client: TestClient, fake_users: _FakeUserRepo) -> None:
     _seed_user(fake_users)
     resp = client.post(
-        "/auth/login", json={"email": "alice@example.com", "password": "correct-horse"}
+        "/api/v1/auth/login", json={"email": "alice@example.com", "password": "correct-horse"}
     )
     assert resp.status_code == 200
 
@@ -237,7 +253,7 @@ async def test_valid_token_allows_protected_endpoint(
 ) -> None:
     _seed_user(fake_users)
     token = await _token(client)
-    resp = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    resp = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     assert resp.json()["success"] is True
 
@@ -250,7 +266,7 @@ async def test_system_admin_route_rejects_regular_user(
 ) -> None:
     _seed_user(fake_users)  # not a system admin
     token = await _token(client)
-    resp = client.get("/system/admin/settings", headers={"Authorization": f"Bearer {token}"})
+    resp = client.get("/api/v1/system/admin/settings", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 403
     assert resp.json()["error"]["code"] == "rbac.system_admin_required"
 
@@ -260,7 +276,7 @@ async def test_system_admin_route_allows_admin(
 ) -> None:
     _seed_user(fake_users, is_system_admin=True)
     token = await _token(client)
-    resp = client.get("/system/admin/settings", headers={"Authorization": f"Bearer {token}"})
+    resp = client.get("/api/v1/system/admin/settings", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
 
 
@@ -276,7 +292,7 @@ async def test_kv_put_requires_admin_role(
     _seed_user(fake_users)
     token = await _token(client)
     resp = client.put(
-        "/tenants/kv/web-search-config",
+        "/api/v1/tenants/kv/web-search-config",
         headers={"Authorization": f"Bearer {token}"},
         json={"max_results": 20},
     )

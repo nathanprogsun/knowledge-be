@@ -142,7 +142,7 @@ def _seed_user(
 async def test_login_success(web_authed_client: TestClient, users_repo: AsyncMock) -> None:
     _seed_user(users_repo)
     resp = web_authed_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={"email": "alice@example.com", "password": "correct-horse"},
     )
     assert resp.status_code == 200
@@ -160,7 +160,7 @@ async def test_login_success(web_authed_client: TestClient, users_repo: AsyncMoc
 async def test_login_wrong_password(web_authed_client: TestClient, users_repo: AsyncMock) -> None:
     _seed_user(users_repo)
     resp = web_authed_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={"email": "alice@example.com", "password": "wrong"},
     )
     assert resp.status_code == 401
@@ -172,7 +172,7 @@ async def test_login_wrong_password(web_authed_client: TestClient, users_repo: A
 async def test_login_unknown_email(web_authed_client: TestClient, users_repo: AsyncMock) -> None:
     _seed_user(users_repo)
     resp = web_authed_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={"email": "nobody@example.com", "password": "x"},
     )
     assert resp.status_code == 401
@@ -181,7 +181,7 @@ async def test_login_unknown_email(web_authed_client: TestClient, users_repo: As
 async def test_login_inactive_user(web_authed_client: TestClient, users_repo: AsyncMock) -> None:
     _seed_user(users_repo, is_active=False)
     resp = web_authed_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={"email": "alice@example.com", "password": "correct-horse"},
     )
     assert resp.status_code == 401
@@ -193,13 +193,13 @@ async def test_login_inactive_user(web_authed_client: TestClient, users_repo: As
 async def test_refresh_success(web_authed_client: TestClient, users_repo: AsyncMock) -> None:
     _seed_user(users_repo)
     login = web_authed_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={"email": "alice@example.com", "password": "correct-horse"},
     )
     refresh_token = login.json()["refresh_token"]
 
     resp = web_authed_client.post(
-        "/auth/refresh",
+        "/api/v1/auth/refresh",
         json={"refreshToken": refresh_token},
     )
     assert resp.status_code == 200
@@ -215,13 +215,13 @@ async def test_refresh_with_access_token_fails(
 ) -> None:
     _seed_user(users_repo)
     login = web_authed_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={"email": "alice@example.com", "password": "correct-horse"},
     )
     access_token = login.json()["token"]
 
     resp = web_authed_client.post(
-        "/auth/refresh",
+        "/api/v1/auth/refresh",
         json={"refreshToken": access_token},
     )
     assert resp.status_code == 401
@@ -229,7 +229,7 @@ async def test_refresh_with_access_token_fails(
 
 async def test_refresh_garbage_token(web_authed_client: TestClient) -> None:
     resp = web_authed_client.post(
-        "/auth/refresh",
+        "/api/v1/auth/refresh",
         json={"refreshToken": "not-a-jwt"},
     )
     assert resp.status_code == 401
@@ -241,13 +241,13 @@ async def test_refresh_garbage_token(web_authed_client: TestClient) -> None:
 async def test_logout_success(web_authed_client: TestClient, users_repo: AsyncMock) -> None:
     _seed_user(users_repo)
     login = web_authed_client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={"email": "alice@example.com", "password": "correct-horse"},
     )
     token = login.json()["token"]
 
     resp = web_authed_client.post(
-        "/auth/logout",
+        "/api/v1/auth/logout",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200
@@ -257,7 +257,7 @@ async def test_logout_success(web_authed_client: TestClient, users_repo: AsyncMo
 
 
 async def test_logout_missing_header(web_authed_client: TestClient) -> None:
-    resp = web_authed_client.post("/auth/logout")
+    resp = web_authed_client.post("/api/v1/auth/logout")
     assert resp.status_code == 422
     body = resp.json()
     assert body["error"]["code"] == "auth.missing_authorization"
@@ -265,7 +265,7 @@ async def test_logout_missing_header(web_authed_client: TestClient) -> None:
 
 async def test_logout_invalid_header_format(web_authed_client: TestClient) -> None:
     resp = web_authed_client.post(
-        "/auth/logout",
+        "/api/v1/auth/logout",
         headers={"Authorization": "Basic abc"},
     )
     assert resp.status_code == 422
@@ -276,7 +276,7 @@ async def test_logout_invalid_header_format(web_authed_client: TestClient) -> No
 async def test_logout_garbage_token(web_authed_client: TestClient, users_repo: AsyncMock) -> None:
     _seed_user(users_repo)
     resp = web_authed_client.post(
-        "/auth/logout",
+        "/api/v1/auth/logout",
         headers={"Authorization": "Bearer not-a-jwt"},
     )
     assert resp.status_code == 401

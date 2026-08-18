@@ -37,6 +37,7 @@ from src.core.knowledge.documents.create_manual import create_knowledge_from_man
 from src.core.knowledge.documents.create_passage import create_knowledge_from_passage
 from src.core.knowledge.documents.create_url import create_knowledge_from_url
 from src.core.knowledge.documents.delete import delete_knowledge
+from src.core.knowledge.documents.list_delete import delete_knowledge_list
 from src.core.knowledge.documents.move import (
     ReparseTrigger,
     move_knowledge,
@@ -323,6 +324,20 @@ class KnowledgeDocumentsOrchestrator:
         return await delete_knowledge(
             tenant_id=tenant_id,
             id=id,
+            knowledge_repo=self._knowledge_repo,
+            chunk_repo=self._chunk_repo,
+        )
+
+    async def delete_documents(self, *, tenant_id: int, ids: list[str]) -> int:
+        """Soft-delete a batch of documents and cascade their chunks.
+
+        Blank ids are dropped before the query; an empty ``ids`` (or one
+        resolving no live rows) returns zero without touching the
+        database. Returns the number of document rows removed.
+        """
+        return await delete_knowledge_list(
+            tenant_id=tenant_id,
+            ids=ids,
             knowledge_repo=self._knowledge_repo,
             chunk_repo=self._chunk_repo,
         )

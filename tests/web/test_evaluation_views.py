@@ -95,7 +95,7 @@ def client() -> TestClient:
     _holder["service"] = _happy_path_service()
     application = FastAPI()
     register_exception_handlers(application)
-    application.include_router(router)
+    application.include_router(router, prefix="/api/v1")
     application.dependency_overrides[require_auth] = _fake_auth
     application.dependency_overrides[get_evaluation_service] = _get_evaluation_service
     return TestClient(application)
@@ -113,7 +113,7 @@ def test_run_evaluation_returns_envelope(client: TestClient) -> None:
     service = evaluation_service(client)
 
     response = client.post(
-        "/evaluation",
+        "/api/v1/evaluation",
         json={
             "dataset_id": "default",
             "knowledge_base_id": "kb-1",
@@ -145,7 +145,7 @@ def test_run_evaluation_maps_empty_chat_and_rerank(client: TestClient) -> None:
     service = evaluation_service(client)
 
     response = client.post(
-        "/evaluation",
+        "/api/v1/evaluation",
         json={
             "dataset_id": "default",
             "knowledge_base_id": "kb-1",
@@ -162,7 +162,7 @@ def test_run_evaluation_maps_empty_chat_and_rerank(client: TestClient) -> None:
 
 def test_run_evaluation_rejects_missing_field(client: TestClient) -> None:
     response = client.post(
-        "/evaluation",
+        "/api/v1/evaluation",
         json={"dataset_id": "default"},
     )
 
@@ -180,7 +180,7 @@ def test_run_evaluation_missing_tenant_is_401(client: TestClient) -> None:
     client.app.dependency_overrides[require_auth] = _no_tenant
 
     response = client.post(
-        "/evaluation",
+        "/api/v1/evaluation",
         json={
             "dataset_id": "default",
             "knowledge_base_id": "kb-1",
@@ -200,7 +200,7 @@ def test_get_evaluation_returns_envelope(client: TestClient) -> None:
     service = evaluation_service(client)
 
     response = client.get(
-        "/evaluation",
+        "/api/v1/evaluation",
         params={"task_id": "evaluation_42_1_abcd"},
     )
 
@@ -213,7 +213,7 @@ def test_get_evaluation_returns_envelope(client: TestClient) -> None:
 
 
 def test_get_evaluation_requires_task_id(client: TestClient) -> None:
-    response = client.get("/evaluation")
+    response = client.get("/api/v1/evaluation")
 
     assert response.status_code == 422
 
@@ -228,7 +228,7 @@ def test_get_evaluation_missing_tenant_is_401(client: TestClient) -> None:
 
     client.app.dependency_overrides[require_auth] = _no_tenant
 
-    response = client.get("/evaluation", params={"task_id": "task-1"})
+    response = client.get("/api/v1/evaluation", params={"task_id": "task-1"})
 
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "evaluation.tenant_context_missing"
@@ -241,7 +241,7 @@ def test_get_evaluation_unknown_task_is_404(client: TestClient) -> None:
         message="evaluation task not found",
     )
 
-    response = client.get("/evaluation", params={"task_id": "missing"})
+    response = client.get("/api/v1/evaluation", params={"task_id": "missing"})
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "evaluation.task_not_found"

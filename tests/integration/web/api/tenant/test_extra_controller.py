@@ -138,7 +138,7 @@ async def test_list_api_keys(
     api_key_repo: AsyncMock,
 ) -> None:
     await _seed_key(api_key_repo)
-    resp = web_authed_client.get("/tenants/7/api-keys")
+    resp = web_authed_client.get("/api/v1/tenants/7/api-keys")
     assert resp.status_code == 200
     body = resp.json()
     assert isinstance(body, list)
@@ -153,7 +153,7 @@ async def test_list_api_keys(
 
 async def test_create_api_key(web_authed_client: TestClient) -> None:
     resp = web_authed_client.post(
-        "/tenants/7/api-keys",
+        "/api/v1/tenants/7/api-keys",
         json={"name": "ci", "full_access": True},
     )
     assert resp.status_code == 201
@@ -173,7 +173,7 @@ async def test_revoke_api_key(
     api_key_repo: AsyncMock,
 ) -> None:
     key = await _seed_key(api_key_repo)
-    resp = web_authed_client.delete(f"/tenants/7/api-keys/{key.id}")
+    resp = web_authed_client.delete(f"/api/v1/tenants/7/api-keys/{key.id}")
     assert resp.status_code == 200
     assert resp.json()["success"] is True
     assert await api_key_repo.list_for_tenant(7) == []
@@ -186,17 +186,17 @@ async def test_put_and_get_kv(
     web_authed_client: TestClient,
     kv_repo: AsyncMock,
 ) -> None:
-    put = web_authed_client.put("/tenants/kv/web-search-config", json={"max_results": 20})
+    put = web_authed_client.put("/api/v1/tenants/kv/web-search-config", json={"max_results": 20})
     assert put.status_code == 200
     assert put.json() == {"max_results": 20}
 
-    get = web_authed_client.get("/tenants/kv/web-search-config")
+    get = web_authed_client.get("/api/v1/tenants/kv/web-search-config")
     assert get.status_code == 200
     assert get.json() == {"max_results": 20}
 
 
 async def test_get_kv_unsupported_key(web_authed_client: TestClient) -> None:
-    resp = web_authed_client.get("/tenants/kv/nonexistent")
+    resp = web_authed_client.get("/api/v1/tenants/kv/nonexistent")
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "tenant_kv.unsupported_key"
 

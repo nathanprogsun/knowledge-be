@@ -79,6 +79,19 @@ def normalize_scope_type(scope_type: str | None) -> str:
     return SCOPE_PLATFORM if normalized == SCOPE_PLATFORM else SCOPE_TENANT
 
 
+def mask_api_key_token(token: str) -> str:
+    """Mask a token for admin-list display (mirrors the upstream masking).
+
+    Tokens shorter than 13 characters collapse to ``"***"``; longer
+    tokens keep only the first 7 and last 4 characters so an operator
+    can recognise a key without being able to use it.
+    """
+    clean = token.strip()
+    if len(clean) <= 12:
+        return "***"
+    return f"{clean[:7]}...{clean[-4:]}"
+
+
 def normalize_capabilities(capabilities: list[str] | None) -> list[str]:
     """Lower-case, de-duplicate and drop unknown capabilities, order kept."""
     return _normalize_unique(capabilities, known=_KNOWN_CAPABILITIES)
@@ -115,6 +128,19 @@ class APIKeyCreateResult:
 
     key: TenantAPIKeyInfo
     token: str
+
+
+@dataclass(frozen=True, slots=True)
+class PlatformAPIKeyView:
+    """Platform key projection for the admin list, carrying a masked token.
+
+    The plaintext credential is available exactly once at creation; every
+    later read carries a masked preview so an operator can recognise the
+    key without being able to use it.
+    """
+
+    key: TenantAPIKeyInfo
+    api_key_masked: str
 
 
 class TenantAPIKeyService:
@@ -255,6 +281,17 @@ class TenantAPIKeyService:
         rows = await self._api_keys_repo.list_platform()
         return [TenantAPIKeyInfo.map_from_db(row) for row in rows]
 
+    async def list_platform_api_keys_for_admin(self) -> list[PlatformAPIKeyView]:
+        """Live platform keys for the admin list, each with a masked token."""
+        rows = await self._api_keys_repo.list_platform()
+        return [
+            PlatformAPIKeyView(
+                key=TenantAPIKeyInfo.map_from_db(row),
+                api_key_masked=mask_api_key_token(row.api_key),
+            )
+            for row in rows
+        ]
+
     # ── Revocation ──────────────────────────────────────────────────
 
     async def revoke_api_key(self, key_id: int, *, tenant_id: int) -> None:
@@ -306,9 +343,11 @@ __all__ = [
     "SCOPE_PLATFORM",
     "SCOPE_TENANT",
     "APIKeyCreateResult",
+    "PlatformAPIKeyView",
     "TenantAPIKeyService",
     "generate_api_key_token",
     "hash_api_key_token",
+    "mask_api_key_token",
     "normalize_capabilities",
     "normalize_knowledge_base_ids",
     "normalize_scope_type",

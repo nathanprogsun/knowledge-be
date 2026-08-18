@@ -241,7 +241,7 @@ def _seed(
 
 
 async def test_list_provider_types_returns_the_allowed_set(client: TestClient) -> None:
-    resp = client.get("/storage-backends/types")
+    resp = client.get("/api/v1/storage-backends/types")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -258,7 +258,7 @@ async def test_create_returns_201_with_the_created_backend(
     repo: AsyncMock,
 ) -> None:
     resp = client.post(
-        "/storage-backends",
+        "/api/v1/storage-backends",
         json={"name": "Primary MinIO", "provider": "minio", "config": _MINIO_BODY_CONFIG},
     )
 
@@ -279,7 +279,7 @@ async def test_create_rejects_a_duplicate_name_with_409(
     _seed(repo, name="Primary MinIO")
 
     resp = client.post(
-        "/storage-backends",
+        "/api/v1/storage-backends",
         json={"name": "Primary MinIO", "provider": "minio", "config": _MINIO_BODY_CONFIG},
     )
 
@@ -290,7 +290,7 @@ async def test_create_rejects_an_unsupported_provider_with_422(
     client: TestClient,
 ) -> None:
     resp = client.post(
-        "/storage-backends",
+        "/api/v1/storage-backends",
         json={"name": "Nope", "provider": "dropbox", "config": _MINIO_BODY_CONFIG},
     )
 
@@ -301,7 +301,7 @@ async def test_create_rejects_a_missing_required_config_field_with_422(
     client: TestClient,
 ) -> None:
     resp = client.post(
-        "/storage-backends",
+        "/api/v1/storage-backends",
         json={"name": "Incomplete", "provider": "minio", "config": {"mode": "remote"}},
     )
 
@@ -319,7 +319,7 @@ async def test_list_masks_credentials_and_reports_the_default(
     _seed(repo, id="backend-2", name="B")
     repo._default_backend_id[_TENANT_ID] = "backend-2"  # type: ignore[attr-defined]
 
-    resp = client.get("/storage-backends")
+    resp = client.get("/api/v1/storage-backends")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -332,7 +332,7 @@ async def test_list_masks_credentials_and_reports_the_default(
 async def test_list_is_empty_for_a_workspace_with_no_backends(
     client: TestClient,
 ) -> None:
-    resp = client.get("/storage-backends")
+    resp = client.get("/api/v1/storage-backends")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -347,7 +347,7 @@ async def test_list_excludes_other_workspaces(
     _seed(repo, id="mine")
     _seed(repo, id="theirs", tenant_id=99)
 
-    resp = client.get("/storage-backends")
+    resp = client.get("/api/v1/storage-backends")
 
     assert [b["id"] for b in resp.json()["data"]] == ["mine"]
 
@@ -361,7 +361,7 @@ async def test_get_returns_the_backend_with_masked_credentials(
 ) -> None:
     _seed(repo)
 
-    resp = client.get("/storage-backends/backend-1")
+    resp = client.get("/api/v1/storage-backends/backend-1")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -370,7 +370,7 @@ async def test_get_returns_the_backend_with_masked_credentials(
 
 
 async def test_get_of_a_missing_backend_returns_404(client: TestClient) -> None:
-    resp = client.get("/storage-backends/ghost")
+    resp = client.get("/api/v1/storage-backends/ghost")
 
     assert resp.status_code == 404
 
@@ -381,7 +381,7 @@ async def test_get_does_not_cross_workspaces(
 ) -> None:
     _seed(repo, tenant_id=99)
 
-    resp = client.get("/storage-backends/backend-1")
+    resp = client.get("/api/v1/storage-backends/backend-1")
 
     assert resp.status_code == 404
 
@@ -399,7 +399,7 @@ async def test_update_renames_and_preserves_redacted_secrets(
     masked_config["secret_access_key"] = REDACTED_SECRET_PLACEHOLDER
 
     resp = client.put(
-        "/storage-backends/backend-1",
+        "/api/v1/storage-backends/backend-1",
         json={"name": "Renamed", "config": masked_config},
     )
 
@@ -418,7 +418,7 @@ async def test_update_rejects_a_location_change_with_422(
     moved = dict(_MINIO_BODY_CONFIG)
     moved["bucket_name"] = "elsewhere"
 
-    resp = client.put("/storage-backends/backend-1", json={"config": moved})
+    resp = client.put("/api/v1/storage-backends/backend-1", json={"config": moved})
 
     assert resp.status_code == 422
 
@@ -429,7 +429,7 @@ async def test_update_of_an_env_backend_returns_422(
 ) -> None:
     _seed(repo, source=STORAGE_BACKEND_SOURCE_ENV)
 
-    resp = client.put("/storage-backends/backend-1", json={"name": "Renamed"})
+    resp = client.put("/api/v1/storage-backends/backend-1", json={"name": "Renamed"})
 
     assert resp.status_code == 422
 
@@ -441,7 +441,7 @@ async def test_update_can_disable_an_unreferenced_backend(
     _seed(repo)
 
     resp = client.put(
-        "/storage-backends/backend-1",
+        "/api/v1/storage-backends/backend-1",
         json={"status": STORAGE_BACKEND_STATUS_DISABLED},
     )
 
@@ -450,7 +450,7 @@ async def test_update_can_disable_an_unreferenced_backend(
 
 
 async def test_update_of_a_missing_backend_returns_404(client: TestClient) -> None:
-    resp = client.put("/storage-backends/ghost", json={"name": "X"})
+    resp = client.put("/api/v1/storage-backends/ghost", json={"name": "X"})
 
     assert resp.status_code == 404
 
@@ -464,7 +464,7 @@ async def test_delete_acknowledges_and_soft_deletes(
 ) -> None:
     _seed(repo)
 
-    resp = client.delete("/storage-backends/backend-1")
+    resp = client.delete("/api/v1/storage-backends/backend-1")
 
     assert resp.status_code == 200
     assert resp.json() == {"success": True}
@@ -479,7 +479,7 @@ async def test_delete_of_the_default_returns_422(
     _seed(repo)
     repo._default_backend_id[_TENANT_ID] = "backend-1"  # type: ignore[attr-defined]
 
-    resp = client.delete("/storage-backends/backend-1")
+    resp = client.delete("/api/v1/storage-backends/backend-1")
 
     assert resp.status_code == 422
 
@@ -491,13 +491,13 @@ async def test_delete_of_a_bound_backend_returns_422(
     _seed(repo)
     repo._kb_refs[0] = 2  # type: ignore[attr-defined]
 
-    resp = client.delete("/storage-backends/backend-1")
+    resp = client.delete("/api/v1/storage-backends/backend-1")
 
     assert resp.status_code == 422
 
 
 async def test_delete_of_a_missing_backend_returns_404(client: TestClient) -> None:
-    resp = client.delete("/storage-backends/ghost")
+    resp = client.delete("/api/v1/storage-backends/ghost")
 
     assert resp.status_code == 404
 
@@ -507,7 +507,7 @@ async def test_delete_of_a_missing_backend_returns_404(client: TestClient) -> No
 
 async def test_test_raw_config_returns_success_true(client: TestClient) -> None:
     resp = client.post(
-        "/storage-backends/test",
+        "/api/v1/storage-backends/test",
         json={"name": "Probe", "provider": "minio", "config": _MINIO_BODY_CONFIG},
     )
 
@@ -533,7 +533,7 @@ async def test_test_raw_config_reports_a_probe_failure_as_200(
     )
 
     resp = client.post(
-        "/storage-backends/test",
+        "/api/v1/storage-backends/test",
         json={"name": "Probe", "provider": "minio", "config": _MINIO_BODY_CONFIG},
     )
 
@@ -550,7 +550,7 @@ async def test_test_raw_config_reports_an_invalid_body_with_200(
     """A validation failure answers 200 with ``success=false`` (Go keeps
     the HTTP status at 200 and reports the error in the body)."""
     resp = client.post(
-        "/storage-backends/test",
+        "/api/v1/storage-backends/test",
         json={"name": "Probe", "provider": "minio", "config": {"mode": "remote"}},
     )
 
@@ -569,14 +569,14 @@ async def test_test_saved_backend_returns_success_true(
 ) -> None:
     _seed(repo)
 
-    resp = client.post("/storage-backends/backend-1/test")
+    resp = client.post("/api/v1/storage-backends/backend-1/test")
 
     assert resp.status_code == 200
     assert resp.json()["success"] is True
 
 
 async def test_test_of_a_missing_backend_returns_404(client: TestClient) -> None:
-    resp = client.post("/storage-backends/ghost/test")
+    resp = client.post("/api/v1/storage-backends/ghost/test")
 
     assert resp.status_code == 404
 
@@ -590,7 +590,7 @@ async def test_set_default_acknowledges_and_points_the_workspace(
 ) -> None:
     _seed(repo)
 
-    resp = client.put("/storage-backends/backend-1/default")
+    resp = client.put("/api/v1/storage-backends/backend-1/default")
 
     assert resp.status_code == 200
     assert resp.json() == {"success": True}
@@ -603,7 +603,7 @@ async def test_set_default_of_a_disabled_backend_returns_422(
 ) -> None:
     _seed(repo, status=STORAGE_BACKEND_STATUS_DISABLED)
 
-    resp = client.put("/storage-backends/backend-1/default")
+    resp = client.put("/api/v1/storage-backends/backend-1/default")
 
     assert resp.status_code == 422
 
@@ -611,7 +611,7 @@ async def test_set_default_of_a_disabled_backend_returns_422(
 async def test_set_default_of_a_missing_backend_returns_404(
     client: TestClient,
 ) -> None:
-    resp = client.put("/storage-backends/ghost/default")
+    resp = client.put("/api/v1/storage-backends/ghost/default")
 
     assert resp.status_code == 404
 
@@ -624,7 +624,7 @@ async def test_types_route_wins_over_the_id_route(
     repo: AsyncMock,
 ) -> None:
     # No row named "types" exists, so a captured id would 404.
-    resp = client.get("/storage-backends/types")
+    resp = client.get("/api/v1/storage-backends/types")
 
     assert resp.status_code == 200
     assert isinstance(resp.json()["data"], list)

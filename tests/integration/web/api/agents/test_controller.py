@@ -208,31 +208,31 @@ def _agent_row(
 
 
 EXPECTED_ROUTES: set[tuple[str, str]] = {
-    ("GET", "/agents/placeholders"),
-    ("GET", "/agents/type-presets"),
-    ("POST", "/agents"),
-    ("GET", "/agents"),
-    ("GET", "/agents/{id}"),
-    ("PUT", "/agents/{id}"),
-    ("DELETE", "/agents/{id}"),
-    ("POST", "/agents/{id}/copy"),
-    ("GET", "/agents/{id}/suggested-questions"),
-    ("GET", "/skills"),
+    ("GET", "/api/v1/agents/placeholders"),
+    ("GET", "/api/v1/agents/type-presets"),
+    ("POST", "/api/v1/agents"),
+    ("GET", "/api/v1/agents"),
+    ("GET", "/api/v1/agents/{id}"),
+    ("PUT", "/api/v1/agents/{id}"),
+    ("DELETE", "/api/v1/agents/{id}"),
+    ("POST", "/api/v1/agents/{id}/copy"),
+    ("GET", "/api/v1/agents/{id}/suggested-questions"),
+    ("GET", "/api/v1/skills"),
 }
 
 # Reads are Viewer+; authoring is Contributor+; owned-object edits map
 # to the strictest available route gate (Admin), mirroring the KB port.
 EXPECTED_ROLES: dict[tuple[str, str], str] = {
-    ("GET", "/agents/placeholders"): "viewer",
-    ("GET", "/agents/type-presets"): "viewer",
-    ("POST", "/agents"): "contributor",
-    ("GET", "/agents"): "viewer",
-    ("GET", "/agents/{id}"): "viewer",
-    ("PUT", "/agents/{id}"): "admin",
-    ("DELETE", "/agents/{id}"): "admin",
-    ("POST", "/agents/{id}/copy"): "contributor",
-    ("GET", "/agents/{id}/suggested-questions"): "viewer",
-    ("GET", "/skills"): "viewer",
+    ("GET", "/api/v1/agents/placeholders"): "viewer",
+    ("GET", "/api/v1/agents/type-presets"): "viewer",
+    ("POST", "/api/v1/agents"): "contributor",
+    ("GET", "/api/v1/agents"): "viewer",
+    ("GET", "/api/v1/agents/{id}"): "viewer",
+    ("PUT", "/api/v1/agents/{id}"): "admin",
+    ("DELETE", "/api/v1/agents/{id}"): "admin",
+    ("POST", "/api/v1/agents/{id}/copy"): "contributor",
+    ("GET", "/api/v1/agents/{id}/suggested-questions"): "viewer",
+    ("GET", "/api/v1/skills"): "viewer",
 }
 
 
@@ -289,7 +289,7 @@ def test_role_gate_helper_is_the_shared_rbac_dependency() -> None:
 
 
 async def test_create_returns_201_envelope(client: TestClient) -> None:
-    resp = client.post("/agents", json={"name": "Agent"})
+    resp = client.post("/api/v1/agents", json={"name": "Agent"})
 
     assert resp.status_code == 201
     payload = resp.json()
@@ -306,7 +306,7 @@ async def test_create_records_creator_and_description(
 ) -> None:
     user_id, _ = admin_user
     resp = client.post(
-        "/agents",
+        "/api/v1/agents",
         json={"name": "Agent", "description": "test description", "avatar": "av"},
     )
 
@@ -318,7 +318,7 @@ async def test_create_records_creator_and_description(
 
 
 async def test_create_rejects_blank_name(client: TestClient) -> None:
-    resp = client.post("/agents", json={"name": "   "})
+    resp = client.post("/api/v1/agents", json={"name": "   "})
 
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "agent.name_required"
@@ -333,9 +333,9 @@ async def test_list_returns_tenant_rows(
 ) -> None:
     agent_repo._rows["agent-1"] = _agent_row(id="agent-1")  # type: ignore[attr-defined]
     agent_repo._rows["agent-2"] = _agent_row(id="agent-2")  # type: ignore[attr-defined]
-    client.post("/agents", json={"name": "agent-3"})
+    client.post("/api/v1/agents", json={"name": "agent-3"})
 
-    resp = client.get("/agents")
+    resp = client.get("/api/v1/agents")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -355,7 +355,7 @@ async def test_list_excludes_other_tenants(
         id="agent-other", tenant_id=TENANT_ID + 1
     )
 
-    resp = client.get("/agents")
+    resp = client.get("/api/v1/agents")
 
     assert resp.status_code == 200
     assert [agent["id"] for agent in resp.json()["data"]] == ["agent-own"]
@@ -378,12 +378,12 @@ async def test_list_filters_by_creator(
         id="builtin-quick-answer", is_builtin=True, created_by=None
     )
 
-    mine = client.get("/agents?creator=mine")
+    mine = client.get("/api/v1/agents?creator=mine")
     assert mine.status_code == 200
     ids = {agent["id"] for agent in mine.json()["data"]}
     assert ids == {"agent-mine", "builtin-quick-answer"}
 
-    others = client.get("/agents?creator=others")
+    others = client.get("/api/v1/agents?creator=others")
     assert others.status_code == 200
     ids = {agent["id"] for agent in others.json()["data"]}
     assert ids == {"agent-other", "builtin-quick-answer"}
@@ -393,10 +393,10 @@ async def test_list_filters_by_creator(
 
 
 async def test_get_returns_one_agent(client: TestClient) -> None:
-    created = client.post("/agents", json={"name": "Agent"})
+    created = client.post("/api/v1/agents", json={"name": "Agent"})
     agent_id = created.json()["data"]["id"]
 
-    resp = client.get(f"/agents/{agent_id}")
+    resp = client.get(f"/api/v1/agents/{agent_id}")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -405,7 +405,7 @@ async def test_get_returns_one_agent(client: TestClient) -> None:
 
 
 async def test_get_missing_returns_404(client: TestClient) -> None:
-    resp = client.get("/agents/does-not-exist")
+    resp = client.get("/api/v1/agents/does-not-exist")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "agent.not_found"
@@ -419,7 +419,7 @@ async def test_get_cross_tenant_returns_404(
         id="agent-other", tenant_id=TENANT_ID + 1
     )
 
-    resp = client.get("/agents/agent-other")
+    resp = client.get("/api/v1/agents/agent-other")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "agent.not_found"
@@ -429,11 +429,11 @@ async def test_get_cross_tenant_returns_404(
 
 
 async def test_update_patches_name_and_description(client: TestClient) -> None:
-    created = client.post("/agents", json={"name": "Agent"})
+    created = client.post("/api/v1/agents", json={"name": "Agent"})
     agent_id = created.json()["data"]["id"]
 
     resp = client.put(
-        f"/agents/{agent_id}",
+        f"/api/v1/agents/{agent_id}",
         json={"name": "Renamed", "description": "renamed", "config": {}},
     )
 
@@ -444,17 +444,17 @@ async def test_update_patches_name_and_description(client: TestClient) -> None:
 
 
 async def test_update_missing_returns_404(client: TestClient) -> None:
-    resp = client.put("/agents/does-not-exist", json={"name": "x", "config": {}})
+    resp = client.put("/api/v1/agents/does-not-exist", json={"name": "x", "config": {}})
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "agent.not_found"
 
 
 async def test_update_rejects_blank_name(client: TestClient) -> None:
-    created = client.post("/agents", json={"name": "Agent"})
+    created = client.post("/api/v1/agents", json={"name": "Agent"})
     agent_id = created.json()["data"]["id"]
 
-    resp = client.put(f"/agents/{agent_id}", json={"name": "  ", "config": {}})
+    resp = client.put(f"/api/v1/agents/{agent_id}", json={"name": "  ", "config": {}})
 
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "agent.name_required"
@@ -469,7 +469,7 @@ async def test_update_builtin_returns_409(
     )
 
     resp = client.put(
-        "/agents/builtin-quick-answer",
+        "/api/v1/agents/builtin-quick-answer",
         json={"name": "Renamed", "config": {}},
     )
 
@@ -484,10 +484,10 @@ async def test_delete_returns_message_and_soft_deletes(
     client: TestClient,
     agent_repo: AsyncMock,
 ) -> None:
-    created = client.post("/agents", json={"name": "Agent"})
+    created = client.post("/api/v1/agents", json={"name": "Agent"})
     agent_id = created.json()["data"]["id"]
 
-    resp = client.delete(f"/agents/{agent_id}")
+    resp = client.delete(f"/api/v1/agents/{agent_id}")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -498,14 +498,14 @@ async def test_delete_returns_message_and_soft_deletes(
 
 
 async def test_delete_missing_returns_404(client: TestClient) -> None:
-    resp = client.delete("/agents/does-not-exist")
+    resp = client.delete("/api/v1/agents/does-not-exist")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "agent.not_found"
 
 
 async def test_delete_builtin_returns_409(client: TestClient) -> None:
-    resp = client.delete("/agents/builtin-quick-answer")
+    resp = client.delete("/api/v1/agents/builtin-quick-answer")
 
     assert resp.status_code == 409
     assert resp.json()["error"]["code"] == "agent.cannot_delete_builtin"
@@ -520,10 +520,10 @@ async def test_copy_returns_201_envelope(
     admin_user: tuple[int, int],
 ) -> None:
     user_id, _ = admin_user
-    created = client.post("/agents", json={"name": "Agent"})
+    created = client.post("/api/v1/agents", json={"name": "Agent"})
     source_id = created.json()["data"]["id"]
 
-    resp = client.post(f"/agents/{source_id}/copy")
+    resp = client.post(f"/api/v1/agents/{source_id}/copy")
 
     assert resp.status_code == 201
     payload = resp.json()
@@ -537,7 +537,7 @@ async def test_copy_returns_201_envelope(
 
 
 async def test_copy_missing_returns_404(client: TestClient) -> None:
-    resp = client.post("/agents/does-not-exist/copy")
+    resp = client.post("/api/v1/agents/does-not-exist/copy")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "agent.not_found"
@@ -547,7 +547,7 @@ async def test_copy_missing_returns_404(client: TestClient) -> None:
 
 
 async def test_placeholders_returns_grouped_catalog(client: TestClient) -> None:
-    resp = client.get("/agents/placeholders")
+    resp = client.get("/api/v1/agents/placeholders")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -565,7 +565,7 @@ async def test_placeholders_returns_grouped_catalog(client: TestClient) -> None:
 
 
 async def test_type_presets_return_empty_registry(client: TestClient) -> None:
-    resp = client.get("/agents/type-presets")
+    resp = client.get("/api/v1/agents/type-presets")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -577,11 +577,11 @@ async def test_type_presets_return_empty_registry(client: TestClient) -> None:
 
 
 async def test_suggested_questions_returns_empty_set(client: TestClient) -> None:
-    created = client.post("/agents", json={"name": "Agent"})
+    created = client.post("/api/v1/agents", json={"name": "Agent"})
     agent_id = created.json()["data"]["id"]
 
     resp = client.get(
-        f"/agents/{agent_id}/suggested-questions?knowledge_base_ids=kb-1&limit=3"
+        f"/api/v1/agents/{agent_id}/suggested-questions?knowledge_base_ids=kb-1&limit=3"
     )
 
     assert resp.status_code == 200
@@ -591,7 +591,7 @@ async def test_suggested_questions_returns_empty_set(client: TestClient) -> None
 
 
 async def test_suggested_questions_missing_returns_404(client: TestClient) -> None:
-    resp = client.get("/agents/does-not-exist/suggested-questions")
+    resp = client.get("/api/v1/agents/does-not-exist/suggested-questions")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "agent.not_found"
@@ -606,7 +606,7 @@ async def test_skills_lists_discovered_catalog(
 ) -> None:
     monkeypatch.setenv("WEKNORA_SANDBOX_MODE", "local")
 
-    resp = skills_client.get("/skills")
+    resp = skills_client.get("/api/v1/skills")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -621,7 +621,7 @@ async def test_skills_available_false_when_disabled(
 ) -> None:
     monkeypatch.setenv("WEKNORA_SANDBOX_MODE", "disabled")
 
-    resp = skills_client.get("/skills")
+    resp = skills_client.get("/api/v1/skills")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -634,7 +634,7 @@ async def test_skills_available_false_when_unset(
 ) -> None:
     monkeypatch.delenv("WEKNORA_SANDBOX_MODE", raising=False)
 
-    resp = skills_client.get("/skills")
+    resp = skills_client.get("/api/v1/skills")
 
     assert resp.status_code == 200
     payload = resp.json()

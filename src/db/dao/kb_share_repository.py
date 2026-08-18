@@ -151,5 +151,27 @@ class KBShareRepository(GenericRepository[KnowledgeBaseShare]):
         ).bindparams(knowledge_base_id=knowledge_base_id)
         return int((await self._session.execute(stmt)).scalar_one())
 
+    async def list_shared_for_tenant(self, tenant_id: int) -> list[KnowledgeBaseShare]:
+        """Every live share into an organization the tenant belongs to.
+
+        The member-org join narrows the sweep to shares the tenant can
+        actually reach; the org and knowledge-base joins drop shares
+        whose owning organization or knowledge base was soft-deleted
+        (mirrors the upstream tenant-scoped share list).
+        """
+        stmt = text(
+            f"select ks.* from {_KB_SHARE_TABLE} ks "
+            "join organization_tenant_members otm "
+            "  on otm.organization_id = ks.organization_id "
+            "join organizations o "
+            "  on o.id = ks.organization_id and o.deleted_at is null "
+            "join knowledge_bases kb "
+            "  on kb.id = ks.knowledge_base_id and kb.deleted_at is null "
+            "where otm.tenant_id = :tenant_id and ks.deleted_at is null "
+            f"order by {_SHARE_ORDER}"
+        ).bindparams(tenant_id=tenant_id)
+        result = await self._session.execute(stmt)
+        return [self._hydrate(m) for m in result.mappings().all()]
+
 
 __all__ = ["KBShareRepository"]

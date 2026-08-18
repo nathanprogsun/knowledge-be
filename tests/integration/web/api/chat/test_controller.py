@@ -210,7 +210,7 @@ def test_knowledge_search_returns_envelope(
     fake_service.search_results = [_hit("c1"), _hit("c2")]
 
     resp = client.post(
-        "/knowledge-search",
+        "/api/v1/knowledge-search",
         json={"query": "hello", "knowledge_base_ids": ["kb-1"]},
     )
 
@@ -236,7 +236,7 @@ def test_knowledge_search_merges_single_kb_id(
     fake_service.search_results = [_hit("c1")]
 
     resp = client.post(
-        "/knowledge-search",
+        "/api/v1/knowledge-search",
         json={"query": "find", "knowledge_base_id": "kb-legacy"},
     )
 
@@ -248,7 +248,7 @@ def test_knowledge_search_merges_single_kb_id(
 
 def test_knowledge_search_rejects_empty_query(client: TestClient) -> None:
     """A blank query fails validation at the Pydantic body boundary."""
-    resp = client.post("/knowledge-search", json={"query": ""})
+    resp = client.post("/api/v1/knowledge-search", json={"query": ""})
     assert resp.status_code == 422
 
 
@@ -264,7 +264,7 @@ def test_knowledge_search_rejects_no_target(
             "knowledge_ids, or scoped tag must be provided"
         ),
     }
-    resp = client.post("/knowledge-search", json={"query": "find"})
+    resp = client.post("/api/v1/knowledge-search", json={"query": "find"})
     assert resp.status_code == 422
 
 
@@ -300,7 +300,7 @@ def test_knowledge_qa_streams_events(
     ]
 
     chunks: list[str] = []
-    with client.stream("POST", "/knowledge-chat/s1", json={"query": "hello"}) as resp:
+    with client.stream("POST", "/api/v1/knowledge-chat/s1", json={"query": "hello"}) as resp:
         assert resp.status_code == 200
         assert resp.headers["content-type"].startswith("text/event-stream")
         for chunk in resp.iter_text():
@@ -318,13 +318,13 @@ def test_knowledge_qa_streams_events(
 
 def test_knowledge_qa_rejects_empty_session(client: TestClient) -> None:
     """A blank-session path is rejected before streaming."""
-    resp = client.post("/knowledge-chat/%20%20", json={"query": "hello"})
+    resp = client.post("/api/v1/knowledge-chat/%20%20", json={"query": "hello"})
     assert resp.status_code == 422
 
 
 def test_knowledge_qa_rejects_empty_query(client: TestClient) -> None:
     """A blank query is rejected before the stream is opened."""
-    resp = client.post("/knowledge-chat/s1", json={"query": "  "})
+    resp = client.post("/api/v1/knowledge-chat/s1", json={"query": "  "})
     assert resp.status_code == 422
 
 
@@ -391,14 +391,14 @@ def test_agent_qa_without_agent_id_is_rejected(
 
 def test_unauthed_knowledge_search_returns_401(anon_client: TestClient) -> None:
     resp = anon_client.post(
-        "/knowledge-search",
+        "/api/v1/knowledge-search",
         json={"query": "x", "knowledge_base_ids": ["kb"]},
     )
     assert resp.status_code == 401
 
 
 def test_unauthed_knowledge_qa_returns_401(anon_client: TestClient) -> None:
-    resp = anon_client.post("/knowledge-chat/s1", json={"query": "x"})
+    resp = anon_client.post("/api/v1/knowledge-chat/s1", json={"query": "x"})
     assert resp.status_code == 401
 
 

@@ -150,5 +150,60 @@ class AgentShareRepository(GenericRepository[AgentShare]):
         ).bindparams(agent_id=agent_id)
         return int((await self._session.execute(stmt)).scalar_one())
 
+    async def list_shared_for_tenant(self, tenant_id: int) -> list[AgentShare]:
+        """Every live share into an organization the tenant belongs to.
+
+        The member-org join narrows the sweep to shares the tenant can
+        actually reach; the org and agent joins drop shares whose owning
+        organization or agent was soft-deleted (mirrors the upstream
+        tenant-scoped share list).
+        """
+        stmt = text(
+            f"select ags.* from {_AGENT_SHARE_TABLE} ags "
+            "join organization_tenant_members otm "
+            "  on otm.organization_id = ags.organization_id "
+            "join organizations o "
+            "  on o.id = ags.organization_id and o.deleted_at is null "
+            "join custom_agents ca "
+            "  on ca.id = ags.agent_id "
+            "  and ca.tenant_id = ags.source_tenant_id "
+            "  and ca.deleted_at is null "
+            "where otm.tenant_id = :tenant_id and ags.deleted_at is null "
+            f"order by {_SHARE_ORDER}"
+        ).bindparams(tenant_id=tenant_id)
+        result = await self._session.execute(stmt)
+        return [self._hydrate(m) for m in result.mappings().all()]
+
+    async def get_share_for_tenant(
+        self,
+        *,
+        tenant_id: int,
+        agent_id: str,
+        exclude_source_tenant_id: int,
+    ) -> AgentShare | None:
+        """Return one live share of ``agent_id`` reachable by the tenant.
+
+        The caller's own tenant is excluded as a source so an agent the
+        caller owns never resolves through a share row; the member-org
+        join keeps the lookup tenant-scoped.
+        """
+        stmt = text(
+            f"select ags.* from {_AGENT_SHARE_TABLE} ags "
+            "join organization_tenant_members otm "
+            "  on otm.organization_id = ags.organization_id "
+            "where otm.tenant_id = :tenant_id "
+            "  and ags.agent_id = :agent_id "
+            "  and ags.source_tenant_id != :exclude_source_tenant_id "
+            f"  and ags.{_LIVE} "
+            "order by ags.id "
+            "limit 1"
+        ).bindparams(
+            tenant_id=tenant_id,
+            agent_id=agent_id,
+            exclude_source_tenant_id=exclude_source_tenant_id,
+        )
+        result = await self._session.execute(stmt)
+        return self._hydrate_opt(result.mappings().first())
+
 
 __all__ = ["AgentShareRepository"]

@@ -119,7 +119,7 @@ async def test_login_writes_tokens_to_db(
 ) -> None:
     uid, email = await _seed_user(session_factory)
     resp = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={"email": email, "password": "correct-horse"},
     )
     assert resp.status_code == 200
@@ -153,7 +153,7 @@ async def test_login_wrong_password_db_unchanged(
 ) -> None:
     uid, email = await _seed_user(session_factory)
     resp = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={"email": email, "password": "wrong"},
     )
     assert resp.status_code == 401
@@ -177,13 +177,13 @@ async def test_refresh_revokes_old_token_in_db(
 ) -> None:
     uid, email = await _seed_user(session_factory)
     login = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={"email": email, "password": "correct-horse"},
     )
     old_refresh = login.json()["refresh_token"]
 
     resp = client.post(
-        "/auth/refresh",
+        "/api/v1/auth/refresh",
         json={"refreshToken": old_refresh},
     )
     assert resp.status_code == 200
@@ -217,13 +217,13 @@ async def test_logout_revokes_all_tokens_in_db(
 ) -> None:
     uid, email = await _seed_user(session_factory)
     login = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={"email": email, "password": "correct-horse"},
     )
     token = login.json()["token"]
 
     resp = client.post(
-        "/auth/logout",
+        "/api/v1/auth/logout",
         headers={"Authorization": f"Bearer {token}"},
     )
     assert resp.status_code == 200
@@ -252,19 +252,19 @@ async def test_logout_then_refresh_fails(
     """After logout, the refresh token is revoked and can no longer be used."""
     _, email = await _seed_user(session_factory)
     login = client.post(
-        "/auth/login",
+        "/api/v1/auth/login",
         json={"email": email, "password": "correct-horse"},
     )
     refresh = login.json()["refresh_token"]
     access = login.json()["token"]
 
     client.post(
-        "/auth/logout",
+        "/api/v1/auth/logout",
         headers={"Authorization": f"Bearer {access}"},
     )
 
     resp = client.post(
-        "/auth/refresh",
+        "/api/v1/auth/refresh",
         json={"refreshToken": refresh},
     )
     assert resp.status_code == 401

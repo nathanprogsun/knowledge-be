@@ -161,7 +161,7 @@ async def _login(
     email: str = "alice@example.com",
     password: str = "correct-horse",
 ) -> str:
-    resp = web_authed_client.post("/auth/login", json={"email": email, "password": password})
+    resp = web_authed_client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert resp.status_code == 200
     return str(resp.json()["token"])
 
@@ -171,7 +171,7 @@ async def _login(
 
 async def test_register_success(web_authed_client: TestClient, users_repo: AsyncMock) -> None:
     resp = web_authed_client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json={"username": "bob", "email": "bob@example.com", "password": "secret1"},
     )
     assert resp.status_code == 200
@@ -179,7 +179,7 @@ async def test_register_success(web_authed_client: TestClient, users_repo: Async
     assert body["success"] is True
     assert body["user"]["username"] == "bob"
     assert body["user"]["email"] == "bob@example.com"
-    assert body["active_tenant"] is None
+    assert body["tenant"] is None
 
 
 async def test_register_duplicate_email(
@@ -187,7 +187,7 @@ async def test_register_duplicate_email(
 ) -> None:
     _seed_user(users_repo)
     resp = web_authed_client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json={"username": "alice2", "email": "alice@example.com", "password": "secret1"},
     )
     assert resp.status_code == 409
@@ -196,7 +196,7 @@ async def test_register_duplicate_email(
 
 async def test_register_empty_username(web_authed_client: TestClient) -> None:
     resp = web_authed_client.post(
-        "/auth/register",
+        "/api/v1/auth/register",
         json={"username": "  ", "email": "x@example.com", "password": "secret1"},
     )
     assert resp.status_code == 422
@@ -208,15 +208,15 @@ async def test_register_empty_username(web_authed_client: TestClient) -> None:
 async def test_me_success(web_authed_client: TestClient, users_repo: AsyncMock) -> None:
     _seed_user(users_repo)
     token = await _login(web_authed_client)
-    resp = web_authed_client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    resp = web_authed_client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
-    assert body["user"]["email"] == "alice@example.com"
+    assert body["data"]["user"]["email"] == "alice@example.com"
 
 
 async def test_me_missing_header(web_authed_client: TestClient) -> None:
-    resp = web_authed_client.get("/auth/me")
+    resp = web_authed_client.get("/api/v1/auth/me")
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "auth.missing_authorization"
 
@@ -227,17 +227,18 @@ async def test_me_missing_header(web_authed_client: TestClient) -> None:
 async def test_validate_valid_token(web_authed_client: TestClient, users_repo: AsyncMock) -> None:
     _seed_user(users_repo)
     token = await _login(web_authed_client)
-    resp = web_authed_client.get("/auth/validate", headers={"Authorization": f"Bearer {token}"})
+    resp = web_authed_client.get("/api/v1/auth/validate", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
     body = resp.json()
-    assert body["valid"] is True
-    assert body["user_id"] == "usr-1"
+    assert body["success"] is True
+    assert body["user"]["email"] == "alice@example.com"
 
 
 async def test_validate_invalid_token(web_authed_client: TestClient) -> None:
-    resp = web_authed_client.get("/auth/validate", headers={"Authorization": "Bearer not-a-jwt"})
+    resp = web_authed_client.get("/api/v1/auth/validate", headers={"Authorization": "Bearer not-a-jwt"})
     assert resp.status_code == 200
-    assert resp.json()["valid"] is False
+    assert resp.json()["success"] is True
+    assert resp.json()["user"] is None
 
 
 # ── POST /auth/change-password ────────────────────────────────────────
@@ -249,7 +250,7 @@ async def test_change_password_success(
     _seed_user(users_repo)
     token = await _login(web_authed_client)
     resp = web_authed_client.post(
-        "/auth/change-password",
+        "/api/v1/auth/change-password",
         headers={"Authorization": f"Bearer {token}"},
         json={"old_password": "correct-horse", "new_password": "new-secret"},
     )
@@ -265,7 +266,7 @@ async def test_change_password_wrong_old(
     _seed_user(users_repo)
     token = await _login(web_authed_client)
     resp = web_authed_client.post(
-        "/auth/change-password",
+        "/api/v1/auth/change-password",
         headers={"Authorization": f"Bearer {token}"},
         json={"old_password": "wrong", "new_password": "new-secret"},
     )

@@ -10,7 +10,7 @@ Uses the shared ``web_app`` fixture (header-based auth) and applies
 the service dep override on it; the real ``require_auth`` dep resolves
 the principal via the ``X-User-Id/X-Tenant-ID/X-Roles`` header trio.
 
-Note on tenant-id duality: the URL path uses literal ``/tenants/{id}``
+Note on tenant-id duality: the URL path uses literal ``/api/v1/tenants/{id}``
 paths (the mock keys on the URL id, e.g. ``7``), while the
 ``X-Tenant-ID`` header carries ``1`` (the integration seed).
 The header-based RBAC gate is a no-op shim, so the two coexist
@@ -190,7 +190,7 @@ async def test_create_tenant_returns_201_with_envelope(
     web_authed_client: TestClient,
     repo: AsyncMock,
 ) -> None:
-    resp = web_authed_client.post("/tenants", json={"name": "acme", "description": "the workspace"})
+    resp = web_authed_client.post("/api/v1/tenants", json={"name": "acme", "description": "the workspace"})
 
     assert resp.status_code == 201
     body = resp.json()
@@ -202,7 +202,7 @@ async def test_create_tenant_returns_201_with_envelope(
 
 
 async def test_create_tenant_applies_default_quota(web_authed_client: TestClient) -> None:
-    resp = web_authed_client.post("/tenants", json={"name": "acme"})
+    resp = web_authed_client.post("/api/v1/tenants", json={"name": "acme"})
 
     assert resp.json()["data"]["storage_quota"] == DEFAULT_STORAGE_QUOTA_BYTES
 
@@ -212,7 +212,7 @@ async def test_create_tenant_stores_retriever_engines(
     repo: AsyncMock,
 ) -> None:
     resp = web_authed_client.post(
-        "/tenants",
+        "/api/v1/tenants",
         json={
             "name": "acme",
             "retriever_engines": {
@@ -228,14 +228,14 @@ async def test_create_tenant_stores_retriever_engines(
 
 
 async def test_create_tenant_rejects_blank_name(web_authed_client: TestClient) -> None:
-    resp = web_authed_client.post("/tenants", json={"name": "   "})
+    resp = web_authed_client.post("/api/v1/tenants", json={"name": "   "})
 
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "tenant.name_required"
 
 
 async def test_create_tenant_requires_a_name(web_authed_client: TestClient) -> None:
-    resp = web_authed_client.post("/tenants", json={})
+    resp = web_authed_client.post("/api/v1/tenants", json={})
 
     assert resp.status_code == 422
 
@@ -249,7 +249,7 @@ async def test_get_tenant_returns_envelope(
 ) -> None:
     stored = await _seed(repo)
 
-    resp = web_authed_client.get(f"/tenants/{stored.id}")
+    resp = web_authed_client.get(f"/api/v1/tenants/{stored.id}")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -259,14 +259,14 @@ async def test_get_tenant_returns_envelope(
 
 
 async def test_get_tenant_missing_returns_404(web_authed_client: TestClient) -> None:
-    resp = web_authed_client.get("/tenants/4242")
+    resp = web_authed_client.get("/api/v1/tenants/4242")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "tenant.not_found"
 
 
 async def test_get_tenant_rejects_non_numeric_id(web_authed_client: TestClient) -> None:
-    resp = web_authed_client.get("/tenants/not-a-number")
+    resp = web_authed_client.get("/api/v1/tenants/not-a-number")
 
     assert resp.status_code == 422
 
@@ -283,7 +283,7 @@ async def test_get_tenant_redacts_secret_config_blobs(
         storage_engine_config={"minio": {"secret_access_key": "s3cret"}},
     )
 
-    data = web_authed_client.get(f"/tenants/{stored.id}").json()["data"]
+    data = web_authed_client.get(f"/api/v1/tenants/{stored.id}").json()["data"]
 
     assert data["credentials"] is None
     assert data["web_search_config"] is None
@@ -301,7 +301,7 @@ async def test_get_tenant_keeps_non_secret_config_blobs(
         retrieval_config={"rerank_top_k": 5},
     )
 
-    data = web_authed_client.get(f"/tenants/{stored.id}").json()["data"]
+    data = web_authed_client.get(f"/api/v1/tenants/{stored.id}").json()["data"]
 
     assert data["context_config"] == {"max_tokens": 100}
     assert data["retrieval_config"] == {"rerank_top_k": 5}
@@ -317,7 +317,7 @@ async def test_list_all_tenants_returns_items_newest_first(
     older = await _seed(repo, name="older", created_at=_NOW)
     newer = await _seed(repo, name="newer", created_at=_NOW + timedelta(days=1))
 
-    body = web_authed_client.get("/tenants/all").json()
+    body = web_authed_client.get("/api/v1/tenants/all").json()
 
     assert [item["id"] for item in body["data"]["items"]] == [newer.id, older.id]
     assert body["data"]["total"] is None
@@ -329,9 +329,9 @@ async def test_list_all_tenants_excludes_deleted(
 ) -> None:
     live = await _seed(repo, name="live")
     gone = await _seed(repo, name="gone")
-    web_authed_client.delete(f"/tenants/{gone.id}")
+    web_authed_client.delete(f"/api/v1/tenants/{gone.id}")
 
-    body = web_authed_client.get("/tenants/all").json()
+    body = web_authed_client.get("/api/v1/tenants/all").json()
 
     assert [item["id"] for item in body["data"]["items"]] == [live.id]
 
@@ -346,7 +346,7 @@ async def test_search_returns_page_with_total(
     for index in range(5):
         await _seed(repo, name=f"t{index}", created_at=_NOW + timedelta(hours=index))
 
-    body = web_authed_client.get("/tenants/search", params={"page": 2, "page_size": 2}).json()
+    body = web_authed_client.get("/api/v1/tenants/search", params={"page": 2, "page_size": 2}).json()
 
     assert body["data"]["total"] == 5
     assert body["data"]["page"] == 2
@@ -361,7 +361,7 @@ async def test_search_filters_by_keyword(
     match = await _seed(repo, name="alpha", description=None)
     await _seed(repo, name="beta", description=None)
 
-    body = web_authed_client.get("/tenants/search", params={"keyword": "alpha"}).json()
+    body = web_authed_client.get("/api/v1/tenants/search", params={"keyword": "alpha"}).json()
 
     assert [item["id"] for item in body["data"]["items"]] == [match.id]
 
@@ -373,7 +373,7 @@ async def test_search_filters_by_tenant_id(
     wanted = await _seed(repo, name="wanted", description=None)
     await _seed(repo, name="other", description=None)
 
-    body = web_authed_client.get("/tenants/search", params={"tenant_id": wanted.id}).json()
+    body = web_authed_client.get("/api/v1/tenants/search", params={"tenant_id": wanted.id}).json()
 
     assert [item["id"] for item in body["data"]["items"]] == [wanted.id]
 
@@ -395,7 +395,7 @@ async def test_search_clamps_paging_params(
     expected_page_size: int,
 ) -> None:
     body = web_authed_client.get(
-        "/tenants/search", params={"page": page, "page_size": page_size}
+        "/api/v1/tenants/search", params={"page": page, "page_size": page_size}
     ).json()
 
     assert body["data"]["page"] == expected_page
@@ -412,7 +412,7 @@ async def test_update_tenant_patches_name_and_description(
     stored = await _seed(repo, name="acme", description="original")
 
     body = web_authed_client.put(
-        f"/tenants/{stored.id}",
+        f"/api/v1/tenants/{stored.id}",
         json={"name": "acme corp", "description": "patched"},
     ).json()
 
@@ -427,7 +427,7 @@ async def test_update_tenant_ignores_privileged_columns(
     stored = await _seed(repo, name="acme")
 
     body = web_authed_client.put(
-        f"/tenants/{stored.id}",
+        f"/api/v1/tenants/{stored.id}",
         json={"name": "acme", "status": "suspended", "storage_quota": 1},
     ).json()
 
@@ -443,14 +443,14 @@ async def test_update_tenant_rejects_blank_name(
 ) -> None:
     stored = await _seed(repo, name="acme")
 
-    resp = web_authed_client.put(f"/tenants/{stored.id}", json={"name": "  "})
+    resp = web_authed_client.put(f"/api/v1/tenants/{stored.id}", json={"name": "  "})
 
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "tenant.name_required"
 
 
 async def test_update_tenant_missing_returns_404(web_authed_client: TestClient) -> None:
-    resp = web_authed_client.put("/tenants/4242", json={"name": "acme"})
+    resp = web_authed_client.put("/api/v1/tenants/4242", json={"name": "acme"})
 
     assert resp.status_code == 404
 
@@ -464,7 +464,7 @@ async def test_delete_tenant_soft_deletes_and_reports_success(
 ) -> None:
     stored = await _seed(repo)
 
-    resp = web_authed_client.delete(f"/tenants/{stored.id}")
+    resp = web_authed_client.delete(f"/api/v1/tenants/{stored.id}")
 
     assert resp.status_code == 200
     assert resp.json() == {"success": True, "message": "Workspace deleted successfully"}
@@ -477,16 +477,16 @@ async def test_delete_tenant_is_idempotent(
     repo: AsyncMock,
 ) -> None:
     stored = await _seed(repo)
-    web_authed_client.delete(f"/tenants/{stored.id}")
+    web_authed_client.delete(f"/api/v1/tenants/{stored.id}")
 
-    resp = web_authed_client.delete(f"/tenants/{stored.id}")
+    resp = web_authed_client.delete(f"/api/v1/tenants/{stored.id}")
 
     assert resp.status_code == 200
     assert resp.json()["success"] is True
 
 
 async def test_delete_unknown_tenant_still_returns_200(web_authed_client: TestClient) -> None:
-    resp = web_authed_client.delete("/tenants/4242")
+    resp = web_authed_client.delete("/api/v1/tenants/4242")
 
     assert resp.status_code == 200
 

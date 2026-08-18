@@ -163,6 +163,105 @@ class MultimodalTestEnvelope(BaseModel):
     data: MultimodalTestDataView
 
 
+# ── Graph-extraction wizard (extract/fabri-*) ────────────────────────
+
+
+class FabriTagRequest(BaseModel):
+    """``{}`` - the tag generator carries no request fields."""
+
+    model_config = ConfigDict(frozen=True)
+
+
+class FabriTagData(BaseModel):
+    """``{"tags": [...]}`` - the randomly selected relation tags."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tags: list[str] = Field(default_factory=list)
+
+
+class FabriTagEnvelope(BaseModel):
+    """``{"success": true, "data": {"tags": [...]}}``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: FabriTagData
+
+
+class FabriTextRequest(BaseModel):
+    """``{"tags": [...], "model_id": "..."}`` - example-text generation."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tags: list[str] = Field(default_factory=list)
+    model_id: str
+
+
+class FabriTextData(BaseModel):
+    """``{"text": "..."}`` - the generated example text."""
+
+    model_config = ConfigDict(frozen=True)
+
+    text: str = ""
+
+
+class FabriTextEnvelope(BaseModel):
+    """``{"success": true, "data": {"text": "..."}}``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: FabriTextData
+
+
+class TextRelationNode(BaseModel):
+    """One extracted graph node."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    attributes: list[str] = Field(default_factory=list)
+
+
+class TextRelationEdge(BaseModel):
+    """One extracted graph relation."""
+
+    model_config = ConfigDict(frozen=True)
+
+    node1: str
+    node2: str
+    type: str
+
+
+class TextRelationExtractionRequest(BaseModel):
+    """``{"text": "...", "tags": [...], "model_id": "..."}`` - relation extraction."""
+
+    model_config = ConfigDict(frozen=True)
+
+    text: str
+    tags: list[str] = Field(default_factory=list)
+    model_id: str
+
+
+class TextRelationExtractionData(BaseModel):
+    """``{"nodes": [...], "relations": [...]}`` - the extraction result."""
+
+    model_config = ConfigDict(frozen=True)
+
+    nodes: list[TextRelationNode] = Field(default_factory=list)
+    relations: list[TextRelationEdge] = Field(default_factory=list)
+
+
+class TextRelationExtractionEnvelope(BaseModel):
+    """``{"success": true, "data": {"nodes": [...], "relations": [...]}}``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: TextRelationExtractionData
+
+
 # ── Conversion helpers ───────────────────────────────────────────────
 
 
@@ -241,11 +340,22 @@ __all__ = [
     "DownloadTaskListEnvelope",
     "DownloadTaskView",
     "EmbeddingTestEnvelope",
+    "FabriTagData",
+    "FabriTagEnvelope",
+    "FabriTagRequest",
+    "FabriTextData",
+    "FabriTextEnvelope",
+    "FabriTextRequest",
     "ModelCheckEnvelope",
     "MultimodalTestEnvelope",
     "OllamaModelsCheckEnvelope",
     "OllamaModelsEnvelope",
     "OllamaStatusEnvelope",
+    "TextRelationEdge",
+    "TextRelationExtractionData",
+    "TextRelationExtractionEnvelope",
+    "TextRelationExtractionRequest",
+    "TextRelationNode",
     "download_progress_envelope",
     "download_start_envelope",
     "download_task_list_envelope",

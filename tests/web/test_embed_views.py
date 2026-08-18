@@ -452,8 +452,8 @@ def admin_client(embed_service: _FakeEmbedService, session_service: _FakeSession
 
     app = FastAPI()
     register_exception_handlers(app)
-    app.include_router(agents_router)
-    app.include_router(router)
+    app.include_router(agents_router, prefix="/api/v1")
+    app.include_router(router, prefix="/api/v1")
     app.dependency_overrides[require_auth] = _fake_admin_auth
     app.dependency_overrides[get_embed_channel_service] = _get_embed_service
     app.dependency_overrides[get_embed_session_service] = _get_session_service
@@ -489,7 +489,7 @@ def public_client(
 
     app = FastAPI()
     register_exception_handlers(app)
-    app.include_router(public_router)
+    app.include_router(public_router, prefix="/api/v1")
     app.dependency_overrides[get_embed_channel] = lambda: channel
     app.dependency_overrides[get_embed_session_service] = lambda: session_service
     app.dependency_overrides[get_embed_webhook_dispatcher] = lambda: webhook_dispatcher
@@ -521,7 +521,7 @@ def _fakes(client: TestClient) -> dict[str, Any]:
 
 def test_admin_create_returns_201_with_publish_token(admin_client: TestClient) -> None:
     response = admin_client.post(
-        f"/agents/{_AGENT_ID}/embed-channels",
+        f"/api/v1/agents/{_AGENT_ID}/embed-channels",
         json={
             "name": "Widget",
             "allowed_origins": [_ORIGIN],
@@ -541,7 +541,7 @@ def test_admin_create_returns_201_with_publish_token(admin_client: TestClient) -
 
 def test_admin_create_rejects_empty_origin_allowlist(admin_client: TestClient) -> None:
     response = admin_client.post(
-        f"/agents/{_AGENT_ID}/embed-channels",
+        f"/api/v1/agents/{_AGENT_ID}/embed-channels",
         json={"name": "Widget", "allowed_origins": []},
     )
 
@@ -555,7 +555,7 @@ def test_admin_create_rejects_wildcard_in_production(
 ) -> None:
     monkeypatch.setenv("GIN_MODE", "release")
     response = admin_client.post(
-        f"/agents/{_AGENT_ID}/embed-channels",
+        f"/api/v1/agents/{_AGENT_ID}/embed-channels",
         json={"name": "Widget", "allowed_origins": ["*"]},
     )
 
@@ -570,7 +570,7 @@ def test_admin_list_by_agent_returns_envelope(admin_client: TestClient) -> None:
         _channel_info(name="B"),
     ]
 
-    response = admin_client.get(f"/agents/{_AGENT_ID}/embed-channels")
+    response = admin_client.get(f"/api/v1/agents/{_AGENT_ID}/embed-channels")
 
     assert response.status_code == 200
     data = response.json()["data"]
@@ -582,7 +582,7 @@ def test_admin_list_all_returns_envelope(admin_client: TestClient) -> None:
     embed_service = admin_client.app.dependency_overrides[get_embed_channel_service]()
     embed_service.list_by_tenant = [_channel_info()]
 
-    response = admin_client.get("/embed-channels")
+    response = admin_client.get("/api/v1/embed-channels")
 
     assert response.status_code == 200
     assert len(response.json()["data"]) == 1
@@ -594,7 +594,7 @@ def test_admin_get_returns_publish_token_and_webhook_flag(
     embed_service = admin_client.app.dependency_overrides[get_embed_channel_service]()
     embed_service.owned_row = _channel_row(webhook_secret="secret-1")
 
-    response = admin_client.get(f"/embed-channels/{_CHANNEL_ID}")
+    response = admin_client.get(f"/api/v1/embed-channels/{_CHANNEL_ID}")
 
     assert response.status_code == 200
     data = response.json()["data"]
@@ -607,7 +607,7 @@ def test_admin_update_returns_updated_record(admin_client: TestClient) -> None:
     embed_service.update_result = _channel_info(name="Renamed")
 
     response = admin_client.put(
-        f"/embed-channels/{_CHANNEL_ID}",
+        f"/api/v1/embed-channels/{_CHANNEL_ID}",
         json={"name": "Renamed"},
     )
 
@@ -624,7 +624,7 @@ def test_admin_update_validates_origin_allowlist_when_changed(
     embed_service = admin_client.app.dependency_overrides[get_embed_channel_service]()
 
     response = admin_client.put(
-        f"/embed-channels/{_CHANNEL_ID}",
+        f"/api/v1/embed-channels/{_CHANNEL_ID}",
         json={"name": "Renamed", "allowed_origins": []},
     )
 
@@ -636,7 +636,7 @@ def test_admin_update_validates_origin_allowlist_when_changed(
 def test_admin_delete_returns_success(admin_client: TestClient) -> None:
     embed_service = admin_client.app.dependency_overrides[get_embed_channel_service]()
 
-    response = admin_client.delete(f"/embed-channels/{_CHANNEL_ID}")
+    response = admin_client.delete(f"/api/v1/embed-channels/{_CHANNEL_ID}")
 
     assert response.status_code == 200
     assert response.json() == {"success": True}
@@ -646,7 +646,7 @@ def test_admin_delete_returns_success(admin_client: TestClient) -> None:
 def test_admin_rotate_token_returns_new_token(admin_client: TestClient) -> None:
     embed_service = admin_client.app.dependency_overrides[get_embed_channel_service]()
 
-    response = admin_client.post(f"/embed-channels/{_CHANNEL_ID}/rotate-token")
+    response = admin_client.post(f"/api/v1/embed-channels/{_CHANNEL_ID}/rotate-token")
 
     assert response.status_code == 200
     assert response.json()["data"]["publish_token"] == "em_rotated"
@@ -656,7 +656,7 @@ def test_admin_rotate_token_returns_new_token(admin_client: TestClient) -> None:
 def test_admin_preview_session_returns_session_token(admin_client: TestClient) -> None:
     session_service = admin_client.app.dependency_overrides[get_embed_session_service]()
 
-    response = admin_client.post(f"/embed-channels/{_CHANNEL_ID}/preview-session")
+    response = admin_client.post(f"/api/v1/embed-channels/{_CHANNEL_ID}/preview-session")
 
     assert response.status_code == 200
     data = response.json()["data"]
@@ -669,7 +669,7 @@ def test_admin_stats_returns_session_count(admin_client: TestClient) -> None:
     embed_service = admin_client.app.dependency_overrides[get_embed_channel_service]()
     embed_service.owned_row = _channel_row()
 
-    response = admin_client.get(f"/embed-channels/{_CHANNEL_ID}/stats")
+    response = admin_client.get(f"/api/v1/embed-channels/{_CHANNEL_ID}/stats")
 
     assert response.status_code == 200
     assert response.json()["data"]["session_count"] == 4
@@ -680,7 +680,7 @@ def test_admin_missing_tenant_context_is_401(admin_client: TestClient) -> None:
 
     admin_client.app.dependency_overrides[get_tenant_id_dep] = lambda: 0
 
-    response = admin_client.get("/embed-channels")
+    response = admin_client.get("/api/v1/embed-channels")
 
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "embed.tenant_context_missing"
@@ -690,7 +690,7 @@ def test_admin_missing_tenant_context_is_401(admin_client: TestClient) -> None:
 
 
 def test_public_config_returns_public_config(public_client: TestClient) -> None:
-    response = public_client.get(f"/embed/{_CHANNEL_ID}/config")
+    response = public_client.get(f"/api/v1/embed/{_CHANNEL_ID}/config")
 
     assert response.status_code == 200
     data = response.json()["data"]
@@ -704,7 +704,7 @@ def test_public_config_returns_public_config(public_client: TestClient) -> None:
 
 def test_public_exchange_mints_session_token(public_client: TestClient) -> None:
     response = public_client.post(
-        f"/embed/{_CHANNEL_ID}/exchange",
+        f"/api/v1/embed/{_CHANNEL_ID}/exchange",
         headers={"Authorization": f"Embed {_PUBLISH_TOKEN}"},
     )
 
@@ -716,7 +716,7 @@ def test_public_exchange_mints_session_token(public_client: TestClient) -> None:
 
 def test_public_exchange_rejects_session_token(public_client: TestClient) -> None:
     response = public_client.post(
-        f"/embed/{_CHANNEL_ID}/exchange",
+        f"/api/v1/embed/{_CHANNEL_ID}/exchange",
         headers={"Authorization": "Embed ems_sessiontoken"},
     )
 
@@ -728,7 +728,7 @@ def test_public_create_session_returns_id_and_sig(public_client: TestClient) -> 
     session_service = _fakes(public_client)["session_service"]
 
     response = public_client.post(
-        f"/embed/{_CHANNEL_ID}/sessions",
+        f"/api/v1/embed/{_CHANNEL_ID}/sessions",
         headers={"Authorization": f"Embed {_PUBLISH_TOKEN}", "Origin": _ORIGIN},
     )
 
@@ -748,7 +748,7 @@ def test_public_suggested_questions_disabled_returns_empty(
         show_suggested_questions=False
     )
 
-    response = public_client.get(f"/embed/{_CHANNEL_ID}/suggested-questions")
+    response = public_client.get(f"/api/v1/embed/{_CHANNEL_ID}/suggested-questions")
 
     assert response.status_code == 200
     assert response.json()["data"]["questions"] == []
@@ -758,7 +758,7 @@ def test_public_suggested_questions_enabled_returns_empty_until_wired(
     public_client: TestClient,
 ) -> None:
     response = public_client.get(
-        f"/embed/{_CHANNEL_ID}/suggested-questions", params={"limit": "100"}
+        f"/api/v1/embed/{_CHANNEL_ID}/suggested-questions", params={"limit": "100"}
     )
 
     assert response.status_code == 200
@@ -771,7 +771,7 @@ def test_public_suggested_questions_enabled_returns_empty_until_wired(
 def test_public_chunk_returns_chunk(public_client: TestClient) -> None:
     _fakes(public_client)["chunk_service"].chunk = _chunk_row()
 
-    response = public_client.get(f"/embed/{_CHANNEL_ID}/chunks/chunk-1")
+    response = public_client.get(f"/api/v1/embed/{_CHANNEL_ID}/chunks/chunk-1")
 
     assert response.status_code == 200
     data = response.json()["data"]
@@ -782,14 +782,14 @@ def test_public_chunk_returns_chunk(public_client: TestClient) -> None:
 def test_public_chunk_forbids_cross_tenant(public_client: TestClient) -> None:
     _fakes(public_client)["chunk_service"].chunk = _chunk_row(tenant_id=_TENANT + 1)
 
-    response = public_client.get(f"/embed/{_CHANNEL_ID}/chunks/chunk-1")
+    response = public_client.get(f"/api/v1/embed/{_CHANNEL_ID}/chunks/chunk-1")
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "embed.chunk_forbidden"
 
 
 def test_public_chunk_missing_is_404(public_client: TestClient) -> None:
-    response = public_client.get(f"/embed/{_CHANNEL_ID}/chunks/missing")
+    response = public_client.get(f"/api/v1/embed/{_CHANNEL_ID}/chunks/missing")
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "embed.chunk_not_found"
@@ -802,7 +802,7 @@ def test_public_load_messages_returns_envelope(public_client: TestClient) -> Non
     _fakes(public_client)["message_service"].rows = []
 
     response = public_client.get(
-        f"/embed/{_CHANNEL_ID}/messages/{_SESSION_ID}/load",
+        f"/api/v1/embed/{_CHANNEL_ID}/messages/{_SESSION_ID}/load",
         headers={"X-Embed-Session": _session_handle(_channel_row())},
     )
 
@@ -814,7 +814,7 @@ def test_public_load_messages_requires_valid_session_handle(
     public_client: TestClient,
 ) -> None:
     response = public_client.get(
-        f"/embed/{_CHANNEL_ID}/messages/{_SESSION_ID}/load",
+        f"/api/v1/embed/{_CHANNEL_ID}/messages/{_SESSION_ID}/load",
         headers={"X-Embed-Session": "bogus"},
     )
 
@@ -827,7 +827,7 @@ def test_public_load_messages_requires_valid_session_handle(
 
 def test_public_webhook_relay_ack(public_client: TestClient) -> None:
     response = public_client.post(
-        f"/embed/{_CHANNEL_ID}/sessions/{_SESSION_ID}/events",
+        f"/api/v1/embed/{_CHANNEL_ID}/sessions/{_SESSION_ID}/events",
         headers={"X-Embed-Session": _session_handle(_channel_row())},
         json={
             "type": "message_sent",
@@ -846,7 +846,7 @@ def test_public_webhook_relay_ack(public_client: TestClient) -> None:
 
 def test_public_webhook_relay_rejects_unknown_type(public_client: TestClient) -> None:
     response = public_client.post(
-        f"/embed/{_CHANNEL_ID}/sessions/{_SESSION_ID}/events",
+        f"/api/v1/embed/{_CHANNEL_ID}/sessions/{_SESSION_ID}/events",
         headers={"X-Embed-Session": _session_handle(_channel_row())},
         json={"type": "message_edited"},
     )
@@ -866,7 +866,7 @@ def test_public_get_suggestions_suppressed_when_disabled(
     )
 
     response = public_client.get(
-        f"/embed/{_CHANNEL_ID}/sessions/{_SESSION_ID}/messages/{_MESSAGE_ID}/suggestions",
+        f"/api/v1/embed/{_CHANNEL_ID}/sessions/{_SESSION_ID}/messages/{_MESSAGE_ID}/suggestions",
         headers={"X-Embed-Session": _session_handle(_channel_row())},
     )
 
@@ -878,7 +878,7 @@ def test_public_get_suggestions_suppressed_when_disabled(
 
 def test_public_record_suggestion_event_returns_204(public_client: TestClient) -> None:
     response = public_client.post(
-        f"/embed/{_CHANNEL_ID}/sessions/{_SESSION_ID}/suggestion-events",
+        f"/api/v1/embed/{_CHANNEL_ID}/sessions/{_SESSION_ID}/suggestion-events",
         headers={"X-Embed-Session": _session_handle(_channel_row())},
         json={
             "suggestion_set_id": "ss-1",
@@ -897,7 +897,7 @@ def test_public_knowledge_chat_patches_payload(public_client: TestClient) -> Non
     chat_service = _fakes(public_client)["chat_service"]
 
     response = public_client.post(
-        f"/embed/{_CHANNEL_ID}/knowledge-chat/{_SESSION_ID}",
+        f"/api/v1/embed/{_CHANNEL_ID}/knowledge-chat/{_SESSION_ID}",
         headers={"X-Embed-Session": _session_handle(_channel_row())},
         json={"query": "hello", "web_search_enabled": True, "images": [{"data": "x"}]},
     )
@@ -917,7 +917,7 @@ def test_public_agent_chat_sets_agent_mode(public_client: TestClient) -> None:
     chat_service = _fakes(public_client)["chat_service"]
 
     response = public_client.post(
-        f"/embed/{_CHANNEL_ID}/agent-chat/{_SESSION_ID}",
+        f"/api/v1/embed/{_CHANNEL_ID}/agent-chat/{_SESSION_ID}",
         headers={"X-Embed-Session": _session_handle(_channel_row())},
         json={"query": "hi"},
     )
@@ -929,7 +929,7 @@ def test_public_agent_chat_sets_agent_mode(public_client: TestClient) -> None:
 
 def test_public_chat_rejects_invalid_json(public_client: TestClient) -> None:
     response = public_client.post(
-        f"/embed/{_CHANNEL_ID}/knowledge-chat/{_SESSION_ID}",
+        f"/api/v1/embed/{_CHANNEL_ID}/knowledge-chat/{_SESSION_ID}",
         headers={"X-Embed-Session": _session_handle(_channel_row())},
         content=b"{not json",
     )
@@ -943,7 +943,7 @@ def test_public_chat_rejects_invalid_json(public_client: TestClient) -> None:
 
 def test_public_stop_session_capability_unavailable(public_client: TestClient) -> None:
     response = public_client.post(
-        f"/embed/{_CHANNEL_ID}/sessions/{_SESSION_ID}/stop",
+        f"/api/v1/embed/{_CHANNEL_ID}/sessions/{_SESSION_ID}/stop",
         headers={"X-Embed-Session": _session_handle(_channel_row())},
     )
 
@@ -955,20 +955,20 @@ def test_public_mcp_oauth_and_files_unavailable(public_client: TestClient) -> No
     headers = {"X-Embed-Session": _session_handle(_channel_row())}
     assert (
         public_client.post(
-            f"/embed/{_CHANNEL_ID}/sessions/{_SESSION_ID}/mcp-oauth-resolutions/p1",
+            f"/api/v1/embed/{_CHANNEL_ID}/sessions/{_SESSION_ID}/mcp-oauth-resolutions/p1",
             headers=headers,
         ).status_code
         == 502
     )
     assert (
         public_client.post(
-            f"/embed/{_CHANNEL_ID}/sessions/{_SESSION_ID}/tool-approvals/p1",
+            f"/api/v1/embed/{_CHANNEL_ID}/sessions/{_SESSION_ID}/tool-approvals/p1",
             headers=headers,
         ).status_code
         == 502
     )
     assert (
-        public_client.get(f"/embed/{_CHANNEL_ID}/files").status_code == 502
+        public_client.get(f"/api/v1/embed/{_CHANNEL_ID}/files").status_code == 502
     )
 
 
@@ -983,7 +983,7 @@ def test_public_routes_require_no_auth_dependency(public_client: TestClient) -> 
     with a missing dependency override.
     """
     assert require_auth not in public_client.app.dependency_overrides
-    response = public_client.get(f"/embed/{_CHANNEL_ID}/config")
+    response = public_client.get(f"/api/v1/embed/{_CHANNEL_ID}/config")
     assert response.status_code == 200
 
 

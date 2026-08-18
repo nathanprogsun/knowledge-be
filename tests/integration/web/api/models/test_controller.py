@@ -178,7 +178,7 @@ async def test_create_model_returns_201_envelope(
     client: TestClient,
     repo: AsyncMock,
 ) -> None:
-    resp = client.post("/models", json=_create_body())
+    resp = client.post("/api/v1/models", json=_create_body())
 
     assert resp.status_code == 201
     payload = resp.json()
@@ -192,7 +192,7 @@ async def test_create_model_returns_201_envelope(
 async def test_create_model_strips_credential_fields(
     client: TestClient,
 ) -> None:
-    resp = client.post("/models", json=_create_body())
+    resp = client.post("/api/v1/models", json=_create_body())
 
     assert resp.status_code == 201
     params = resp.json()["data"]["parameters"]
@@ -208,7 +208,7 @@ async def test_create_model_strips_credential_fields(
 
 
 async def test_create_model_rejects_blank_name(client: TestClient) -> None:
-    resp = client.post("/models", json=_create_body(name="   "))
+    resp = client.post("/api/v1/models", json=_create_body(name="   "))
 
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "model.name_required"
@@ -218,10 +218,10 @@ async def test_create_model_rejects_blank_name(client: TestClient) -> None:
 
 
 async def test_list_models_returns_tenant_rows(client: TestClient) -> None:
-    client.post("/models", json=_create_body(name="chat-1"))
-    client.post("/models", json=_create_body(name="chat-2"))
+    client.post("/api/v1/models", json=_create_body(name="chat-1"))
+    client.post("/api/v1/models", json=_create_body(name="chat-2"))
 
-    resp = client.get("/models")
+    resp = client.get("/api/v1/models")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -230,10 +230,10 @@ async def test_list_models_returns_tenant_rows(client: TestClient) -> None:
 
 
 async def test_list_models_filters_by_type(client: TestClient) -> None:
-    client.post("/models", json=_create_body(name="chat", type="KnowledgeQA"))
-    client.post("/models", json=_create_body(name="embed", type="Embedding"))
+    client.post("/api/v1/models", json=_create_body(name="chat", type="KnowledgeQA"))
+    client.post("/api/v1/models", json=_create_body(name="embed", type="Embedding"))
 
-    resp = client.get("/models?type=Embedding")
+    resp = client.get("/api/v1/models?type=Embedding")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -244,10 +244,10 @@ async def test_list_models_filters_by_type(client: TestClient) -> None:
 
 
 async def test_get_model_returns_one_model(client: TestClient) -> None:
-    created = client.post("/models", json=_create_body())
+    created = client.post("/api/v1/models", json=_create_body())
 
     model_id = created.json()["data"]["id"]
-    resp = client.get(f"/models/{model_id}")
+    resp = client.get(f"/api/v1/models/{model_id}")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -256,7 +256,7 @@ async def test_get_model_returns_one_model(client: TestClient) -> None:
 
 
 async def test_get_model_returns_404_when_absent(client: TestClient) -> None:
-    resp = client.get("/models/does-not-exist")
+    resp = client.get("/api/v1/models/does-not-exist")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "model.not_found"
@@ -268,11 +268,11 @@ async def test_get_model_returns_404_when_absent(client: TestClient) -> None:
 async def test_update_model_patches_supplied_columns(
     client: TestClient,
 ) -> None:
-    created = client.post("/models", json=_create_body())
+    created = client.post("/api/v1/models", json=_create_body())
     model_id = created.json()["data"]["id"]
 
     resp = client.put(
-        f"/models/{model_id}",
+        f"/api/v1/models/{model_id}",
         json={"name": "gpt-4-turbo", "description": "renamed"},
     )
 
@@ -283,7 +283,7 @@ async def test_update_model_patches_supplied_columns(
 
 
 async def test_update_model_returns_404_when_absent(client: TestClient) -> None:
-    resp = client.put("/models/does-not-exist", json={"name": "x"})
+    resp = client.put("/api/v1/models/does-not-exist", json={"name": "x"})
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "model.not_found"
@@ -296,10 +296,10 @@ async def test_delete_model_removes_row(
     client: TestClient,
     repo: AsyncMock,
 ) -> None:
-    created = client.post("/models", json=_create_body())
+    created = client.post("/api/v1/models", json=_create_body())
     model_id = created.json()["data"]["id"]
 
-    resp = client.delete(f"/models/{model_id}")
+    resp = client.delete(f"/api/v1/models/{model_id}")
 
     assert resp.status_code == 200
     assert resp.json()["success"] is True
@@ -312,7 +312,7 @@ async def test_delete_model_removes_row(
 
 
 async def test_list_providers_returns_catalog(client: TestClient) -> None:
-    resp = client.get("/models/providers")
+    resp = client.get("/api/v1/models/providers")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -333,11 +333,11 @@ async def test_list_providers_returns_catalog(client: TestClient) -> None:
 
 
 async def test_debug_model_returns_envelope(client: TestClient) -> None:
-    created = client.post("/models", json=_create_body())
+    created = client.post("/api/v1/models", json=_create_body())
     model_id = created.json()["data"]["id"]
 
     resp = client.post(
-        f"/models/{model_id}/debug",
+        f"/api/v1/models/{model_id}/debug",
         data={"input": "hello"},
     )
 
@@ -350,7 +350,7 @@ async def test_debug_model_returns_envelope(client: TestClient) -> None:
 
 
 async def test_debug_model_returns_404_when_absent(client: TestClient) -> None:
-    resp = client.post("/models/does-not-exist/debug", data={"input": "hi"})
+    resp = client.post("/api/v1/models/does-not-exist/debug", data={"input": "hi"})
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "model.not_found"
@@ -359,12 +359,12 @@ async def test_debug_model_returns_404_when_absent(client: TestClient) -> None:
 async def test_debug_model_rejects_oversized_input(
     client: TestClient,
 ) -> None:
-    created = client.post("/models", json=_create_body())
+    created = client.post("/api/v1/models", json=_create_body())
     model_id = created.json()["data"]["id"]
 
     oversize = "x" * (65 * 1024)
     resp = client.post(
-        f"/models/{model_id}/debug",
+        f"/api/v1/models/{model_id}/debug",
         data={"input": oversize},
     )
 

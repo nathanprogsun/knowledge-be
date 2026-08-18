@@ -73,18 +73,9 @@ KNOWN_CONTRACT_DRIFT: dict[str, str] = {
         "'require_approval' field that KnowledgeBaseShareResponse carries "
         "upstream."
     ),
-    "SharedKnowledgeBaseListItem": (
-        "Python SharedKnowledgeBaseListItem carries "
-        "'shared_by_user_id' and 'shared_by_username' which the upstream "
-        "OrganizationSharedKnowledgeBaseItem struct does not."
-    ),
     "AgentShare": (
         "Python AgentShare is missing the reference 'id' and "
         "'scope_mcp_count' fields that AgentShareResponse carries upstream."
-    ),
-    "SharedAgentListItem": (
-        "Python SharedAgentListItem is missing the reference "
-        "'web_search_ready' field that SharedAgentInfo carries upstream."
     ),
 }
 

@@ -459,44 +459,44 @@ def _folder(**overrides: object) -> WikiFolder:
 # ── Route inventory + permission gates ───────────────────────────────
 
 EXPECTED_ROUTES: set[tuple[str, str]] = {
-    ("GET", "/knowledgebase/{kb_id}/wiki/pages"),
-    ("POST", "/knowledgebase/{kb_id}/wiki/pages"),
-    ("GET", "/knowledgebase/{kb_id}/wiki/pages/{slug:path}"),
-    ("PUT", "/knowledgebase/{kb_id}/wiki/pages/{slug:path}"),
-    ("DELETE", "/knowledgebase/{kb_id}/wiki/pages/{slug:path}"),
-    ("PUT", "/knowledgebase/{kb_id}/wiki/move-page"),
-    ("GET", "/knowledgebase/{kb_id}/wiki/folders"),
-    ("POST", "/knowledgebase/{kb_id}/wiki/folders"),
-    ("PUT", "/knowledgebase/{kb_id}/wiki/folders/{folder_id}"),
-    ("DELETE", "/knowledgebase/{kb_id}/wiki/folders/{folder_id}"),
-    ("GET", "/knowledgebase/{kb_id}/wiki/index"),
-    ("GET", "/knowledgebase/{kb_id}/wiki/graph"),
-    ("GET", "/knowledgebase/{kb_id}/wiki/stats"),
-    ("GET", "/knowledgebase/{kb_id}/wiki/search"),
-    ("POST", "/knowledgebase/{kb_id}/wiki/rebuild-links"),
-    ("GET", "/knowledgebase/{kb_id}/wiki/lint"),
-    ("POST", "/knowledgebase/{kb_id}/wiki/auto-fix"),
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/pages"),
+    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/pages"),
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/pages/{slug:path}"),
+    ("PUT", "/api/v1/knowledgebase/{kb_id}/wiki/pages/{slug:path}"),
+    ("DELETE", "/api/v1/knowledgebase/{kb_id}/wiki/pages/{slug:path}"),
+    ("PUT", "/api/v1/knowledgebase/{kb_id}/wiki/move-page"),
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/folders"),
+    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/folders"),
+    ("PUT", "/api/v1/knowledgebase/{kb_id}/wiki/folders/{folder_id}"),
+    ("DELETE", "/api/v1/knowledgebase/{kb_id}/wiki/folders/{folder_id}"),
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/index"),
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/graph"),
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/stats"),
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/search"),
+    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/rebuild-links"),
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/lint"),
+    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/auto-fix"),
 }
 
 # Reads are Viewer+; content mutations and maintenance are Admin+.
 EXPECTED_ROLES: dict[tuple[str, str], str] = {
-    ("GET", "/knowledgebase/{kb_id}/wiki/pages"): "viewer",
-    ("POST", "/knowledgebase/{kb_id}/wiki/pages"): "admin",
-    ("GET", "/knowledgebase/{kb_id}/wiki/pages/{slug:path}"): "viewer",
-    ("PUT", "/knowledgebase/{kb_id}/wiki/pages/{slug:path}"): "admin",
-    ("DELETE", "/knowledgebase/{kb_id}/wiki/pages/{slug:path}"): "admin",
-    ("PUT", "/knowledgebase/{kb_id}/wiki/move-page"): "admin",
-    ("GET", "/knowledgebase/{kb_id}/wiki/folders"): "viewer",
-    ("POST", "/knowledgebase/{kb_id}/wiki/folders"): "admin",
-    ("PUT", "/knowledgebase/{kb_id}/wiki/folders/{folder_id}"): "admin",
-    ("DELETE", "/knowledgebase/{kb_id}/wiki/folders/{folder_id}"): "admin",
-    ("GET", "/knowledgebase/{kb_id}/wiki/index"): "viewer",
-    ("GET", "/knowledgebase/{kb_id}/wiki/graph"): "viewer",
-    ("GET", "/knowledgebase/{kb_id}/wiki/stats"): "viewer",
-    ("GET", "/knowledgebase/{kb_id}/wiki/search"): "viewer",
-    ("POST", "/knowledgebase/{kb_id}/wiki/rebuild-links"): "admin",
-    ("GET", "/knowledgebase/{kb_id}/wiki/lint"): "viewer",
-    ("POST", "/knowledgebase/{kb_id}/wiki/auto-fix"): "admin",
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/pages"): "viewer",
+    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/pages"): "admin",
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/pages/{slug:path}"): "viewer",
+    ("PUT", "/api/v1/knowledgebase/{kb_id}/wiki/pages/{slug:path}"): "admin",
+    ("DELETE", "/api/v1/knowledgebase/{kb_id}/wiki/pages/{slug:path}"): "admin",
+    ("PUT", "/api/v1/knowledgebase/{kb_id}/wiki/move-page"): "admin",
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/folders"): "viewer",
+    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/folders"): "admin",
+    ("PUT", "/api/v1/knowledgebase/{kb_id}/wiki/folders/{folder_id}"): "admin",
+    ("DELETE", "/api/v1/knowledgebase/{kb_id}/wiki/folders/{folder_id}"): "admin",
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/index"): "viewer",
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/graph"): "viewer",
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/stats"): "viewer",
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/search"): "viewer",
+    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/rebuild-links"): "admin",
+    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/lint"): "viewer",
+    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/auto-fix"): "admin",
 }
 
 
@@ -546,7 +546,7 @@ def test_every_endpoint_declares_the_expected_role_gate() -> None:
 async def test_missing_kb_returns_404(client: TestClient, kb_repo: AsyncMock) -> None:
     kb_repo._rows.pop("kb-1", None)  # type: ignore[attr-defined]
 
-    resp = client.get("/knowledgebase/nope/wiki/pages")
+    resp = client.get("/api/v1/knowledgebase/nope/wiki/pages")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "knowledge_base.not_found"
@@ -558,7 +558,7 @@ async def test_non_wiki_kb_returns_422(client: TestClient, kb_repo: AsyncMock) -
         update={"indexing_strategy": {"wiki_enabled": False}}
     )
 
-    resp = client.get(f"/knowledgebase/{KB_ID}/wiki/pages")
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/pages")
 
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "wiki.kb_wiki_not_enabled"
@@ -573,7 +573,7 @@ async def test_list_pages_returns_envelope(client: TestClient, page_repo: AsyncM
         id="page-2", slug="concept/rag", title="RAG", page_type="concept"
     )
 
-    resp = client.get(f"/knowledgebase/{KB_ID}/wiki/pages")
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/pages")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -594,7 +594,7 @@ async def test_list_pages_filters_by_status(client: TestClient, page_repo: Async
         id="page-2", slug="concept/rag", title="RAG", page_type="concept", status="archived"
     )
 
-    resp = client.get(f"/knowledgebase/{KB_ID}/wiki/pages", params={"status": "archived"})
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/pages", params={"status": "archived"})
 
     assert resp.status_code == 200
     assert [p["slug"] for p in resp.json()["data"]["pages"]] == ["concept/rag"]
@@ -609,7 +609,7 @@ async def test_create_page_returns_201(
     default_create_wiki_request: dict[str, object],
 ) -> None:
     resp = client.post(
-        f"/knowledgebase/{KB_ID}/wiki/pages",
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/pages",
         json=default_create_wiki_request,
     )
 
@@ -632,7 +632,7 @@ async def test_create_page_rejects_invalid_page_type(
 ) -> None:
     body = dict(default_create_wiki_request, page_type="bogus")
 
-    resp = client.post(f"/knowledgebase/{KB_ID}/wiki/pages", json=body)
+    resp = client.post(f"/api/v1/knowledgebase/{KB_ID}/wiki/pages", json=body)
 
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "wiki.page_invalid_type"
@@ -644,7 +644,7 @@ async def test_create_page_requires_slug(
 ) -> None:
     body = {k: v for k, v in default_create_wiki_request.items() if k != "slug"}
 
-    resp = client.post(f"/knowledgebase/{KB_ID}/wiki/pages", json=body)
+    resp = client.post(f"/api/v1/knowledgebase/{KB_ID}/wiki/pages", json=body)
 
     assert resp.status_code == 422
 
@@ -655,7 +655,7 @@ async def test_create_page_requires_slug(
 async def test_get_page_returns_page(client: TestClient, page_repo: AsyncMock) -> None:
     page_repo._rows["page-1"] = _page()  # type: ignore[attr-defined]
 
-    resp = client.get(f"/knowledgebase/{KB_ID}/wiki/pages/entity/acme-corp")
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/pages/entity/acme-corp")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -665,7 +665,7 @@ async def test_get_page_returns_page(client: TestClient, page_repo: AsyncMock) -
 
 
 async def test_get_page_missing_returns_404(client: TestClient) -> None:
-    resp = client.get(f"/knowledgebase/{KB_ID}/wiki/pages/entity/nope")
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/pages/entity/nope")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "wiki.page_not_found"
@@ -681,7 +681,7 @@ async def test_update_page_patches_fields(
     page_repo._rows["page-1"] = _page()  # type: ignore[attr-defined]
 
     resp = client.put(
-        f"/knowledgebase/{KB_ID}/wiki/pages/entity/acme-corp",
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/pages/entity/acme-corp",
         json={"title": "Acme Renamed"},
     )
 
@@ -698,7 +698,7 @@ async def test_update_page_version_conflict_returns_409(
     page_repo._rows["page-1"] = _page()  # type: ignore[attr-defined]
 
     resp = client.put(
-        f"/knowledgebase/{KB_ID}/wiki/pages/entity/acme-corp",
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/pages/entity/acme-corp",
         json={"title": "x", "version": 99},
     )
 
@@ -710,7 +710,7 @@ async def test_update_page_version_conflict_returns_409(
 
 async def test_update_page_missing_returns_404(client: TestClient) -> None:
     resp = client.put(
-        f"/knowledgebase/{KB_ID}/wiki/pages/entity/nope",
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/pages/entity/nope",
         json={"title": "x"},
     )
 
@@ -724,14 +724,14 @@ async def test_update_page_missing_returns_404(client: TestClient) -> None:
 async def test_delete_page_returns_204(client: TestClient, page_repo: AsyncMock) -> None:
     page_repo._rows["page-1"] = _page()  # type: ignore[attr-defined]
 
-    resp = client.delete(f"/knowledgebase/{KB_ID}/wiki/pages/entity/acme-corp")
+    resp = client.delete(f"/api/v1/knowledgebase/{KB_ID}/wiki/pages/entity/acme-corp")
 
     assert resp.status_code == 204
     assert page_repo._rows["page-1"].deleted_at is not None  # type: ignore[attr-defined]
 
 
 async def test_delete_page_missing_returns_404(client: TestClient) -> None:
-    resp = client.delete(f"/knowledgebase/{KB_ID}/wiki/pages/entity/nope")
+    resp = client.delete(f"/api/v1/knowledgebase/{KB_ID}/wiki/pages/entity/nope")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "wiki.page_not_found"
@@ -751,7 +751,7 @@ async def test_move_page_returns_page(
     )
 
     resp = client.put(
-        f"/knowledgebase/{KB_ID}/wiki/move-page",
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/move-page",
         json={"slug": "entity/acme-corp", "folder_id": "folder-9"},
     )
 
@@ -762,7 +762,7 @@ async def test_move_page_returns_page(
 
 async def test_move_page_requires_slug(client: TestClient) -> None:
     resp = client.put(
-        f"/knowledgebase/{KB_ID}/wiki/move-page",
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/move-page",
         json={"slug": "   "},
     )
 
@@ -781,7 +781,7 @@ async def test_list_folders_returns_nodes(
     folder_repo._rows["folder-1"] = _folder()  # type: ignore[attr-defined]
     page_repo._rows["page-1"] = _page(folder_id="folder-1")  # type: ignore[attr-defined]
 
-    resp = client.get(f"/knowledgebase/{KB_ID}/wiki/folders")
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/folders")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -799,7 +799,7 @@ async def test_list_folders_returns_nodes(
 
 async def test_create_folder_returns_201(client: TestClient, folder_repo: AsyncMock) -> None:
     resp = client.post(
-        f"/knowledgebase/{KB_ID}/wiki/folders",
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/folders",
         json={"name": "Research"},
     )
 
@@ -817,7 +817,7 @@ async def test_create_folder_conflict_returns_409(
     folder_repo._rows["folder-1"] = _folder(name="Research", path="Research")  # type: ignore[attr-defined]
 
     resp = client.post(
-        f"/knowledgebase/{KB_ID}/wiki/folders",
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/folders",
         json={"name": "Research"},
     )
 
@@ -832,7 +832,7 @@ async def test_update_folder_renames(client: TestClient, folder_repo: AsyncMock)
     folder_repo._rows["folder-1"] = _folder()  # type: ignore[attr-defined]
 
     resp = client.put(
-        f"/knowledgebase/{KB_ID}/wiki/folders/folder-1",
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/folders/folder-1",
         json={"name": "Products v2"},
     )
 
@@ -846,14 +846,14 @@ async def test_update_folder_renames(client: TestClient, folder_repo: AsyncMock)
 async def test_delete_folder_returns_204(client: TestClient, folder_repo: AsyncMock) -> None:
     folder_repo._rows["folder-1"] = _folder()  # type: ignore[attr-defined]
 
-    resp = client.delete(f"/knowledgebase/{KB_ID}/wiki/folders/folder-1")
+    resp = client.delete(f"/api/v1/knowledgebase/{KB_ID}/wiki/folders/folder-1")
 
     assert resp.status_code == 204
     assert folder_repo._rows["folder-1"].deleted_at is not None  # type: ignore[attr-defined]
 
 
 async def test_delete_folder_missing_returns_404(client: TestClient) -> None:
-    resp = client.delete(f"/knowledgebase/{KB_ID}/wiki/folders/nope")
+    resp = client.delete(f"/api/v1/knowledgebase/{KB_ID}/wiki/folders/nope")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "wiki.folder_not_found"
@@ -871,7 +871,7 @@ async def test_get_index_returns_groups(
         id="page-2", slug="concept/rag", title="RAG", page_type="concept"
     )
 
-    resp = client.get(f"/knowledgebase/{KB_ID}/wiki/index")
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/index")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -902,7 +902,7 @@ async def test_get_graph_overview_returns_nodes(
         in_links=["entity/acme-corp"],
     )
 
-    resp = client.get(f"/knowledgebase/{KB_ID}/wiki/graph")
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/graph")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -914,14 +914,14 @@ async def test_get_graph_overview_returns_nodes(
 
 
 async def test_get_graph_invalid_mode_returns_422(client: TestClient) -> None:
-    resp = client.get(f"/knowledgebase/{KB_ID}/wiki/graph", params={"mode": "bogus"})
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/graph", params={"mode": "bogus"})
 
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "wiki.graph_invalid_mode"
 
 
 async def test_get_graph_ego_requires_center(client: TestClient) -> None:
-    resp = client.get(f"/knowledgebase/{KB_ID}/wiki/graph", params={"mode": "ego"})
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/graph", params={"mode": "ego"})
 
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "wiki.graph_center_required"
@@ -939,7 +939,7 @@ async def test_get_stats_returns_totals(
         id="page-2", slug="concept/rag", title="RAG", page_type="concept"
     )
 
-    resp = client.get(f"/knowledgebase/{KB_ID}/wiki/stats")
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/stats")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -952,7 +952,7 @@ async def test_get_stats_returns_totals(
 
 
 async def test_search_requires_q(client: TestClient) -> None:
-    resp = client.get(f"/knowledgebase/{KB_ID}/wiki/search")
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/search")
 
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "wiki.search_query_required"
@@ -967,7 +967,7 @@ async def test_search_returns_pages(
         id="page-2", slug="concept/rag", title="RAG", page_type="concept"
     )
 
-    resp = client.get(f"/knowledgebase/{KB_ID}/wiki/search", params={"q": "RAG"})
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/search", params={"q": "RAG"})
 
     assert resp.status_code == 200
     body = resp.json()
@@ -984,7 +984,7 @@ async def test_rebuild_links_returns_message(
 ) -> None:
     page_repo._rows["page-1"] = _page()  # type: ignore[attr-defined]
 
-    resp = client.post(f"/knowledgebase/{KB_ID}/wiki/rebuild-links")
+    resp = client.post(f"/api/v1/knowledgebase/{KB_ID}/wiki/rebuild-links")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -1011,7 +1011,7 @@ async def test_lint_returns_report(
         in_links=["concept/company"],
     )
 
-    resp = client.get(f"/knowledgebase/{KB_ID}/wiki/lint")
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/lint")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -1039,7 +1039,7 @@ async def test_auto_fix_returns_fixed(
         in_links=["concept/company"],
     )
 
-    resp = client.post(f"/knowledgebase/{KB_ID}/wiki/auto-fix")
+    resp = client.post(f"/api/v1/knowledgebase/{KB_ID}/wiki/auto-fix")
 
     assert resp.status_code == 200
     body = resp.json()

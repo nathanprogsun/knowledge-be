@@ -207,9 +207,98 @@ class MeResponse(BaseModel):
     data: MeData
 
 
+class AuthConfigResponse(BaseModel):
+    """Public registration-mode config read on app load (no auth).
+
+    Mirrors Go's ``GetAuthConfig``: only ``registration_mode`` is
+    exposed; the frontend uses it to decide whether to show the
+    Register tab.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    registration_mode: str
+
+
+class UpdatePreferencesRequest(BaseModel):
+    """PATCH body for ``PUT /auth/me/preferences``.
+
+    Fields are optional so the handler can distinguish "key not
+    present" (preserve existing value) from "explicit value"; send
+    ``last_active_tenant_id=0`` to clear the preference. Mirrors Go's
+    ``updateMyPreferencesRequest``.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    last_active_tenant_id: int | None = Field(default=None)
+
+
+class UpdatePreferencesResponse(BaseModel):
+    """The merged preferences after a PATCH update."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: JsonObject = Field(default_factory=dict)
+
+
+class InvitationLookupRequest(BaseModel):
+    """Body for ``POST /auth/invitations/lookup``.
+
+    The token travels in the body (not the path) so it never lands in
+    access logs / browser history / tracing spans.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    token: str
+
+
+class InviteLookup(BaseModel):
+    """Public projection of a share-link row for the registration page.
+
+    Narrow on purpose: just enough to render "X invited you to Y"
+    without leaking inviter audit fields.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    tenant_id: int
+    tenant_name: str | None = Field(default=None)
+    role: str
+    expires_at: datetime
+
+
+class InvitationLookupResponse(BaseModel):
+    """``POST /auth/invitations/lookup`` response."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: InviteLookup | None = Field(default=None)
+    message: str | None = Field(default=None)
+
+
+class RegisterByInviteRequest(BaseModel):
+    """Body for ``POST /auth/register-by-invite``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    token: str
+    email: str
+    username: str
+    password: str = Field(min_length=6)
+
+
 __all__ = [
+    "AuthConfigResponse",
     "AuthUser",
     "ChangePasswordRequest",
+    "InvitationLookupRequest",
+    "InvitationLookupResponse",
+    "InviteLookup",
     "LoginRequest",
     "LoginResponse",
     "MeCapabilities",
@@ -220,7 +309,10 @@ __all__ = [
     "OIDCMetaConfig",
     "RefreshTokenRequest",
     "RefreshTokenResponse",
+    "RegisterByInviteRequest",
     "RegisterRequest",
     "RegisterResponse",
+    "UpdatePreferencesRequest",
+    "UpdatePreferencesResponse",
     "ValidateTokenResponse",
 ]

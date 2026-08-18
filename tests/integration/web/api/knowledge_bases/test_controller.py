@@ -199,30 +199,30 @@ def _create_body(**overrides: object) -> dict[str, object]:
 
 
 EXPECTED_ROUTES: set[tuple[str, str]] = {
-    ("POST", "/knowledge-bases"),
-    ("GET", "/knowledge-bases"),
-    ("GET", "/knowledge-bases/{id}"),
-    ("PUT", "/knowledge-bases/{id}"),
-    ("DELETE", "/knowledge-bases/{id}"),
-    ("POST", "/knowledge-bases/{id}/duplicate"),
-    ("POST", "/knowledge-bases/copy"),
-    ("GET", "/knowledge-bases/{id}/move-targets"),
-    ("POST", "/knowledge-bases/{id}/hybrid-search"),
-    ("GET", "/knowledge-bases/{id}/hybrid-search"),
+    ("POST", "/api/v1/knowledge-bases"),
+    ("GET", "/api/v1/knowledge-bases"),
+    ("GET", "/api/v1/knowledge-bases/{id}"),
+    ("PUT", "/api/v1/knowledge-bases/{id}"),
+    ("DELETE", "/api/v1/knowledge-bases/{id}"),
+    ("POST", "/api/v1/knowledge-bases/{id}/duplicate"),
+    ("POST", "/api/v1/knowledge-bases/copy"),
+    ("GET", "/api/v1/knowledge-bases/{id}/move-targets"),
+    ("POST", "/api/v1/knowledge-bases/{id}/hybrid-search"),
+    ("GET", "/api/v1/knowledge-bases/{id}/hybrid-search"),
 }
 
 # Reads are Viewer+; content-mutating operations are Admin+.
 EXPECTED_ROLES: dict[tuple[str, str], str] = {
-    ("POST", "/knowledge-bases"): "admin",
-    ("GET", "/knowledge-bases"): "viewer",
-    ("GET", "/knowledge-bases/{id}"): "viewer",
-    ("PUT", "/knowledge-bases/{id}"): "admin",
-    ("DELETE", "/knowledge-bases/{id}"): "admin",
-    ("POST", "/knowledge-bases/{id}/duplicate"): "admin",
-    ("POST", "/knowledge-bases/copy"): "admin",
-    ("GET", "/knowledge-bases/{id}/move-targets"): "viewer",
-    ("POST", "/knowledge-bases/{id}/hybrid-search"): "viewer",
-    ("GET", "/knowledge-bases/{id}/hybrid-search"): "viewer",
+    ("POST", "/api/v1/knowledge-bases"): "admin",
+    ("GET", "/api/v1/knowledge-bases"): "viewer",
+    ("GET", "/api/v1/knowledge-bases/{id}"): "viewer",
+    ("PUT", "/api/v1/knowledge-bases/{id}"): "admin",
+    ("DELETE", "/api/v1/knowledge-bases/{id}"): "admin",
+    ("POST", "/api/v1/knowledge-bases/{id}/duplicate"): "admin",
+    ("POST", "/api/v1/knowledge-bases/copy"): "admin",
+    ("GET", "/api/v1/knowledge-bases/{id}/move-targets"): "viewer",
+    ("POST", "/api/v1/knowledge-bases/{id}/hybrid-search"): "viewer",
+    ("GET", "/api/v1/knowledge-bases/{id}/hybrid-search"): "viewer",
 }
 
 
@@ -287,7 +287,7 @@ async def test_create_returns_201_envelope(
     client: TestClient,
     kb_repo: AsyncMock,
 ) -> None:
-    resp = client.post("/knowledge-bases", json=_create_body())
+    resp = client.post("/api/v1/knowledge-bases", json=_create_body())
 
     assert resp.status_code == 201
     payload = resp.json()
@@ -300,7 +300,7 @@ async def test_create_returns_201_envelope(
 
 
 async def test_create_applies_default_indexing_strategy(client: TestClient) -> None:
-    resp = client.post("/knowledge-bases", json=_create_body())
+    resp = client.post("/api/v1/knowledge-bases", json=_create_body())
 
     assert resp.status_code == 201
     strategy = resp.json()["data"]["indexing_strategy"]
@@ -313,14 +313,14 @@ async def test_create_applies_default_indexing_strategy(client: TestClient) -> N
 
 
 async def test_create_rejects_blank_name(client: TestClient) -> None:
-    resp = client.post("/knowledge-bases", json=_create_body(name="   "))
+    resp = client.post("/api/v1/knowledge-bases", json=_create_body(name="   "))
 
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "knowledge_base.name_required"
 
 
 async def test_create_rejects_unknown_type(client: TestClient) -> None:
-    resp = client.post("/knowledge-bases", json=_create_body(type="bogus"))
+    resp = client.post("/api/v1/knowledge-bases", json=_create_body(type="bogus"))
 
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "knowledge_base.type_invalid"
@@ -335,9 +335,9 @@ async def test_list_returns_tenant_rows(
 ) -> None:
     kb_repo._rows["kb-1"] = _kb_row(id="kb-1")  # type: ignore[attr-defined]
     kb_repo._rows["kb-2"] = _kb_row(id="kb-2")  # type: ignore[attr-defined]
-    client.post("/knowledge-bases", json=_create_body(name="kb-3"))
+    client.post("/api/v1/knowledge-bases", json=_create_body(name="kb-3"))
 
-    resp = client.get("/knowledge-bases")
+    resp = client.get("/api/v1/knowledge-bases")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -354,7 +354,7 @@ async def test_list_excludes_other_tenants(
     kb_repo._rows["kb-own"] = _kb_row(id="kb-own")  # type: ignore[attr-defined]
     kb_repo._rows["kb-other"] = _kb_row(id="kb-other", tenant_id=TENANT_ID + 1)  # type: ignore[attr-defined]
 
-    resp = client.get("/knowledge-bases")
+    resp = client.get("/api/v1/knowledge-bases")
 
     assert resp.status_code == 200
     assert [kb["id"] for kb in resp.json()["data"]] == ["kb-own"]
@@ -370,11 +370,11 @@ async def test_list_filters_by_creator(
     kb_repo._rows["kb-other"] = _kb_row(id="kb-other", creator_id="someone-else")  # type: ignore[attr-defined]
     kb_repo._rows["kb-anon"] = _kb_row(id="kb-anon", creator_id=None)  # type: ignore[attr-defined]
 
-    mine = client.get("/knowledge-bases?creator=mine")
+    mine = client.get("/api/v1/knowledge-bases?creator=mine")
     assert mine.status_code == 200
     assert {kb["id"] for kb in mine.json()["data"]} == {"kb-mine"}
 
-    others = client.get("/knowledge-bases?creator=others")
+    others = client.get("/api/v1/knowledge-bases?creator=others")
     assert others.status_code == 200
     assert {kb["id"] for kb in others.json()["data"]} == {"kb-other"}
 
@@ -383,10 +383,10 @@ async def test_list_filters_by_creator(
 
 
 async def test_get_returns_one_knowledge_base(client: TestClient) -> None:
-    created = client.post("/knowledge-bases", json=_create_body())
+    created = client.post("/api/v1/knowledge-bases", json=_create_body())
     kb_id = created.json()["data"]["id"]
 
-    resp = client.get(f"/knowledge-bases/{kb_id}")
+    resp = client.get(f"/api/v1/knowledge-bases/{kb_id}")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -405,7 +405,7 @@ async def test_get_fills_document_count(
 
     kb_repo.count_documents.side_effect = _count_docs
 
-    resp = client.get("/knowledge-bases/kb-1")
+    resp = client.get("/api/v1/knowledge-bases/kb-1")
 
     assert resp.status_code == 200
     assert resp.json()["data"]["knowledge_count"] == 7
@@ -422,14 +422,14 @@ async def test_get_fills_faq_chunk_count(
 
     kb_repo.count_chunks.side_effect = _count_chunks
 
-    resp = client.get("/knowledge-bases/kb-1")
+    resp = client.get("/api/v1/knowledge-bases/kb-1")
 
     assert resp.status_code == 200
     assert resp.json()["data"]["chunk_count"] == 5
 
 
 async def test_get_missing_returns_404(client: TestClient) -> None:
-    resp = client.get("/knowledge-bases/does-not-exist")
+    resp = client.get("/api/v1/knowledge-bases/does-not-exist")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "knowledge_base.not_found"
@@ -441,7 +441,7 @@ async def test_get_cross_tenant_returns_404(
 ) -> None:
     kb_repo._rows["kb-other"] = _kb_row(id="kb-other", tenant_id=TENANT_ID + 1)  # type: ignore[attr-defined]
 
-    resp = client.get("/knowledge-bases/kb-other")
+    resp = client.get("/api/v1/knowledge-bases/kb-other")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "knowledge_base.not_found"
@@ -453,11 +453,11 @@ async def test_get_cross_tenant_returns_404(
 async def test_update_patches_name_and_description(
     client: TestClient,
 ) -> None:
-    created = client.post("/knowledge-bases", json=_create_body())
+    created = client.post("/api/v1/knowledge-bases", json=_create_body())
     kb_id = created.json()["data"]["id"]
 
     resp = client.put(
-        f"/knowledge-bases/{kb_id}",
+        f"/api/v1/knowledge-bases/{kb_id}",
         json={"name": "Renamed KB", "description": "renamed"},
     )
 
@@ -468,7 +468,7 @@ async def test_update_patches_name_and_description(
 
 
 async def test_update_missing_returns_404(client: TestClient) -> None:
-    resp = client.put("/knowledge-bases/does-not-exist", json={"name": "x"})
+    resp = client.put("/api/v1/knowledge-bases/does-not-exist", json={"name": "x"})
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "knowledge_base.not_found"
@@ -480,17 +480,17 @@ async def test_update_cross_tenant_returns_404(
 ) -> None:
     kb_repo._rows["kb-other"] = _kb_row(id="kb-other", tenant_id=TENANT_ID + 1)  # type: ignore[attr-defined]
 
-    resp = client.put("/knowledge-bases/kb-other", json={"name": "x"})
+    resp = client.put("/api/v1/knowledge-bases/kb-other", json={"name": "x"})
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "knowledge_base.not_found"
 
 
 async def test_update_rejects_blank_name(client: TestClient) -> None:
-    created = client.post("/knowledge-bases", json=_create_body())
+    created = client.post("/api/v1/knowledge-bases", json=_create_body())
     kb_id = created.json()["data"]["id"]
 
-    resp = client.put(f"/knowledge-bases/{kb_id}", json={"name": "  "})
+    resp = client.put(f"/api/v1/knowledge-bases/{kb_id}", json={"name": "  "})
 
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "knowledge_base.name_required"
@@ -503,10 +503,10 @@ async def test_delete_returns_message_and_soft_deletes(
     client: TestClient,
     kb_repo: AsyncMock,
 ) -> None:
-    created = client.post("/knowledge-bases", json=_create_body())
+    created = client.post("/api/v1/knowledge-bases", json=_create_body())
     kb_id = created.json()["data"]["id"]
 
-    resp = client.delete(f"/knowledge-bases/{kb_id}")
+    resp = client.delete(f"/api/v1/knowledge-bases/{kb_id}")
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -517,7 +517,7 @@ async def test_delete_returns_message_and_soft_deletes(
 
 
 async def test_delete_missing_returns_404(client: TestClient) -> None:
-    resp = client.delete("/knowledge-bases/does-not-exist")
+    resp = client.delete("/api/v1/knowledge-bases/does-not-exist")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "knowledge_base.not_found"
@@ -530,10 +530,10 @@ async def test_copy_without_target_creates_new_kb(
     client: TestClient,
     kb_repo: AsyncMock,
 ) -> None:
-    created = client.post("/knowledge-bases", json=_create_body())
+    created = client.post("/api/v1/knowledge-bases", json=_create_body())
     source_id = created.json()["data"]["id"]
 
-    resp = client.post("/knowledge-bases/copy", json={"source_id": source_id})
+    resp = client.post("/api/v1/knowledge-bases/copy", json={"source_id": source_id})
 
     assert resp.status_code == 200
     payload = resp.json()
@@ -548,7 +548,7 @@ async def test_copy_without_target_creates_new_kb(
 
 
 async def test_copy_missing_source_returns_404(client: TestClient) -> None:
-    resp = client.post("/knowledge-bases/copy", json={"source_id": "does-not-exist"})
+    resp = client.post("/api/v1/knowledge-bases/copy", json={"source_id": "does-not-exist"})
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "knowledge_base.not_found"
@@ -561,10 +561,10 @@ async def test_duplicate_returns_201_envelope(
     client: TestClient,
     kb_repo: AsyncMock,
 ) -> None:
-    created = client.post("/knowledge-bases", json=_create_body(name="Original"))
+    created = client.post("/api/v1/knowledge-bases", json=_create_body(name="Original"))
     source_id = created.json()["data"]["id"]
 
-    resp = client.post(f"/knowledge-bases/{source_id}/duplicate")
+    resp = client.post(f"/api/v1/knowledge-bases/{source_id}/duplicate")
 
     assert resp.status_code == 201
     payload = resp.json()
@@ -579,7 +579,7 @@ async def test_duplicate_returns_201_envelope(
 
 
 async def test_duplicate_missing_source_returns_404(client: TestClient) -> None:
-    resp = client.post("/knowledge-bases/does-not-exist/duplicate")
+    resp = client.post("/api/v1/knowledge-bases/does-not-exist/duplicate")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "knowledge_base.not_found"
@@ -605,14 +605,14 @@ async def test_move_targets_filters_eligible_rows(
         id="kb-embed", name="embed", embedding_model_id="embed-b"
     )
 
-    resp = client.get("/knowledge-bases/kb-src/move-targets")
+    resp = client.get("/api/v1/knowledge-bases/kb-src/move-targets")
 
     assert resp.status_code == 200
     assert [kb["id"] for kb in resp.json()["data"]] == ["kb-ok"]
 
 
 async def test_move_targets_missing_source_returns_404(client: TestClient) -> None:
-    resp = client.get("/knowledge-bases/does-not-exist/move-targets")
+    resp = client.get("/api/v1/knowledge-bases/does-not-exist/move-targets")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "knowledge_base.not_found"
@@ -624,11 +624,11 @@ async def test_move_targets_missing_source_returns_404(client: TestClient) -> No
 async def test_hybrid_search_returns_empty_data_envelope(
     client: TestClient,
 ) -> None:
-    created = client.post("/knowledge-bases", json=_create_body())
+    created = client.post("/api/v1/knowledge-bases", json=_create_body())
     kb_id = created.json()["data"]["id"]
 
     resp = client.post(
-        f"/knowledge-bases/{kb_id}/hybrid-search",
+        f"/api/v1/knowledge-bases/{kb_id}/hybrid-search",
         json={"query_text": "how to use"},
     )
 
@@ -640,7 +640,7 @@ async def test_hybrid_search_returns_empty_data_envelope(
 
 async def test_hybrid_search_missing_kb_returns_404(client: TestClient) -> None:
     resp = client.post(
-        "/knowledge-bases/does-not-exist/hybrid-search",
+        "/api/v1/knowledge-bases/does-not-exist/hybrid-search",
         json={"query_text": "how to use"},
     )
 
@@ -654,12 +654,12 @@ async def test_hybrid_search_missing_kb_returns_404(client: TestClient) -> None:
 async def test_hybrid_search_get_compat_shim(
     client: TestClient,
 ) -> None:
-    created = client.post("/knowledge-bases", json=_create_body())
+    created = client.post("/api/v1/knowledge-bases", json=_create_body())
     kb_id = created.json()["data"]["id"]
 
     # ``TestClient`` cannot attach a JSON body to a GET; the shim ignores
     # the legacy body anyway, so the request is asserted bare.
-    resp = client.get(f"/knowledge-bases/{kb_id}/hybrid-search")
+    resp = client.get(f"/api/v1/knowledge-bases/{kb_id}/hybrid-search")
 
     assert resp.status_code == 200
     payload = resp.json()

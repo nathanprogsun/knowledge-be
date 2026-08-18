@@ -25,6 +25,7 @@ from src.common.exception import (
     ConflictError,
     DataError,
     ExternalServiceError,
+    GoneError,
     NotFoundError,
     PermissionDeniedError,
     UnauthorizedError,
@@ -46,6 +47,7 @@ _REQUEST_VALIDATION_MESSAGE = "Request validation failed"
 
 _STATUS_BY_TYPE: dict[type[ApplicationError], int] = {
     NotFoundError: 404,
+    GoneError: 410,
     ConflictError: 409,
     ValidationError: 422,
     PermissionDeniedError: 403,

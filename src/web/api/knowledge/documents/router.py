@@ -7,8 +7,9 @@ mapping follows the upstream knowledge handler:
 
 - KB-scoped uploads and list live under ``/knowledge-bases/{id}/knowledge``;
 - per-document routes address ``/knowledge/{id}``;
-- ``/move`` and ``/move/progress/{task_id}`` sit outside the ``{id}``
-  group so a literal ``move`` segment is never captured as an id;
+- ``/move``, ``/move/progress/{task_id}``, ``/batch-delete``,
+  ``/batch-reparse`` and ``/tags`` sit outside the ``{id}``
+  group so a literal segment is never captured as an id;
 - reads are Viewer+, every mutation Contributor+.
 
 Cross-workspace ids read as 404 rather than 403 so the id space is not
@@ -30,7 +31,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
-from src.common.exception import NotFoundError, UnauthorizedError, ValidationError
+from src.common.exception import NotFoundError, PermissionDeniedError, UnauthorizedError, ValidationError
 from src.common.json import JsonObject
 from src.core.contracts.knowledge import (
     CreateKnowledgeFromURLRequest,
@@ -41,12 +42,20 @@ from src.core.contracts.knowledge import (
 )
 from src.core.knowledge.documents.types import DocumentListFilter
 from src.web.api.knowledge.documents.views import (
+    BatchDeleteEnvelope,
+    BatchDeleteRequest,
+    BatchDeleteData,
+    BatchReparseData,
+    BatchReparseEnvelope,
+    BatchReparseRequest,
     CloneKnowledgeRequest,
     CreatePassageKnowledgeRequest,
     DeleteEnvelope,
     DeleteResult,
     KnowledgeEnvelope,
     KnowledgeListEnvelope,
+    KnowledgeTagBatchEnvelope,
+    KnowledgeTagBatchUpdateRequest,
     KnowledgeTaskEnvelope,
     KnowledgeUpdatedEnvelope,
     MoveEnvelope,
@@ -54,10 +63,12 @@ from src.web.api.knowledge.documents.views import (
 )
 from src.web.deps import AuthDep, RoleContributorDep, RoleViewerDep
 from src.web.deps.context import get_tenant_id_dep
+from src.web.deps.knowledge_bases import KBServiceDep
 from src.web.deps.knowledge_documents import (
     KnowledgeDocumentsDep,
     KnowledgeServiceDep,
 )
+from src.web.deps.knowledge_tags import TagServiceDep
 from src.web.deps.task_progress import TaskProgressTenantDep
 
 # Function-arg-style principal dep aliases.
@@ -73,6 +84,16 @@ documents_router = APIRouter(prefix="/knowledge", tags=["knowledge-documents"])
 
 _MOVE_TASK_TYPE = "kg_move"
 _MOVE_STARTED_MESSAGE = "Knowledge move task started"
+
+# Batch cross-document writes mirror the single-document lifecycle
+# routes: Contributor+, tenant-scoped, and a synthetic task id so the
+# wire contract (task_id + count) matches the async upstream while the
+# work itself runs synchronously until the task infrastructure lands.
+_MAX_BATCH = 200
+_BATCH_DELETE_TASK_TYPE = "kg_batch_delete"
+_BATCH_REPARSE_TASK_TYPE = "kg_batch_reparse"
+_BATCH_DELETE_MESSAGE = "Batch delete task submitted"
+_BATCH_REPARSE_MESSAGE = "Batch reparse task submitted"
 
 
 def _require_tenant(tenant_id: int) -> int:
@@ -160,6 +181,25 @@ def _move_task_id(tenant_id: int, kb_id: str) -> str:
     millis = int(datetime.now(UTC).timestamp() * 1000)
     business = kb_id.replace("-", "").replace("_", "")[:12]
     return f"{_MOVE_TASK_TYPE}_{tenant_id}_{millis}_{uuid.uuid4().hex[:8]}_{business}"
+
+
+def _batch_task_id(tenant_id: int, kb_id: str, task_type: str) -> str:
+    """Generate a tenant-embedded batch task id mirroring the move shape."""
+    millis = int(datetime.now(UTC).timestamp() * 1000)
+    business = kb_id.replace("-", "").replace("_", "")[:12]
+    return f"{task_type}_{tenant_id}_{millis}_{uuid.uuid4().hex[:8]}_{business}"
+
+
+def _dedupe_ids(raw_ids: list[str]) -> list[str]:
+    """Trim, deduplicate, and drop blank ids, preserving first-seen order."""
+    seen: set[str] = set()
+    clean: list[str] = []
+    for raw in raw_ids:
+        value = raw.strip()
+        if value and value not in seen:
+            seen.add(value)
+            clean.append(value)
+    return clean
 
 
 # ── KB-scoped creates + list ──────────────────────────────────────────
@@ -307,6 +347,207 @@ async def list_documents(
         page_size=result.page_size,
         data=result.data,
     )
+
+
+# ── Cross-document static routes (declared before /{id}) ──────────────
+
+
+@documents_router.post("/batch-delete", response_model=BatchDeleteEnvelope)
+async def batch_delete_documents(
+    _auth: AuthDep,
+    _contributor: RoleContributorDep,
+    body: BatchDeleteRequest,
+    service: KnowledgeServiceDep,
+    orchestrator: KnowledgeDocumentsDep,
+    kb_service: KBServiceDep,
+    tenant_id: _PrincipalTenant,
+) -> BatchDeleteEnvelope:
+    """Soft-delete a batch of documents under one knowledge base.
+
+    Validates that every id exists and belongs to ``kb_id`` (cross-KB
+    deletion is rejected), then runs the cascade delete synchronously and
+    answers with a task id so the wire contract matches the async
+    upstream submission.
+    """
+    tenant_id = _require_tenant(tenant_id)
+    ids = _dedupe_ids(body.ids)
+    if not ids:
+        raise ValidationError(
+            code="knowledge.batch_ids_required",
+            message="ids cannot be empty",
+        )
+    if len(ids) > _MAX_BATCH:
+        raise ValidationError(
+            code="knowledge.batch_too_many",
+            message=f"too many ids (max {_MAX_BATCH} per batch)",
+        )
+    await kb_service.get_knowledge_base_by_id_and_tenant(
+        tenant_id=tenant_id,
+        knowledge_base_id=body.kb_id,
+    )
+    documents = await service.get_documents(tenant_id=tenant_id, ids=ids)
+    if len(documents) != len(ids):
+        raise ValidationError(
+            code="knowledge.batch_not_found",
+            message="One or more knowledge entries not found",
+        )
+    for document in documents:
+        if document.knowledge_base_id != body.kb_id:
+            raise ValidationError(
+                code="knowledge.batch_cross_kb",
+                message=(
+                    f"Knowledge {document.id} does not belong to "
+                    f"knowledge base {body.kb_id}"
+                ),
+            )
+    await orchestrator.delete_documents(tenant_id=tenant_id, ids=ids)
+    task_id = _batch_task_id(tenant_id, body.kb_id, _BATCH_DELETE_TASK_TYPE)
+    return BatchDeleteEnvelope(
+        success=True,
+        message=_BATCH_DELETE_MESSAGE,
+        data=BatchDeleteData(task_id=task_id, deleted_count=len(ids)),
+    )
+
+
+@documents_router.post("/batch-reparse", response_model=BatchReparseEnvelope)
+async def batch_reparse_documents(
+    _auth: AuthDep,
+    _contributor: RoleContributorDep,
+    body: BatchReparseRequest,
+    service: KnowledgeServiceDep,
+    orchestrator: KnowledgeDocumentsDep,
+    kb_service: KBServiceDep,
+    tenant_id: _PrincipalTenant,
+) -> BatchReparseEnvelope:
+    """Reset and re-submit a batch of documents under one knowledge base.
+
+    Each document is validated to exist and belong to ``kb_id``, then
+    reset for a fresh parse attempt; the response carries a task id and
+    the submitted count.
+    """
+    tenant_id = _require_tenant(tenant_id)
+    ids = _dedupe_ids(body.ids)
+    if not ids:
+        raise ValidationError(
+            code="knowledge.batch_ids_required",
+            message="no knowledge IDs provided for batch reparse",
+        )
+    if len(ids) > _MAX_BATCH:
+        raise ValidationError(
+            code="knowledge.batch_too_many",
+            message=f"too many ids (max {_MAX_BATCH} per batch)",
+        )
+    await kb_service.get_knowledge_base_by_id_and_tenant(
+        tenant_id=tenant_id,
+        knowledge_base_id=body.kb_id,
+    )
+    documents = await service.get_documents(tenant_id=tenant_id, ids=ids)
+    if len(documents) != len(ids):
+        raise ValidationError(
+            code="knowledge.batch_not_found",
+            message="some knowledge entries were not found",
+        )
+    for document in documents:
+        if document.knowledge_base_id != body.kb_id:
+            raise ValidationError(
+                code="knowledge.batch_cross_kb",
+                message=(
+                    f"Knowledge {document.id} does not belong to "
+                    f"knowledge base {body.kb_id}"
+                ),
+            )
+    for document in documents:
+        await orchestrator.reparse(
+            tenant_id=tenant_id,
+            knowledge_id=document.id,
+            process_overrides=body.process_config,
+        )
+    task_id = _batch_task_id(tenant_id, body.kb_id, _BATCH_REPARSE_TASK_TYPE)
+    return BatchReparseEnvelope(
+        success=True,
+        message=_BATCH_REPARSE_MESSAGE,
+        data=BatchReparseData(task_id=task_id, reparse_count=len(ids)),
+    )
+
+
+@documents_router.put("/tags", response_model=KnowledgeTagBatchEnvelope)
+async def update_knowledge_tag_batch(
+    _auth: AuthDep,
+    _contributor: RoleContributorDep,
+    body: KnowledgeTagBatchUpdateRequest,
+    service: KnowledgeServiceDep,
+    tag_service: TagServiceDep,
+    kb_service: KBServiceDep,
+    tenant_id: _PrincipalTenant,
+) -> KnowledgeTagBatchEnvelope:
+    """Replace the tag bindings of many documents in one request.
+
+    An explicit ``kb_id`` narrows the authorized scope; without one the
+    knowledge base is inferred from the first updated document (shared-KB
+    resolution). Every tag must exist and belong to the same knowledge
+    base as the document it is bound to.
+    """
+    tenant_id = _require_tenant(tenant_id)
+    updates = body.updates
+    if not updates:
+        raise ValidationError(
+            code="knowledge.tags_updates_required",
+            message="请求参数不合法",
+        )
+    documents = await service.get_documents(tenant_id=tenant_id, ids=list(updates))
+    if len(documents) != len(updates):
+        raise PermissionDeniedError(
+            code="knowledge.tags_knowledge_not_found",
+            message="some knowledge IDs are not accessible in the authorized scope",
+        )
+    by_id = {document.id: document for document in documents}
+
+    if body.kb_id:
+        await kb_service.get_knowledge_base_by_id_and_tenant(
+            tenant_id=tenant_id,
+            knowledge_base_id=body.kb_id,
+        )
+        for document in documents:
+            if document.knowledge_base_id != body.kb_id:
+                raise PermissionDeniedError(
+                    code="knowledge.tags_cross_kb",
+                    message=(
+                        f"knowledge {document.id} does not belong to "
+                        "authorized knowledge base"
+                    ),
+                )
+
+    tag_ids = {tag_id for ids in updates.values() for tag_id in ids if tag_id}
+    tags = await tag_service.get_tags_by_ids(
+        tenant_id=tenant_id,
+        ids=sorted(tag_ids),
+    )
+    for knowledge_id, tag_ids_for_knowledge in updates.items():
+        document = by_id[knowledge_id]
+        for tag_id in tag_ids_for_knowledge:
+            if not tag_id:
+                continue
+            tag = tags.get(tag_id)
+            if tag is None:
+                raise ValidationError(
+                    code="knowledge.tags_not_found",
+                    message=f"标签 {tag_id} 不存在",
+                )
+            if tag.knowledge_base_id != document.knowledge_base_id:
+                raise ValidationError(
+                    code="knowledge.tags_cross_kb",
+                    message=(
+                        f"标签 {tag_id} 不属于知识库 "
+                        f"{document.knowledge_base_id}"
+                    ),
+                )
+
+    for knowledge_id, tag_ids_for_knowledge in updates.items():
+        await tag_service.set_knowledge_tags(
+            knowledge_id=knowledge_id,
+            tag_ids=tag_ids_for_knowledge,
+        )
+    return KnowledgeTagBatchEnvelope(success=True)
 
 
 # ── Per-document routes (declared after the static /move group) ──────

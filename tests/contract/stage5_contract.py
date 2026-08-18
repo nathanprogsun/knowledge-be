@@ -165,7 +165,7 @@ async def chat_client(
 @pytest_asyncio.fixture
 async def agent_seed(authed_client: TestClient) -> AgentSeed:
     """A custom agent minted through the real service + database."""
-    response = authed_client.post("/agents", json={"name": "contract-agent"})
+    response = authed_client.post("/api/v1/agents", json={"name": "contract-agent"})
     assert response.status_code == 201, response.text
     return AgentSeed(authed_client, response.json()["data"]["id"])
 
@@ -287,9 +287,9 @@ def test_knowledge_qa_stream_frames_match_reference(
             data={"final_answer": "Answer text"},
         ),
     ]
-    status, _ = _endpoint_spec("POST", "/knowledge-chat/{session_id}")
+    status, _ = _endpoint_spec("POST", "/api/v1/knowledge-chat/{session_id}")
     chunks: list[str] = []
-    with chat_client.stream("POST", "/knowledge-chat/s1", json={"query": "hello"}) as resp:
+    with chat_client.stream("POST", "/api/v1/knowledge-chat/s1", json={"query": "hello"}) as resp:
         assert resp.status_code == status, resp.text
         assert resp.headers["content-type"].startswith("text/event-stream")
         for chunk in resp.iter_text():
@@ -415,7 +415,7 @@ def test_knowledge_search_envelope_matches_reference(
         )
     ]
     resp = chat_client.post(
-        "/knowledge-search",
+        "/api/v1/knowledge-search",
         json={"query": "hello", "knowledge_base_ids": ["kb-1"]},
     )
     assert resp.status_code == 200, resp.text
@@ -431,8 +431,8 @@ def test_knowledge_search_envelope_matches_reference(
 
 def test_create_agent_matches_reference(authed_client: TestClient) -> None:
     """POST /agents answers 201 with the reference agent envelope."""
-    status, keys = _endpoint_spec("POST", "/agents")
-    response = authed_client.post("/agents", json={"name": "contract-agent-create"})
+    status, keys = _endpoint_spec("POST", "/api/v1/agents")
+    response = authed_client.post("/api/v1/agents", json={"name": "contract-agent-create"})
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "POST /agents")
@@ -441,8 +441,8 @@ def test_create_agent_matches_reference(authed_client: TestClient) -> None:
 
 def test_get_agent_matches_reference(agent_seed: AgentSeed) -> None:
     """GET /agents/{id} answers 200 with the reference agent envelope."""
-    status, keys = _endpoint_spec("GET", "/agents/{id}")
-    response = agent_seed.client.get(f"/agents/{agent_seed.agent_id}")
+    status, keys = _endpoint_spec("GET", "/api/v1/agents/{id}")
+    response = agent_seed.client.get(f"/api/v1/agents/{agent_seed.agent_id}")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "GET /agents/{id}")
@@ -451,8 +451,8 @@ def test_get_agent_matches_reference(agent_seed: AgentSeed) -> None:
 
 def test_list_agents_matches_reference(agent_seed: AgentSeed) -> None:
     """GET /agents answers 200 with the reference list envelope."""
-    status, keys = _endpoint_spec("GET", "/agents")
-    response = agent_seed.client.get("/agents")
+    status, keys = _endpoint_spec("GET", "/api/v1/agents")
+    response = agent_seed.client.get("/api/v1/agents")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "GET /agents")
@@ -463,9 +463,9 @@ def test_list_agents_matches_reference(agent_seed: AgentSeed) -> None:
 
 def test_update_agent_matches_reference(agent_seed: AgentSeed) -> None:
     """PUT /agents/{id} answers 200 with the reference envelope."""
-    status, keys = _endpoint_spec("PUT", "/agents/{id}")
+    status, keys = _endpoint_spec("PUT", "/api/v1/agents/{id}")
     response = agent_seed.client.put(
-        f"/agents/{agent_seed.agent_id}",
+        f"/api/v1/agents/{agent_seed.agent_id}",
         json={"name": "renamed", "config": {}},
     )
     assert response.status_code == status, response.text
@@ -474,16 +474,16 @@ def test_update_agent_matches_reference(agent_seed: AgentSeed) -> None:
 
 def test_delete_agent_matches_reference(agent_seed: AgentSeed) -> None:
     """DELETE /agents/{id} answers 200 with the reference message envelope."""
-    status, keys = _endpoint_spec("DELETE", "/agents/{id}")
-    response = agent_seed.client.delete(f"/agents/{agent_seed.agent_id}")
+    status, keys = _endpoint_spec("DELETE", "/api/v1/agents/{id}")
+    response = agent_seed.client.delete(f"/api/v1/agents/{agent_seed.agent_id}")
     assert response.status_code == status, response.text
     _assert_keys(response.json(), keys, "DELETE /agents/{id}")
 
 
 def test_copy_agent_matches_reference(agent_seed: AgentSeed) -> None:
     """POST /agents/{id}/copy answers 201 with the reference envelope."""
-    status, keys = _endpoint_spec("POST", "/agents/{id}/copy")
-    response = agent_seed.client.post(f"/agents/{agent_seed.agent_id}/copy")
+    status, keys = _endpoint_spec("POST", "/api/v1/agents/{id}/copy")
+    response = agent_seed.client.post(f"/api/v1/agents/{agent_seed.agent_id}/copy")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "POST /agents/{id}/copy")
@@ -492,8 +492,8 @@ def test_copy_agent_matches_reference(agent_seed: AgentSeed) -> None:
 
 def test_placeholders_match_reference(authed_client: TestClient) -> None:
     """GET /agents/placeholders answers 200 with the reference group shape."""
-    status, keys = _endpoint_spec("GET", "/agents/placeholders")
-    response = authed_client.get("/agents/placeholders")
+    status, keys = _endpoint_spec("GET", "/api/v1/agents/placeholders")
+    response = authed_client.get("/api/v1/agents/placeholders")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "GET /agents/placeholders")
@@ -506,8 +506,8 @@ def test_placeholders_match_reference(authed_client: TestClient) -> None:
 
 def test_type_presets_match_reference(authed_client: TestClient) -> None:
     """GET /agents/type-presets answers 200 with the reference list shape."""
-    status, keys = _endpoint_spec("GET", "/agents/type-presets")
-    response = authed_client.get("/agents/type-presets")
+    status, keys = _endpoint_spec("GET", "/api/v1/agents/type-presets")
+    response = authed_client.get("/api/v1/agents/type-presets")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "GET /agents/type-presets")
@@ -516,8 +516,8 @@ def test_type_presets_match_reference(authed_client: TestClient) -> None:
 
 def test_suggested_questions_match_reference(agent_seed: AgentSeed) -> None:
     """GET /agents/{id}/suggested-questions answers the reference shape."""
-    status, keys = _endpoint_spec("GET", "/agents/{id}/suggested-questions")
-    response = agent_seed.client.get(f"/agents/{agent_seed.agent_id}/suggested-questions")
+    status, keys = _endpoint_spec("GET", "/api/v1/agents/{id}/suggested-questions")
+    response = agent_seed.client.get(f"/api/v1/agents/{agent_seed.agent_id}/suggested-questions")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "GET /agents/{id}/suggested-questions")
@@ -530,8 +530,8 @@ def test_suggested_questions_match_reference(agent_seed: AgentSeed) -> None:
 
 def test_skills_match_reference(authed_client: TestClient) -> None:
     """GET /skills answers 200 with the reference skills envelope."""
-    status, keys = _endpoint_spec("GET", "/skills")
-    response = authed_client.get("/skills")
+    status, keys = _endpoint_spec("GET", "/api/v1/skills")
+    response = authed_client.get("/api/v1/skills")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "GET /skills")

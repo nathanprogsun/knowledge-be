@@ -14,17 +14,22 @@ Maps the non-KB initialization endpoints from
 - ``POST /initialization/rerank/check``                     — Admin
 - ``POST /initialization/asr/check``                        — Admin
 - ``POST /initialization/multimodal/test``                  — Admin
+- ``POST /initialization/extract/fabri-tag``                — Admin
+- ``POST /initialization/extract/fabri-text``               — Admin
+- ``POST /initialization/extract/text-relation``            — Admin
 
 The KB-scoped routes (``/initialization/config/{kbId}``,
 ``/initialization/initialize/{kbId}``) belong to the knowledge domain
-and are intentionally absent, as are the three
-``/initialization/extract/*`` routes (they need the chat/LLM layer).
+and are intentionally absent.
 
 Every route carries ``AuthDep`` plus its role gate, matching the
 ``g.Viewer()`` / ``g.Admin()`` argument on the Go route registration.
 Probe failures are reported as ``available: false`` inside a 200 body —
 Go never turns an unreachable provider into a 5xx — so only invalid input
-produces a 4xx.
+produces a 4xx. The graph-extraction wizard's tag generator is a pure
+random draw; its example-text and relation-extraction endpoints resolve
+the chat model first and answer with a clear not-configured error until
+the chat-inference path is wired.
 
 Swagger ``description`` strings are Chinese, mirroring the upstream Go
 annotations; RUF001 is suppressed for the same reason as in
@@ -33,10 +38,12 @@ annotations; RUF001 is suppressed for the same reason as in
 
 from __future__ import annotations
 
+import random
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, UploadFile
 
+from src.common.exception import AIProviderError, ValidationError
 from src.core.contracts.infra import (
     CheckOllamaModelsRequest,
     DownloadOllamaModelRequest,
@@ -48,11 +55,18 @@ from src.web.api.infra.initialization.views import (
     DownloadStartEnvelope,
     DownloadTaskListEnvelope,
     EmbeddingTestEnvelope,
+    FabriTagData,
+    FabriTagEnvelope,
+    FabriTagRequest,
+    FabriTextEnvelope,
+    FabriTextRequest,
     ModelCheckEnvelope,
     MultimodalTestEnvelope,
     OllamaModelsCheckEnvelope,
     OllamaModelsEnvelope,
     OllamaStatusEnvelope,
+    TextRelationExtractionEnvelope,
+    TextRelationExtractionRequest,
     download_progress_envelope,
     download_start_envelope,
     download_task_list_envelope,
@@ -63,16 +77,47 @@ from src.web.api.infra.initialization.views import (
     ollama_models_envelope,
     ollama_status_envelope,
 )
-from src.web.deps import AuthDep, RoleAdminDep, RoleViewerDep
+from src.web.deps import AuthDep, ModelServiceDep, RoleAdminDep, RoleViewerDep
+from src.web.deps.context import get_tenant_id_dep
 from src.web.deps.infra_initialization import InitializationServiceDep
 
 router = APIRouter(prefix="/initialization", tags=["initialization"])
+
+# Function-arg-style principal dep alias.
+_PrincipalTenant = Annotated[int, Depends(get_tenant_id_dep)]
 
 # Multipart parameter aliases. Declared as ``Annotated`` types rather than
 # call-in-default (``x: str = Form(...)``) so the marker objects are
 # module-level singletons — the pattern flake8-bugbear's B008 asks for.
 ImageUpload = Annotated[UploadFile, File(description="测试图片")]
 FormField = Annotated[str, Form()]
+
+# ── Graph-extraction wizard helpers ──────────────────────────────────
+#
+# The tag pool mirrors the upstream default; the tag generator is a
+# pure random draw, the example-text and relation-extraction paths
+# depend on a chat model.
+
+_TAG_OPTIONS = [
+    "Content",
+    "Culture",
+    "Person",
+    "Event",
+    "Time",
+    "Location",
+    "Work",
+    "Author",
+    "Relation",
+    "Attribute",
+]
+_MAX_EXTRACT_TEXT_LENGTH = 5000
+_EXTRACT_NOT_WIRED_MESSAGE = "chat model inference is not yet wired"
+
+
+def _random_select_tags() -> list[str]:
+    """Randomly select 1..(n-1) tags from the pool without replacement."""
+    count = random.randint(1, len(_TAG_OPTIONS) - 1)
+    return random.sample(_TAG_OPTIONS, count)
 
 
 # ── Ollama detection ─────────────────────────────────────────────────
@@ -265,6 +310,109 @@ async def test_multimodal_function(
         size=len(content),
     )
     return multimodal_test_envelope(result)
+
+
+# ── Graph-extraction wizard ──────────────────────────────────────────
+
+
+def _require_tenant(tenant_id: int) -> int:
+    """Return the active workspace id, or fail.
+
+    The extract endpoints resolve the caller's chat model through the
+    tenant-scoped model service; without a tenant context there is no
+    safe default, so this rejects rather than guessing.
+    """
+    if tenant_id == 0:
+        raise ValidationError(
+            code="initialization.tenant_context_missing",
+            message="No active workspace in request context",
+        )
+    return tenant_id
+
+
+@router.post("/extract/fabri-tag", response_model=FabriTagEnvelope)
+async def extract_fabri_tag(
+    _auth: AuthDep,
+    _admin: RoleAdminDep,
+    body: FabriTagRequest | None = None,
+) -> FabriTagEnvelope:
+    """Randomly select a set of relation tags for the extraction wizard.
+
+    The tag pool and the draw semantics mirror the upstream generator —
+    no chat model is involved.
+    """
+    return FabriTagEnvelope(success=True, data=FabriTagData(tags=_random_select_tags()))
+
+
+@router.post("/extract/fabri-text", response_model=FabriTextEnvelope)
+async def extract_fabri_text(
+    _auth: AuthDep,
+    _admin: RoleAdminDep,
+    body: FabriTextRequest,
+    model_service: ModelServiceDep,
+    tenant_id: _PrincipalTenant,
+) -> FabriTextEnvelope:
+    """Generate an example text for the given tags through a chat model.
+
+    The chat-inference path is not wired yet: the model is resolved so a
+    missing id reads as not-found (mirroring the upstream model fetch),
+    and a resolved model answers with a clear not-configured error
+    instead of calling out.
+    """
+    tenant_id = _require_tenant(tenant_id)
+    if not body.model_id:
+        raise ValidationError(
+            code="initialization.model_id_required",
+            message="model_id is required",
+        )
+    await model_service.get_model(tenant_id=tenant_id, model_id=body.model_id)
+    raise AIProviderError(
+        _EXTRACT_NOT_WIRED_MESSAGE,
+        code="initialization.extract_not_wired",
+    )
+
+
+@router.post("/extract/text-relation", response_model=TextRelationExtractionEnvelope)
+async def extract_text_relation(
+    _auth: AuthDep,
+    _admin: RoleAdminDep,
+    body: TextRelationExtractionRequest,
+    model_service: ModelServiceDep,
+    tenant_id: _PrincipalTenant,
+) -> TextRelationExtractionEnvelope:
+    """Extract entities and relations from a text through a chat model.
+
+    Validation mirrors the upstream handler (non-empty text capped at
+    5000 characters, at least one relation tag, mandatory model id). The
+    chat-inference path is not wired yet, so a resolved model still
+    answers with a clear not-configured error.
+    """
+    tenant_id = _require_tenant(tenant_id)
+    if not body.text.strip():
+        raise ValidationError(
+            code="initialization.text_required",
+            message="文本内容不能为空",
+        )
+    if len(body.text) > _MAX_EXTRACT_TEXT_LENGTH:
+        raise ValidationError(
+            code="initialization.text_too_long",
+            message="文本内容长度不能超过5000字符",
+        )
+    if not body.tags:
+        raise ValidationError(
+            code="initialization.tags_required",
+            message="至少需要选择一个关系标签",
+        )
+    if not body.model_id:
+        raise ValidationError(
+            code="initialization.model_id_required",
+            message="model_id is required",
+        )
+    await model_service.get_model(tenant_id=tenant_id, model_id=body.model_id)
+    raise AIProviderError(
+        _EXTRACT_NOT_WIRED_MESSAGE,
+        code="initialization.extract_not_wired",
+    )
 
 
 __all__ = ["router"]

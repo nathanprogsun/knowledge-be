@@ -13,10 +13,12 @@ from typing import Annotated, cast
 
 from fastapi import Depends, Request
 
+from src.core.system.admin_service import SystemAdminService
 from src.core.system.audit_service import AuditLogService
 from src.core.system.factory import (
     build_audit_log_service,
     build_favorite_service,
+    build_system_admin_service,
     build_system_setting_service,
 )
 from src.core.system.favorite_service import UserResourceFavoriteService
@@ -31,6 +33,14 @@ def get_system_setting_service(session: SessionDep) -> SystemSettingService:
 
 
 SystemSettingServiceDep = Annotated[SystemSettingService, Depends(get_system_setting_service)]
+
+
+def get_system_admin_service(session: SessionDep) -> SystemAdminService:
+    """Build a per-request ``SystemAdminService`` on the shared session."""
+    return build_system_admin_service(session)
+
+
+SystemAdminServiceDep = Annotated[SystemAdminService, Depends(get_system_admin_service)]
 
 
 def get_audit_log_service(session: SessionDep) -> AuditLogService:
@@ -70,10 +80,12 @@ SystemInfoServiceDep = Annotated[SystemInfoService, Depends(get_system_info_serv
 __all__ = [
     "AuditLogServiceDep",
     "FavoriteServiceDep",
+    "SystemAdminServiceDep",
     "SystemInfoServiceDep",
     "SystemSettingServiceDep",
     "get_audit_log_service",
     "get_favorite_service",
+    "get_system_admin_service",
     "get_system_info_service",
     "get_system_setting_service",
 ]

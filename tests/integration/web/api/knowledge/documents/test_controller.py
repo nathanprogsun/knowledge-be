@@ -1,7 +1,7 @@
 """Web-layer tests for the knowledge document routers.
 
-Exercises both routers (``/knowledge-bases/{id}/knowledge`` and
-``/knowledge``) over HTTP via ``TestClient`` against the app: the full
+Exercises both routers (``/api/v1/knowledge-bases/{id}/knowledge`` and
+``/api/v1/knowledge``) over HTTP via ``TestClient`` against the app: the full
 HTTP path (routing, serialization, exception mapping) with the two
 document dependency factories overridden by ``AsyncMock(spec=...)``
 services so no database is involved.
@@ -144,36 +144,36 @@ def _knowledge(
 
 # The upstream document route table, verbatim.
 EXPECTED_ROUTES: set[tuple[str, str]] = {
-    ("POST", "/knowledge-bases/{id}/knowledge/file"),
-    ("POST", "/knowledge-bases/{id}/knowledge/url"),
-    ("POST", "/knowledge-bases/{id}/knowledge/passage"),
-    ("POST", "/knowledge-bases/{id}/knowledge/manual"),
-    ("GET", "/knowledge-bases/{id}/knowledge"),
-    ("GET", "/knowledge/{id}"),
-    ("PUT", "/knowledge/{id}"),
-    ("DELETE", "/knowledge/{id}"),
-    ("POST", "/knowledge/{id}/reparse"),
-    ("POST", "/knowledge/{id}/cancel-parse"),
-    ("POST", "/knowledge/{id}/clone"),
-    ("POST", "/knowledge/move"),
-    ("GET", "/knowledge/move/progress/{task_id}"),
+    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/file"),
+    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/url"),
+    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/passage"),
+    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/manual"),
+    ("GET", "/api/v1/knowledge-bases/{id}/knowledge"),
+    ("GET", "/api/v1/knowledge/{id}"),
+    ("PUT", "/api/v1/knowledge/{id}"),
+    ("DELETE", "/api/v1/knowledge/{id}"),
+    ("POST", "/api/v1/knowledge/{id}/reparse"),
+    ("POST", "/api/v1/knowledge/{id}/cancel-parse"),
+    ("POST", "/api/v1/knowledge/{id}/clone"),
+    ("POST", "/api/v1/knowledge/move"),
+    ("GET", "/api/v1/knowledge/move/progress/{task_id}"),
 }
 
 # Reads are Viewer+; every content mutation is Contributor+.
 EXPECTED_ROLES: dict[tuple[str, str], str] = {
-    ("POST", "/knowledge-bases/{id}/knowledge/file"): "contributor",
-    ("POST", "/knowledge-bases/{id}/knowledge/url"): "contributor",
-    ("POST", "/knowledge-bases/{id}/knowledge/passage"): "contributor",
-    ("POST", "/knowledge-bases/{id}/knowledge/manual"): "contributor",
-    ("GET", "/knowledge-bases/{id}/knowledge"): "viewer",
-    ("GET", "/knowledge/{id}"): "viewer",
-    ("PUT", "/knowledge/{id}"): "contributor",
-    ("DELETE", "/knowledge/{id}"): "contributor",
-    ("POST", "/knowledge/{id}/reparse"): "contributor",
-    ("POST", "/knowledge/{id}/cancel-parse"): "contributor",
-    ("POST", "/knowledge/{id}/clone"): "contributor",
-    ("POST", "/knowledge/move"): "contributor",
-    ("GET", "/knowledge/move/progress/{task_id}"): "viewer",
+    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/file"): "contributor",
+    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/url"): "contributor",
+    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/passage"): "contributor",
+    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/manual"): "contributor",
+    ("GET", "/api/v1/knowledge-bases/{id}/knowledge"): "viewer",
+    ("GET", "/api/v1/knowledge/{id}"): "viewer",
+    ("PUT", "/api/v1/knowledge/{id}"): "contributor",
+    ("DELETE", "/api/v1/knowledge/{id}"): "contributor",
+    ("POST", "/api/v1/knowledge/{id}/reparse"): "contributor",
+    ("POST", "/api/v1/knowledge/{id}/cancel-parse"): "contributor",
+    ("POST", "/api/v1/knowledge/{id}/clone"): "contributor",
+    ("POST", "/api/v1/knowledge/move"): "contributor",
+    ("GET", "/api/v1/knowledge/move/progress/{task_id}"): "viewer",
 }
 
 
@@ -233,7 +233,7 @@ async def test_create_file_returns_document(
     orchestrator.create_from_file.return_value = _knowledge(id="kn-file")
 
     resp = client.post(
-        f"/knowledge-bases/{KB_ID}/knowledge/file",
+        f"/api/v1/knowledge-bases/{KB_ID}/knowledge/file",
         files={"file": ("a.txt", b"file content", "text/plain")},
     )
 
@@ -251,7 +251,7 @@ async def test_create_file_forwards_form_fields(
     orchestrator.create_from_file.return_value = _knowledge()
 
     client.post(
-        f"/knowledge-bases/{KB_ID}/knowledge/file",
+        f"/api/v1/knowledge-bases/{KB_ID}/knowledge/file",
         files={"file": ("a.txt", b"data", "text/plain")},
         data={
             "file_name": "custom.txt",
@@ -269,7 +269,7 @@ async def test_create_file_forwards_form_fields(
 
 
 async def test_create_file_rejects_missing_file(client: TestClient) -> None:
-    resp = client.post(f"/knowledge-bases/{KB_ID}/knowledge/file")
+    resp = client.post(f"/api/v1/knowledge-bases/{KB_ID}/knowledge/file")
 
     assert resp.status_code == 422
 
@@ -284,7 +284,7 @@ async def test_create_url_returns_201_document(
     orchestrator.create_from_url.return_value = _knowledge(id="kn-url")
 
     resp = client.post(
-        f"/knowledge-bases/{KB_ID}/knowledge/url",
+        f"/api/v1/knowledge-bases/{KB_ID}/knowledge/url",
         json={"url": "https://example.com/page"},
     )
 
@@ -295,7 +295,7 @@ async def test_create_url_returns_201_document(
 
 
 async def test_create_url_requires_url(client: TestClient) -> None:
-    resp = client.post(f"/knowledge-bases/{KB_ID}/knowledge/url", json={})
+    resp = client.post(f"/api/v1/knowledge-bases/{KB_ID}/knowledge/url", json={})
 
     assert resp.status_code == 422
 
@@ -310,7 +310,7 @@ async def test_create_passage_returns_201_document(
     orchestrator.create_from_passage.return_value = _knowledge(id="kn-passage")
 
     resp = client.post(
-        f"/knowledge-bases/{KB_ID}/knowledge/passage",
+        f"/api/v1/knowledge-bases/{KB_ID}/knowledge/passage",
         json={"passages": ["first", "second"], "sync": True},
     )
 
@@ -323,7 +323,7 @@ async def test_create_passage_returns_201_document(
 
 async def test_create_passage_rejects_empty_list(client: TestClient) -> None:
     resp = client.post(
-        f"/knowledge-bases/{KB_ID}/knowledge/passage",
+        f"/api/v1/knowledge-bases/{KB_ID}/knowledge/passage",
         json={"passages": []},
     )
 
@@ -341,7 +341,7 @@ async def test_create_manual_returns_document(
     orchestrator.create_from_manual.return_value = _knowledge(id="kn-manual")
 
     resp = client.post(
-        f"/knowledge-bases/{KB_ID}/knowledge/manual",
+        f"/api/v1/knowledge-bases/{KB_ID}/knowledge/manual",
         json=default_create_document_request,
     )
 
@@ -352,7 +352,7 @@ async def test_create_manual_returns_document(
 
 
 async def test_create_manual_requires_title_and_content(client: TestClient) -> None:
-    resp = client.post(f"/knowledge-bases/{KB_ID}/knowledge/manual", json={})
+    resp = client.post(f"/api/v1/knowledge-bases/{KB_ID}/knowledge/manual", json={})
 
     assert resp.status_code == 422
 
@@ -371,7 +371,7 @@ async def test_list_returns_paged_envelope(
         data=[_knowledge()],
     )
 
-    resp = client.get(f"/knowledge-bases/{KB_ID}/knowledge")
+    resp = client.get(f"/api/v1/knowledge-bases/{KB_ID}/knowledge")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -387,7 +387,7 @@ async def test_list_rejects_unparseable_time(
     knowledge_service: AsyncMock,
 ) -> None:
     resp = client.get(
-        f"/knowledge-bases/{KB_ID}/knowledge",
+        f"/api/v1/knowledge-bases/{KB_ID}/knowledge",
         params={"start_time": "not-a-date"},
     )
 
@@ -403,7 +403,7 @@ async def test_get_returns_document(
 ) -> None:
     knowledge_service.get_document.return_value = _knowledge()
 
-    resp = client.get("/knowledge/kn-1")
+    resp = client.get("/api/v1/knowledge/kn-1")
 
     assert resp.status_code == 200
     assert resp.json()["data"]["id"] == "kn-1"
@@ -417,7 +417,7 @@ async def test_get_missing_returns_404(
         code="knowledge.not_found", message="knowledge not found"
     )
 
-    resp = client.get("/knowledge/nope")
+    resp = client.get("/api/v1/knowledge/nope")
 
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "knowledge.not_found"
@@ -432,7 +432,7 @@ async def test_get_cross_tenant_returns_404(
         code="knowledge.not_found", message="knowledge not found"
     )
 
-    resp = client.get("/knowledge/kn-theirs")
+    resp = client.get("/api/v1/knowledge/kn-theirs")
 
     assert resp.status_code == 404
 
@@ -446,7 +446,7 @@ async def test_update_patches_title(
 ) -> None:
     knowledge_service.update_document.return_value = _knowledge(title="renamed")
 
-    resp = client.put("/knowledge/kn-1", json={"title": "renamed"})
+    resp = client.put("/api/v1/knowledge/kn-1", json={"title": "renamed"})
 
     assert resp.status_code == 200
     body = resp.json()
@@ -463,7 +463,7 @@ async def test_update_missing_returns_404(
         code="knowledge.not_found", message="knowledge not found"
     )
 
-    resp = client.put("/knowledge/nope", json={"title": "x"})
+    resp = client.put("/api/v1/knowledge/nope", json={"title": "x"})
 
     assert resp.status_code == 404
 
@@ -477,7 +477,7 @@ async def test_delete_returns_ack(
 ) -> None:
     orchestrator.delete.return_value = True
 
-    resp = client.delete("/knowledge/kn-1")
+    resp = client.delete("/api/v1/knowledge/kn-1")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -493,7 +493,7 @@ async def test_delete_missing_returns_404(
         code="knowledge.not_found", message="knowledge not found"
     )
 
-    resp = client.delete("/knowledge/nope")
+    resp = client.delete("/api/v1/knowledge/nope")
 
     assert resp.status_code == 404
 
@@ -507,7 +507,7 @@ async def test_reparse_returns_submitted_ack(
 ) -> None:
     orchestrator.reparse.return_value = _knowledge(parse_status="pending")
 
-    resp = client.post("/knowledge/kn-1/reparse")
+    resp = client.post("/api/v1/knowledge/kn-1/reparse")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -523,7 +523,7 @@ async def test_reparse_forwards_process_config(
     orchestrator.reparse.return_value = _knowledge(parse_status="pending")
 
     client.post(
-        "/knowledge/kn-1/reparse",
+        "/api/v1/knowledge/kn-1/reparse",
         json={"process_config": {"enable_multimodel": True}},
     )
 
@@ -539,7 +539,7 @@ async def test_reparse_missing_returns_404(
         code="knowledge.not_found", message="knowledge not found"
     )
 
-    resp = client.post("/knowledge/nope/reparse")
+    resp = client.post("/api/v1/knowledge/nope/reparse")
 
     assert resp.status_code == 404
 
@@ -553,7 +553,7 @@ async def test_cancel_parse_returns_cancelled_ack(
 ) -> None:
     orchestrator.cancel_parse.return_value = _knowledge(parse_status="cancelled")
 
-    resp = client.post("/knowledge/kn-1/cancel-parse")
+    resp = client.post("/api/v1/knowledge/kn-1/cancel-parse")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -570,7 +570,7 @@ async def test_cancel_parse_finished_returns_422(
         code="knowledge.parse_not_cancellable", message="parse already finished"
     )
 
-    resp = client.post("/knowledge/kn-1/cancel-parse")
+    resp = client.post("/api/v1/knowledge/kn-1/cancel-parse")
 
     assert resp.status_code == 422
 
@@ -584,7 +584,7 @@ async def test_clone_returns_cloned_document(
 ) -> None:
     orchestrator.clone.return_value = _knowledge(id="kn-clone", kb_id="kb-2")
 
-    resp = client.post("/knowledge/kn-1/clone", json={"target_kb_id": "kb-2"})
+    resp = client.post("/api/v1/knowledge/kn-1/clone", json={"target_kb_id": "kb-2"})
 
     assert resp.status_code == 200
     body = resp.json()
@@ -599,7 +599,7 @@ async def test_clone_not_completed_returns_422(
 ) -> None:
     orchestrator.clone.return_value = None
 
-    resp = client.post("/knowledge/kn-1/clone", json={"target_kb_id": "kb-2"})
+    resp = client.post("/api/v1/knowledge/kn-1/clone", json={"target_kb_id": "kb-2"})
 
     assert resp.status_code == 422
 
@@ -614,7 +614,7 @@ async def test_move_returns_task_response(
     orchestrator.move.return_value = _knowledge(kb_id="kb-2")
 
     resp = client.post(
-        "/knowledge/move",
+        "/api/v1/knowledge/move",
         json={
             "knowledge_ids": ["kn-1"],
             "source_kb_id": KB_ID,
@@ -637,7 +637,7 @@ async def test_move_returns_task_response(
 
 async def test_move_same_kb_returns_422(client: TestClient) -> None:
     resp = client.post(
-        "/knowledge/move",
+        "/api/v1/knowledge/move",
         json={
             "knowledge_ids": ["kn-1"],
             "source_kb_id": KB_ID,
@@ -651,7 +651,7 @@ async def test_move_same_kb_returns_422(client: TestClient) -> None:
 
 async def test_move_empty_ids_returns_422(client: TestClient) -> None:
     resp = client.post(
-        "/knowledge/move",
+        "/api/v1/knowledge/move",
         json={
             "knowledge_ids": [],
             "source_kb_id": KB_ID,
@@ -673,7 +673,7 @@ def _task_id(tenant_id: int) -> str:
 async def test_move_progress_malformed_task_id_returns_422(
     client: TestClient,
 ) -> None:
-    resp = client.get("/knowledge/move/progress/not-a-task")
+    resp = client.get("/api/v1/knowledge/move/progress/not-a-task")
 
     assert resp.status_code == 422
 
@@ -681,7 +681,7 @@ async def test_move_progress_malformed_task_id_returns_422(
 async def test_move_progress_cross_tenant_hidden_as_404(
     client: TestClient,
 ) -> None:
-    resp = client.get(f"/knowledge/move/progress/{_task_id(TENANT_ID + 1)}")
+    resp = client.get(f"/api/v1/knowledge/move/progress/{_task_id(TENANT_ID + 1)}")
 
     # A cross-workspace task reads as not-found so the task space is not
     # enumerable.
@@ -693,6 +693,6 @@ async def test_move_progress_same_tenant_no_record_returns_404(
 ) -> None:
     # The tenant guard passes; progress records land with the async task
     # infrastructure, so a well-formed task resolves to no record.
-    resp = client.get(f"/knowledge/move/progress/{_task_id(TENANT_ID)}")
+    resp = client.get(f"/api/v1/knowledge/move/progress/{_task_id(TENANT_ID)}")
 
     assert resp.status_code == 404

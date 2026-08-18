@@ -13,7 +13,7 @@ resolves the principal via the ``X-User-Id/X-Tenant-ID/X-Roles`` header trio.
 The load-bearing checks:
 
 1. All four endpoints exist under the paths and methods upstream
-   registers (``/knowledge-bases/{id}/tags`` CRUD).
+   registers (``/api/v1/knowledge-bases/{id}/tags`` CRUD).
 2. Every endpoint declares the auth gate plus the role gate (reads
    Viewer+, mutations Contributor+), asserted structurally so a
    dropped guard fails the suite.
@@ -256,18 +256,18 @@ def _kb_row(*, kb_id: str = KB_ID, tenant_id: int | None = None) -> KnowledgeBas
 # ── Route inventory + permission gates ───────────────────────────────
 
 EXPECTED_ROUTES: set[tuple[str, str]] = {
-    ("GET", "/knowledge-bases/{id}/tags"),
-    ("POST", "/knowledge-bases/{id}/tags"),
-    ("PUT", "/knowledge-bases/{id}/tags/{tag_id}"),
-    ("DELETE", "/knowledge-bases/{id}/tags/{tag_id}"),
+    ("GET", "/api/v1/knowledge-bases/{id}/tags"),
+    ("POST", "/api/v1/knowledge-bases/{id}/tags"),
+    ("PUT", "/api/v1/knowledge-bases/{id}/tags/{tag_id}"),
+    ("DELETE", "/api/v1/knowledge-bases/{id}/tags/{tag_id}"),
 }
 
 # Reads are Viewer+; mutations are Contributor+.
 EXPECTED_ROLES: dict[tuple[str, str], str] = {
-    ("GET", "/knowledge-bases/{id}/tags"): "viewer",
-    ("POST", "/knowledge-bases/{id}/tags"): "contributor",
-    ("PUT", "/knowledge-bases/{id}/tags/{tag_id}"): "contributor",
-    ("DELETE", "/knowledge-bases/{id}/tags/{tag_id}"): "contributor",
+    ("GET", "/api/v1/knowledge-bases/{id}/tags"): "viewer",
+    ("POST", "/api/v1/knowledge-bases/{id}/tags"): "contributor",
+    ("PUT", "/api/v1/knowledge-bases/{id}/tags/{tag_id}"): "contributor",
+    ("DELETE", "/api/v1/knowledge-bases/{id}/tags/{tag_id}"): "contributor",
 }
 
 
@@ -330,7 +330,7 @@ async def test_list_returns_enveloped_page(
 ) -> None:
     tag_repo._rows["tag-abc"] = _tag_row()  # type: ignore[attr-defined]
 
-    resp = client.get(f"/knowledge-bases/{owned_kb.id}/tags")
+    resp = client.get(f"/api/v1/knowledge-bases/{owned_kb.id}/tags")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -356,7 +356,7 @@ async def test_list_filters_by_keyword(
     rows["t2"] = _tag_row(tag_id="t2", name="storage")
 
     resp = client.get(
-        f"/knowledge-bases/{owned_kb.id}/tags",
+        f"/api/v1/knowledge-bases/{owned_kb.id}/tags",
         params={"keyword": "network"},
     )
 
@@ -368,7 +368,7 @@ async def test_list_empty_kb_returns_empty_page(
     client: TestClient,
     owned_kb: KnowledgeBase,
 ) -> None:
-    resp = client.get(f"/knowledge-bases/{owned_kb.id}/tags")
+    resp = client.get(f"/api/v1/knowledge-bases/{owned_kb.id}/tags")
 
     assert resp.status_code == 200
     body = resp.json()
@@ -379,14 +379,14 @@ async def test_list_empty_kb_returns_empty_page(
 
 async def test_list_cross_tenant_kb_returns_404(client: TestClient) -> None:
     # No KB row is seeded for the authed tenant, so the id is invisible.
-    resp = client.get("/knowledge-bases/kb-other/tags")
+    resp = client.get("/api/v1/knowledge-bases/kb-other/tags")
 
     assert resp.status_code == 404
 
 
 async def test_list_rejects_invalid_pagination(client: TestClient) -> None:
     resp = client.get(
-        f"/knowledge-bases/{KB_ID}/tags",
+        f"/api/v1/knowledge-bases/{KB_ID}/tags",
         params={"page": 0},
     )
 
@@ -402,7 +402,7 @@ async def test_create_returns_enveloped_tag(
     default_create_tag_request: dict[str, object],
 ) -> None:
     resp = client.post(
-        f"/knowledge-bases/{owned_kb.id}/tags",
+        f"/api/v1/knowledge-bases/{owned_kb.id}/tags",
         json=default_create_tag_request,
     )
 
@@ -423,7 +423,7 @@ async def test_create_persists_color_and_sort_order(
     owned_kb: KnowledgeBase,
 ) -> None:
     resp = client.post(
-        f"/knowledge-bases/{owned_kb.id}/tags",
+        f"/api/v1/knowledge-bases/{owned_kb.id}/tags",
         json={"name": "networking", "color": "#00ff00", "sort_order": 2},
     )
 
@@ -446,7 +446,7 @@ async def test_create_duplicate_name_returns_conflict(
     tag_repo._rows["existing"] = _tag_row(tag_id="existing", name="placeholder")  # type: ignore[attr-defined]
 
     resp = client.post(
-        f"/knowledge-bases/{owned_kb.id}/tags",
+        f"/api/v1/knowledge-bases/{owned_kb.id}/tags",
         json={"name": "placeholder"},
     )
 
@@ -454,13 +454,13 @@ async def test_create_duplicate_name_returns_conflict(
 
 
 async def test_create_unknown_kb_returns_404(client: TestClient) -> None:
-    resp = client.post("/knowledge-bases/kb-other/tags", json={"name": "x"})
+    resp = client.post("/api/v1/knowledge-bases/kb-other/tags", json={"name": "x"})
 
     assert resp.status_code == 404
 
 
 async def test_create_rejects_missing_name(client: TestClient) -> None:
-    resp = client.post(f"/knowledge-bases/{KB_ID}/tags", json={})
+    resp = client.post(f"/api/v1/knowledge-bases/{KB_ID}/tags", json={})
 
     assert resp.status_code == 422
 
@@ -476,7 +476,7 @@ async def test_update_patches_name_by_uuid(
     tag_repo._rows["tag-abc"] = _tag_row()  # type: ignore[attr-defined]
 
     resp = client.put(
-        f"/knowledge-bases/{owned_kb.id}/tags/tag-abc",
+        f"/api/v1/knowledge-bases/{owned_kb.id}/tags/tag-abc",
         json={"name": "renamed"},
     )
 
@@ -495,7 +495,7 @@ async def test_update_by_seq_id_resolves_to_uuid(
     tag_repo._rows["tag-abc"] = _tag_row(seq_id=10000001)  # type: ignore[attr-defined]
 
     resp = client.put(
-        f"/knowledge-bases/{owned_kb.id}/tags/10000001",
+        f"/api/v1/knowledge-bases/{owned_kb.id}/tags/10000001",
         json={"color": "#0000ff"},
     )
 
@@ -507,7 +507,7 @@ async def test_update_by_seq_id_resolves_to_uuid(
 
 async def test_update_missing_returns_404(client: TestClient) -> None:
     resp = client.put(
-        f"/knowledge-bases/{KB_ID}/tags/nope",
+        f"/api/v1/knowledge-bases/{KB_ID}/tags/nope",
         json={"name": "x"},
     )
 
@@ -516,7 +516,7 @@ async def test_update_missing_returns_404(client: TestClient) -> None:
 
 async def test_update_unknown_seq_id_returns_404(client: TestClient) -> None:
     resp = client.put(
-        f"/knowledge-bases/{KB_ID}/tags/99999999",
+        f"/api/v1/knowledge-bases/{KB_ID}/tags/99999999",
         json={"name": "x"},
     )
 
@@ -530,7 +530,7 @@ async def test_update_cross_tenant_tag_returns_404(
     tag_repo._rows["theirs"] = _tag_row(tag_id="theirs", tenant_id=99)  # type: ignore[attr-defined]
 
     resp = client.put(
-        f"/knowledge-bases/{KB_ID}/tags/theirs",
+        f"/api/v1/knowledge-bases/{KB_ID}/tags/theirs",
         json={"name": "x"},
     )
 
@@ -547,7 +547,7 @@ async def test_delete_returns_success_ack_and_removes(
 ) -> None:
     tag_repo._rows["tag-abc"] = _tag_row()  # type: ignore[attr-defined]
 
-    resp = client.delete(f"/knowledge-bases/{owned_kb.id}/tags/tag-abc")
+    resp = client.delete(f"/api/v1/knowledge-bases/{owned_kb.id}/tags/tag-abc")
 
     assert resp.status_code == 200
     assert resp.json() == {"success": True}
@@ -562,7 +562,7 @@ async def test_delete_referenced_tag_without_force_returns_422(
     tag_repo._rows["tag-abc"] = _tag_row()  # type: ignore[attr-defined]
     tag_repo._refs["tag-abc"] = TagReferenceCounts(knowledge_count=2, chunk_count=0)  # type: ignore[attr-defined]
 
-    resp = client.delete(f"/knowledge-bases/{owned_kb.id}/tags/tag-abc")
+    resp = client.delete(f"/api/v1/knowledge-bases/{owned_kb.id}/tags/tag-abc")
 
     assert resp.status_code == 422
 
@@ -576,7 +576,7 @@ async def test_delete_referenced_tag_with_force_succeeds(
     tag_repo._refs["tag-abc"] = TagReferenceCounts(knowledge_count=2, chunk_count=0)  # type: ignore[attr-defined]
 
     resp = client.delete(
-        f"/knowledge-bases/{owned_kb.id}/tags/tag-abc",
+        f"/api/v1/knowledge-bases/{owned_kb.id}/tags/tag-abc",
         params={"force": "true"},
     )
 
@@ -592,7 +592,7 @@ async def test_delete_content_only_keeps_tag(
     tag_repo._rows["tag-abc"] = _tag_row()  # type: ignore[attr-defined]
 
     resp = client.delete(
-        f"/knowledge-bases/{owned_kb.id}/tags/tag-abc",
+        f"/api/v1/knowledge-bases/{owned_kb.id}/tags/tag-abc",
         params={"content_only": "true"},
     )
 
@@ -609,7 +609,7 @@ async def test_delete_with_exclude_ids_keeps_tag(
 
     resp = client.request(
         "DELETE",
-        f"/knowledge-bases/{owned_kb.id}/tags/tag-abc",
+        f"/api/v1/knowledge-bases/{owned_kb.id}/tags/tag-abc",
         json={"exclude_ids": [1, 2]},
     )
 
@@ -618,6 +618,6 @@ async def test_delete_with_exclude_ids_keeps_tag(
 
 
 async def test_delete_missing_returns_404(client: TestClient) -> None:
-    resp = client.delete(f"/knowledge-bases/{KB_ID}/tags/nope")
+    resp = client.delete(f"/api/v1/knowledge-bases/{KB_ID}/tags/nope")
 
     assert resp.status_code == 404

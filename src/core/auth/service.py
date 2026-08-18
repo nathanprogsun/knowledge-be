@@ -12,7 +12,7 @@ from src.common.exception import (
     UnauthorizedError,
     ValidationError,
 )
-from src.core.auth.types import UserInfo
+from src.core.auth.types import UserInfo, UserPreferences
 from src.db.dao.auth_tokens_repository import (
     AuthTokenRepository,
 )
@@ -221,7 +221,22 @@ class AuthService:
         email: str,
         password: str,
     ) -> LoginResult:
-        """Create a user and mint an access/refresh pair.
+        """Create a user and mint an access/refresh pair."""
+        user_row = await self.create_user(
+            username=username,
+            email=email,
+            password=password,
+        )
+        return await self._mint_pair(UserInfo.map_from_db(user_row))
+
+    async def create_user(
+        self,
+        *,
+        username: str,
+        email: str,
+        password: str,
+    ) -> User:
+        """Validate + insert a user row without minting tokens.
 
         Rejects empty / colliding usernames or emails with a
         ``ConflictError`` (the ``users`` table enforces uniqueness on
@@ -250,13 +265,12 @@ class AuthService:
             updated_at=now,
         )
         try:
-            stored = await self._users_repo.insert(user_row)
+            return await self._users_repo.insert(user_row)
         except ConflictError as exc:
             raise ConflictError(
                 code="user.exists",
                 message="Email or username already registered",
             ) from exc
-        return await self._mint_pair(UserInfo.map_from_db(stored))
 
     async def change_password(
         self,
@@ -294,6 +308,68 @@ class AuthService:
     async def get_me(self, *, token: str) -> tuple[UserInfo, int | None]:
         """Resolve the authenticated user + active tenant from an access token."""
         return await self._validate_token(token)
+
+    async def get_user_row_by_email(self, email: str) -> User | None:
+        """Return the storage row for ``email`` or ``None`` (never raises)."""
+        try:
+            return await self._users_repo.find_by_email(email.strip().lower())
+        except NotFoundError:
+            return None
+
+    async def mint_pair_for_user_row(self, user_row: User) -> LoginResult:
+        """Mint + persist an access/refresh pair for an existing user row."""
+        return await mint_token_pair(
+            tokens_repo=self._tokens_repo,
+            info=UserInfo.map_from_db(user_row),
+        )
+
+    async def update_home_tenant(self, user_id: str, tenant_id: int) -> User:
+        """Point the user's home workspace at ``tenant_id``; returns the row."""
+        updated = await self._users_repo.update_by_primary_key(
+            {"id": user_id},
+            {"tenant_id": tenant_id, "updated_at": datetime.now(UTC)},
+        )
+        if updated is None:
+            raise NotFoundError(
+                code="user.not_found",
+                message=f"User {user_id} not found",
+            )
+        return updated
+
+    async def update_my_preferences(
+        self,
+        *,
+        user_id: str,
+        patch: UserPreferences,
+    ) -> UserPreferences:
+        """PATCH-merge user preferences (only supplied keys are overwritten).
+
+        ``last_active_tenant_id=0`` clears the preference (matches the
+        Go PATCH semantics); ``None`` leaves the stored value untouched.
+        """
+        try:
+            user = await self._users_repo.find_by_id(user_id)
+        except NotFoundError as exc:
+            raise UnauthorizedError(
+                code="auth.invalid_credentials",
+                message="User not found",
+            ) from exc
+        current = UserPreferences.from_json(user.preferences)
+        merged = UserPreferences(
+            last_active_tenant_id=(
+                patch.last_active_tenant_id
+                if patch.last_active_tenant_id is not None
+                else current.last_active_tenant_id
+            ),
+        )
+        await self._users_repo.update_by_primary_key(
+            {"id": user_id},
+            {
+                "preferences": merged.model_dump(mode="json"),
+                "updated_at": datetime.now(UTC),
+            },
+        )
+        return merged
 
     # ── Internal helpers ────────────────────────────────────────────
 

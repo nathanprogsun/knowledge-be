@@ -295,6 +295,22 @@ class TagService:
             for knowledge_id, rows in grouped.items()
         }
 
+    async def get_tags_by_ids(
+        self,
+        *,
+        tenant_id: int,
+        ids: list[str],
+    ) -> dict[str, TagInfo]:
+        """Return the tenant's tags whose id is in ``ids``, keyed by id.
+
+        Absent or cross-tenant ids are dropped; an empty ``ids`` returns
+        an empty mapping without touching the database.
+        """
+        if not ids:
+            return {}
+        rows = await self._tag_repo.get_by_ids(tenant_id, ids)
+        return {row.id: TagInfo.map_from_db(row) for row in rows}
+
     async def delete_knowledge_tag_relations(self, knowledge_id: str) -> int:
         """Remove every tag binding of a document; return the row count."""
         return await self._tag_repo.delete_knowledge_tag_relations(knowledge_id)
