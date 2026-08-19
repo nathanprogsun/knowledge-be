@@ -70,7 +70,7 @@ def test_validation_error_status_422() -> None:
 
 
 def test_request_validation_error_uses_app_envelope() -> None:
-    """FastAPI body validation is wrapped in the standard envelope (PR-146 B3).
+    """FastAPI body validation is wrapped in the standard envelope.
 
     Without the explicit handler, FastAPI emits ``{"detail": [...]}`` for
     malformed bodies. We override to keep the contract single-shape so

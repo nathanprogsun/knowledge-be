@@ -1,4 +1,4 @@
-"""Unit tests for the storage rows added in PR-156.
+"""Unit tests for the storage rows added with the tenant api_key column.
 
 These tests pin the column shape, primary-key composition, JSON
 column declarations, and ``db_generated_columns`` carve-out of the
@@ -15,7 +15,6 @@ from typing import ClassVar
 
 import pytest
 
-from src.common.json import JsonObject
 from src.db.models.tenant_disabled_shared_agent import TenantDisabledSharedAgent
 from src.db.models.tenants.tenants import Tenant
 from src.db.models.user_kb_pin import UserKBPin

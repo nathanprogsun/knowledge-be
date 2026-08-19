@@ -471,7 +471,7 @@ async def test_embed_auth_stub_raises_not_implemented() -> None:
 __all__ = []
 
 
-# ── Path tenant match (PR-146 B4) ──────────────────────────────────
+# ── Path tenant match ────────────────────────────────────────────────
 
 
 async def test_path_tenant_match_passes_when_match() -> None:

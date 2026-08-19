@@ -96,7 +96,7 @@ async def _resolve_jwt(
 
     # Fallback for users whose JWT carries no tenant_id (e.g. the
     # ``preferences.last_active_tenant_id`` was never written, as was
-    # the case for every tenant created before PR-146). Mirrors Go's
+    # the case for legacy tenants). Mirrors the upstream
     # ``userService.resolveLoginTenantID`` →
     # ``homeOrFirstMembershipTenant``: a tenantless identity with at
     # least one active membership is dropped into the earliest one so

@@ -98,7 +98,11 @@ _BAD_FILENAMES = {
     "checkpoint-2-report.md",
 }
 
-DEFAULT_ALLOWLIST_PATHS = {"docs/release-notes", "scripts/check_pr_leak.py"}
+DEFAULT_ALLOWLIST_PATHS = {
+    "docs/release-notes",
+    "docs/migration/checkpoints",
+    "scripts/check_pr_leak.py",
+}
 
 
 # ─────────────────────────────────────────────────────────────────────────
