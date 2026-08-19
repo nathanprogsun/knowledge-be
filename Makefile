@@ -1,4 +1,4 @@
-.PHONY: help install sync lint typecheck format format-fix test migrate clean dev-app check check-layer check-singleton check-endpoint check-schema check-contract check-imports check-sql check-pr-leak check-map-from-db check-exception-types
+.PHONY: help install sync lint typecheck format format-fix test migrate clean dev-app check check-layer check-singleton check-endpoint check-schema check-contract check-imports check-sql check-pr-leak check-map-from-db check-exception-types check-agent-notes
 
 help:
 	@echo "Targets:"
@@ -47,7 +47,7 @@ clean:
 
 INFRA_DOMAINS := datasources,initialization,mcp_services,models,storage_backends,vector_stores,web_search
 
-check: check-layer check-singleton check-endpoint check-schema check-contract check-imports check-sql check-pr-leak check-map-from-db check-exception-types
+check: check-layer check-singleton check-endpoint check-schema check-contract check-imports check-sql check-pr-leak check-map-from-db check-exception-types check-agent-notes
 	@echo "All anti-drift checks passed"
 
 # Layer check covers every shipped domain. Endpoint coverage can only
@@ -82,6 +82,9 @@ check-map-from-db:
 
 check-exception-types:
 	python scripts/check_exception_types.py --src-root src/
+
+check-agent-notes:
+	python scripts/verify_agent_notes.py --repo-root .
 
 dev-app:
 	uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000

@@ -132,3 +132,49 @@ the boundary translation. The db layer never references the wire DTO
   ``from_json`` classmethod that accepts both parsed ``dict`` and raw
   JSON ``str`` (driver-portability).
 - ``web`` receives the projected DTO; it never calls ``map_from_db``.
+
+## 10. Agent workflow
+
+- ``.agents/notes/`` holds **Agent Notes** — RFC-style decision records
+  preserving the *why* and *what we gave up*. Every non-trivial change
+  MUST add or update at least one Agent Note in the same change (only
+  mechanical/local edits are exempt). The path scheme and format are
+  enforced by ``scripts/verify_agent_notes.py``
+  (``make check-agent-notes``; also a pre-commit hook).
+- ``.agents/skills/`` holds reusable agent workflows (``SKILL.md``):
+  ``kb-pre-push-checks``, ``kb-code-review``,
+  ``kb-contract-alignment``, ``kb-trim-cot-leakage``, ``kb-agent-note``.
+  On machines with Claude Code, ``.claude/skills`` symlinks here.
+- The public-facing wording rules of §2 apply to everything under
+  ``.agents/``.
+
+## 11. Pre-commit / pre-push
+
+Pre-commit hooks (run on every commit) are intentionally narrow:
+``ruff check --fix`` and ``ruff-format`` on staged files, plus
+``verify-agent-notes`` (full repo scan, fast). The ``mypy`` hook is
+moved to the **pre-push** stage so commit-time stays fast — full
+strict typecheck of ``src/`` and ``tests/`` runs before the push lands.
+
+Install both stages once:
+
+```sh
+pre-commit install --hook-type pre-commit --hook-type pre-push
+```
+
+## 12. CI gate follow-ups
+
+- **Coverage threshold not yet enforced.** CI runs ``pytest --cov=src``
+  for visibility only; no ``fail_under`` until a baseline is observed
+  over a release cycle. The audit recommends tightening the threshold
+  once the real number is known.
+- **Anti-drift ``check-endpoint`` is fail-closed.** ``scripts/check_endpoint_coverage.py``
+  now errors out when the docs root is missing instead of passing
+  silently; bundle the upstream API endpoint tables in ``docs/api/*.md``
+  (or pass ``--docs-root`` in CI) before merging the change that
+  exposed this gate.
+- **Real-DB integration tests are not yet wired into CI.** ``docker-compose.test.yml``
+  lists Postgres and Redis as commented-out placeholders. Either uncomment
+  them and add a ``services:`` block to the CI job, or add a DB
+  reachability probe in ``tests/integration/conftest.py`` that
+  ``pytest.skip``s the integration suites when no DB is reachable.

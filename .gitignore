@@ -228,3 +228,12 @@ __marimo__/
 !.pre-commit-config.yaml
 !.pyrightconfig.json
 
+# Agent workflow directory (dot-prefixed; re-include for tracking)
+!.agents/
+
+# Expose agent skills to Claude Code via a tracked symlink, without
+# un-ignoring the rest of .claude/ (CLAUDE.md, local settings stay out).
+!.claude/
+.claude/*
+!.claude/skills
+

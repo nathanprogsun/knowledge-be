@@ -30,3 +30,16 @@ repos:
           - types-redis
         args: [--config=mypy.ini]
         pass_filenames: false
+        # Typecheck is heavy (full src+tests under strict mode); keep it
+        # out of the commit-time checkpoint so pre-commit stays fast.
+        # Run on pre-push instead. Install via:
+        #   pre-commit install --hook-type pre-commit --hook-type pre-push
+        stages: [pre-push]
+
+  - repo: local
+    hooks:
+      - id: verify-agent-notes
+        name: verify-agent-notes
+        entry: python scripts/verify_agent_notes.py --repo-root .
+        language: system
+        pass_filenames: false
