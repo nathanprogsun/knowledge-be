@@ -308,6 +308,12 @@ class CreateAgentShareRequest(BaseModel):
     permission: str
 
 
+class UpdateSharePermissionRequest(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    permission: str
+
+
 class SharedAgentListItem(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -374,4 +380,5 @@ __all__ = [
     "UpdateKnowledgeBaseShareRequest",
     "UpdateMemberRoleRequest",
     "UpdateOrganizationRequest",
+    "UpdateSharePermissionRequest",
 ]

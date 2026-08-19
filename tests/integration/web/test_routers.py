@@ -67,6 +67,8 @@ _EXPECTED_ALL_ROUTES: set[str] = {
     "/api/v1/agents/type-presets",
     "/api/v1/agents/{agent_id}/embed-channels",
     "/api/v1/agents/{agent_id}/im-channels",
+    "/api/v1/agents/{agent_id}/shares",
+    "/api/v1/agents/{agent_id}/shares/{share_id}",
     "/api/v1/agents/{id}",
     "/api/v1/agents/{id}/copy",
     "/api/v1/agents/{id}/suggested-questions",

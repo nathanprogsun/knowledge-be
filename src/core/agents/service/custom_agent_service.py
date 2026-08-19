@@ -30,6 +30,7 @@ from datetime import UTC, datetime
 
 from src.common.exception import ConflictError, NotFoundError, ValidationError
 from src.common.json import JsonObject, JsonValue
+from src.core.agents.builtin_registry import BUILTIN_AGENT_ORDER, get_builtin_agent
 from src.core.agents.types import (
     AGENT_MODE_QUICK_ANSWER,
     AGENT_MODE_SMART_REASONING,
@@ -134,13 +135,21 @@ class CustomAgentService:
     async def get_agent_by_id(self, *, tenant_id: int, agent_id: str) -> CustomAgentInfo:
         """Return one agent for the tenant, or raise ``NotFoundError``.
 
-        The built-in preset lookup is a deferred seam; until the registry
-        is ported, every read resolves the stored row.
+        Built-in ids resolve to the registry default when no customized
+        row exists; custom ids resolve to the stored row.
         """
         _require_tenant_id(tenant_id)
         _require_agent_id(agent_id)
-        row = await self._get_live_agent(tenant_id=tenant_id, agent_id=agent_id)
-        return CustomAgentInfo.from_row(_ensure_defaults(row))
+        row = await self._agent_repo.get_by_id_and_tenant(id=agent_id, tenant_id=tenant_id)
+        if row is not None:
+            return CustomAgentInfo.from_row(_ensure_defaults(row))
+        builtin = get_builtin_agent(agent_id, tenant_id)
+        if builtin is not None:
+            return builtin
+        raise NotFoundError(
+            code=_NOT_FOUND_CODE,
+            message=f"custom agent {agent_id} not found",
+        )
 
     async def get_agent_by_id_and_tenant(
         self,
@@ -159,10 +168,26 @@ class CustomAgentService:
         return CustomAgentInfo.from_row(_ensure_defaults(row))
 
     async def list_agents(self, *, tenant_id: int) -> list[CustomAgentInfo]:
-        """Return every live agent of the tenant, newest-first."""
+        """Return the tenant's agents: built-in presets first, then custom.
+
+        Built-in presets appear in the fixed registry order; a preset
+        with a customized row in storage is replaced by that row. Custom
+        agents follow newest-first.
+        """
         _require_tenant_id(tenant_id)
         rows = await self._agent_repo.list_by_tenant(tenant_id)
-        return [CustomAgentInfo.from_row(_ensure_defaults(row)) for row in rows]
+        by_id = {row.id: CustomAgentInfo.from_row(_ensure_defaults(row)) for row in rows}
+
+        result: list[CustomAgentInfo] = []
+        for builtin_id in BUILTIN_AGENT_ORDER:
+            if builtin_id in by_id:
+                result.append(by_id[builtin_id])
+            else:
+                builtin = get_builtin_agent(builtin_id, tenant_id)
+                if builtin is not None:
+                    result.append(builtin)
+        result.extend(info for agent_id, info in by_id.items() if agent_id not in BUILTIN_AGENT_ORDER)
+        return result
 
     # ── Update ──────────────────────────────────────────────────────
 

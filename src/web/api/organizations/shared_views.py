@@ -17,10 +17,13 @@ from pydantic import BaseModel, ConfigDict
 
 from src.common.json import JsonObject
 from src.core.contracts.organizations import (
+    AgentShare,
+    AgentShareListResponse,
     SharedAgentListItem,
     SharedKnowledgeBaseListItem,
 )
 from src.core.organizations.types import SharedAgentInfo, SharedKnowledgeBaseInfo
+from src.db.models.agent_share import AgentShare as AgentShareRow
 from src.web.api.agents.views import agent_to_contract
 from src.web.api.knowledge_bases.views import knowledge_base_to_contract
 
@@ -134,6 +137,80 @@ def shared_agent_list_envelope(
 def shared_agent_disabled_envelope() -> SharedAgentDisabledEnvelope:
     """Wrap the hide-preference acknowledgement."""
     return SharedAgentDisabledEnvelope(success=True)
+
+
+# ── Agent share management ─────────────────────────────────────────
+
+
+class AgentShareEnvelope(BaseModel):
+    """``{"success": true, "data": {...}}`` - single agent-share responses."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: AgentShare
+
+
+class AgentShareListEnvelope(BaseModel):
+    """``{"success": true, "data": {"shares": [...], "total": n}}``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: AgentShareListResponse
+
+
+def agent_share_to_contract(
+    share: AgentShareRow,
+    *,
+    org_name: str | None = None,
+) -> AgentShare:
+    """Project one agent-share row onto the wire contract.
+
+    The display fields the row does not carry (agent name / avatar,
+    sharer username) stay ``None``; the organization name is resolved
+    by the route layer and passed in.
+    """
+    return AgentShare(
+        id=share.id,
+        agent_id=share.agent_id,
+        organization_id=share.organization_id,
+        organization_name=org_name,
+        shared_by_user_id=share.shared_by_user_id,
+        source_tenant_id=share.source_tenant_id,
+        permission=share.permission,
+        created_at=share.created_at,
+    )
+
+
+def agent_share_envelope(
+    share: AgentShareRow,
+    *,
+    org_name: str | None = None,
+) -> AgentShareEnvelope:
+    """Wrap one agent-share row in the success envelope."""
+    return AgentShareEnvelope(
+        success=True,
+        data=agent_share_to_contract(share, org_name=org_name),
+    )
+
+
+def agent_share_list_envelope(
+    shares: list[AgentShareRow],
+    *,
+    org_names: dict[str, str],
+) -> AgentShareListEnvelope:
+    """Wrap the agent-share rows in the success envelope."""
+    return AgentShareListEnvelope(
+        success=True,
+        data=AgentShareListResponse(
+            shares=[
+                agent_share_to_contract(share, org_name=org_names.get(share.organization_id))
+                for share in shares
+            ],
+            total=len(shares),
+        ),
+    )
 
 
 __all__ = [

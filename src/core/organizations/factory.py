@@ -15,6 +15,7 @@ from src.core.organizations.service.organization_service import OrganizationServ
 from src.core.organizations.service.shared_resource_service import (
     SharedResourceService,
 )
+from src.core.sharing.agent_share_service import AgentShareServiceImpl
 from src.db.dao.agent_share_repository import AgentShareRepository
 from src.db.dao.custom_agent_repository import CustomAgentRepository
 from src.db.dao.kb_share_repository import KBShareRepository
@@ -59,7 +60,22 @@ def build_shared_resource_service(session: AsyncSession) -> SharedResourceServic
     )
 
 
+def build_agent_share_service(session: AsyncSession) -> AgentShareServiceImpl:
+    """Per-request ``AgentShareServiceImpl`` with fresh repositories.
+
+    Cross-tenant agent share management (share / revoke / list);
+    shares one request session with the organization service.
+    """
+    return AgentShareServiceImpl(
+        agent_repo=CustomAgentRepository(session),
+        org_repo=OrganizationRepository(session),
+        member_repo=OrganizationMemberRepository(session),
+        share_repo=AgentShareRepository(session),
+    )
+
+
 __all__ = [
+    "build_agent_share_service",
     "build_organization_service",
     "build_shared_resource_service",
 ]
