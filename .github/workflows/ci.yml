@@ -8,40 +8,97 @@ on:
 permissions:
   contents: read
 
+# Lane organization: each blocking gate runs as its own job so a failure
+# surfaces the exact failing check, and parallel jobs hide latency. The
+# final `all-checks-passed` aggregator is the only job that branch
+# protection should require — it consolidates every blocking result
+# via `needs` + `if: always()` so a failed dependency still produces a
+# failure here (no false green from a skipped aggregator).
+
 jobs:
-  quality-gate:
-    name: lint / format / typecheck / test / check
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.10.9"
+      - name: Lint (ruff check)
+        run: uv run ruff check .
+
+  format:
+    name: format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.10.9"
+      - name: Format (ruff format --check)
+        run: uv run ruff format --check .
+
+  typecheck:
+    name: typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.10.9"
+      - name: Typecheck (mypy --strict)
+        run: uv run mypy
+
+  test:
+    name: test
     runs-on: ubuntu-latest
     env:
       PYTHON_VERSION: "3.11"
     steps:
       - uses: actions/checkout@v4
-
       - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
           version: "0.10.9"
-
       - name: Install Python
         run: uv python install ${{ env.PYTHON_VERSION }}
-
       - name: Sync dependencies
         run: uv sync --all-extras
+      - name: Run pytest with coverage report
+        # Coverage is reported for visibility only; no fail_under yet.
+        # Decide the baseline threshold in a follow-up PR after observing
+        # the reported numbers for a release cycle.
+        run: uv run pytest -q --cov=src --cov-report=term-missing --cov-report=xml
 
-      - name: Lint (ruff check)
-        run: uv run ruff check .
-
-      - name: Format (ruff format --check)
-        run: uv run ruff format --check .
-
-      - name: Typecheck (mypy --strict)
-        run: uv run mypy
-
-      - name: Test (pytest)
-        run: uv run pytest -q
-        env:
-          # Integration tests that need a Docker Postgres skip when absent.
-          TEST_SKIP_DOCKER: "1"
-
+  check:
+    name: anti-drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.10.9"
       - name: Anti-drift checks
         run: make check
+
+  all-checks-passed:
+    name: all-checks-passed
+    runs-on: ubuntu-latest
+    needs: [lint, format, typecheck, test, check]
+    if: always()
+    steps:
+      - name: Verify every blocking job succeeded
+        run: |
+          if [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.format.result }}" != "success" ] || \
+             [ "${{ needs.typecheck.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.check.result }}" != "success" ]; then
+            echo "One or more blocking checks failed."
+            exit 1
+          fi
+          echo "All blocking checks passed."

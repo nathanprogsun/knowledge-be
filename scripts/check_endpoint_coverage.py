@@ -38,10 +38,12 @@ from pathlib import Path
 # ─────────────────────────────────────────────────────────────────────────
 
 
-def _resolve(explicit: str | None, default: Path) -> Path | None:
+def _resolve(explicit: str | None, default: Path | None) -> Path | None:
     if explicit:
         p = Path(explicit).resolve()
         return p if p.exists() else None
+    if default is None:
+        return None
     return default if default.exists() else None
 
 
@@ -63,9 +65,11 @@ def resolve_src_root(explicit: str | None) -> Path | None:
     return None
 
 
-# Default docs root — the upstream source repo (location of the
-# frozen API markdown used by the coverage check).
-DEFAULT_DOCS_ROOT = Path("/Users/jung/pro/WeKnora/docs")
+# Default docs root. None means the docs directory is not bundled in
+# the repo; the caller must pass --docs-root explicitly. This is
+# intentionally fail-closed: silently passing when the docs source is
+# missing produces a false green for the anti-drift gate.
+DEFAULT_DOCS_ROOT: Path | None = None
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -307,8 +311,11 @@ def main() -> int:
 
     docs_root = _resolve(args.docs_root, DEFAULT_DOCS_ROOT)
     if docs_root is None:
-        print("[WARN] docs/ directory not found — nothing to check (exit 0).")
-        return 0
+        print(
+            "[FAIL] docs/ directory not found — pass --docs-root <path> or "
+            "bundle docs/api/*.md in the repository."
+        )
+        return 1
 
     src = resolve_src_root(args.src_root)
     if src is None or not (src / "web" / "api").is_dir():

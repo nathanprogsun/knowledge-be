@@ -28,10 +28,14 @@ Rules (all are reported as violations):
 
 Default scanned roots::
 
-    src/  tests/  alembic/  docs/  ruff.toml  Makefile
+    src/  tests/  alembic/  docs/  scripts/  .github/  .agents/
+    ruff.toml  Makefile  pyproject.toml  mypy.ini
+    .pre-commit-config.yaml  AGENTS.md
 
 Files under ``docs/release-notes/`` are exempt by default (release notes
-are the only sanctioned place to mention historical PR ids).
+are the only sanctioned place to mention historical PR ids). The
+checker itself is also exempt — its docstring and pattern definitions
+necessarily contain the literal pattern tokens.
 
 Usage::
 
@@ -94,7 +98,7 @@ _BAD_FILENAMES = {
     "checkpoint-2-report.md",
 }
 
-DEFAULT_ALLOWLIST_PATHS = {"docs/release-notes"}
+DEFAULT_ALLOWLIST_PATHS = {"docs/release-notes", "scripts/check_pr_leak.py"}
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -290,11 +294,18 @@ def main() -> int:
 
     allow: set[str] = set(args.allow)
     targets: list[Path] = []
-    for name in ("src", "tests", "alembic", "docs"):
+    for name in ("src", "tests", "alembic", "docs", "scripts", ".github", ".agents"):
         p = repo / name
         if p.is_dir():
             targets.append(p)
-    for cfg in ("ruff.toml", "Makefile", "pyproject.toml", "mypy.ini"):
+    for cfg in (
+        "ruff.toml",
+        "Makefile",
+        "pyproject.toml",
+        "mypy.ini",
+        ".pre-commit-config.yaml",
+        "AGENTS.md",
+    ):
         p = repo / cfg
         if p.is_file():
             targets.append(p)

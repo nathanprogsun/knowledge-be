@@ -76,6 +76,12 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
 
+[tool.uv]
+# Pin `uv` to the version used by CI (mirrors the setup-uv version in
+# .github/workflows/ci.yml). Without this, local and CI may resolve to
+# different `uv` minor versions and produce inconsistent lock updates.
+required-version = ">=0.10.9,<0.11.0"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
