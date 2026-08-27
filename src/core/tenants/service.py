@@ -252,7 +252,11 @@ class TenantService:
                 existing_secret = raw
         provided = config.get("hmac_secret")
         hmac_secret = existing_secret
-        if isinstance(provided, str) and provided.strip() and provided.strip() != _PRINCIPAL_SECRET_REDACTED:
+        if (
+            isinstance(provided, str)
+            and provided.strip()
+            and provided.strip() != _PRINCIPAL_SECRET_REDACTED
+        ):
             hmac_secret = provided.strip()
         if mode == "signed_token" and not hmac_secret:
             raise ValidationError(

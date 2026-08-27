@@ -120,9 +120,7 @@ class _FakeAgentOwnership:
     """Minimal seam; rejects agent ids not in ``owned``."""
 
     def __init__(self, owned: set[str] | None = None) -> None:
-        self._owned = (
-            owned if owned is not None else {"builtin-quick-answer", "agent-1"}
-        )
+        self._owned = owned if owned is not None else {"builtin-quick-answer", "agent-1"}
 
     async def get_agent_by_id(self, *, tenant_id: int, agent_id: str) -> object:
         if agent_id not in self._owned:
@@ -154,28 +152,16 @@ def _make_embed_repo() -> tuple[AsyncMock, dict[str, EmbedChannel]]:
         return _live().get(channel_id)
 
     async def _list_by_agent(tenant_id: int, agent_id: str) -> list[EmbedChannel]:
-        return [
-            r
-            for r in _live().values()
-            if r.tenant_id == tenant_id and r.agent_id == agent_id
-        ]
+        return [r for r in _live().values() if r.tenant_id == tenant_id and r.agent_id == agent_id]
 
     async def _list_by_tenant(tenant_id: int) -> list[EmbedChannel]:
         return [r for r in _live().values() if r.tenant_id == tenant_id]
 
-    async def _soft_delete(
-        *, channel_id: str, tenant_id: int, now: datetime
-    ) -> bool:
+    async def _soft_delete(*, channel_id: str, tenant_id: int, now: datetime) -> bool:
         existing = rows.get(channel_id)
-        if (
-            existing is None
-            or existing.tenant_id != tenant_id
-            or existing.deleted_at is not None
-        ):
+        if existing is None or existing.tenant_id != tenant_id or existing.deleted_at is not None:
             return False
-        rows[channel_id] = existing.model_copy(
-            update={"deleted_at": now, "updated_at": now}
-        )
+        rows[channel_id] = existing.model_copy(update={"deleted_at": now, "updated_at": now})
         return True
 
     repo.create.side_effect = _create
@@ -388,9 +374,7 @@ async def test_list_channels_by_agent(
     _seed_channel(rows, id="ch-1", agent_id="agent-1")
     _seed_channel(rows, id="ch-2", agent_id="agent-1")
     _seed_channel(rows, id="ch-3", agent_id="agent-2")
-    infos = await service.list_channels_by_agent(
-        tenant_id=_TENANT, agent_id="agent-1"
-    )
+    infos = await service.list_channels_by_agent(tenant_id=_TENANT, agent_id="agent-1")
     assert {i.id for i in infos} == {"ch-1", "ch-2"}
 
 
@@ -540,9 +524,7 @@ async def test_rotate_token_mints_new_token(
     service: EmbedChannelService, rows: dict[str, EmbedChannel]
 ) -> None:
     _seed_channel(rows, id="ch-1", publish_token="em_old-token")
-    info, token = await service.rotate_token(
-        tenant_id=_TENANT, channel_id="ch-1"
-    )
+    info, token = await service.rotate_token(tenant_id=_TENANT, channel_id="ch-1")
     assert token.startswith(EMBED_PUBLISH_TOKEN_PREFIX)
     assert token != "em_old-token"
     assert rows["ch-1"].publish_token == token
@@ -576,9 +558,7 @@ def test_origin_allowed_no_wildcard_suffix() -> None:
     assert origin_allowed("https://sub.trusted.io", allowed) is True
 
 
-async def test_session_origin_gate(
-    embed_repo: AsyncMock, rows: dict[str, EmbedChannel]
-) -> None:
+async def test_session_origin_gate(embed_repo: AsyncMock, rows: dict[str, EmbedChannel]) -> None:
     _seed_channel(rows, id="ch-1", publish_token="em_pub")
     session_repo, _ = _make_session_repo()
     svc = EmbedSessionService(
@@ -601,9 +581,7 @@ async def test_lookup_for_embed_valid_publish_token(
     embed_repo: AsyncMock, rows: dict[str, EmbedChannel]
 ) -> None:
     _seed_channel(rows, id="ch-1", publish_token="em_pub-token")
-    svc = EmbedSessionService(
-        embed_channel_repo=embed_repo, session_repo=_make_session_repo()[0]
-    )
+    svc = EmbedSessionService(embed_channel_repo=embed_repo, session_repo=_make_session_repo()[0])
     channel = await svc.lookup_for_embed(channel_id="ch-1", token="em_pub-token")
     assert channel.id == "ch-1"
 
@@ -612,9 +590,7 @@ async def test_lookup_for_embed_invalid_token_raises(
     embed_repo: AsyncMock, rows: dict[str, EmbedChannel]
 ) -> None:
     _seed_channel(rows, id="ch-1", publish_token="em_real")
-    svc = EmbedSessionService(
-        embed_channel_repo=embed_repo, session_repo=_make_session_repo()[0]
-    )
+    svc = EmbedSessionService(embed_channel_repo=embed_repo, session_repo=_make_session_repo()[0])
     with pytest.raises(UnauthorizedError):
         await svc.lookup_for_embed(channel_id="ch-1", token="em_wrong")
 
@@ -623,9 +599,7 @@ async def test_lookup_for_embed_disabled_channel_raises(
     embed_repo: AsyncMock, rows: dict[str, EmbedChannel]
 ) -> None:
     _seed_channel(rows, id="ch-1", publish_token="em_pub", enabled=False)
-    svc = EmbedSessionService(
-        embed_channel_repo=embed_repo, session_repo=_make_session_repo()[0]
-    )
+    svc = EmbedSessionService(embed_channel_repo=embed_repo, session_repo=_make_session_repo()[0])
     with pytest.raises(PermissionDeniedError):
         await svc.lookup_for_embed(channel_id="ch-1", token="em_pub")
 
@@ -633,9 +607,7 @@ async def test_lookup_for_embed_disabled_channel_raises(
 async def test_lookup_enabled_channel_raises_on_missing(
     embed_repo: AsyncMock, rows: dict[str, EmbedChannel]
 ) -> None:
-    svc = EmbedSessionService(
-        embed_channel_repo=embed_repo, session_repo=_make_session_repo()[0]
-    )
+    svc = EmbedSessionService(embed_channel_repo=embed_repo, session_repo=_make_session_repo()[0])
     with pytest.raises(UnauthorizedError):
         await svc.lookup_enabled_channel("ch-ghost")
 
@@ -656,9 +628,7 @@ def test_sign_handle_empty_session_id() -> None:
     assert sign_embed_session_handle(None, "session-1") == ""
 
 
-async def test_create_session_success(
-    embed_repo: AsyncMock, rows: dict[str, EmbedChannel]
-) -> None:
+async def test_create_session_success(embed_repo: AsyncMock, rows: dict[str, EmbedChannel]) -> None:
     _seed_channel(rows, id="ch-1", publish_token="em_pub-token")
     session_repo, created = _make_session_repo()
     svc = EmbedSessionService(
@@ -677,9 +647,7 @@ async def test_create_session_success(
     assert session.id == result.session_id
     assert session.tenant_id == _TENANT
     assert session.description == EMBED_SESSION_MARKER_PREFIX + "ch-1"
-    assert verify_embed_session_handle(
-        rows["ch-1"], session.id, result.handle
-    ) is True
+    assert verify_embed_session_handle(rows["ch-1"], session.id, result.handle) is True
 
 
 async def test_create_session_uses_session_token(
@@ -723,9 +691,7 @@ async def test_create_session_uses_session_token(
 async def test_resolve_session_token_invalid(
     embed_repo: AsyncMock,
 ) -> None:
-    svc = EmbedSessionService(
-        embed_channel_repo=embed_repo, session_repo=_make_session_repo()[0]
-    )
+    svc = EmbedSessionService(embed_channel_repo=embed_repo, session_repo=_make_session_repo()[0])
     with pytest.raises(UnauthorizedError):
         await svc.resolve_session_token("not-a-session-token")
 
@@ -734,16 +700,12 @@ async def test_issue_session_token_without_redis_raises(
     embed_repo: AsyncMock, rows: dict[str, EmbedChannel]
 ) -> None:
     _seed_channel(rows, id="ch-1")
-    svc = EmbedSessionService(
-        embed_channel_repo=embed_repo, session_repo=_make_session_repo()[0]
-    )
+    svc = EmbedSessionService(embed_channel_repo=embed_repo, session_repo=_make_session_repo()[0])
     with pytest.raises(ValidationError):
         await svc.issue_session_token(channel_id="ch-1")
 
 
-async def test_issue_preview_session(
-    embed_repo: AsyncMock, rows: dict[str, EmbedChannel]
-) -> None:
+async def test_issue_preview_session(embed_repo: AsyncMock, rows: dict[str, EmbedChannel]) -> None:
     _seed_channel(rows, id="ch-1", publish_token="em_pub")
     session_repo, _ = _make_session_repo()
 
@@ -773,9 +735,7 @@ async def test_issue_preview_session(
 async def test_in_memory_rate_limiter_budget() -> None:
     limiter = InMemoryRateLimiter()
     for _ in range(3):
-        await limiter.check(
-            key="ch-1:1.2.3.4", limit=3, window_seconds=60
-        )
+        await limiter.check(key="ch-1:1.2.3.4", limit=3, window_seconds=60)
     with pytest.raises(RateLimitExceededError):
         await limiter.check(key="ch-1:1.2.3.4", limit=3, window_seconds=60)
     # A separate key keeps its own budget.
@@ -795,9 +755,7 @@ async def test_embed_rate_limiter_redis() -> None:
                 now = int(args[0])
                 window = int(args[1])
                 max_req = int(args[2])
-                live = [
-                    ts for ts in self._hits.get(key, []) if ts > now - window
-                ]
+                live = [ts for ts in self._hits.get(key, []) if ts > now - window]
                 if len(live) < max_req:
                     live.append(now)
                     self._hits[key] = live
@@ -827,9 +785,7 @@ async def test_enforce_rate_limits_composes_buckets(
     recorded: list[tuple[str, int, int]] = []
 
     class _RecordingLimiter:
-        async def check(
-            self, *, key: str, limit: int, window_seconds: int
-        ) -> None:
+        async def check(self, *, key: str, limit: int, window_seconds: int) -> None:
             recorded.append((key, limit, window_seconds))
 
     svc = EmbedSessionService(
@@ -837,9 +793,7 @@ async def test_enforce_rate_limits_composes_buckets(
         session_repo=session_repo,
         rate_limiter=_RecordingLimiter(),
     )
-    await svc.enforce_rate_limits(
-        channel=rows["ch-1"], client_ip="1.2.3.4"
-    )
+    await svc.enforce_rate_limits(channel=rows["ch-1"], client_ip="1.2.3.4")
     assert len(recorded) == 3
     keys = {key for key, _, _ in recorded}
     assert "embed:ratelimit:ch-1:1.2.3.4" in keys
@@ -897,9 +851,7 @@ def test_verify_embed_webhook_signature() -> None:
     raw = b'{"type":"session_created"}'
     sig = sign_embed_webhook_body("whsec_secret", raw)
     assert verify_embed_webhook_signature("whsec_secret", raw, sig) is True
-    assert verify_embed_webhook_signature(
-        "whsec_secret", raw, SIGNATURE_PREFIX + sig
-    ) is True
+    assert verify_embed_webhook_signature("whsec_secret", raw, SIGNATURE_PREFIX + sig) is True
     assert verify_embed_webhook_signature("wrong", raw, sig) is False
     assert verify_embed_webhook_signature("whsec_secret", b"tampered", sig) is False
     assert verify_embed_webhook_signature("", raw, sig) is False
@@ -924,9 +876,7 @@ async def test_validate_embed_webhook_url_ssrf_hook() -> None:
     async def _guard(raw: str) -> None:
         called.append(raw)
 
-    await validate_embed_webhook_url(
-        "https://hooks.example.com", url_safety_check=_guard
-    )
+    await validate_embed_webhook_url("https://hooks.example.com", url_safety_check=_guard)
     assert called == ["https://hooks.example.com"]
 
 
@@ -942,9 +892,7 @@ async def test_dispatch_embed_webhook_sends_signed_post() -> None:
             content: bytes,
             headers: dict[str, str],
         ) -> None:
-            self.posts.append(
-                {"url": url, "content": content, "headers": headers}
-            )
+            self.posts.append({"url": url, "content": content, "headers": headers})
 
     client = _FakeHTTPClient()
     dispatcher = EmbedWebhookDispatcher(http_client=client)
@@ -970,9 +918,7 @@ async def test_dispatch_embed_webhook_sends_signed_post() -> None:
     assert signature.startswith(SIGNATURE_PREFIX)
     body = post["content"]
     assert isinstance(body, bytes)
-    assert verify_embed_webhook_signature(
-        "whsec_secret", body, signature
-    ) is True
+    assert verify_embed_webhook_signature("whsec_secret", body, signature) is True
     import json
 
     payload = json.loads(body)
@@ -1008,9 +954,7 @@ async def test_dispatch_embed_webhook_without_secret_omits_signature() -> None:
 
     client = _FakeHTTPClient()
     dispatcher = EmbedWebhookDispatcher(http_client=client)
-    channel = _channel(
-        id="ch-1", webhook_url="https://hooks.example.com/embed", webhook_secret=""
-    )
+    channel = _channel(id="ch-1", webhook_url="https://hooks.example.com/embed", webhook_secret="")
     task = dispatcher.dispatch(channel, event_type="x", session_id="s", payload={})
     await task
     assert SIGNATURE_HEADER_NAME not in (client.headers or {})
@@ -1022,12 +966,8 @@ async def test_dispatch_embed_webhook_invalid_url_swallowed() -> None:
     async def _guard(raw: str) -> None:
         raise ValidationError(code="oidc.ssrf_blocked", message="blocked")
 
-    dispatcher = EmbedWebhookDispatcher(
-        http_client=client, url_safety_check=_guard
-    )
-    channel = _channel(
-        id="ch-1", webhook_url="https://hooks.example.com/embed", webhook_secret=""
-    )
+    dispatcher = EmbedWebhookDispatcher(http_client=client, url_safety_check=_guard)
+    channel = _channel(id="ch-1", webhook_url="https://hooks.example.com/embed", webhook_secret="")
     # The fire-and-forget task never raises; the POST never fires.
     task = dispatcher.dispatch(channel, event_type="x", session_id="s", payload={})
     await task
@@ -1044,11 +984,7 @@ def test_factory_builders_wire_services() -> None:
     # Repositories only retain the session reference, so a bare object is
     # a sufficient construction-time stand-in.
     session = object()
-    assert isinstance(
-        build_embed_channel_service(session), EmbedChannelService
-    )
+    assert isinstance(build_embed_channel_service(session), EmbedChannelService)
     session_service = build_embed_session_service(session)
     assert isinstance(session_service, EmbedSessionService)
-    assert isinstance(
-        build_embed_webhook_dispatcher(), EmbedWebhookDispatcher
-    )
+    assert isinstance(build_embed_webhook_dispatcher(), EmbedWebhookDispatcher)

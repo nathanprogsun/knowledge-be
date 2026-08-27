@@ -182,11 +182,7 @@ def test_search_respects_max_results_cap() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             200,
-            json={
-                "results": [
-                    {"title": f"T{i}", "url": f"https://e/{i}"} for i in range(10)
-                ]
-            },
+            json={"results": [{"title": f"T{i}", "url": f"https://e/{i}"} for i in range(10)]},
         )
 
     results = _keenable(handler).search("hello", 3, False)

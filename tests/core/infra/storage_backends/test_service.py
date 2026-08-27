@@ -73,28 +73,22 @@ def _make_repo() -> AsyncMock:
 
     def _live_rows() -> dict[str, StorageBackend]:
         return {
-            i: r for i, r in repo.rows.items() if r.deleted_at is None  # type: ignore[attr-defined]
+            i: r
+            for i, r in repo.rows.items()
+            if r.deleted_at is None  # type: ignore[attr-defined]
         }
 
-    async def _get_by_id(
-        *, tenant_id: int, id: str
-    ) -> StorageBackend | None:
+    async def _get_by_id(*, tenant_id: int, id: str) -> StorageBackend | None:
         row = repo.rows.get(id)  # type: ignore[attr-defined]
         if row is None or row.tenant_id != tenant_id or row.deleted_at is not None:
             return None
         return row
 
     async def _list_for_tenant(tenant_id: int) -> list[StorageBackend]:
-        live = [
-            row
-            for row in _live_rows().values()
-            if row.tenant_id == tenant_id
-        ]
+        live = [row for row in _live_rows().values() if row.tenant_id == tenant_id]
         return sorted(live, key=lambda r: (r.created_at, r.id))
 
-    async def _find_legacy_alias(
-        *, tenant_id: int, provider: str
-    ) -> StorageBackend | None:
+    async def _find_legacy_alias(*, tenant_id: int, provider: str) -> StorageBackend | None:
         candidates = [
             row
             for row in await _list_for_tenant(tenant_id)
@@ -102,9 +96,7 @@ def _make_repo() -> AsyncMock:
         ]
         return candidates[0] if candidates else None
 
-    async def _find_by_name(
-        *, tenant_id: int, name: str
-    ) -> StorageBackend | None:
+    async def _find_by_name(*, tenant_id: int, name: str) -> StorageBackend | None:
         for row in await _list_for_tenant(tenant_id):
             if row.name == name:
                 return row
@@ -137,9 +129,7 @@ def _make_repo() -> AsyncMock:
     async def _get_default_backend_id(tenant_id: int) -> str | None:
         return repo.default_backend_id.get(tenant_id)  # type: ignore[attr-defined]
 
-    async def _set_default_backend_id(
-        *, tenant_id: int, id: str
-    ) -> bool:
+    async def _set_default_backend_id(*, tenant_id: int, id: str) -> bool:
         repo.default_backend_id[tenant_id] = id  # type: ignore[attr-defined]
         return True
 

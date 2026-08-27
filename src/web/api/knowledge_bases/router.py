@@ -269,11 +269,14 @@ async def update_knowledge_base(
     service: KBServiceDep,
     tenant_id: _PrincipalTenant,
 ) -> KnowledgeBaseEnvelope:
-    """Update a knowledge base's mutable fields.
+    """Partial-update a knowledge base's mutable fields.
 
-    The tenant-ownership pre-check makes a cross-workspace id read as
-    not-found; the vector-store binding is immutable by contract and
-    never part of an update.
+    Every body field is optional (per ``UpdateKnowledgeBaseRequest``);
+    the service treats a missing field as "leave the existing value
+    alone", so the same request shape works for PUT (full body) and
+    PATCH (subset). The tenant-ownership pre-check makes a
+    cross-workspace id read as not-found; the vector-store binding is
+    immutable by contract and never part of an update.
     """
     tenant_id = _require_tenant(tenant_id)
     await service.get_knowledge_base_by_id_and_tenant(

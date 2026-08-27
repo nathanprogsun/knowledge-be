@@ -54,6 +54,8 @@ def _bind_tenant_id_to_admin(
     """
     global _TENANT_ID
     _TENANT_ID = admin_user[1]
+
+
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
 _MINIO_CONFIG = StorageBackendConfigInfo(

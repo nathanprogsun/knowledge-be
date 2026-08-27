@@ -32,7 +32,6 @@ from src.util.security import (
 )
 from tests.util.service_test import ServiceTest
 
-
 # ── In-memory repository doubles (stateful via side_effect closures) ─
 
 

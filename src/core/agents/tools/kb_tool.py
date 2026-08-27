@@ -435,9 +435,7 @@ class KnowledgeSearchTool:
                 filtered = mmr_results
 
         final_results = self._deduplicate_results(filtered)
-        final_results.sort(
-            key=lambda meta: (-meta.result.score, meta.result.knowledge_id)
-        )
+        final_results.sort(key=lambda meta: (-meta.result.score, meta.result.knowledge_id))
 
         return await self._format_output(final_results, kb_ids, queries)
 
@@ -475,9 +473,7 @@ class KnowledgeSearchTool:
         # kept so the downstream search can still surface the real error.
         known_kbs = {kb.id: True for kb in kb_list}
         searchable_kbs = {
-            kb.id: True
-            for kb in kb_list
-            if _is_vector_enabled(kb) or _is_keyword_enabled(kb)
+            kb.id: True for kb in kb_list if _is_vector_enabled(kb) or _is_keyword_enabled(kb)
         }
         filtered_targets: list[SearchTarget] = []
         for target in search_targets:
@@ -592,9 +588,7 @@ class KnowledgeSearchTool:
 
     # ── Dedup / rerank / MMR ────────────────────────────────────────
 
-    def _deduplicate_results(
-        self, results: list[SearchResultMeta]
-    ) -> list[SearchResultMeta]:
+    def _deduplicate_results(self, results: list[SearchResultMeta]) -> list[SearchResultMeta]:
         """Remove duplicate or near-duplicate chunks, keeping the best score."""
         seen: set[str] = set()
         content_sig: set[str] = set()
@@ -726,8 +720,7 @@ class KnowledgeSearchTool:
                 all_scores[batch_start + j] = score
 
         rank_items = [
-            _RankItem(index=i, relevance_score=score)
-            for i, score in enumerate(all_scores)
+            _RankItem(index=i, relevance_score=score) for i, score in enumerate(all_scores)
         ]
         rank_items.sort(key=lambda item: item.relevance_score, reverse=True)
         return self._apply_model_rerank_scores(
@@ -884,7 +877,9 @@ class KnowledgeSearchTool:
             result = meta.result
             faq_meta: FAQChunkMetadata | None = None
             if meta.knowledge_base_type == "faq":
-                faq_meta = _faq_metadata_cached(result.id, result.chunk_metadata, faq_metadata_cache)
+                faq_meta = _faq_metadata_cached(
+                    result.id, result.chunk_metadata, faq_metadata_cache
+                )
 
             knowledge_chunk_map.setdefault(result.knowledge_id, set()).add(result.chunk_index)
             knowledge_title_map[result.knowledge_id] = result.knowledge_title

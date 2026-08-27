@@ -53,7 +53,7 @@ from src.common.exception import ValidationError
 _CTX = TaskContext()
 
 _DIM = 4
-_COLLECTION = "weknora_embeddings_4"
+_COLLECTION = "kb_embeddings_4"
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────
@@ -139,8 +139,8 @@ def test_supports_keywords_and_vector() -> None:
 
 def test_collection_name_is_dimension_scoped() -> None:
     repo = _repo()
-    assert repo._get_collection_name(4) == "weknora_embeddings_4"
-    assert repo._get_collection_name(8) == "weknora_embeddings_8"
+    assert repo._get_collection_name(4) == "kb_embeddings_4"
+    assert repo._get_collection_name(8) == "kb_embeddings_8"
 
 
 def test_collection_name_uses_index_config_prefix() -> None:
@@ -154,9 +154,7 @@ def test_collection_name_uses_index_config_name() -> None:
 
 
 def test_collection_name_prefix_wins_over_name() -> None:
-    repo = _repo(
-        index_config=IndexConfig(collection_prefix="prefix", collection_name="named")
-    )
+    repo = _repo(index_config=IndexConfig(collection_prefix="prefix", collection_name="named"))
     assert repo._get_collection_name(4) == "prefix_4"
 
 
@@ -249,14 +247,8 @@ async def test_batch_save_groups_by_dimension() -> None:
     client = _mock_client()
     client.has_collection.return_value = True
     repo = _repo(client)
-    items = [
-        _index_info(source_id=f"src-{i}", chunk_id=f"c-{i}") for i in range(3)
-    ]
-    params = {
-        "embedding": {
-            f"src-{i}": [0.1] * _DIM for i in range(3)
-        }
-    }
+    items = [_index_info(source_id=f"src-{i}", chunk_id=f"c-{i}") for i in range(3)]
+    params = {"embedding": {f"src-{i}": [0.1] * _DIM for i in range(3)}}
     await repo.batch_save(_CTX, items, params)
     assert client.upsert.call_count == 1
     data = client.upsert.call_args.kwargs["data"]
@@ -386,9 +378,9 @@ async def test_vector_retrieve_no_search_params_when_threshold_zero() -> None:
 async def test_keywords_retrieve_searches_owned_collections_only() -> None:
     client = _mock_client()
     client.list_collections.return_value = [
-        "weknora_embeddings_4",
+        "kb_embeddings_4",
         "other_collection",
-        "weknora_embeddings_8",
+        "kb_embeddings_8",
     ]
     client.search.return_value = [[_search_row()]]
     repo = _repo(client)
@@ -402,9 +394,7 @@ async def test_keywords_retrieve_searches_owned_collections_only() -> None:
 async def test_keywords_retrieve_truncates_to_top_k() -> None:
     client = _mock_client()
     client.list_collections.return_value = [_COLLECTION]
-    client.search.return_value = [
-        [_search_row(row_id=f"r{i}") for i in range(10)]
-    ]
+    client.search.return_value = [[_search_row(row_id=f"r{i}") for i in range(10)]]
     repo = _repo(client)
     params = RetrieveParams(query="hello", top_k=3, retriever_type=RetrieverType.KEYWORDS)
     results = await repo.keywords_retrieve(_CTX, params)
@@ -519,8 +509,8 @@ async def test_copy_indices_resolves_question_source_id() -> None:
 async def test_batch_update_chunk_enabled_status_updates_all_collections() -> None:
     client = _mock_client()
     client.list_collections.return_value = [
-        "weknora_embeddings_4",
-        "weknora_embeddings_8",
+        "kb_embeddings_4",
+        "kb_embeddings_8",
         "unrelated",
     ]
     client.query.return_value = [_search_row(row_id="r1", chunk_id="c1")]
@@ -589,9 +579,7 @@ def test_estimate_storage_size_sums_all_items() -> None:
     total = repo.estimate_storage_size(_CTX, items, params)
     assert total > 0
     # Each item: 4 dims * 4 bytes = 16 vector + 16 index + 32 meta + payload
-    single = _calculate_storage_size(
-        _to_milvus_vector_embedding(items[0], params)
-    )
+    single = _calculate_storage_size(_to_milvus_vector_embedding(items[0], params))
     assert total == single * 3
 
 
@@ -668,32 +656,24 @@ def test_filter_rejects_nil_condition() -> None:
 def test_filter_rejects_unknown_operator() -> None:
     converter = MilvusFilterConverter()
     with pytest.raises(ValidationError, match="unsupported operator"):
-        converter.convert(
-            UniversalFilterCondition(field="x", operator="bogus", value=1)
-        )
+        converter.convert(UniversalFilterCondition(field="x", operator="bogus", value=1))
 
 
 def test_filter_in_rejects_non_list() -> None:
     converter = MilvusFilterConverter()
     with pytest.raises(ValidationError, match="must be a slice"):
-        converter.convert(
-            UniversalFilterCondition(field="x", operator="in", value="not-a-list")
-        )
+        converter.convert(UniversalFilterCondition(field="x", operator="in", value="not-a-list"))
 
 
 def test_filter_in_rejects_empty_list() -> None:
     converter = MilvusFilterConverter()
     with pytest.raises(ValidationError, match="must be a slice"):
-        converter.convert(
-            UniversalFilterCondition(field="x", operator="in", value=[])
-        )
+        converter.convert(UniversalFilterCondition(field="x", operator="in", value=[]))
 
 
 def test_filter_param_name_replaces_dots() -> None:
     converter = MilvusFilterConverter()
-    result = converter.convert(
-        UniversalFilterCondition(field="meta.field", operator="eq", value=1)
-    )
+    result = converter.convert(UniversalFilterCondition(field="meta.field", operator="eq", value=1))
     assert "meta_field_" in result.expr_str
 
 
@@ -786,16 +766,12 @@ def test_calculate_storage_size_without_embedding() -> None:
 
 
 async def test_new_milvus_retrieve_engine_repository_builds_client() -> None:
-    cfg = MilvusClientConfig(
-        address="milvus:19530", username="root", password="pw", db_name="db1"
-    )
+    cfg = MilvusClientConfig(address="milvus:19530", username="root", password="pw", db_name="db1")
     with patch("src.ai.retrieval.milvus.MilvusClient") as mock_ctor:
         mock_client = MagicMock()
         mock_ctor.return_value = mock_client
         repo = await new_milvus_retrieve_engine_repository(cfg, None)
-    mock_ctor.assert_called_once_with(
-        uri="milvus:19530", user="root", password="pw", db_name="db1"
-    )
+    mock_ctor.assert_called_once_with(uri="milvus:19530", user="root", password="pw", db_name="db1")
     assert isinstance(repo, MilvusRetrieveEngineRepository)
 
 

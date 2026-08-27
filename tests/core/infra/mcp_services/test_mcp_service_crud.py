@@ -59,26 +59,18 @@ def _make_mcp_repo() -> tuple[AsyncMock, dict[str, MCPService]]:
 
     async def _exists_by_tenant_and_name(tenant_id: int, name: str) -> bool:
         return any(
-            row.tenant_id == tenant_id
-            and row.name == name
-            and row.deleted_at is None
+            row.tenant_id == tenant_id and row.name == name and row.deleted_at is None
             for row in rows.values()
         )
 
-    async def _soft_delete(
-        tenant_id: int, id: str, *, deleted_at: datetime
-    ) -> bool:
+    async def _soft_delete(tenant_id: int, id: str, *, deleted_at: datetime) -> bool:
         row = await _find_for_tenant(tenant_id, id)
         if row is None:
             return False
-        rows[id] = row.model_copy(
-            update={"deleted_at": deleted_at, "updated_at": deleted_at}
-        )
+        rows[id] = row.model_copy(update={"deleted_at": deleted_at, "updated_at": deleted_at})
         return True
 
-    async def _update(
-        tenant_id: int, id: str, *, columns: dict[str, object]
-    ) -> MCPService | None:
+    async def _update(tenant_id: int, id: str, *, columns: dict[str, object]) -> MCPService | None:
         row = await _find_for_tenant(tenant_id, id)
         if row is None:
             return None

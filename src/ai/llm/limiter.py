@@ -36,7 +36,7 @@ DEFAULT_LEASE_TTL = timedelta(seconds=30)
 #: How often a waiting acquirer re-checks for a free slot.
 DEFAULT_POLL_INTERVAL = timedelta(milliseconds=200)
 #: Namespaces the semaphore ZSETs in Redis.
-KEY_PREFIX = "weknora:modelsem:"
+KEY_PREFIX = "kb:modelsem:"
 
 _ACQUIRE_LUA = """
 redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
@@ -80,8 +80,7 @@ class _ScriptRunner(Protocol):
         self,
         keys: Sequence[object] | None = None,
         args: Sequence[object] | None = None,
-    ) -> int:
-        ...
+    ) -> int: ...
 
 
 class ModelConcurrencyLimiter(Protocol):
@@ -169,9 +168,7 @@ class RedisLimiter:
         stats: list[RuntimeStat] = []
         for model_id, tracked in self._tracked.items():
             try:
-                active = await rdb.zcount(
-                    KEY_PREFIX + model_id, str(now_ms + 1), "+inf"
-                )
+                active = await rdb.zcount(KEY_PREFIX + model_id, str(now_ms + 1), "+inf")
             except Exception:
                 continue
             stats.append(
@@ -349,9 +346,7 @@ async def gate_n(model_id: str, model_limit: int) -> Callable[[], None]:
     return await gate_named_n(model_id, "", model_limit)
 
 
-async def gate_named_n(
-    model_id: str, model_name: str, model_limit: int
-) -> Callable[[], None]:
+async def gate_named_n(model_id: str, model_name: str, model_limit: int) -> Callable[[], None]:
     """Acquire a background per-model slot; always safe to release.
 
     On the passthrough / fail-open paths the returned release is a no-op. The

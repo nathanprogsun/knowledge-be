@@ -18,11 +18,11 @@ from pydantic import BaseModel, ConfigDict
 from src.core.contracts.organizations import (
     JoinRequestListResponse,
     JoinRequestRecord,
-    OrgMember,
-    OrgMemberListResponse,
     Organization,
     OrganizationList,
     OrganizationPreview,
+    OrgMember,
+    OrgMemberListResponse,
     RegenerateInviteCodeResponse,
     SearchOrganizationsResponse,
 )

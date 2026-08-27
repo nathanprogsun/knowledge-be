@@ -90,13 +90,9 @@ class PluginMerge:
             return await next()
 
         tenant_id = pipeline_ctx.tenant_id
-        search_result = await resolve_parent_chunks(
-            ctx, self._chunk_repo, tenant_id, search_result
-        )
+        search_result = await resolve_parent_chunks(ctx, self._chunk_repo, tenant_id, search_result)
         merged_chunks = await group_and_merge_current_content(ctx, search_result)
-        merged_chunks = await populate_faq_answers(
-            ctx, self._chunk_repo, tenant_id, merged_chunks
-        )
+        merged_chunks = await populate_faq_answers(ctx, self._chunk_repo, tenant_id, merged_chunks)
         merged_chunks = await expand_short_context_with_neighbors(
             ctx, self._chunk_repo, tenant_id, merged_chunks
         )
@@ -298,7 +294,11 @@ async def resolve_parent_chunks(
 
         elif result.chunk_type in (CHUNK_TYPE_IMAGE_OCR, CHUNK_TYPE_IMAGE_CAPTION):
             text_parent = parent_map.get(result.parent_chunk_id)
-            if text_parent is None or not text_parent.content or text_parent.chunk_type != CHUNK_TYPE_TEXT:
+            if (
+                text_parent is None
+                or not text_parent.content
+                or text_parent.chunk_type != CHUNK_TYPE_TEXT
+            ):
                 out.append(result)
                 continue
             hit_image_info = result.image_info

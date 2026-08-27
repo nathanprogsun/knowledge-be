@@ -60,9 +60,7 @@ def build_embed_session_service(
     return EmbedSessionService(
         embed_channel_repo=EmbedChannelRepository(session),
         session_repo=SessionRepository(session),
-        rate_limiter=(
-            EmbedRateLimiter(redis_client) if redis_client is not None else None
-        ),
+        rate_limiter=(EmbedRateLimiter(redis_client) if redis_client is not None else None),
         redis_client=redis_client,
     )
 
@@ -78,9 +76,7 @@ def build_embed_webhook_dispatcher() -> EmbedWebhookDispatcher:
 
 def _agent_ownership(session: AsyncSession) -> AgentOwnershipLike:
     """Wrap the per-request :class:`CustomAgentService` as the seam."""
-    custom_agent_service: CustomAgentService = build_custom_agent_service(
-        session
-    )
+    custom_agent_service: CustomAgentService = build_custom_agent_service(session)
     return _CustomAgentAdapter(custom_agent_service)
 
 

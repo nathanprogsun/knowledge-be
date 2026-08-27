@@ -20,7 +20,6 @@ Query-parameter descriptions are intentionally Chinese (mirrors the
 upstream swagger annotations). RUF001 flags the full-width punctuation;
 suppressed file-wide for the same reason as ``src/web/api/system/router.py``.
 """
-# ruff: noqa: RUF001
 
 from __future__ import annotations
 
@@ -31,7 +30,12 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 
-from src.common.exception import NotFoundError, PermissionDeniedError, UnauthorizedError, ValidationError
+from src.common.exception import (
+    NotFoundError,
+    PermissionDeniedError,
+    UnauthorizedError,
+    ValidationError,
+)
 from src.common.json import JsonObject
 from src.core.contracts.knowledge import (
     CreateKnowledgeFromURLRequest,
@@ -42,9 +46,9 @@ from src.core.contracts.knowledge import (
 )
 from src.core.knowledge.documents.types import DocumentListFilter
 from src.web.api.knowledge.documents.views import (
+    BatchDeleteData,
     BatchDeleteEnvelope,
     BatchDeleteRequest,
-    BatchDeleteData,
     BatchReparseData,
     BatchReparseEnvelope,
     BatchReparseRequest,
@@ -115,9 +119,7 @@ def _split_tag_ids(raw: str) -> list[str]:
     if not raw:
         return []
     return [
-        part.strip()
-        for part in raw.split(",")
-        if part.strip() and part.strip() != "__untagged__"
+        part.strip() for part in raw.split(",") if part.strip() and part.strip() != "__untagged__"
     ]
 
 
@@ -395,10 +397,7 @@ async def batch_delete_documents(
         if document.knowledge_base_id != body.kb_id:
             raise ValidationError(
                 code="knowledge.batch_cross_kb",
-                message=(
-                    f"Knowledge {document.id} does not belong to "
-                    f"knowledge base {body.kb_id}"
-                ),
+                message=(f"Knowledge {document.id} does not belong to knowledge base {body.kb_id}"),
             )
     await orchestrator.delete_documents(tenant_id=tenant_id, ids=ids)
     task_id = _batch_task_id(tenant_id, body.kb_id, _BATCH_DELETE_TASK_TYPE)
@@ -451,10 +450,7 @@ async def batch_reparse_documents(
         if document.knowledge_base_id != body.kb_id:
             raise ValidationError(
                 code="knowledge.batch_cross_kb",
-                message=(
-                    f"Knowledge {document.id} does not belong to "
-                    f"knowledge base {body.kb_id}"
-                ),
+                message=(f"Knowledge {document.id} does not belong to knowledge base {body.kb_id}"),
             )
     for document in documents:
         await orchestrator.reparse(
@@ -512,8 +508,7 @@ async def update_knowledge_tag_batch(
                 raise PermissionDeniedError(
                     code="knowledge.tags_cross_kb",
                     message=(
-                        f"knowledge {document.id} does not belong to "
-                        "authorized knowledge base"
+                        f"knowledge {document.id} does not belong to authorized knowledge base"
                     ),
                 )
 
@@ -536,10 +531,7 @@ async def update_knowledge_tag_batch(
             if tag.knowledge_base_id != document.knowledge_base_id:
                 raise ValidationError(
                     code="knowledge.tags_cross_kb",
-                    message=(
-                        f"标签 {tag_id} 不属于知识库 "
-                        f"{document.knowledge_base_id}"
-                    ),
+                    message=(f"标签 {tag_id} 不属于知识库 {document.knowledge_base_id}"),
                 )
 
     for knowledge_id, tag_ids_for_knowledge in updates.items():

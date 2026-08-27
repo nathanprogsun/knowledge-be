@@ -64,11 +64,7 @@ class _StubEventManager:
         event_type: EventType | str,
         pipeline_ctx: PipelineContext,
     ) -> PluginError | None:
-        et = (
-            event_type
-            if isinstance(event_type, EventType)
-            else EventType(str(event_type))
-        )
+        et = event_type if isinstance(event_type, EventType) else EventType(str(event_type))
         self.triggered.append(et)
         return self._results.get(et)
 
@@ -207,9 +203,7 @@ class TestBuildPipelineStages:
         stages = build_pipeline_stages(pipeline_ctx=ctx)
 
         assert EventType.WEB_FETCH in stages
-        assert stages.index(EventType.WEB_FETCH) < stages.index(
-            EventType.CHUNK_MERGE
-        )
+        assert stages.index(EventType.WEB_FETCH) < stages.index(EventType.CHUNK_MERGE)
 
     def test_rag_without_web_search_excludes_web_fetch(self) -> None:
         ctx = _make_ctx(
@@ -230,9 +224,7 @@ class TestBuildPipelineStages:
         stages = build_pipeline_stages(pipeline_ctx=ctx)
 
         assert EventType.DATA_ANALYSIS in stages
-        assert stages.index(EventType.DATA_ANALYSIS) < stages.index(
-            EventType.INTO_CHAT_MESSAGE
-        )
+        assert stages.index(EventType.DATA_ANALYSIS) < stages.index(EventType.INTO_CHAT_MESSAGE)
 
     def test_rag_without_data_analysis_excludes_stage(self) -> None:
         ctx = _make_ctx(
@@ -462,9 +454,7 @@ class TestExecuteKnowledgeQa:
             event_bus=bus,
         )
 
-        ref_events = [
-            e for e in bus.events if e.type == ChatEventType.AGENT_REFERENCES
-        ]
+        ref_events = [e for e in bus.events if e.type == ChatEventType.AGENT_REFERENCES]
         assert len(ref_events) == 1
 
     @pytest.mark.asyncio
@@ -482,9 +472,7 @@ class TestExecuteKnowledgeQa:
             event_bus=bus,
         )
 
-        ref_events = [
-            e for e in bus.events if e.type == ChatEventType.AGENT_REFERENCES
-        ]
+        ref_events = [e for e in bus.events if e.type == ChatEventType.AGENT_REFERENCES]
         assert len(ref_events) == 0
 
     @pytest.mark.asyncio
@@ -496,9 +484,7 @@ class TestExecuteKnowledgeQa:
         )
         stages = [EventType.CHUNK_SEARCH_PARALLEL]
         bus = _RecordingBus()
-        manager = _StubEventManager(
-            results={EventType.CHUNK_SEARCH_PARALLEL: ERR_SEARCH_NOTHING}
-        )
+        manager = _StubEventManager(results={EventType.CHUNK_SEARCH_PARALLEL: ERR_SEARCH_NOTHING})
 
         await execute_knowledge_qa(
             ctx=_Ctx(),
@@ -510,11 +496,7 @@ class TestExecuteKnowledgeQa:
 
         # Only the search stage was triggered, then the pipeline stops.
         assert manager.triggered == [EventType.CHUNK_SEARCH_PARALLEL]
-        fallback_events = [
-            e
-            for e in bus.events
-            if e.type == ChatEventType.AGENT_FINAL_ANSWER
-        ]
+        fallback_events = [e for e in bus.events if e.type == ChatEventType.AGENT_FINAL_ANSWER]
         assert len(fallback_events) == 1
         assert fallback_events[0].data["is_fallback"] is True
         assert fallback_events[0].data["content"] == "No results found"
@@ -532,9 +514,7 @@ class TestExecuteKnowledgeQa:
             EventType.CHAT_COMPLETION_STREAM,
         ]
         bus = _RecordingBus()
-        manager = _StubEventManager(
-            results={EventType.CHUNK_SEARCH_PARALLEL: ERR_SEARCH_NOTHING}
-        )
+        manager = _StubEventManager(results={EventType.CHUNK_SEARCH_PARALLEL: ERR_SEARCH_NOTHING})
 
         await execute_knowledge_qa(
             ctx=_Ctx(),
@@ -557,9 +537,7 @@ class TestExecuteKnowledgeQa:
         bus = _RecordingBus()
         original_exc = RuntimeError("rerank service unavailable")
         manager = _StubEventManager(
-            results={
-                EventType.CHUNK_RERANK: ERR_SEARCH.with_error(original_exc)
-            }
+            results={EventType.CHUNK_RERANK: ERR_SEARCH.with_error(original_exc)}
         )
 
         with pytest.raises(RuntimeError, match="rerank service unavailable"):
@@ -581,9 +559,7 @@ class TestExecuteKnowledgeQa:
             EventType.CHAT_COMPLETION_STREAM,
         ]
         bus = _RecordingBus()
-        manager = _StubEventManager(
-            results={EventType.QUERY_UNDERSTAND: ERR_SEARCH}
-        )
+        manager = _StubEventManager(results={EventType.QUERY_UNDERSTAND: ERR_SEARCH})
 
         # Should not raise; pipeline stops silently.
         await execute_knowledge_qa(
@@ -724,9 +700,7 @@ class TestRunKnowledgeQa:
 
         ctx = _make_ctx(knowledge_base_ids=["kb-1"])
         bus = _RecordingBus()
-        manager = _StubEventManager(
-            results={EventType.CHUNK_SEARCH_PARALLEL: ERR_SEARCH_NOTHING}
-        )
+        manager = _StubEventManager(results={EventType.CHUNK_SEARCH_PARALLEL: ERR_SEARCH_NOTHING})
         handler = _RecordingFallback()
 
         await run_knowledge_qa(

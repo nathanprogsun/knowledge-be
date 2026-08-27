@@ -1,4 +1,4 @@
-# ruff: noqa: RUF001  # Prompt-editor labels are Chinese with fullwidth punctuation.
+# Prompt-editor labels are Chinese with fullwidth punctuation.
 
 """Prompt placeholder catalog — static definitions for the agent editor.
 
@@ -101,8 +101,7 @@ _PLACEHOLDER_LANGUAGE = PromptPlaceholder(
     name="language",
     label="用户语言",
     description=(
-        "用户界面的语言偏好，如 Chinese (Simplified)、English、Korean "
-        "等，用于控制 LLM 回答语言"
+        "用户界面的语言偏好，如 Chinese (Simplified)、English、Korean 等，用于控制 LLM 回答语言"
     ),
 )
 
@@ -169,17 +168,12 @@ def all_placeholders() -> list[JsonObject]:
 
 def placeholders_by_field(field: str) -> list[JsonObject]:
     """Return the placeholders available for one prompt-field type."""
-    return [
-        placeholder.to_json()
-        for placeholder in _FIELD_PLACEHOLDERS.get(field, ())
-    ]
+    return [placeholder.to_json() for placeholder in _FIELD_PLACEHOLDERS.get(field, ())]
 
 
 def prompt_placeholder_group() -> dict[str, list[JsonObject]]:
     """Return the full field → placeholders map the editor renders."""
-    return {
-        field: placeholders_by_field(field) for field in PROMPT_FIELDS
-    }
+    return {field: placeholders_by_field(field) for field in PROMPT_FIELDS}
 
 
 __all__ = [

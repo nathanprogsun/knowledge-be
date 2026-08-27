@@ -50,7 +50,7 @@ from src.common.exception import StorageBackendError, ValidationError
 
 # ── Constants ────────────────────────────────────────────────────────
 
-_DEFAULT_TABLE_BASE_NAME = "weknora_embeddings"
+_DEFAULT_TABLE_BASE_NAME = "kb_embeddings"
 _ENV_DORIS_TABLE_PREFIX = "DORIS_TABLE_PREFIX"
 _ENV_DORIS_COMPAT_MODE = "DORIS_COMPAT_MODE"
 
@@ -69,19 +69,39 @@ _FIELD_IS_ENABLED = "is_enabled"
 _FIELD_EMBEDDING = "embedding"
 
 _COLUMNS = [
-    _FIELD_ID, _FIELD_CONTENT, _FIELD_SOURCE_ID, _FIELD_SOURCE_TYPE,
-    _FIELD_CHUNK_ID, _FIELD_KNOWLEDGE_ID, _FIELD_KNOWLEDGE_BASE_ID,
-    _FIELD_TAG_ID, _FIELD_IS_ENABLED, _FIELD_EMBEDDING,
+    _FIELD_ID,
+    _FIELD_CONTENT,
+    _FIELD_SOURCE_ID,
+    _FIELD_SOURCE_TYPE,
+    _FIELD_CHUNK_ID,
+    _FIELD_KNOWLEDGE_ID,
+    _FIELD_KNOWLEDGE_BASE_ID,
+    _FIELD_TAG_ID,
+    _FIELD_IS_ENABLED,
+    _FIELD_EMBEDDING,
 ]
 _COLUMNS_FOR_RETRIEVE = [
-    _FIELD_ID, _FIELD_CONTENT, _FIELD_SOURCE_ID, _FIELD_SOURCE_TYPE,
-    _FIELD_CHUNK_ID, _FIELD_KNOWLEDGE_ID, _FIELD_KNOWLEDGE_BASE_ID,
-    _FIELD_TAG_ID, _FIELD_IS_ENABLED,
+    _FIELD_ID,
+    _FIELD_CONTENT,
+    _FIELD_SOURCE_ID,
+    _FIELD_SOURCE_TYPE,
+    _FIELD_CHUNK_ID,
+    _FIELD_KNOWLEDGE_ID,
+    _FIELD_KNOWLEDGE_BASE_ID,
+    _FIELD_TAG_ID,
+    _FIELD_IS_ENABLED,
 ]
 _COLUMNS_FOR_COPY = [
-    _FIELD_ID, _FIELD_CONTENT, _FIELD_SOURCE_ID, _FIELD_SOURCE_TYPE,
-    _FIELD_CHUNK_ID, _FIELD_KNOWLEDGE_ID, _FIELD_KNOWLEDGE_BASE_ID,
-    _FIELD_TAG_ID, _FIELD_IS_ENABLED, _FIELD_EMBEDDING,
+    _FIELD_ID,
+    _FIELD_CONTENT,
+    _FIELD_SOURCE_ID,
+    _FIELD_SOURCE_TYPE,
+    _FIELD_CHUNK_ID,
+    _FIELD_KNOWLEDGE_ID,
+    _FIELD_KNOWLEDGE_BASE_ID,
+    _FIELD_TAG_ID,
+    _FIELD_IS_ENABLED,
+    _FIELD_EMBEDDING,
 ]
 
 CompatMode = Literal["auto", "legacy", "inner_product_duplicate"]
@@ -267,8 +287,13 @@ def _to_doris_vector_embedding(
 def _calculate_storage_size(emb: DorisVectorEmbedding) -> int:
     """Estimate one row's storage cost (upstream ``calculateStorageSize``)."""
     payload = (
-        len(emb.content) + len(emb.source_id) + len(emb.chunk_id)
-        + len(emb.knowledge_id) + len(emb.knowledge_base_id) + len(emb.tag_id) + 8
+        len(emb.content)
+        + len(emb.source_id)
+        + len(emb.chunk_id)
+        + len(emb.knowledge_id)
+        + len(emb.knowledge_base_id)
+        + len(emb.tag_id)
+        + 8
     )
     vec_bytes = len(emb.embedding) * 4 if emb.embedding else 0
     hnsw_bytes = 32 * 2 * 8 if emb.embedding else 0  # max_degree=32
@@ -327,12 +352,14 @@ def _build_base_filter(params: RetrieveParams) -> _WhereBuilder:
 def _build_retrieve_result(
     results: list[Any], retriever_type: RetrieverType
 ) -> list[RetrieveResult]:
-    return [RetrieveResult(
-        results=results,
-        retriever_engine_type=RetrieverEngineType.DORIS,
-        retriever_type=retriever_type,
-        error=None,
-    )]
+    return [
+        RetrieveResult(
+            results=results,
+            retriever_engine_type=RetrieverEngineType.DORIS,
+            retriever_type=retriever_type,
+            error=None,
+        )
+    ]
 
 
 # ── DDL ─────────────────────────────────────────────────────────────
@@ -352,8 +379,7 @@ def _build_create_table_ddl(
         metric_type = "cosine_distance"
         key_mode = "UNIQUE KEY(id)"
         properties = (
-            f'\t"replication_num"="{replication}",\n'
-            f'\t"enable_unique_key_merge_on_write"="true"'
+            f'\t"replication_num"="{replication}",\n\t"enable_unique_key_merge_on_write"="true"'
         )
     return (
         f"CREATE TABLE IF NOT EXISTS `{table_name}` (\n"
@@ -421,7 +447,9 @@ class DorisRepository:
         if invalid:
             logger.warning(
                 "Invalid {}={}, defaulting to {}",
-                _ENV_DORIS_COMPAT_MODE, invalid, _COMPAT_MODE_AUTO,
+                _ENV_DORIS_COMPAT_MODE,
+                invalid,
+                _COMPAT_MODE_AUTO,
             )
         self._compat_mode_resolved: CompatMode | None = None
         self._compat_resolve_error: Exception | None = None
@@ -432,28 +460,34 @@ class DorisRepository:
 
     async def _execute(self, sql: str, args: list[Any] | None = None) -> int:
         async with self._lock:
+
             def _do() -> int:
                 with self._db.cursor() as cur:
                     affected = cur.execute(sql, args or ())
                     self._db.commit()
                     return int(affected or 0)
+
             return await asyncio.to_thread(_do)
 
     async def _query(self, sql: str, args: list[Any] | None = None) -> list[tuple[Any, ...]]:
         async with self._lock:
+
             def _do() -> list[tuple[Any, ...]]:
                 with self._db.cursor() as cur:
                     cur.execute(sql, args or ())
                     return list(cur.fetchall())
+
             return await asyncio.to_thread(_do)
 
     async def _query_row(self, sql: str, args: list[Any] | None = None) -> tuple[Any, ...] | None:
         async with self._lock:
+
             def _do() -> tuple[Any, ...] | None:
                 with self._db.cursor() as cur:
                     cur.execute(sql, args or ())
                     row = cur.fetchone()
                     return cast("tuple[Any, ...] | None", row)
+
             return await asyncio.to_thread(_do)
 
     # ── compat mode resolution ──
@@ -562,10 +596,15 @@ class DorisRepository:
             if row.id == "":
                 row = DorisVectorEmbedding(
                     id=emb.source_id or str(uuid.uuid4()),
-                    content=emb.content, source_id=emb.source_id, source_type=emb.source_type,
-                    chunk_id=emb.chunk_id, knowledge_id=emb.knowledge_id,
-                    knowledge_base_id=emb.knowledge_base_id, tag_id=emb.tag_id,
-                    is_enabled=emb.is_enabled, embedding=emb.embedding,
+                    content=emb.content,
+                    source_id=emb.source_id,
+                    source_type=emb.source_type,
+                    chunk_id=emb.chunk_id,
+                    knowledge_id=emb.knowledge_id,
+                    knowledge_base_id=emb.knowledge_base_id,
+                    tag_id=emb.tag_id,
+                    is_enabled=emb.is_enabled,
+                    embedding=emb.embedding,
                 )
             dim = len(emb.embedding)
             groups.setdefault(dim, []).append(row)
@@ -579,22 +618,36 @@ class DorisRepository:
                 await self._insert_rows(ctx, table, rows)
             logger.info("Saved {} rows to {}", len(rows), table)
 
-    async def _insert_rows(self, ctx: Context, table: str, rows: list[DorisVectorEmbedding]) -> None:
+    async def _insert_rows(
+        self, ctx: Context, table: str, rows: list[DorisVectorEmbedding]
+    ) -> None:
         if not rows:
             return
         parts: list[str] = []
         args: list[Any] = []
         for e in rows:
-            parts.append("(%s, %s, %s, %s, %s, %s, %s, %s, %s, " + _embedding_literal(e.embedding) + ")")
-            args.extend([
-                e.id, e.content, e.source_id, e.source_type,
-                e.chunk_id, e.knowledge_id, e.knowledge_base_id, e.tag_id,
-                e.is_enabled,
-            ])
+            parts.append(
+                "(%s, %s, %s, %s, %s, %s, %s, %s, %s, " + _embedding_literal(e.embedding) + ")"
+            )
+            args.extend(
+                [
+                    e.id,
+                    e.content,
+                    e.source_id,
+                    e.source_type,
+                    e.chunk_id,
+                    e.knowledge_id,
+                    e.knowledge_base_id,
+                    e.tag_id,
+                    e.is_enabled,
+                ]
+            )
         stmt = f"INSERT INTO `{table}` ({', '.join(_COLUMNS)}) VALUES {', '.join(parts)}"
         await self._execute(stmt, args)
 
-    async def _replace_rows(self, ctx: Context, table: str, rows: list[DorisVectorEmbedding]) -> None:
+    async def _replace_rows(
+        self, ctx: Context, table: str, rows: list[DorisVectorEmbedding]
+    ) -> None:
         deduped = _dedupe_rows_by_id(rows)
         if not deduped:
             return
@@ -678,9 +731,16 @@ class DorisRepository:
         rows = await self._query(stmt, args)
         results = [
             IndexWithScore(
-                id=r[0], content=r[1], source_id=r[2], source_type=r[3],
-                chunk_id=r[4], knowledge_id=r[5], knowledge_base_id=r[6],
-                tag_id=r[7], is_enabled=r[8], score=float(r[9]),
+                id=r[0],
+                content=r[1],
+                source_id=r[2],
+                source_type=r[3],
+                chunk_id=r[4],
+                knowledge_id=r[5],
+                knowledge_base_id=r[6],
+                tag_id=r[7],
+                is_enabled=r[8],
+                score=float(r[9]),
                 match_type=MatchType.EMBEDDING,
             )
             for r in rows
@@ -688,7 +748,9 @@ class DorisRepository:
         logger.info("Vector retrieval found {} results in {}", len(results), table)
         return _build_retrieve_result(results, RetrieverType.VECTOR)
 
-    async def _keywords_retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
+    async def _keywords_retrieve(
+        self, ctx: Context, params: RetrieveParams
+    ) -> list[RetrieveResult]:
         query = params.query.strip()
         if query == "":
             return _build_retrieve_result([], RetrieverType.KEYWORDS)
@@ -712,15 +774,26 @@ class DorisRepository:
                 logger.warning("Keyword retrieve in {} failed: {}", table, exc)
                 continue
             for r in rows:
-                all_results.append(IndexWithScore(
-                    id=r[0], content=r[1], source_id=r[2], source_type=r[3],
-                    chunk_id=r[4], knowledge_id=r[5], knowledge_base_id=r[6],
-                    tag_id=r[7], is_enabled=r[8], score=1.0,
-                    match_type=MatchType.KEYWORDS,
-                ))
+                all_results.append(
+                    IndexWithScore(
+                        id=r[0],
+                        content=r[1],
+                        source_id=r[2],
+                        source_type=r[3],
+                        chunk_id=r[4],
+                        knowledge_id=r[5],
+                        knowledge_base_id=r[6],
+                        tag_id=r[7],
+                        is_enabled=r[8],
+                        score=1.0,
+                        match_type=MatchType.KEYWORDS,
+                    )
+                )
         if len(all_results) > params.top_k:
-            all_results = all_results[:params.top_k]
-        logger.info("Keywords retrieval found {} results across {} tables", len(all_results), len(tables))
+            all_results = all_results[: params.top_k]
+        logger.info(
+            "Keywords retrieval found {} results across {} tables", len(all_results), len(tables)
+        )
         return _build_retrieve_result(all_results, RetrieverType.KEYWORDS)
 
     # ── copy_indices ──
@@ -754,9 +827,15 @@ class DorisRepository:
             targets: list[DorisVectorEmbedding] = []
             for r in rows:
                 src = DorisVectorEmbedding(
-                    id=r[0], content=r[1], source_id=r[2], source_type=r[3],
-                    chunk_id=r[4], knowledge_id=r[5], knowledge_base_id=r[6],
-                    tag_id=r[7], is_enabled=r[8],
+                    id=r[0],
+                    content=r[1],
+                    source_id=r[2],
+                    source_type=r[3],
+                    chunk_id=r[4],
+                    knowledge_id=r[5],
+                    knowledge_base_id=r[6],
+                    tag_id=r[7],
+                    is_enabled=r[8],
                     embedding=_parse_embedding_literal(r[9]),
                 )
                 target_chunk_id = source_to_target_chunk_id_map.get(src.chunk_id, "")
@@ -765,19 +844,23 @@ class DorisRepository:
                 target_knowledge_id = source_to_target_kb_id_map.get(src.knowledge_id, "")
                 if target_knowledge_id == "":
                     continue
-                target_source_id = _translate_source_id(src.source_id, src.chunk_id, target_chunk_id)
-                targets.append(DorisVectorEmbedding(
-                    id=str(uuid.uuid4()),
-                    content=src.content,
-                    source_id=target_source_id,
-                    source_type=src.source_type,
-                    chunk_id=target_chunk_id,
-                    knowledge_id=target_knowledge_id,
-                    knowledge_base_id=target_knowledge_base_id,
-                    tag_id=src.tag_id,
-                    is_enabled=src.is_enabled,
-                    embedding=src.embedding,
-                ))
+                target_source_id = _translate_source_id(
+                    src.source_id, src.chunk_id, target_chunk_id
+                )
+                targets.append(
+                    DorisVectorEmbedding(
+                        id=str(uuid.uuid4()),
+                        content=src.content,
+                        source_id=target_source_id,
+                        source_type=src.source_type,
+                        chunk_id=target_chunk_id,
+                        knowledge_id=target_knowledge_id,
+                        knowledge_base_id=target_knowledge_base_id,
+                        tag_id=src.tag_id,
+                        is_enabled=src.is_enabled,
+                        embedding=src.embedding,
+                    )
+                )
             if targets:
                 await self._insert_rows(ctx, table, targets)
                 total_copied += len(targets)
@@ -804,11 +887,18 @@ class DorisRepository:
             if enabled is None or row.is_enabled == enabled:
                 return None
             return DorisVectorEmbedding(
-                id=row.id, content=row.content, source_id=row.source_id,
-                source_type=row.source_type, chunk_id=row.chunk_id,
-                knowledge_id=row.knowledge_id, knowledge_base_id=row.knowledge_base_id,
-                tag_id=row.tag_id, is_enabled=enabled, embedding=row.embedding,
+                id=row.id,
+                content=row.content,
+                source_id=row.source_id,
+                source_type=row.source_type,
+                chunk_id=row.chunk_id,
+                knowledge_id=row.knowledge_id,
+                knowledge_base_id=row.knowledge_base_id,
+                tag_id=row.tag_id,
+                is_enabled=enabled,
+                embedding=row.embedding,
             )
+
         await self._rewrite_chunk_rows(ctx, chunk_ids, mutate, "rewrite is_enabled")
 
     async def batch_update_chunk_tag_id(
@@ -827,11 +917,18 @@ class DorisRepository:
             if tag_id is None or row.tag_id == tag_id:
                 return None
             return DorisVectorEmbedding(
-                id=row.id, content=row.content, source_id=row.source_id,
-                source_type=row.source_type, chunk_id=row.chunk_id,
-                knowledge_id=row.knowledge_id, knowledge_base_id=row.knowledge_base_id,
-                tag_id=tag_id, is_enabled=row.is_enabled, embedding=row.embedding,
+                id=row.id,
+                content=row.content,
+                source_id=row.source_id,
+                source_type=row.source_type,
+                chunk_id=row.chunk_id,
+                knowledge_id=row.knowledge_id,
+                knowledge_base_id=row.knowledge_base_id,
+                tag_id=tag_id,
+                is_enabled=row.is_enabled,
+                embedding=row.embedding,
             )
+
         await self._rewrite_chunk_rows(ctx, chunk_ids, mutate, "rewrite tag_id")
 
     async def _rewrite_chunk_rows(
@@ -868,9 +965,15 @@ class DorisRepository:
         rows = await self._query(stmt, chunk_ids)
         return [
             DorisVectorEmbedding(
-                id=r[0], content=r[1], source_id=r[2], source_type=r[3],
-                chunk_id=r[4], knowledge_id=r[5], knowledge_base_id=r[6],
-                tag_id=r[7], is_enabled=r[8],
+                id=r[0],
+                content=r[1],
+                source_id=r[2],
+                source_type=r[3],
+                chunk_id=r[4],
+                knowledge_id=r[5],
+                knowledge_base_id=r[6],
+                tag_id=r[7],
+                is_enabled=r[8],
                 embedding=_parse_embedding_literal(r[9]),
             )
             for r in rows
@@ -886,9 +989,12 @@ class DorisRepository:
             if enabled is None:
                 continue
             for loc in locations:
-                by_table.setdefault(loc[0], []).append({
-                    _FIELD_ID: loc[1], _FIELD_IS_ENABLED: enabled,
-                })
+                by_table.setdefault(loc[0], []).append(
+                    {
+                        _FIELD_ID: loc[1],
+                        _FIELD_IS_ENABLED: enabled,
+                    }
+                )
         for table, rows in by_table.items():
             await self._partial_update_rows(ctx, table, [_FIELD_ID, _FIELD_IS_ENABLED], rows)
 
@@ -902,9 +1008,12 @@ class DorisRepository:
             if tag_id is None:
                 continue
             for loc in locations:
-                by_table.setdefault(loc[0], []).append({
-                    _FIELD_ID: loc[1], _FIELD_TAG_ID: tag_id,
-                })
+                by_table.setdefault(loc[0], []).append(
+                    {
+                        _FIELD_ID: loc[1],
+                        _FIELD_TAG_ID: tag_id,
+                    }
+                )
         for table, rows in by_table.items():
             await self._partial_update_rows(ctx, table, [_FIELD_ID, _FIELD_TAG_ID], rows)
 
@@ -981,7 +1090,9 @@ def new_doris_retrieve_engine_repository(
     return DorisRepository(db, fe_http_base, username, password, database, index_cfg)
 
 
-def _connect_doris(addr: str, username: str, password: str, database: str) -> pymysql.connections.Connection:
+def _connect_doris(
+    addr: str, username: str, password: str, database: str
+) -> pymysql.connections.Connection:
     """Create a pymysql connection to Doris FE (MySQL protocol)."""
     host = addr
     port = 9030

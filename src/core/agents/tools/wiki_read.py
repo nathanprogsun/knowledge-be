@@ -109,7 +109,7 @@ WIKI_READ_SOURCE_DOC_TOOL_SCHEMA = json.dumps(
                 "type": "string",
                 "description": (
                     "Optional: A regex query to filter the document chunks. Use this to find specific "
-                    'quotes or details efficiently. Remember to double-escape backslashes for JSON: '
+                    "quotes or details efficiently. Remember to double-escape backslashes for JSON: "
                     'write "C\\\\\\\\+\\\\\\\\+" (NOT "C\\\\+\\\\+") and "\\\\\\\\d+" (NOT "\\\\d+").'
                 ),
             },
@@ -360,9 +360,7 @@ class WikiReadPageTool:
                 try:
                     passes_scope = await page_passes_wiki_scope(ctx, page, scope, self._tag_fetcher)
                 except Exception as exc:
-                    errs.append(
-                        f"Failed to validate wiki scope for '{slug}' in KB {kb_id}: {exc}"
-                    )
+                    errs.append(f"Failed to validate wiki scope for '{slug}' in KB {kb_id}: {exc}")
                     continue
                 if not passes_scope:
                     filtered_out.setdefault(slug, [])
@@ -398,7 +396,7 @@ class WikiReadPageTool:
         )
         if omitted_slugs:
             final_output += (
-                "\n\n<omitted_pages reason=\"output budget exceeded\">\n"
+                '\n\n<omitted_pages reason="output budget exceeded">\n'
                 + "\n".join(omitted_slugs)
                 + "\n</omitted_pages>"
                 + "\n<hint>These pages were resolved but not rendered. "

@@ -488,9 +488,7 @@ class IMChannelService:
         """Return ``(adapter, channel, running)`` for the active channel."""
         return self._supervisor.get_channel_adapter(channel_id)
 
-    async def ensure_channel_adapter(
-        self, channel_id: str
-    ) -> tuple[IMAdapter, IMChannelInfo]:
+    async def ensure_channel_adapter(self, channel_id: str) -> tuple[IMAdapter, IMChannelInfo]:
         """Resolve the durable row and return a running adapter for ``channel_id``.
 
         Mirrors the runtime contract the callback path relies on: the

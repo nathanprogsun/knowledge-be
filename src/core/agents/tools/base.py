@@ -82,7 +82,9 @@ def available_tool_definitions() -> list[AvailableTool]:
         AvailableTool(TOOL_WIKI_READ_PAGE, "读取Wiki页面", "读取指定的Wiki页面内容"),
         AvailableTool(TOOL_WIKI_SEARCH, "搜索Wiki", "在Wiki中搜索页面"),
         AvailableTool(TOOL_WIKI_READ_SOURCE_DOC, "精读源文档", "使用知识点深入阅读特定原始文档"),
-        AvailableTool(TOOL_WIKI_FLAG_ISSUE, "标记Wiki问题", "标记页面中存在的事实错误或合并冲突问题"),
+        AvailableTool(
+            TOOL_WIKI_FLAG_ISSUE, "标记Wiki问题", "标记页面中存在的事实错误或合并冲突问题"
+        ),
         AvailableTool(TOOL_WIKI_WRITE_PAGE, "创建/覆盖Wiki", "创建新页面或完全覆盖已有页面"),
         AvailableTool(TOOL_WIKI_REPLACE_TEXT, "局部替换Wiki", "替换Wiki页面中的特定文本"),
         AvailableTool(TOOL_WIKI_RENAME_PAGE, "重命名Wiki", "重命名Wiki页面并自动更新关联链接"),

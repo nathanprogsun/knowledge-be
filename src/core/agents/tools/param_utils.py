@@ -243,10 +243,7 @@ def validate_property(
             errors.append(
                 ValidationError(
                     param=name,
-                    message=(
-                        f"parameter '{name}' must have at least "
-                        f"{int(min_length)} characters"
-                    ),
+                    message=(f"parameter '{name}' must have at least {int(min_length)} characters"),
                 )
             )
         max_length = get_float(prop, "maxLength")
@@ -254,10 +251,7 @@ def validate_property(
             errors.append(
                 ValidationError(
                     param=name,
-                    message=(
-                        f"parameter '{name}' must have at most "
-                        f"{int(max_length)} characters"
-                    ),
+                    message=(f"parameter '{name}' must have at most {int(max_length)} characters"),
                 )
             )
 

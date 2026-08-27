@@ -24,7 +24,7 @@ from src.web.deps.agents import SkillsManagerDep
 
 #: Environment variable naming the sandbox backend kind. Any value other
 #: than empty or ``disabled`` means skills are available.
-_SANDBOX_MODE_ENV = "WEKNORA_SANDBOX_MODE"
+_SANDBOX_MODE_ENV = "KB_SANDBOX_MODE"
 _DISABLED_MODE = "disabled"
 
 
@@ -74,10 +74,7 @@ async def list_skills(
     metadata = manager.get_all_metadata()
     return SkillListEnvelope(
         success=True,
-        data=[
-            SkillInfoResponse(name=meta.name, description=meta.description)
-            for meta in metadata
-        ],
+        data=[SkillInfoResponse(name=meta.name, description=meta.description) for meta in metadata],
         skills_available=_skills_available(),
     )
 

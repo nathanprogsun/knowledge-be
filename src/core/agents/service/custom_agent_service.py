@@ -1,4 +1,4 @@
-# ruff: noqa: RUF001  # Chinese API messages use fullwidth punctuation.
+# Chinese API messages use fullwidth punctuation.
 
 """Custom-agent service — CRUD over the ``custom_agents`` table.
 
@@ -186,7 +186,9 @@ class CustomAgentService:
                 builtin = get_builtin_agent(builtin_id, tenant_id)
                 if builtin is not None:
                     result.append(builtin)
-        result.extend(info for agent_id, info in by_id.items() if agent_id not in BUILTIN_AGENT_ORDER)
+        result.extend(
+            info for agent_id, info in by_id.items() if agent_id not in BUILTIN_AGENT_ORDER
+        )
         return result
 
     # ── Update ──────────────────────────────────────────────────────
@@ -196,36 +198,40 @@ class CustomAgentService:
         *,
         tenant_id: int,
         agent_id: str,
-        name: str,
-        config: JsonObject,
+        name: str | None = None,
+        config: JsonObject | None = None,
         description: str | None = None,
         avatar: str | None = None,
     ) -> CustomAgentInfo:
-        """Overwrite an agent's mutable fields and return the result.
+        """Partial-update an agent's mutable fields and return the result.
 
-        Built-in rows reject basic-info edits. The name is required and
-        the config is re-defaulted and re-validated before persist.
+        Every parameter is optional — ``None`` means "leave the existing
+        value alone". This lets the same request shape serve PUT (full
+        body) and PATCH (subset). Built-in rows reject basic-info edits;
+        supplied ``config`` is re-defaulted and re-validated before
+        persist; if ``config`` is omitted the existing config is kept
+        verbatim (no defaults reapplied, no validation rerun).
         """
         _require_tenant_id(tenant_id)
         _require_agent_id(agent_id)
-        clean_name = _require_name(name)
         existing = await self._get_live_agent(tenant_id=tenant_id, agent_id=agent_id)
         if existing.is_builtin:
             raise ConflictError(
                 code="agent.cannot_modify_builtin",
                 message="cannot modify built-in agent basic info",
             )
-        resolved_config = _apply_config_defaults(config)
-        _validate_config(resolved_config)
-        updated = existing.model_copy(
-            update={
-                "name": clean_name,
-                "description": description,
-                "avatar": avatar,
-                "config": resolved_config,
-                "updated_at": _now(),
-            }
-        )
+        patch: dict[str, object] = {"updated_at": _now()}
+        if name is not None:
+            patch["name"] = _require_name(name)
+        if description is not None:
+            patch["description"] = description
+        if avatar is not None:
+            patch["avatar"] = avatar
+        if config is not None:
+            resolved_config = _apply_config_defaults(config)
+            _validate_config(resolved_config)
+            patch["config"] = resolved_config
+        updated = existing.model_copy(update=patch)
         persisted = await self._agent_repo.update(updated)
         return CustomAgentInfo.from_row(persisted)
 

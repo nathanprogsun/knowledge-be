@@ -40,7 +40,7 @@ from src.ai.retrieval.types import (
 from src.common.exception import ValidationError
 
 _CTX = TaskContext()
-_BASE = "weknora_test"
+_BASE = "kb_test"
 
 
 # ── helpers ──────────────────────────────────────────────────────────
@@ -70,8 +70,15 @@ def _repo(
     return OpenSearchRepository(
         client or _mock_os_client(),
         base,
-        cfg or {"shards": 4, "replicas": 1, "knn_engine": "lucene",
-                "hnsw_m": 16, "hnsw_ef_construction": 100, "ef_search": 100},
+        cfg
+        or {
+            "shards": 4,
+            "replicas": 1,
+            "knn_engine": "lucene",
+            "hnsw_m": 16,
+            "hnsw_ef_construction": 100,
+            "ef_search": 100,
+        },
         audit,
     )
 
@@ -90,9 +97,15 @@ def _index_info(**overrides: Any) -> IndexInfo:
 
 
 def _search_hit(doc_id: str = "doc1", score: float = 0.95, **source: Any) -> dict[str, Any]:
-    src = {"chunk_id": "c1", "content": "text", "source_id": "s1",
-           "knowledge_id": "k1", "knowledge_base_id": "kb1",
-           "source_type": 0, "is_enabled": True}
+    src = {
+        "chunk_id": "c1",
+        "content": "text",
+        "source_id": "s1",
+        "knowledge_id": "k1",
+        "knowledge_base_id": "kb1",
+        "source_type": 0,
+        "is_enabled": True,
+    }
     src.update(source)
     return {"_id": doc_id, "_score": score, "_source": src}
 
@@ -160,12 +173,12 @@ def test_transform_source_id_generated_question() -> None:
 
 
 def test_resolve_base_index_env_store_no_prefix() -> None:
-    assert _resolve_base_index("", None) == "weknora"
+    assert _resolve_base_index("", None) == "kb"
 
 
 def test_resolve_base_index_db_store_folds_id() -> None:
     base = _resolve_base_index("abcdef0123456789", None)
-    assert base == "weknora_abcdef012345"
+    assert base == "kb_abcdef012345"
 
 
 def test_resolve_base_index_rejects_short_store_id() -> None:
@@ -194,6 +207,7 @@ def test_save_with_embedding_uses_dim_alias() -> None:
     info = _index_info()
     params = {"embedding": {"src-1": [0.1, 0.2]}}
     import asyncio
+
     asyncio.run(repo.save(_CTX, info, params))
     client.indices.create.assert_called_once()
     _, kwargs = client.indices.create.call_args
@@ -209,6 +223,7 @@ def test_save_without_embedding_uses_keywords_index() -> None:
     repo = _repo(client)
     info = _index_info()
     import asyncio
+
     asyncio.run(repo.save(_CTX, info, {}))
     client.indices.create.assert_called_once()
     _, kwargs = client.indices.create.call_args
@@ -222,6 +237,7 @@ def test_batch_save_rejects_too_many_docs() -> None:
     repo = _repo()
     infos = [_index_info(chunk_id=f"c{i}") for i in range(1001)]
     import asyncio
+
     with pytest.raises(BatchTooLargeError, match="1000-doc cap"):
         asyncio.run(repo.batch_save(_CTX, infos, {}))
 
@@ -231,6 +247,7 @@ def test_batch_save_rejects_oversized_body() -> None:
     infos = [_index_info(chunk_id=f"c{i}", source_id=f"src-{i}") for i in range(1000)]
     params = {"embedding": {f"src-{i}": [0.0] * 2000 for i in range(1000)}}
     import asyncio
+
     with pytest.raises(BatchTooLargeError, match="exceeds"):
         asyncio.run(repo.batch_save(_CTX, infos, params))
 
@@ -239,6 +256,7 @@ def test_batch_save_empty_list_skips() -> None:
     client = _mock_os_client()
     repo = _repo(client)
     import asyncio
+
     asyncio.run(repo.batch_save(_CTX, [], {}))
     client.bulk.assert_not_called()
 
@@ -251,10 +269,13 @@ def test_vector_retrieve_builds_knn_query() -> None:
     client.search.return_value = {"hits": {"hits": [_search_hit()]}}
     repo = _repo(client)
     params = RetrieveParams(
-        embedding=[0.1, 0.2], top_k=5, threshold=0.5,
+        embedding=[0.1, 0.2],
+        top_k=5,
+        threshold=0.5,
         retriever_type=RetrieverType.VECTOR,
     )
     import asyncio
+
     results = asyncio.run(repo.retrieve(_CTX, params))
     assert len(results) == 1
     assert results[0].retriever_type == RetrieverType.VECTOR
@@ -270,10 +291,12 @@ def test_keyword_retrieve_builds_match_query() -> None:
     client.search.return_value = {"hits": {"hits": [_search_hit()]}}
     repo = _repo(client)
     params = RetrieveParams(
-        query="hello", top_k=10,
+        query="hello",
+        top_k=10,
         retriever_type=RetrieverType.KEYWORDS,
     )
     import asyncio
+
     results = asyncio.run(repo.retrieve(_CTX, params))
     assert len(results) == 1
     assert results[0].retriever_type == RetrieverType.KEYWORDS
@@ -286,9 +309,11 @@ def test_keyword_retrieve_builds_match_query() -> None:
 def test_retrieve_vector_requires_dim() -> None:
     repo = _repo()
     params = RetrieveParams(
-        retriever_type=RetrieverType.VECTOR, top_k=5,
+        retriever_type=RetrieverType.VECTOR,
+        top_k=5,
     )
     import asyncio
+
     with pytest.raises(DimensionMismatchError):
         asyncio.run(repo.retrieve(_CTX, params))
 
@@ -296,9 +321,11 @@ def test_retrieve_vector_requires_dim() -> None:
 def test_retrieve_rejects_unknown_type() -> None:
     repo = _repo()
     params = RetrieveParams(
-        retriever_type=RetrieverType.WEB_SEARCH, top_k=5,
+        retriever_type=RetrieverType.WEB_SEARCH,
+        top_k=5,
     )
     import asyncio
+
     with pytest.raises(ValidationError, match="unsupported retriever type"):
         asyncio.run(repo.retrieve(_CTX, params))
 
@@ -310,6 +337,7 @@ def test_delete_by_chunk_id_list() -> None:
     client = _mock_os_client()
     repo = _repo(client)
     import asyncio
+
     asyncio.run(repo.delete_by_chunk_id_list(_CTX, ["c1", "c2"], 128, "doc"))
     client.delete_by_query.assert_called_once()
     _, kwargs = client.delete_by_query.call_args
@@ -320,6 +348,7 @@ def test_delete_empty_list_skips() -> None:
     client = _mock_os_client()
     repo = _repo(client)
     import asyncio
+
     asyncio.run(repo.delete_by_chunk_id_list(_CTX, [], 128, "doc"))
     client.delete_by_query.assert_not_called()
 
@@ -328,6 +357,7 @@ def test_delete_rejects_too_many() -> None:
     repo = _repo()
     ids = [f"c{i}" for i in range(1001)]
     import asyncio
+
     with pytest.raises(BatchTooLargeError):
         asyncio.run(repo.delete_by_chunk_id_list(_CTX, ids, 128, "doc"))
 
@@ -336,6 +366,7 @@ def test_delete_by_source_id_list() -> None:
     client = _mock_os_client()
     repo = _repo(client)
     import asyncio
+
     asyncio.run(repo.delete_by_source_id_list(_CTX, ["s1", "s2"], 128, "doc"))
     client.delete_by_query.assert_called_once()
     _, kwargs = client.delete_by_query.call_args
@@ -348,6 +379,7 @@ def test_delete_by_source_id_list_empty_skips() -> None:
     client = _mock_os_client()
     repo = _repo(client)
     import asyncio
+
     asyncio.run(repo.delete_by_source_id_list(_CTX, [], 128, "doc"))
     client.delete_by_query.assert_not_called()
 
@@ -356,6 +388,7 @@ def test_delete_by_source_id_list_rejects_too_many() -> None:
     repo = _repo()
     ids = [f"s{i}" for i in range(1001)]
     import asyncio
+
     with pytest.raises(BatchTooLargeError, match="source_id-delete"):
         asyncio.run(repo.delete_by_source_id_list(_CTX, ids, 128, "doc"))
 
@@ -364,6 +397,7 @@ def test_delete_by_knowledge_id_list() -> None:
     client = _mock_os_client()
     repo = _repo(client)
     import asyncio
+
     asyncio.run(repo.delete_by_knowledge_id_list(_CTX, ["k1", "k2"], 128, "doc"))
     client.delete_by_query.assert_called_once()
     _, kwargs = client.delete_by_query.call_args
@@ -376,6 +410,7 @@ def test_delete_by_knowledge_id_list_empty_skips() -> None:
     client = _mock_os_client()
     repo = _repo(client)
     import asyncio
+
     asyncio.run(repo.delete_by_knowledge_id_list(_CTX, [], 128, "doc"))
     client.delete_by_query.assert_not_called()
 
@@ -384,6 +419,7 @@ def test_delete_by_knowledge_id_list_rejects_too_many() -> None:
     repo = _repo()
     ids = [f"k{i}" for i in range(1001)]
     import asyncio
+
     with pytest.raises(BatchTooLargeError, match="knowledge_id-delete"):
         asyncio.run(repo.delete_by_knowledge_id_list(_CTX, ids, 128, "doc"))
 
@@ -395,40 +431,64 @@ def test_copy_indices_empty_map_skips() -> None:
     client = _mock_os_client()
     repo = _repo(client)
     import asyncio
-    asyncio.run(repo.copy_indices(
-        _CTX, "kb", {}, {}, "tgt", 128, "doc",
-    ))
+
+    asyncio.run(
+        repo.copy_indices(
+            _CTX,
+            "kb",
+            {},
+            {},
+            "tgt",
+            128,
+            "doc",
+        )
+    )
     client.search.assert_not_called()
 
 
 def test_copy_indices_requires_positive_dim() -> None:
     repo = _repo()
     import asyncio
+
     with pytest.raises(DimensionMismatchError, match="dim > 0"):
-        asyncio.run(repo.copy_indices(
-            _CTX, "kb", {"k": "k"}, {"c": "c"}, "tgt", 0, "doc",
-        ))
+        asyncio.run(
+            repo.copy_indices(
+                _CTX,
+                "kb",
+                {"k": "k"},
+                {"c": "c"},
+                "tgt",
+                0,
+                "doc",
+            )
+        )
 
 
 def test_copy_indices_paginates_and_saves() -> None:
     client = _mock_os_client()
     client.search.return_value = {
-        "hits": {"hits": [
-            _search_hit(doc_id="d1", chunk_id="src_c1", knowledge_id="src_k1",
-                        embedding=[0.1, 0.2]),
-        ]}
+        "hits": {
+            "hits": [
+                _search_hit(
+                    doc_id="d1", chunk_id="src_c1", knowledge_id="src_k1", embedding=[0.1, 0.2]
+                ),
+            ]
+        }
     }
     repo = _repo(client)
     import asyncio
-    asyncio.run(repo.copy_indices(
-        _CTX,
-        source_knowledge_base_id="src_kb",
-        source_to_target_kb_id_map={"src_k1": "tgt_k1"},
-        source_to_target_chunk_id_map={"src_c1": "tgt_c1"},
-        target_knowledge_base_id="tgt_kb",
-        dimension=128,
-        knowledge_type="doc",
-    ))
+
+    asyncio.run(
+        repo.copy_indices(
+            _CTX,
+            source_knowledge_base_id="src_kb",
+            source_to_target_kb_id_map={"src_k1": "tgt_k1"},
+            source_to_target_chunk_id_map={"src_c1": "tgt_c1"},
+            target_knowledge_base_id="tgt_kb",
+            dimension=128,
+            knowledge_type="doc",
+        )
+    )
     client.bulk.assert_called_once()
 
 
@@ -439,6 +499,7 @@ def test_batch_update_chunk_enabled_status_groups_by_value() -> None:
     client = _mock_os_client()
     repo = _repo(client)
     import asyncio
+
     asyncio.run(repo.batch_update_chunk_enabled_status(_CTX, {"c1": True, "c2": False}))
     assert client.update_by_query.call_count == 2
 
@@ -447,6 +508,7 @@ def test_batch_update_chunk_tag_id_groups_by_tag() -> None:
     client = _mock_os_client()
     repo = _repo(client)
     import asyncio
+
     asyncio.run(repo.batch_update_chunk_tag_id(_CTX, {"c1": "t1", "c2": "t2"}))
     assert client.update_by_query.call_count == 2
 
@@ -455,6 +517,7 @@ def test_batch_update_empty_map_skips() -> None:
     client = _mock_os_client()
     repo = _repo(client)
     import asyncio
+
     asyncio.run(repo.batch_update_chunk_enabled_status(_CTX, {}))
     client.update_by_query.assert_not_called()
 
@@ -484,6 +547,7 @@ def test_audit_sink_emits_on_index_creation() -> None:
     info = _index_info()
     params = {"embedding": {"src-1": [0.1, 0.2]}}
     import asyncio
+
     asyncio.run(repo.save(_CTX, info, params))
     assert len(sink.index_created) == 1
     alias, dim = sink.index_created[0]
@@ -494,17 +558,27 @@ def test_audit_sink_emits_on_index_creation() -> None:
 def test_audit_sink_emits_on_reindex() -> None:
     client = _mock_os_client()
     client.search.return_value = {
-        "hits": {"hits": [
-            _search_hit(chunk_id="src_c1", knowledge_id="src_k1", embedding=[0.1, 0.2]),
-        ]}
+        "hits": {
+            "hits": [
+                _search_hit(chunk_id="src_c1", knowledge_id="src_k1", embedding=[0.1, 0.2]),
+            ]
+        }
     }
     sink = _CapturingAuditSink()
     repo = _repo(client, audit=sink)
     import asyncio
-    asyncio.run(repo.copy_indices(
-        _CTX, "src_kb", {"src_k1": "tgt_k1"}, {"src_c1": "tgt_c1"},
-        "tgt_kb", 128, "doc",
-    ))
+
+    asyncio.run(
+        repo.copy_indices(
+            _CTX,
+            "src_kb",
+            {"src_k1": "tgt_k1"},
+            {"src_c1": "tgt_c1"},
+            "tgt_kb",
+            128,
+            "doc",
+        )
+    )
     assert len(sink.reindex_executed) == 1
     assert sink.reindex_executed[0][2] == 1
 

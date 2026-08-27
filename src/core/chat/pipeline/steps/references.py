@@ -197,7 +197,9 @@ def prepare_messages_with_model_context(
     messages = prepare_messages_with_history(pipeline_ctx)
     if messages:
         first = messages[0]
-        updated_first = replace(first, content=first.content.rstrip(" \t\r\n") + registry.protocol_prompt())
+        updated_first = replace(
+            first, content=first.content.rstrip(" \t\r\n") + registry.protocol_prompt()
+        )
         messages = [updated_first, *messages[1:]]
     if not pipeline_ctx.merge_result or not messages:
         return messages, registry
@@ -235,7 +237,9 @@ def prepare_messages_with_model_context(
             "display_type": "search_results",
             "results": cast("list[JsonValue]", knowledge_rows),
         }
-        context_parts.append(registry.model_tool_result(ToolResult(success=True, data=knowledge_data)))
+        context_parts.append(
+            registry.model_tool_result(ToolResult(success=True, data=knowledge_data))
+        )
     if web_rows:
         web_data: JsonObject = {
             "display_type": "web_search_results",
@@ -251,13 +255,22 @@ def prepare_messages_with_model_context(
     replaced = False
     for index in (0, last):
         message = messages[index]
-        if pipeline_ctx.rendered_contexts != "" and pipeline_ctx.rendered_contexts in message.content:
-            updated = replace(message, content=message.content.replace(pipeline_ctx.rendered_contexts, model_contexts))
+        if (
+            pipeline_ctx.rendered_contexts != ""
+            and pipeline_ctx.rendered_contexts in message.content
+        ):
+            updated = replace(
+                message,
+                content=message.content.replace(pipeline_ctx.rendered_contexts, model_contexts),
+            )
             messages = [updated if i == index else m for i, m in enumerate(messages)]
             replaced = True
     if not replaced:
         last_message = messages[last]
-        messages = [*messages[:last], replace(last_message, content=model_contexts + "\n\n" + last_message.content)]
+        messages = [
+            *messages[:last],
+            replace(last_message, content=model_contexts + "\n\n" + last_message.content),
+        ]
     return messages, registry
 
 

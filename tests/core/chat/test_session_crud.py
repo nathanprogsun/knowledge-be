@@ -59,9 +59,7 @@ class _FakeSessionRepo:
             return None
         return row
 
-    async def get_by_id_for_user(
-        self, *, tenant_id: int, user_id: str, id: str
-    ) -> Session | None:
+    async def get_by_id_for_user(self, *, tenant_id: int, user_id: str, id: str) -> Session | None:
         row = self.store.get(id)
         if row is None or row.tenant_id != tenant_id or row.deleted_at is not None:
             return None
@@ -69,9 +67,7 @@ class _FakeSessionRepo:
             return None
         return row
 
-    async def list_by_tenant(
-        self, *, tenant_id: int, user_id: str = ""
-    ) -> list[Session]:
+    async def list_by_tenant(self, *, tenant_id: int, user_id: str = "") -> list[Session]:
         return [
             row
             for row in sorted(
@@ -230,9 +226,7 @@ class _FakeChatFactory(ChatFactoryLike):
         self._chat = chat
         self.calls: list[tuple[int, str]] = []
 
-    async def resolve_chat(
-        self, *, tenant_id: int, model_id: str = ""
-    ) -> tuple[_FakeChat, str]:
+    async def resolve_chat(self, *, tenant_id: int, model_id: str = "") -> tuple[_FakeChat, str]:
         self.calls.append((tenant_id, model_id))
         resolved = model_id or "resolved-model"
         return self._chat, resolved

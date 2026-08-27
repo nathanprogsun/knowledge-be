@@ -69,9 +69,7 @@ class _FakeEngine:
     def support(self) -> list[RetrieverType]:
         return list(self._support)
 
-    async def retrieve(
-        self, _ctx: Context, params: RetrieveParams
-    ) -> list[RetrieveResult]:
+    async def retrieve(self, _ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
         self.calls.append(("retrieve", params))
         if self._retrieve_error is not None:
             raise self._retrieve_error
@@ -122,9 +120,7 @@ class _FakeEngine:
         dimension: int,
         knowledge_type: str,
     ) -> None:
-        self.calls.append(
-            ("delete_by_chunk_id_list", (index_id_list, dimension, knowledge_type))
-        )
+        self.calls.append(("delete_by_chunk_id_list", (index_id_list, dimension, knowledge_type)))
 
     async def delete_by_source_id_list(
         self,
@@ -133,9 +129,7 @@ class _FakeEngine:
         dimension: int,
         knowledge_type: str,
     ) -> None:
-        self.calls.append(
-            ("delete_by_source_id_list", (source_id_list, dimension, knowledge_type))
-        )
+        self.calls.append(("delete_by_source_id_list", (source_id_list, dimension, knowledge_type)))
 
     async def copy_indices(
         self,
@@ -197,9 +191,7 @@ def _embedder() -> Embedder:
 def _params(
     engine_type: RetrieverEngineType, retriever_type: RetrieverType
 ) -> RetrieverEngineParams:
-    return RetrieverEngineParams(
-        retriever_engine_type=engine_type, retriever_type=retriever_type
-    )
+    return RetrieverEngineParams(retriever_engine_type=engine_type, retriever_type=retriever_type)
 
 
 def _registry(*engines: _FakeEngine) -> RetrieveEngineRegistry:
@@ -248,9 +240,7 @@ def test_new_composite_groups_by_engine_type() -> None:
 
 
 def test_new_composite_multiple_engines_preserved() -> None:
-    keyword_engine = _FakeEngine(
-        RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS]
-    )
+    keyword_engine = _FakeEngine(RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS])
     vector_engine = _FakeEngine(RetrieverEngineType.QDRANT, [RetrieverType.VECTOR])
     composite = new_composite_retrieve_engine(
         _registry(keyword_engine, vector_engine),
@@ -281,9 +271,7 @@ def test_new_composite_missing_engine_raises() -> None:
 
 
 def test_support_retriever() -> None:
-    keyword_engine = _FakeEngine(
-        RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS]
-    )
+    keyword_engine = _FakeEngine(RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS])
     composite = new_composite_retrieve_engine(
         _registry(keyword_engine),
         [_params(RetrieverEngineType.ELASTICSEARCH, RetrieverType.KEYWORDS)],
@@ -299,9 +287,7 @@ async def test_retrieve_dispatches_per_retriever_type_and_merges() -> None:
     keyword_engine = _FakeEngine(
         RetrieverEngineType.ELASTICSEARCH,
         [RetrieverType.KEYWORDS],
-        retrieve_results=[
-            _result(RetrieverEngineType.ELASTICSEARCH, RetrieverType.KEYWORDS)
-        ],
+        retrieve_results=[_result(RetrieverEngineType.ELASTICSEARCH, RetrieverType.KEYWORDS)],
     )
     vector_engine = _FakeEngine(
         RetrieverEngineType.QDRANT,
@@ -334,9 +320,7 @@ async def test_retrieve_routes_to_first_matching_engine() -> None:
     hybrid_engine = _FakeEngine(
         RetrieverEngineType.ELASTICSEARCH,
         [RetrieverType.KEYWORDS, RetrieverType.VECTOR],
-        retrieve_results=[
-            _result(RetrieverEngineType.ELASTICSEARCH, RetrieverType.VECTOR)
-        ],
+        retrieve_results=[_result(RetrieverEngineType.ELASTICSEARCH, RetrieverType.VECTOR)],
     )
     vector_engine = _FakeEngine(RetrieverEngineType.QDRANT, [RetrieverType.VECTOR])
     composite = new_composite_retrieve_engine(
@@ -350,17 +334,13 @@ async def test_retrieve_routes_to_first_matching_engine() -> None:
 
     results = await composite.retrieve(_CTX, [params])
 
-    assert results == [
-        _result(RetrieverEngineType.ELASTICSEARCH, RetrieverType.VECTOR)
-    ]
+    assert results == [_result(RetrieverEngineType.ELASTICSEARCH, RetrieverType.VECTOR)]
     assert hybrid_engine.calls == [("retrieve", params)]
     assert vector_engine.calls == []
 
 
 async def test_retrieve_empty_params_returns_empty() -> None:
-    keyword_engine = _FakeEngine(
-        RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS]
-    )
+    keyword_engine = _FakeEngine(RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS])
     composite = new_composite_retrieve_engine(
         _registry(keyword_engine),
         [_params(RetrieverEngineType.ELASTICSEARCH, RetrieverType.KEYWORDS)],
@@ -370,9 +350,7 @@ async def test_retrieve_empty_params_returns_empty() -> None:
 
 
 async def test_retrieve_unsupported_retriever_type_raises_not_found() -> None:
-    keyword_engine = _FakeEngine(
-        RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS]
-    )
+    keyword_engine = _FakeEngine(RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS])
     composite = new_composite_retrieve_engine(
         _registry(keyword_engine),
         [_params(RetrieverEngineType.ELASTICSEARCH, RetrieverType.KEYWORDS)],
@@ -403,9 +381,7 @@ async def test_retrieve_propagates_engine_error() -> None:
 
 
 async def test_index_fans_out_to_every_engine_with_its_retriever_types() -> None:
-    keyword_engine = _FakeEngine(
-        RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS]
-    )
+    keyword_engine = _FakeEngine(RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS])
     vector_engine = _FakeEngine(RetrieverEngineType.QDRANT, [RetrieverType.VECTOR])
     composite = new_composite_retrieve_engine(
         _registry(keyword_engine, vector_engine),
@@ -418,9 +394,7 @@ async def test_index_fans_out_to_every_engine_with_its_retriever_types() -> None
 
     await composite.index(_CTX, _embedder(), index_info)
 
-    assert keyword_engine.calls == [
-        ("index", (index_info, (RetrieverType.KEYWORDS,)))
-    ]
+    assert keyword_engine.calls == [("index", (index_info, (RetrieverType.KEYWORDS,)))]
     assert vector_engine.calls == [("index", (index_info, (RetrieverType.VECTOR,)))]
 
 
@@ -439,15 +413,11 @@ async def test_batch_index_deduplicates_by_source_id() -> None:
     await composite.batch_index(_CTX, _embedder(), items)
 
     # Only the first occurrence of each source id is forwarded.
-    assert engine.calls == [
-        ("batch_index", (("s1", "s2"), (RetrieverType.KEYWORDS,)))
-    ]
+    assert engine.calls == [("batch_index", (("s1", "s2"), (RetrieverType.KEYWORDS,)))]
 
 
 async def test_write_ops_fan_out_to_every_engine() -> None:
-    keyword_engine = _FakeEngine(
-        RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS]
-    )
+    keyword_engine = _FakeEngine(RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS])
     vector_engine = _FakeEngine(RetrieverEngineType.QDRANT, [RetrieverType.VECTOR])
     composite = new_composite_retrieve_engine(
         _registry(keyword_engine, vector_engine),
@@ -505,9 +475,7 @@ def test_estimate_storage_size_sums_across_engines() -> None:
         [RetrieverType.KEYWORDS],
         estimate_size=10,
     )
-    engine_b = _FakeEngine(
-        RetrieverEngineType.QDRANT, [RetrieverType.VECTOR], estimate_size=20
-    )
+    engine_b = _FakeEngine(RetrieverEngineType.QDRANT, [RetrieverType.VECTOR], estimate_size=20)
     composite = new_composite_retrieve_engine(
         _registry(engine_a, engine_b),
         [

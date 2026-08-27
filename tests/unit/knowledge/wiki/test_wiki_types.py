@@ -1,6 +1,6 @@
 """Unit tests for wiki domain types and validation helpers."""
 
-# ruff: noqa: RUF001  # Chinese test data uses fullwidth punctuation.
+# Chinese test data uses fullwidth punctuation.
 
 from __future__ import annotations
 

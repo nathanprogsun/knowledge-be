@@ -142,9 +142,7 @@ def test_ingest_payload_parses_full() -> None:
 
 def test_ingest_payload_defaults_language() -> None:
     """``language`` is optional and defaults to empty."""
-    payload = WikiIngestPayload.model_validate(
-        {"tenant_id": 1, "knowledge_base_id": "kb-1"}
-    )
+    payload = WikiIngestPayload.model_validate({"tenant_id": 1, "knowledge_base_id": "kb-1"})
     assert payload.language == ""
 
 
@@ -177,9 +175,7 @@ def test_ingest_payload_rejects_missing_knowledge_base_id() -> None:
 
 def test_ingest_payload_is_frozen() -> None:
     """The payload model is immutable; mutations must raise."""
-    payload = WikiIngestPayload.model_validate(
-        {"tenant_id": 1, "knowledge_base_id": "kb-1"}
-    )
+    payload = WikiIngestPayload.model_validate({"tenant_id": 1, "knowledge_base_id": "kb-1"})
     with pytest.raises(ValidationError):
         payload.knowledge_base_id = "tampered"
 
@@ -203,9 +199,7 @@ def test_finalize_payload_parses_full() -> None:
 
 def test_finalize_payload_defaults_language() -> None:
     """``language`` is optional and defaults to empty."""
-    payload = WikiFinalizePayload.model_validate(
-        {"tenant_id": 1, "knowledge_base_id": "kb-1"}
-    )
+    payload = WikiFinalizePayload.model_validate({"tenant_id": 1, "knowledge_base_id": "kb-1"})
     assert payload.language == ""
 
 
@@ -238,9 +232,7 @@ def test_finalize_payload_rejects_missing_knowledge_base_id() -> None:
 
 def test_finalize_payload_is_frozen() -> None:
     """The payload model is immutable; mutations must raise."""
-    payload = WikiFinalizePayload.model_validate(
-        {"tenant_id": 1, "knowledge_base_id": "kb-1"}
-    )
+    payload = WikiFinalizePayload.model_validate({"tenant_id": 1, "knowledge_base_id": "kb-1"})
     with pytest.raises(ValidationError):
         payload.knowledge_base_id = "tampered"
 
@@ -465,14 +457,20 @@ def _restore_registry() -> Iterator[None]:
     that import the module leave the registration in place, but a
     future test that re-registers under the same name would silently
     overwrite it. The fixture is defensive — a no-op today.
+
+    Eagerly imports ``src.workers.tasks`` before snapshotting so the
+    first test in the session captures the canonical 19-task set
+    rather than an empty dict (tasks register at import time).
     """
+    import src.workers.tasks  # noqa: F401 — side effect: register all handlers
     from src.workers import registry as registry_module
 
-    snapshot = dict(registry_module.all_tasks())
+    baseline = dict(registry_module.all_tasks())
     yield
     # Restore the snapshot — drop any entries added during the test.
     current = registry_module.all_tasks()
-    for name in current.keys() - snapshot.keys():
-        current.pop(name, None)
-    for name, handler in snapshot.items():
+    for name in list(current.keys()):
+        if name not in baseline:
+            current.pop(name, None)
+    for name, handler in baseline.items():
         current[name] = handler

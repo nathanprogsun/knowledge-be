@@ -90,9 +90,7 @@ _MEMBER_ROLE_UPDATED_MESSAGE = "Member role updated successfully"
 _REVIEW_MESSAGE = "Review completed"
 _MEMBER_ADDED_MESSAGE = "Member added successfully"
 
-_VALID_ROLES: frozenset[str] = frozenset(
-    {ORG_ROLE_ADMIN, ORG_ROLE_EDITOR, ORG_ROLE_VIEWER}
-)
+_VALID_ROLES: frozenset[str] = frozenset({ORG_ROLE_ADMIN, ORG_ROLE_EDITOR, ORG_ROLE_VIEWER})
 
 
 class InviteMemberRequest(BaseModel):
@@ -175,9 +173,7 @@ async def _org_contract(
     members = await service.list_tenant_members(org_id=info.id)
     my_role: str | None = None
     try:
-        my_role = await service.get_tenant_role_in_org(
-            org_id=info.id, tenant_id=tenant_id
-        )
+        my_role = await service.get_tenant_role_in_org(org_id=info.id, tenant_id=tenant_id)
     except NotFoundError:
         my_role = None
     is_owner = _is_owner(info, tenant_id=tenant_id, user_id=user_id)
@@ -186,9 +182,7 @@ async def _org_contract(
         pending = await service.count_pending_join_requests(org_id=info.id)
     has_pending_upgrade = False
     try:
-        await service.get_pending_upgrade_request(
-            org_id=info.id, tenant_id=tenant_id
-        )
+        await service.get_pending_upgrade_request(org_id=info.id, tenant_id=tenant_id)
         has_pending_upgrade = True
     except NotFoundError:
         has_pending_upgrade = False
@@ -210,15 +204,11 @@ async def _org_envelope(
     user_id: str | None,
 ) -> OrganizationEnvelope:
     """Wrap one enriched organization in the success envelope."""
-    data = await _org_contract(
-        service=service, info=info, tenant_id=tenant_id, user_id=user_id
-    )
+    data = await _org_contract(service=service, info=info, tenant_id=tenant_id, user_id=user_id)
     return OrganizationEnvelope(success=True, data=data)
 
 
-async def _member_visible_org(
-    service: OrganizationService, org_id: str, tenant_id: int
-) -> None:
+async def _member_visible_org(service: OrganizationService, org_id: str, tenant_id: int) -> None:
     """Gate on membership: non-members of private orgs read as not-found.
 
     Mirrors the upstream visibility gate: a caller may read an org when
@@ -232,12 +222,10 @@ async def _member_visible_org(
             raise NotFoundError(
                 code="organization.not_found",
                 message="Organization not found",
-            )
+            ) from None
 
 
-async def _require_admin(
-    service: OrganizationService, org_id: str, tenant_id: int
-) -> None:
+async def _require_admin(service: OrganizationService, org_id: str, tenant_id: int) -> None:
     """Require the caller's workspace to hold the admin role in the org."""
     is_admin = await service.is_tenant_org_admin(org_id=org_id, tenant_id=tenant_id)
     if not is_admin:
@@ -247,9 +235,7 @@ async def _require_admin(
         )
 
 
-async def _is_member(
-    service: OrganizationService, org_id: str, tenant_id: int
-) -> bool:
+async def _is_member(service: OrganizationService, org_id: str, tenant_id: int) -> bool:
     """Whether the caller's workspace is already a member of the org."""
     try:
         await service.get_tenant_member(org_id=org_id, tenant_id=tenant_id)
@@ -282,9 +268,7 @@ async def create_organization(
         invite_code_validity_days=body.invite_code_validity_days,
         member_limit=body.member_limit,
     )
-    return await _org_envelope(
-        service=service, info=info, tenant_id=tenant_id, user_id=caller
-    )
+    return await _org_envelope(service=service, info=info, tenant_id=tenant_id, user_id=caller)
 
 
 @router.get("", response_model=OrganizationListEnvelope)
@@ -299,9 +283,7 @@ async def list_my_organizations(
     tenant_id = _require_tenant(tenant_id)
     infos = await service.list_tenant_organizations(tenant_id=tenant_id)
     items = [
-        await _org_contract(
-            service=service, info=info, tenant_id=tenant_id, user_id=user_id
-        )
+        await _org_contract(service=service, info=info, tenant_id=tenant_id, user_id=user_id)
         for info in infos
     ]
     return OrganizationListEnvelope(
@@ -323,9 +305,7 @@ async def search_organizations(
     tenant_id = _require_tenant(tenant_id)
     if limit <= 0 or limit > 100:
         limit = 20
-    infos = await service.search_searchable_organizations(
-        tenant_id=tenant_id, query=q, limit=limit
-    )
+    infos = await service.search_searchable_organizations(tenant_id=tenant_id, query=q, limit=limit)
     previews = []
     for info in infos:
         members = await service.list_tenant_members(org_id=info.id)
@@ -375,9 +355,7 @@ async def join_by_invite_code(
         user_id=caller,
         tenant_id=tenant_id,
     )
-    return await _org_envelope(
-        service=service, info=info, tenant_id=tenant_id, user_id=caller
-    )
+    return await _org_envelope(service=service, info=info, tenant_id=tenant_id, user_id=caller)
 
 
 @router.post("/join-request", response_model=JoinRequestEnvelope)
@@ -436,9 +414,7 @@ async def join_by_organization_id(
         message=body.message or "",
         requested_role=body.role or "",
     )
-    return await _org_envelope(
-        service=service, info=info, tenant_id=tenant_id, user_id=caller
-    )
+    return await _org_envelope(service=service, info=info, tenant_id=tenant_id, user_id=caller)
 
 
 @router.get("/{id}", response_model=OrganizationEnvelope)
@@ -454,9 +430,7 @@ async def get_organization(
     tenant_id = _require_tenant(tenant_id)
     await _member_visible_org(service, id, tenant_id)
     info = await service.get_organization(id=id)
-    return await _org_envelope(
-        service=service, info=info, tenant_id=tenant_id, user_id=user_id
-    )
+    return await _org_envelope(service=service, info=info, tenant_id=tenant_id, user_id=user_id)
 
 
 @router.put("/{id}", response_model=OrganizationEnvelope)
@@ -484,9 +458,7 @@ async def update_organization(
         invite_code_validity_days=body.invite_code_validity_days,
         member_limit=body.member_limit,
     )
-    return await _org_envelope(
-        service=service, info=info, tenant_id=tenant_id, user_id=caller
-    )
+    return await _org_envelope(service=service, info=info, tenant_id=tenant_id, user_id=caller)
 
 
 @router.delete("/{id}", response_model=SimpleAckResponse)
@@ -719,9 +691,7 @@ async def _search_tenant_candidates(
         limit = 10
     existing_members = await service.list_tenant_members(org_id=org_id)
     existing_ids = {m.tenant_id for m in existing_members}
-    tenants, _ = await tenant_service.search_tenants(
-        keyword=query, page=0, page_size=limit * 2
-    )
+    tenants, _ = await tenant_service.search_tenants(keyword=query, page=0, page_size=limit * 2)
     ordered: list[int] = []
     present: set[int] = set()
     for t in tenants:
@@ -819,7 +789,7 @@ async def invite_member(
             raise NotFoundError(
                 code="organization.tenant_not_found",
                 message="Workspace not found",
-            )
+            ) from None
         if not representative_user_id:
             representative_user_id = body.user_id
     elif body.user_id:

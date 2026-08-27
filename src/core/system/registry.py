@@ -24,7 +24,6 @@ copy operators see in the Go deployment. RUF001/002/003 flag the
 full-width punctuation as ambiguous; suppressed file-wide because
 every description carries it.
 """
-# ruff: noqa: RUF001
 
 from __future__ import annotations
 
@@ -77,7 +76,7 @@ _REGISTRY: Final[dict[str, SettingSpec]] = {
     ),
     "auth.default_tenant_mode": SettingSpec(
         value_type="string",
-        env_name="WEKNORA_AUTH_DEFAULT_TENANT_MODE",
+        env_name="KB_AUTH_DEFAULT_TENANT_MODE",
         default="create_personal",
         enum=("create_personal", "tenantless"),
         category="auth",
@@ -88,7 +87,7 @@ _REGISTRY: Final[dict[str, SettingSpec]] = {
     ),
     "tenant.max_owned_per_user": SettingSpec(
         value_type="int",
-        env_name="WEKNORA_TENANT_MAX_OWNED_PER_USER",
+        env_name="KB_TENANT_MAX_OWNED_PER_USER",
         default=10,
         category="tenant",
         description=(
@@ -98,7 +97,7 @@ _REGISTRY: Final[dict[str, SettingSpec]] = {
     ),
     "tenant.self_service_creation_enabled": SettingSpec(
         value_type="bool",
-        env_name="WEKNORA_TENANT_SELF_SERVICE_CREATION_ENABLED",
+        env_name="KB_TENANT_SELF_SERVICE_CREATION_ENABLED",
         default=True,
         category="tenant",
         description=(
@@ -108,7 +107,7 @@ _REGISTRY: Final[dict[str, SettingSpec]] = {
     ),
     "tenant.default_storage_quota_gb": SettingSpec(
         value_type="int",
-        env_name="WEKNORA_TENANT_DEFAULT_STORAGE_QUOTA_GB",
+        env_name="KB_TENANT_DEFAULT_STORAGE_QUOTA_GB",
         default=10,
         category="tenant",
         description=(
@@ -119,7 +118,7 @@ _REGISTRY: Final[dict[str, SettingSpec]] = {
     ),
     "tenant.auto_create_api_key": SettingSpec(
         value_type="bool",
-        env_name="WEKNORA_TENANT_AUTO_CREATE_API_KEY",
+        env_name="KB_TENANT_AUTO_CREATE_API_KEY",
         default=False,
         category="tenant",
         description=(
@@ -130,7 +129,7 @@ _REGISTRY: Final[dict[str, SettingSpec]] = {
     ),
     "asynq.core_concurrency": SettingSpec(
         value_type="int",
-        env_name="WEKNORA_ASYNQ_CORE_CONCURRENCY",
+        env_name="KB_ASYNQ_CORE_CONCURRENCY",
         default=4,
         category="worker",
         requires_restart=True,
@@ -138,7 +137,7 @@ _REGISTRY: Final[dict[str, SettingSpec]] = {
     ),
     "asynq.postprocess_concurrency": SettingSpec(
         value_type="int",
-        env_name="WEKNORA_ASYNQ_POSTPROCESS_CONCURRENCY",
+        env_name="KB_ASYNQ_POSTPROCESS_CONCURRENCY",
         default=2,
         category="worker",
         requires_restart=True,
@@ -146,7 +145,7 @@ _REGISTRY: Final[dict[str, SettingSpec]] = {
     ),
     "asynq.enrichment_concurrency": SettingSpec(
         value_type="int",
-        env_name="WEKNORA_ASYNQ_ENRICHMENT_CONCURRENCY",
+        env_name="KB_ASYNQ_ENRICHMENT_CONCURRENCY",
         default=2,
         category="worker",
         requires_restart=True,
@@ -154,7 +153,7 @@ _REGISTRY: Final[dict[str, SettingSpec]] = {
     ),
     "asynq.maintenance_concurrency": SettingSpec(
         value_type="int",
-        env_name="WEKNORA_ASYNQ_MAINTENANCE_CONCURRENCY",
+        env_name="KB_ASYNQ_MAINTENANCE_CONCURRENCY",
         default=1,
         category="worker",
         requires_restart=True,
@@ -162,7 +161,7 @@ _REGISTRY: Final[dict[str, SettingSpec]] = {
     ),
     "asynq.shared_concurrency": SettingSpec(
         value_type="int",
-        env_name="WEKNORA_ASYNQ_SHARED_CONCURRENCY",
+        env_name="KB_ASYNQ_SHARED_CONCURRENCY",
         default=4,
         category="worker",
         requires_restart=True,
@@ -170,7 +169,7 @@ _REGISTRY: Final[dict[str, SettingSpec]] = {
     ),
     "asynq.wiki_concurrency": SettingSpec(
         value_type="int",
-        env_name="WEKNORA_WIKI_ASYNQ_CONCURRENCY",
+        env_name="KB_WIKI_ASYNQ_CONCURRENCY",
         default=8,
         category="worker",
         requires_restart=True,
@@ -182,7 +181,7 @@ _REGISTRY: Final[dict[str, SettingSpec]] = {
     ),
     "model.max_concurrency": SettingSpec(
         value_type="int",
-        env_name="WEKNORA_MODEL_MAX_CONCURRENCY",
+        env_name="KB_MODEL_MAX_CONCURRENCY",
         default=32,
         category="worker",
         description=(

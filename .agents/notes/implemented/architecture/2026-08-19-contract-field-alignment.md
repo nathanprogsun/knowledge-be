@@ -1,8 +1,10 @@
 # Agent Note: HTTP contract field alignment
 
 Status: implemented
+Tags: contracts, pagination, errors, http
 Date: 2026-08-19
 Scope: wire shapes for pagination and application errors
+Related files: src/common/pagination.py, src/common/exception.py, scripts/check_pr_leak.py
 
 ## Context
 

@@ -12,6 +12,8 @@ import pytest
 
 from src.core.system.parser_engine import (
     BUILTIN_ENGINE_NAME,
+    KB_CLOUD_APP_ID_OVERRIDE,
+    KB_CLOUD_ENGINE_NAME,
     LOCAL_PARSER_ENGINES,
     MINERU_API_KEY_OVERRIDE,
     MINERU_CLOUD_ENGINE_NAME,
@@ -22,8 +24,6 @@ from src.core.system.parser_engine import (
     PADDLEOCR_VL_ENDPOINT_OVERRIDE,
     PADDLEOCR_VL_ENGINE_NAME,
     SIMPLE_ENGINE_NAME,
-    WEKNORA_CLOUD_APP_ID_OVERRIDE,
-    WEKNORA_CLOUD_ENGINE_NAME,
     ParserEngineInfo,
     list_all_engines,
     local_engine_names,
@@ -50,7 +50,7 @@ def test_local_engine_names_match_the_go_registration_order() -> None:
     assert names == [
         BUILTIN_ENGINE_NAME,
         SIMPLE_ENGINE_NAME,
-        WEKNORA_CLOUD_ENGINE_NAME,
+        KB_CLOUD_ENGINE_NAME,
         MINERU_ENGINE_NAME,
         MINERU_CLOUD_ENGINE_NAME,
         PADDLEOCR_VL_ENGINE_NAME,
@@ -106,19 +106,19 @@ def test_builtin_engine_is_available_when_docreader_is_connected() -> None:
     assert engines[BUILTIN_ENGINE_NAME].unavailable_reason == ""
 
 
-def test_weknoracloud_engine_needs_an_app_id_override() -> None:
+def test_cloud_engine_needs_an_app_id_override() -> None:
     # Arrange / Act
     without = {e.name: e for e in list_all_engines()}
     with_creds = {
-        e.name: e for e in list_all_engines(overrides={WEKNORA_CLOUD_APP_ID_OVERRIDE: "app-123"})
+        e.name: e for e in list_all_engines(overrides={KB_CLOUD_APP_ID_OVERRIDE: "app-123"})
     }
 
     # Assert
-    assert without[WEKNORA_CLOUD_ENGINE_NAME].available is False
-    assert "WeKnora Cloud credentials not configured" in (
-        without[WEKNORA_CLOUD_ENGINE_NAME].unavailable_reason
+    assert without[KB_CLOUD_ENGINE_NAME].available is False
+    assert "Knowledge Base Cloud credentials not configured" in (
+        without[KB_CLOUD_ENGINE_NAME].unavailable_reason
     )
-    assert with_creds[WEKNORA_CLOUD_ENGINE_NAME].available is True
+    assert with_creds[KB_CLOUD_ENGINE_NAME].available is True
 
 
 @pytest.mark.parametrize(

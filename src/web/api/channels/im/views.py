@@ -492,9 +492,9 @@ async def _build_callback_request(request: Request) -> CallbackRequest:
     """Capture the raw request parts the adapters interpret."""
     body_bytes = await request.body()
     return CallbackRequest(
-        headers={key: value for key, value in request.headers.items()},
+        headers=dict(request.headers.items()),
         body=body_bytes.decode("utf-8", errors="replace"),
-        query={key: value for key, value in request.query_params.items()},
+        query=dict(request.query_params.items()),
     )
 
 

@@ -1,4 +1,4 @@
-# ruff: noqa: RUF001  # Chinese API messages use fullwidth punctuation.
+# Chinese API messages use fullwidth punctuation.
 
 """Tag service — knowledge-base scoped tag operations.
 

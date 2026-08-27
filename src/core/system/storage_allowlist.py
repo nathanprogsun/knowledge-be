@@ -57,14 +57,14 @@ _SEPARATOR_PATTERN: Final = re.compile(r"[,;|\n\t ]+")
 # byte-for-byte from Go (fullwidth punctuation included), so the ruff
 # ambiguous-character rule is suppressed rather than the text altered.
 STORAGE_PROVIDER_DESCRIPTIONS: Final[dict[str, str]] = {
-    "local": "本地文件系统存储，仅适合单机部署",  # noqa: RUF001
-    "minio": "S3 兼容的自托管对象存储，适合内网和私有云部署",  # noqa: RUF001
-    "cos": "腾讯云对象存储服务，适合公有云部署，支持 CDN 加速",  # noqa: RUF001
-    "tos": "火山引擎对象存储服务，适合公有云部署",  # noqa: RUF001
-    "s3": "AWS S3 与兼容对象存储服务，适合公有云与混合云部署",  # noqa: RUF001
-    "oss": "阿里云对象存储服务，适合公有云部署，支持 S3 兼容协议",  # noqa: RUF001
-    "ks3": "金山云对象存储服务，适合公有云部署",  # noqa: RUF001
-    "obs": "华为云对象存储服务，适合公有云部署",  # noqa: RUF001
+    "local": "本地文件系统存储，仅适合单机部署",
+    "minio": "S3 兼容的自托管对象存储，适合内网和私有云部署",
+    "cos": "腾讯云对象存储服务，适合公有云部署，支持 CDN 加速",
+    "tos": "火山引擎对象存储服务，适合公有云部署",
+    "s3": "AWS S3 与兼容对象存储服务，适合公有云与混合云部署",
+    "oss": "阿里云对象存储服务，适合公有云部署，支持 S3 兼容协议",
+    "ks3": "金山云对象存储服务，适合公有云部署",
+    "obs": "华为云对象存储服务，适合公有云部署",
 }
 
 # ``local`` needs no configuration, so Go hard-codes ``Available: true``.

@@ -236,7 +236,7 @@ class DataSourceInfo(BaseModel):
         return cls.model_validate(record)
 
 
-def parse_config(raw: JsonObject | None | str) -> DataSourceConfig | None:
+def parse_config(raw: JsonObject | str | None) -> DataSourceConfig | None:
     """Decode a stored ``config`` blob — ``DataSource.ParseConfig``.
 
     Returns ``None`` for an absent/empty blob so callers can distinguish

@@ -1,4 +1,4 @@
-# ruff: noqa: RUF001  # Chinese API messages use fullwidth punctuation.
+# Chinese API messages use fullwidth punctuation.
 
 """Create a knowledge entry from a URL source.
 

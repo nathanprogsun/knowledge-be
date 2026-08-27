@@ -190,13 +190,9 @@ async def _generate_for_chunk(
     if prev_content or next_content:
         context_section = "<surrounding_context>\n"
         if prev_content:
-            context_section += (
-                f"<preceding_content>\n{prev_content}\n\n</preceding_content>\n\n"
-            )
+            context_section += f"<preceding_content>\n{prev_content}\n\n</preceding_content>\n\n"
         if next_content:
-            context_section += (
-                f"<following_content>\n{next_content}\n\n</following_content>\n\n"
-            )
+            context_section += f"<following_content>\n{next_content}\n\n</following_content>\n\n"
         context_section += "</surrounding_context>\n\n"
     rendered = render_placeholders(
         prompt,

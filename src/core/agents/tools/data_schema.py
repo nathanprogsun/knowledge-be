@@ -133,9 +133,7 @@ class SqlSchemaChunkStore:
                 limit=limit,
             )
         )
-        return [
-            _chunk_from_mapping(mapping) for mapping in rows_result.mappings().all()
-        ]
+        return [_chunk_from_mapping(mapping) for mapping in rows_result.mappings().all()]
 
 
 def _chunk_from_mapping(mapping: RowMapping) -> Chunk:
@@ -252,9 +250,7 @@ class DataSchemaTool:
         try:
             return await self._knowledge_service.get_document_by_id_only(id=knowledge_id)
         except Exception as exc:
-            logger.warning(
-                "[Tool][DataSchema] Failed to get knowledge '%s': %s", knowledge_id, exc
-            )
+            logger.warning("[Tool][DataSchema] Failed to get knowledge '%s': %s", knowledge_id, exc)
             return None
 
 

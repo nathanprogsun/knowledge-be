@@ -226,7 +226,9 @@ class WikiFlagIssueTool:
         slug = normalized_slug
 
         if not self._kb_ids:
-            return ToolResult(success=False, error="No knowledge bases available for issue tracking")
+            return ToolResult(
+                success=False, error="No knowledge bases available for issue tracking"
+            )
 
         try:
             page, kb_id = await resolve_unique_wiki_page(
@@ -241,7 +243,9 @@ class WikiFlagIssueTool:
                     ctx, self._search_targets, suspected, self._knowledge_service
                 )
             except ApplicationError as exc:
-                return ToolResult(success=False, error=f"Invalid suspected_knowledge_ids: {exc.message}")
+                return ToolResult(
+                    success=False, error=f"Invalid suspected_knowledge_ids: {exc.message}"
+                )
             suspected = [ref.split("|", 1)[0] for ref in resolved]
 
         now = datetime.now(UTC)
@@ -322,7 +326,11 @@ class WikiReadIssueTool:
             except ApplicationError as exc:
                 return ToolResult(success=False, error=f"Failed to list issues: {exc.message}")
             for issue in kb_issues:
-                if issue is not None and issue.knowledge_base_id and issue.knowledge_base_id != kb_id:
+                if (
+                    issue is not None
+                    and issue.knowledge_base_id
+                    and issue.knowledge_base_id != kb_id
+                ):
                     return ToolResult(
                         success=False,
                         error=(

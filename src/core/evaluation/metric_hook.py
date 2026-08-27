@@ -432,8 +432,7 @@ def _compute_bleu(
     references = [_tokenize(metric_input.generated_gt)]
 
     precisions = [
-        _modified_precision(candidate, references, n, smoothing=True)
-        for n in range(1, 5)
+        _modified_precision(candidate, references, n, smoothing=True) for n in range(1, 5)
     ]
 
     overlap = 0

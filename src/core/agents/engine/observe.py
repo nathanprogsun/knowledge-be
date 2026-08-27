@@ -76,9 +76,7 @@ class ObservePhase:
             rendered = self._model_context.model_tool_result_for_tool(
                 tc.name, _to_model_output_result(result)
             )
-            out.append(
-                Message(role="tool", content=rendered, tool_call_id=tc.id, name=tc.name)
-            )
+            out.append(Message(role="tool", content=rendered, tool_call_id=tc.id, name=tc.name))
         return out
 
 

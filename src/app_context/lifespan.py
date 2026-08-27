@@ -37,6 +37,7 @@ from src.ai.mcp_transport import MCPConnectionManager
 from src.app_context.registry import LifeSpanService
 from src.app_logging import configure_logging, logger
 from src.common.oidc_client import OidcClient
+from src.common.telemetry import instrument_engine, is_file_exporter, is_tracing_enabled, setup_tracing
 from src.core.infra.mcp_services.oauth import (
     InMemorySecretStore,
     OAuthManager,
@@ -45,7 +46,9 @@ from src.core.infra.mcp_services.oauth import (
 from src.core.infra.mcp_services.types import MCPServiceInfo
 from src.core.infra.web_search.registry import build_web_search_client_registry
 from src.db.base import DatabaseEngine
+from src.db.dao.audit_log_repository import AuditLogRepository
 from src.settings import get_settings
+from src.workers.settings import get_worker_settings
 from src.web.api.agents.router import router as agents_router
 from src.web.api.agents.skill_views import skill_router as skills_router
 from src.web.api.auth.router import router as auth_router
@@ -72,6 +75,7 @@ from src.web.api.chat.messages.router import (
 )
 from src.web.api.chat.router import router as chat_router
 from src.web.api.chat.sessions.router import router as sessions_router
+from src.web.api.cloud.router import router as cloud_router
 from src.web.api.evaluation.router import router as evaluation_router
 from src.web.api.favorites.router import router as favorites_router
 from src.web.api.files.router import bare_files_router, kb_files_router
@@ -111,7 +115,6 @@ from src.web.api.system.router import info_router as system_info_router
 from src.web.api.system.router import router as system_router
 from src.web.api.system.service_views import router as system_service_router
 from src.web.api.tenants.router import router as tenants_router
-from src.web.api.weknoracloud.router import router as weknoracloud_router
 from src.web.exception_handler import register_exception_handlers
 
 
@@ -136,6 +139,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     if settings.db_conn_prewarm:
         await db_engine.prewarm()
+
+    # Tracing instruments the SQLAlchemy engine; the FastAPI/httpx side
+    # ran earlier in create_app (instrumenting from the lifespan is too
+    # late — uvicorn has already built the middleware stack).
+    instrument_engine(db_engine.engine)
 
     # APP-scope singleton: pooled httpx.AsyncClient underneath; shared
     # across requests so TCP/TLS connections to the IdP are reused.
@@ -217,6 +225,10 @@ def create_app() -> FastAPI:
 
     register_exception_handlers(application)
 
+    # OTel must instrument before the server builds the middleware stack;
+    # no-op unless OTEL_ENABLED is set.
+    setup_tracing(application)
+
     # All API routes live under /api/v1, matching the upstream contract
     # (the frontend and nginx proxy send /api/v1/... unchanged). /health
     # stays bare below for infra probes.
@@ -261,7 +273,7 @@ def create_app() -> FastAPI:
         system_service_router,
         tenants_router,
         vector_stores_router,
-        weknoracloud_router,
+        cloud_router,
         web_search_catalog_router,
         web_search_router,
         documents_router,
@@ -277,6 +289,59 @@ def create_app() -> FastAPI:
     @application.get("/health", tags=["meta"])
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @application.get("/api/v1/meta/capabilities", tags=["meta"])
+    async def capabilities() -> dict[str, str | int | bool | list[str]]:
+        """Self-describing capability manifest.
+
+        Agents and operators read this endpoint to discover which
+        routes exist, which feature flags are on, and which optional
+        services (OIDC, OTel, ARQ worker) are wired. Designed to be
+        cheap (no DB / no Redis) so it can be polled.
+        """
+        routes: set[str] = set()
+
+        def _walk(route_list: list, prefix: str = "") -> None:
+            for r in route_list:
+                path = getattr(r, "path", None)
+                methods = getattr(r, "methods", None)
+                # FastAPI's ``_IncludedRouter`` wraps every router passed
+                # to ``app.include_router`` and exposes its child routes
+                # via ``.original_router.routes``. The mount prefix
+                # (``include_context.prefix``) is what FastAPI prepends
+                # to child paths at serve time; merge it so the manifest
+                # reports the fully qualified path agents would call.
+                if type(r).__name__ == "_IncludedRouter":
+                    inner = getattr(r, "original_router", None)
+                    ic_prefix = ""
+                    ic = getattr(r, "include_context", None)
+                    if ic is not None:
+                        ic_prefix = getattr(ic, "prefix", "") or ""
+                    if inner is not None:
+                        _walk(list(getattr(inner, "routes", [])), prefix + ic_prefix)
+                    continue
+                child_routes = getattr(r, "routes", None)
+                if child_routes and not methods and isinstance(child_routes, list):
+                    _walk(child_routes, prefix + (path or ""))
+                    continue
+                if not methods or not path or not isinstance(methods, set):
+                    continue
+                cleaned = methods - {"HEAD", "OPTIONS"}
+                if not cleaned:
+                    continue
+                routes.add(f"{','.join(sorted(cleaned))} {prefix}{path}")
+
+        _walk(application.routes)
+        return {
+            "service": "knowledge-be",
+            "version": "0.2.0",
+            "api_prefix": api_v1_prefix,
+            "total_routes": len(routes),
+            "routes": sorted(routes),
+            "tracing_enabled": is_tracing_enabled(),
+            "file_exporter": is_file_exporter(),
+            "worker_configured": get_worker_settings().redis_url != "",
+        }
 
     return application
 

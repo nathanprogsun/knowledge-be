@@ -108,11 +108,7 @@ def _make_repo() -> tuple[AsyncMock, dict[str, KnowledgeBase]]:
 
     async def _list_by_tenant(tenant_id: int) -> list[KnowledgeBase]:
         return sorted(
-            (
-                r
-                for r in _live().values()
-                if r.tenant_id == tenant_id and not r.is_temporary
-            ),
+            (r for r in _live().values() if r.tenant_id == tenant_id and not r.is_temporary),
             key=lambda r: r.created_at,
             reverse=True,
         )
@@ -880,12 +876,8 @@ async def test_integration_copy_rejects_embedding_mismatch(session: AsyncSession
 async def test_integration_copy_rejects_vector_store_mismatch(session: AsyncSession) -> None:
     service = _service(session)
     tid = make_test_tenant_id()
-    source = await service.create_knowledge_base(
-        tenant_id=tid, name="docs", vector_store_id="vs-a"
-    )
-    target = await service.create_knowledge_base(
-        tenant_id=tid, name="tgt", vector_store_id="vs-b"
-    )
+    source = await service.create_knowledge_base(tenant_id=tid, name="docs", vector_store_id="vs-a")
+    target = await service.create_knowledge_base(tenant_id=tid, name="tgt", vector_store_id="vs-b")
     await session.commit()
 
     with pytest.raises(ValidationError) as excinfo:

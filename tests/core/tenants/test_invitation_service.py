@@ -14,10 +14,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from src.common.exception import (
-    ConflictError,
     NotFoundError,
-    PermissionDeniedError,
-    ValidationError,
 )
 from src.core.tenants.invitation_service import (
     TenantInvitationService,
@@ -27,8 +24,6 @@ from src.core.tenants.member_service import ROLE_OWNER, ROLE_VIEWER, TenantMembe
 from src.db.dao.tenant_invitations_repository import TenantInvitationRepository
 from src.db.dao.tenant_members_repository import TenantMemberRepository
 from src.db.models.tenants.tenant_invitations import (
-    STATUS_ACCEPTED,
-    STATUS_DECLINED,
     STATUS_EXPIRED,
     STATUS_PENDING,
     TenantInvitation,
@@ -148,9 +143,7 @@ def _make_invitations_repo() -> tuple[AsyncMock, dict[int, TenantInvitation]]:
         )
         return rs[offset : offset + limit] if limit is not None else rs
 
-    async def _count_by_tenant(
-        tenant_id: int, *, include_terminal: bool = False
-    ) -> int:
+    async def _count_by_tenant(tenant_id: int, *, include_terminal: bool = False) -> int:
         return len(
             _filtered(
                 [r for r in _live() if r.tenant_id == tenant_id],
@@ -284,9 +277,7 @@ def service(
     )
 
 
-def _expire(
-    rows: dict[int, TenantInvitation], invitation_id: int
-) -> None:
+def _expire(rows: dict[int, TenantInvitation], invitation_id: int) -> None:
     """Backdate a row's expiry so the next sweep flips it."""
     row = rows[invitation_id]
     rows[invitation_id] = row.model_copy(
@@ -334,9 +325,7 @@ class TestShareLinkInvitation(ServiceTest):
         self,
         service: TenantInvitationService,
     ) -> None:
-        invitation, token = await service.create_share_link(
-            tenant_id=_TENANT_ID, role=ROLE_VIEWER
-        )
+        invitation, token = await service.create_share_link(tenant_id=_TENANT_ID, role=ROLE_VIEWER)
 
         assert invitation.status == STATUS_PENDING
         assert invitation.invitee_user_id == ""
@@ -347,9 +336,7 @@ class TestShareLinkInvitation(ServiceTest):
         self,
         service: TenantInvitationService,
     ) -> None:
-        invitation, _ = await service.create_share_link(
-            tenant_id=_TENANT_ID, role=ROLE_VIEWER
-        )
+        invitation, _ = await service.create_share_link(tenant_id=_TENANT_ID, role=ROLE_VIEWER)
 
         assert "token" not in invitation.model_dump()
 
@@ -357,12 +344,8 @@ class TestShareLinkInvitation(ServiceTest):
         self,
         service: TenantInvitationService,
     ) -> None:
-        first, _ = await service.create_share_link(
-            tenant_id=_TENANT_ID, role=ROLE_VIEWER
-        )
-        second, _ = await service.create_share_link(
-            tenant_id=_TENANT_ID, role=ROLE_VIEWER
-        )
+        first, _ = await service.create_share_link(tenant_id=_TENANT_ID, role=ROLE_VIEWER)
+        second, _ = await service.create_share_link(tenant_id=_TENANT_ID, role=ROLE_VIEWER)
 
         assert first.id != second.id
 
@@ -370,9 +353,7 @@ class TestShareLinkInvitation(ServiceTest):
         self,
         service: TenantInvitationService,
     ) -> None:
-        created, token = await service.create_share_link(
-            tenant_id=_TENANT_ID, role=ROLE_VIEWER
-        )
+        created, token = await service.create_share_link(tenant_id=_TENANT_ID, role=ROLE_VIEWER)
 
         found = await service.lookup_by_token(f"  {token}  ")
 
@@ -393,9 +374,7 @@ class TestShareLinkInvitation(ServiceTest):
         service: TenantInvitationService,
         invitation_rows: dict[int, TenantInvitation],
     ) -> None:
-        created, token = await service.create_share_link(
-            tenant_id=_TENANT_ID, role=ROLE_VIEWER
-        )
+        created, token = await service.create_share_link(tenant_id=_TENANT_ID, role=ROLE_VIEWER)
         _expire(invitation_rows, created.id)
 
         with pytest.raises(NotFoundError):
@@ -406,9 +385,7 @@ class TestShareLinkInvitation(ServiceTest):
         service: TenantInvitationService,
         invitation_rows: dict[int, TenantInvitation],
     ) -> None:
-        created, token = await service.create_share_link(
-            tenant_id=_TENANT_ID, role=ROLE_VIEWER
-        )
+        created, token = await service.create_share_link(tenant_id=_TENANT_ID, role=ROLE_VIEWER)
 
         member = await service.accept_by_token(token, user_id="usr-new")
 
@@ -423,9 +400,7 @@ class TestShareLinkInvitation(ServiceTest):
         service: TenantInvitationService,
         invitation_rows: dict[int, TenantInvitation],
     ) -> None:
-        created, token = await service.create_share_link(
-            tenant_id=_TENANT_ID, role=ROLE_VIEWER
-        )
+        created, token = await service.create_share_link(tenant_id=_TENANT_ID, role=ROLE_VIEWER)
 
         await service.accept_by_token(token, user_id="usr-a")
         await service.accept_by_token(token, user_id="usr-b")
@@ -437,9 +412,7 @@ class TestShareLinkInvitation(ServiceTest):
         service: TenantInvitationService,
         member_service: TenantMemberService,
     ) -> None:
-        _, token = await service.create_share_link(
-            tenant_id=_TENANT_ID, role=ROLE_VIEWER
-        )
+        _, token = await service.create_share_link(tenant_id=_TENANT_ID, role=ROLE_VIEWER)
         await service.accept_by_token(token, user_id="usr-a")
         await member_service.update_role(
             user_id="usr-a",

@@ -335,9 +335,7 @@ class OrganizationService:
         _require_org_id(id)
         _require_user_id(operator_user_id)
         _require_tenant_id(operator_tenant_id)
-        is_admin = await self.is_tenant_org_admin(
-            org_id=id, tenant_id=operator_tenant_id
-        )
+        is_admin = await self.is_tenant_org_admin(org_id=id, tenant_id=operator_tenant_id)
         if not is_admin:
             raise self._permission_denied(
                 "operator tenant is not an admin of this organization",
@@ -359,9 +357,7 @@ class OrganizationService:
         if searchable is not None:
             updates["searchable"] = searchable
         if invite_code_validity_days is not None:
-            updates["invite_code_validity_days"] = _require_validity_days(
-                invite_code_validity_days
-            )
+            updates["invite_code_validity_days"] = _require_validity_days(invite_code_validity_days)
         if member_limit is not None:
             limit = _require_member_limit(member_limit)
             if limit > 0:
@@ -399,12 +395,10 @@ class OrganizationService:
             raise self._not_found(id)
 
         is_owner_tenant = (
-            existing.owner_tenant_id != 0
-            and existing.owner_tenant_id == operator_tenant_id
+            existing.owner_tenant_id != 0 and existing.owner_tenant_id == operator_tenant_id
         )
         is_legacy_owner_user = (
-            existing.owner_tenant_id == 0
-            and existing.owner_id == operator_user_id
+            existing.owner_tenant_id == 0 and existing.owner_id == operator_user_id
         )
         if not is_owner_tenant and not is_legacy_owner_user:
             raise self._permission_denied(
@@ -426,9 +420,7 @@ class OrganizationService:
         _require_org_id(org_id)
         _require_user_id(operator_user_id)
         _require_tenant_id(operator_tenant_id)
-        is_admin = await self.is_tenant_org_admin(
-            org_id=org_id, tenant_id=operator_tenant_id
-        )
+        is_admin = await self.is_tenant_org_admin(org_id=org_id, tenant_id=operator_tenant_id)
         if not is_admin:
             raise self._permission_denied(
                 "operator tenant is not an admin of this organization",
@@ -527,17 +519,13 @@ class OrganizationService:
             )
 
         if operator_tenant_id != member_tenant_id:
-            is_admin = await self.is_tenant_org_admin(
-                org_id=org_id, tenant_id=operator_tenant_id
-            )
+            is_admin = await self.is_tenant_org_admin(org_id=org_id, tenant_id=operator_tenant_id)
             if not is_admin:
                 raise self._permission_denied(
                     "operator tenant is not an admin of this organization",
                 )
 
-        await self._member_repo.remove_member(
-            organization_id=org_id, tenant_id=member_tenant_id
-        )
+        await self._member_repo.remove_member(organization_id=org_id, tenant_id=member_tenant_id)
 
     async def update_tenant_member_role(
         self,
@@ -554,9 +542,7 @@ class OrganizationService:
         required_role = _require_role(role)
         _require_user_id(operator_user_id)
         _require_tenant_id(operator_tenant_id)
-        is_admin = await self.is_tenant_org_admin(
-            org_id=org_id, tenant_id=operator_tenant_id
-        )
+        is_admin = await self.is_tenant_org_admin(org_id=org_id, tenant_id=operator_tenant_id)
         if not is_admin:
             raise self._permission_denied(
                 "operator tenant is not an admin of this organization",
@@ -604,9 +590,7 @@ class OrganizationService:
         """Return one (org, tenant) membership, or raise ``NotFoundError``."""
         _require_org_id(org_id)
         _require_tenant_id(tenant_id)
-        row = await self._member_repo.get_member(
-            organization_id=org_id, tenant_id=tenant_id
-        )
+        row = await self._member_repo.get_member(organization_id=org_id, tenant_id=tenant_id)
         if row is None:
             raise self._not_member(tenant_id)
         return OrganizationMemberInfo.map_from_db(row)
@@ -620,9 +604,7 @@ class OrganizationService:
         """Return whether ``tenant_id`` holds the admin role in ``org_id``."""
         _require_org_id(org_id)
         _require_tenant_id(tenant_id)
-        member = await self._member_repo.get_member(
-            organization_id=org_id, tenant_id=tenant_id
-        )
+        member = await self._member_repo.get_member(organization_id=org_id, tenant_id=tenant_id)
         if member is None:
             return False
         return member.role == ORG_ROLE_ADMIN
@@ -636,9 +618,7 @@ class OrganizationService:
         """Return the tenant's role in the org; ``NotFoundError`` if absent."""
         _require_org_id(org_id)
         _require_tenant_id(tenant_id)
-        member = await self._member_repo.get_member(
-            organization_id=org_id, tenant_id=tenant_id
-        )
+        member = await self._member_repo.get_member(organization_id=org_id, tenant_id=tenant_id)
         if member is None:
             raise self._not_member(tenant_id)
         return member.role
@@ -695,9 +675,7 @@ class OrganizationService:
                 "organization is not open for searchable join",
             )
 
-        existing = await self._member_repo.get_member(
-            organization_id=org_id, tenant_id=tenant_id
-        )
+        existing = await self._member_repo.get_member(organization_id=org_id, tenant_id=tenant_id)
         if existing is not None:
             return OrganizationInfo.map_from_db(org)
 
@@ -725,9 +703,7 @@ class OrganizationService:
         representative_user_id: str,
     ) -> None:
         """Idempotent viewer-enrolment; enforces the member limit."""
-        existing = await self._member_repo.get_member(
-            organization_id=org_id, tenant_id=tenant_id
-        )
+        existing = await self._member_repo.get_member(organization_id=org_id, tenant_id=tenant_id)
         if existing is not None:
             return
         org = await self._org_repo.get_by_id_or_none(org_id)
@@ -830,9 +806,7 @@ class OrganizationService:
                 code="organization.join_request_status_invalid",
                 message=f"invalid join-request status: {status}",
             )
-        rows = await self._join_request_repo.list_join_requests(
-            org_id, status=status
-        )
+        rows = await self._join_request_repo.list_join_requests(org_id, status=status)
         return [OrganizationJoinRequestInfo.map_from_db(row) for row in rows]
 
     async def count_pending_join_requests(self, *, org_id: str) -> int:
@@ -900,9 +874,7 @@ class OrganizationService:
                 if org is None:
                     raise self._not_found(request.organization_id)
                 if org.member_limit > 0:
-                    count = await self._member_repo.count_members(
-                        request.organization_id
-                    )
+                    count = await self._member_repo.count_members(request.organization_id)
                     if count >= org.member_limit:
                         raise ConflictError(
                             code="organization.member_limit_reached",
@@ -973,9 +945,7 @@ class OrganizationService:
         _require_org_id(org_id)
         required_role = _require_role(requested_role)
 
-        member = await self._member_repo.get_member(
-            organization_id=org_id, tenant_id=tenant_id
-        )
+        member = await self._member_repo.get_member(organization_id=org_id, tenant_id=tenant_id)
         if member is None:
             raise self._not_member(tenant_id)
         if member.role == ORG_ROLE_ADMIN:
@@ -983,10 +953,7 @@ class OrganizationService:
                 code="organization.already_admin",
                 message="tenant is already an admin",
             )
-        if (
-            not has_org_permission(required_role, member.role)
-            or required_role == member.role
-        ):
+        if not has_org_permission(required_role, member.role) or required_role == member.role:
             raise ConflictError(
                 code="organization.upgrade_to_same_or_lower_role",
                 message="cannot request upgrade to same or lower role",
@@ -1121,6 +1088,6 @@ __all__ = [
     "ORG_ROLE_ADMIN",
     "ORG_ROLE_EDITOR",
     "ORG_ROLE_VIEWER",
-    "OrganizationService",
     "VALID_INVITE_CODE_VALIDITY_DAYS",
+    "OrganizationService",
 ]

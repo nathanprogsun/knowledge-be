@@ -76,9 +76,7 @@ class DataAnalysisTool(Protocol):
 class KnowledgeService(Protocol):
     """Resolves a knowledge document by id for data analysis."""
 
-    async def get_knowledge_by_id(
-        self, ctx: Context, knowledge_id: str
-    ) -> Knowledge | None: ...
+    async def get_knowledge_by_id(self, ctx: Context, knowledge_id: str) -> Knowledge | None: ...
 
 
 class DataAnalysisStep:
@@ -119,9 +117,7 @@ class DataAnalysisStep:
         # Only the first data file is processed for now to keep the turn bounded.
         target = data_files[0]
         try:
-            knowledge = await self._knowledge_service.get_knowledge_by_id(
-                ctx, target.knowledge_id
-            )
+            knowledge = await self._knowledge_service.get_knowledge_by_id(ctx, target.knowledge_id)
         except Exception as exc:
             pipeline_error(
                 "DataAnalysis",

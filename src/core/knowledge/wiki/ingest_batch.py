@@ -112,7 +112,7 @@ def has_sufficient_text_content(content: str) -> bool:
 
 
 #: Headline prefixes the summariser emits (half- and full-width colon).
-_SUMMARY_PREFIXES: tuple[str, ...] = ("SUMMARY:", "SUMMARY：")  # noqa: RUF001
+_SUMMARY_PREFIXES: tuple[str, ...] = ("SUMMARY:", "SUMMARY：")
 
 
 def split_summary_line(raw: str) -> tuple[str, str]:
@@ -279,9 +279,7 @@ async def _chunk_and_persist(
             )
         )
     rows = [
-        row.model_copy(update={"next_chunk_id": rows[i + 1].id})
-        if i < len(rows) - 1
-        else row
+        row.model_copy(update={"next_chunk_id": rows[i + 1].id}) if i < len(rows) - 1 else row
         for i, row in enumerate(rows)
     ]
     await deps.chunk_store.delete_by_knowledge_id(
@@ -666,9 +664,7 @@ async def reduce_slug_updates(
             return False, "", False
         page = _new_page(tenant_id=tenant_id, knowledge_base_id=knowledge_base_id, slug=slug)
 
-    summary_update = next(
-        (u for u in live_updates if u.type == WIKI_PAGE_TYPE_SUMMARY), None
-    )
+    summary_update = next((u for u in live_updates if u.type == WIKI_PAGE_TYPE_SUMMARY), None)
     retracts = [
         u for u in live_updates if u.type in (WIKI_UPDATE_RETRACT, WIKI_UPDATE_RETRACT_STALE)
     ]
@@ -691,9 +687,7 @@ async def reduce_slug_updates(
 
     if retracts:
         if not page.source_refs:
-            await deps.page_service.delete_page(
-                knowledge_base_id=knowledge_base_id, slug=slug
-            )
+            await deps.page_service.delete_page(knowledge_base_id=knowledge_base_id, slug=slug)
             return True, "retract", False
         await deps.page_service.update_page_meta(page=page)
         return True, "retract", False
@@ -744,9 +738,7 @@ def _apply_summary(page: WikiPage, update: WikiSlugUpdate) -> WikiPage:
 
 def _strip_retracted_refs(page: WikiPage, retracts: list[WikiSlugUpdate]) -> WikiPage:
     retract_kids = {r.knowledge_id for r in retracts if r.knowledge_id}
-    new_refs = [
-        ref for ref in page.source_refs if _ref_knowledge_id(ref) not in retract_kids
-    ]
+    new_refs = [ref for ref in page.source_refs if _ref_knowledge_id(ref) not in retract_kids]
     return page.model_copy(update={"source_refs": new_refs})
 
 
@@ -822,9 +814,7 @@ async def process_wiki_ingest_batch(
     nothing still reports ``follow_up_scheduled`` based on the remaining
     queue depth so the worker layer can chain the next drain.
     """
-    ops = await deps.pending_store.peek(
-        knowledge_base_id=knowledge_base_id, limit=max_docs
-    )
+    ops = await deps.pending_store.peek(knowledge_base_id=knowledge_base_id, limit=max_docs)
     if not ops:
         return WikiBatchOutcome(
             pending_ops=0,
@@ -913,9 +903,7 @@ async def process_wiki_ingest_batch(
         max_fail_retries=max_fail_retries,
     )
 
-    remaining = await deps.pending_store.pending_count(
-        knowledge_base_id=knowledge_base_id
-    )
+    remaining = await deps.pending_store.pending_count(knowledge_base_id=knowledge_base_id)
     return WikiBatchOutcome(
         pending_ops=len(ops),
         ingest_succeeded=ingest_succeeded,
@@ -929,13 +917,9 @@ async def process_wiki_ingest_batch(
 async def _load_existing_pages(
     ctx: Context, deps: WikiIngestDeps, knowledge_base_id: str
 ) -> list[WikiPage]:
-    pages = await deps.page_service.list_all_pages(
-        knowledge_base_id=knowledge_base_id
-    )
+    pages = await deps.page_service.list_all_pages(knowledge_base_id=knowledge_base_id)
     return [
-        page
-        for page in pages
-        if page.page_type in (WIKI_PAGE_TYPE_ENTITY, WIKI_PAGE_TYPE_CONCEPT)
+        page for page in pages if page.page_type in (WIKI_PAGE_TYPE_ENTITY, WIKI_PAGE_TYPE_CONCEPT)
     ]
 
 
@@ -971,9 +955,7 @@ async def _settle_queue(
                 knowledge_base_id=knowledge_base_id,
                 op=op,
                 fail_count=count,
-                last_error=(
-                    f"exceeded max_fail_retries={max_fail_retries} (in-batch retries)"
-                ),
+                last_error=(f"exceeded max_fail_retries={max_fail_retries} (in-batch retries)"),
             )
             await deps.pending_store.delete_by_ids([op.row_id])
             await _settle_document_terminal(ctx, deps, tenant_id, op.knowledge_id, failed=True)

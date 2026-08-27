@@ -32,6 +32,7 @@ from src.ai.provider.predicates import (
 from src.ai.provider.registry import (
     PROVIDER_ALIYUN,
     PROVIDER_AZURE_OPENAI,
+    PROVIDER_CLOUD,
     PROVIDER_DEEPSEEK,
     PROVIDER_GEMINI,
     PROVIDER_GENERIC,
@@ -40,7 +41,6 @@ from src.ai.provider.registry import (
     PROVIDER_NVIDIA,
     PROVIDER_OPENAI,
     PROVIDER_VOLCENGINE,
-    PROVIDER_WEKNORACLOUD,
 )
 from src.ai.utils.signer import sign_request
 from src.common.json import JsonObject, JsonValue
@@ -111,11 +111,11 @@ class ProviderAdapter:
         """Write provider state back into an outbound tool_call object."""
 
 
-class WeKnoraCloudProvider(ProviderAdapter):
+class CloudProvider(ProviderAdapter):
     """Managed cloud: custom endpoint + request signing + multi-content downgrade."""
 
     def name(self) -> str:
-        return PROVIDER_WEKNORACLOUD
+        return PROVIDER_CLOUD
 
     def endpoint(self, base_url: str, model_id: str, is_stream: bool) -> str:
         return base_url.rstrip("/") + "/api/v1/chat/completions"
@@ -125,9 +125,7 @@ class WeKnoraCloudProvider(ProviderAdapter):
 
     def auth_headers(self, creds: AuthCreds, body: bytes) -> dict[str, str]:
         request_id = str(uuid.uuid4())
-        return sign_request(
-            creds.app_id, creds.app_secret, request_id, body.decode("utf-8")
-        )
+        return sign_request(creds.app_id, creds.app_secret, request_id, body.decode("utf-8"))
 
     def transform_messages(self, messages: list[JsonObject]) -> list[JsonObject]:
         """Downgrade multi-content to plain text, preserving tool protocol fields."""
@@ -329,7 +327,7 @@ def shape_openai_reasoning(req: JsonObject) -> None:
 
 #: Ordered registry: specific adapters precede the generic catch-all.
 PROVIDER_REGISTRY: list[ProviderAdapter] = [
-    WeKnoraCloudProvider(),
+    CloudProvider(),
     QwenThinkingProvider(),
     LkeapProvider(),
     DeepseekProvider(),
@@ -357,6 +355,7 @@ __all__ = [
     "AuthCreds",
     "AzureProvider",
     "AzureReasoningProvider",
+    "CloudProvider",
     "DeepseekProvider",
     "GeminiProvider",
     "GenericProvider",
@@ -367,7 +366,6 @@ __all__ = [
     "ProviderAdapter",
     "QwenThinkingProvider",
     "VolcengineProvider",
-    "WeKnoraCloudProvider",
     "resolve_provider",
     "shape_openai_reasoning",
 ]

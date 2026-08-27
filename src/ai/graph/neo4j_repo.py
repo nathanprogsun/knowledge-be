@@ -133,9 +133,7 @@ async def connect_driver(
             if driver is not None:
                 await driver.close()
             if attempt < max_retries:
-                logger.warning(
-                    "neo4j connect attempt {}/{} failed: {}", attempt, max_retries, exc
-                )
+                logger.warning("neo4j connect attempt {}/{} failed: {}", attempt, max_retries, exc)
                 await asyncio.sleep(retry_interval)
             continue
         return driver
@@ -169,9 +167,7 @@ class Neo4jRepository:
     every method then no-ops / returns ``None``.
     """
 
-    def __init__(
-        self, driver: AsyncDriver | None, *, node_prefix: str = _NODE_PREFIX
-    ) -> None:
+    def __init__(self, driver: AsyncDriver | None, *, node_prefix: str = _NODE_PREFIX) -> None:
         self._driver = driver
         self._node_prefix = node_prefix
 
@@ -195,9 +191,7 @@ class Neo4jRepository:
         for graph in graphs:
             await self._add_graph(self._driver, namespace, graph)
 
-    async def _add_graph(
-        self, driver: AsyncDriver, namespace: NameSpace, graph: GraphData
-    ) -> None:
+    async def _add_graph(self, driver: AsyncDriver, namespace: NameSpace, graph: GraphData) -> None:
         session = driver.session()
         try:
             await session.execute_write(self._write_graph, namespace, graph)
@@ -257,9 +251,7 @@ class Neo4jRepository:
             nodes_result = await tx.run(_delete_nodes_query(label_expr), params)
             await nodes_result.consume()
 
-    async def search_node(
-        self, namespace: NameSpace, nodes: list[str]
-    ) -> GraphData | None:
+    async def search_node(self, namespace: NameSpace, nodes: list[str]) -> GraphData | None:
         """Return the subgraph matching any of ``nodes``, or ``None`` when disabled."""
         if self._driver is None:
             logger.warning("graph repository disabled — search_node returns None")

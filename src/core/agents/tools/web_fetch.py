@@ -81,8 +81,14 @@ _WEB_FETCH_SCHEMA: JsonValue = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "url": {"type": "string", "description": "Short wN web page ID from web_search results"},
-                    "prompt": {"type": "string", "description": "Prompt for analyzing the fetched web page content"},
+                    "url": {
+                        "type": "string",
+                        "description": "Short wN web page ID from web_search results",
+                    },
+                    "prompt": {
+                        "type": "string",
+                        "description": "Prompt for analyzing the fetched web page content",
+                    },
                 },
                 "required": ["url", "prompt"],
             },
@@ -413,7 +419,9 @@ class WebFetchTool:
     async def _fetch_item(self, item: WebFetchItem) -> _ItemResult:
         display_url = item.url.strip()
         if not item.prompt.strip():
-            return _failed_item_result(display_url, False, "invalid_arguments", "prompt is required")
+            return _failed_item_result(
+                display_url, False, "invalid_arguments", "prompt is required"
+            )
 
         fetch_url = normalize_github_url(display_url)
         try:
@@ -573,7 +581,9 @@ def _build_tool_result(results: list[_ItemResult | None]) -> ToolResult:
     skipped_count = 0
     for index, result in enumerate(results):
         if result is None:
-            result = _failed_item_result("", False, "internal_error", "fetch item returned no result")
+            result = _failed_item_result(
+                "", False, "internal_error", "fetch item returned no result"
+            )
         parts.append(f"#{index + 1}:\n{result.output}\n")
         aggregated.append(result.data)
         if result.status == "success":
@@ -598,7 +608,9 @@ def _build_tool_result(results: list[_ItemResult | None]) -> ToolResult:
             "- Use successful page content together with existing search snippets; failed URLs "
             "do not invalidate successful evidence.\n"
         )
-        parts.append("- Do not retry non-retryable failures. If evidence is sufficient, answer now.\n")
+        parts.append(
+            "- Do not retry non-retryable failures. If evidence is sufficient, answer now.\n"
+        )
     else:
         parts.append("- Synthesize the fetched evidence and answer when it is sufficient.\n")
 

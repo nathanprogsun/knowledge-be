@@ -241,8 +241,6 @@ def test_build_accepts_api_key() -> None:
 def test_build_ignores_proxy_url() -> None:
     # Ollama does not honor an explicit proxy per the contract; the
     # builder must still produce a usable client.
-    provider = build_ollama_client(
-        {"api_key": "k", "proxy_url": "https://proxy.example.com:3128"}
-    )
+    provider = build_ollama_client({"api_key": "k", "proxy_url": "https://proxy.example.com:3128"})
     assert isinstance(provider, OllamaProvider)
     assert provider._api_key == "k"

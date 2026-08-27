@@ -105,9 +105,7 @@ class HelpCommand(Command):
                 return CommandResult(
                     content=f"未知指令 `{args[0]}`，发送 `/help` 查看所有可用指令。"
                 )
-            return CommandResult(
-                content=f"**/{command.name()}** — {command.description()}"
-            )
+            return CommandResult(content=f"**/{command.name()}** — {command.description()}")
 
         commands = sorted(self._registry.all(), key=lambda c: c.name())
         lines = ["**可用指令**", ""]
@@ -250,9 +248,7 @@ class InfoCommand(Command):
         lines.append(f"  {output_label}")
         return lines
 
-    async def _render_knowledge_bases(
-        self, ctx: CommandContext, config: JsonObject
-    ) -> list[str]:
+    async def _render_knowledge_bases(self, ctx: CommandContext, config: JsonObject) -> list[str]:
         """Render the knowledge-base section, mirroring the upstream logic.
 
         ``KBSelectionMode == "all"`` lists every KB under the tenant;
@@ -278,7 +274,7 @@ class InfoCommand(Command):
             return lines
         names = await self._list_kb_names(ctx.tenant_id)
         if names:
-            name_map = {name_id: name for name_id, name in names}
+            name_map = dict(names)
             for kb_id in kb_ids:
                 lines.append(f"  · {name_map.get(kb_id, kb_id)}")
         else:
@@ -387,9 +383,7 @@ def build_default_registry(
     registry = CommandRegistry()
     registry.register(HelpCommand(registry))
     registry.register(InfoCommand(kb_service=kb_service))
-    registry.register(
-        SearchCommand(search_service=search_service, kb_service=kb_service)
-    )
+    registry.register(SearchCommand(search_service=search_service, kb_service=kb_service))
     registry.register(StopCommand())
     registry.register(ClearCommand())
     return registry

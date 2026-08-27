@@ -91,9 +91,7 @@ _COLUMN_DESCRIPTIONS_MAX_TOKENS = 2048
 _DATA_TABLE_FILE_TYPES: frozenset[str] = frozenset({"csv", "xlsx", "xls"})
 
 
-def _engine_pair(
-    engine: RetrieverEngineType, retriever: RetrieverType
-) -> RetrieverEngineParams:
+def _engine_pair(engine: RetrieverEngineType, retriever: RetrieverType) -> RetrieverEngineParams:
     """Build one engine/retriever selection pair."""
     return RetrieverEngineParams(
         retriever_engine_type=engine,
@@ -477,9 +475,7 @@ async def index_to_vector_db(
         return
     await chunk_service.create_chunks(chunks=chunks)
     await engine.batch_index(ctx, embedder, build_datatable_index_infos(chunks))
-    indexed = [
-        chunk.model_copy(update={"status": CHUNK_STATUS_INDEXED}) for chunk in chunks
-    ]
+    indexed = [chunk.model_copy(update={"status": CHUNK_STATUS_INDEXED}) for chunk in chunks]
     await chunk_service.update_chunks(chunks=indexed)
 
 
@@ -591,12 +587,8 @@ async def process_datatable_summary(
     schema_desc = schema.description()
     sample_desc = build_sample_data_description(rows, SAMPLE_ROW_LIMIT)
 
-    kb = await kb_service.get_knowledge_base_by_id(
-        knowledge_base_id=row.knowledge_base_id
-    )
-    custom_instructions = resolve_table_metadata_instructions(
-        kb, _process_overrides_of(row)
-    )
+    kb = await kb_service.get_knowledge_base_by_id(knowledge_base_id=row.knowledge_base_id)
+    custom_instructions = resolve_table_metadata_instructions(kb, _process_overrides_of(row))
 
     table_description = await generate_table_description(
         chat, schema.table_name, schema_desc, sample_desc, custom_instructions

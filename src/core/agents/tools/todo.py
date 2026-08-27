@@ -267,7 +267,9 @@ def generate_plan_output(task: str, steps: list[PlanStep]) -> str:
             "Note: No specific steps provided. It is recommended to create 3-7 retrieval "
             "tasks for systematic research.\n\n"
         )
-        output += "Suggested retrieval workflow (focused on retrieval tasks, excluding summarization):\n"
+        output += (
+            "Suggested retrieval workflow (focused on retrieval tasks, excluding summarization):\n"
+        )
         output += "1. Use grep_chunks to search keywords and locate relevant documents\n"
         output += "2. Use knowledge_search for semantic search to retrieve relevant content\n"
         output += "3. Use list_knowledge_chunks to get the full content of key documents\n"

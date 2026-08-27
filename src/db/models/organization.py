@@ -67,9 +67,7 @@ JOIN_REQUEST_STATUSES: frozenset[str] = frozenset(
 JOIN_REQUEST_TYPE_JOIN = "join"
 JOIN_REQUEST_TYPE_UPGRADE = "upgrade"
 
-JOIN_REQUEST_TYPES: frozenset[str] = frozenset(
-    {JOIN_REQUEST_TYPE_JOIN, JOIN_REQUEST_TYPE_UPGRADE}
-)
+JOIN_REQUEST_TYPES: frozenset[str] = frozenset({JOIN_REQUEST_TYPE_JOIN, JOIN_REQUEST_TYPE_UPGRADE})
 
 
 class Organization(TableModel):

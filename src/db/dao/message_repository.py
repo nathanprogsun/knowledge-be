@@ -291,7 +291,7 @@ class MessageRepository(GenericRepository[Message]):
         self._assert_safe_identifier("content", kind="column")
         ids_clause = ""
         if session_ids:
-            ids_clause = f" and session_id in :session_ids"
+            ids_clause = " and session_id in :session_ids"
         stmt = text(
             f"select * from {_TABLE_NAME} "
             "where content ilike :pattern "

@@ -702,7 +702,7 @@ def find_semantic_overlap_boundary_ending_at_or_after(text: str, min_end: int) -
 
     for i in range(n):
         ch = text[i]
-        if ch in "。？！":  # noqa: RUF001
+        if ch in "。？！":
             consider(i, i + 1, 3)
         elif ch in ".?!" and i + 1 < n and text[i + 1] == " ":
             consider(i, i + 2, 3)

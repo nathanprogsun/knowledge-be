@@ -37,8 +37,10 @@ from typing import Final
 
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
+from typing_extensions import TypedDict
 
 from src.common.exception import ValidationError
+from src.common.json import JsonValue
 from src.core.auth.types import UserInfo
 from src.core.tenants.api_key_service import (
     SCOPE_PLATFORM,
@@ -503,6 +505,23 @@ async def apply_default_storage_quota(
     return {"affected": affected, "quota_bytes": quota_bytes}
 
 
+class SystemAdminListView(TypedDict):
+    """Wire shape for ``GET /system/admin/list``."""
+
+    total: int
+    admins: list[dict[str, JsonValue]]
+
+
+class RuntimeTaskPageView(TypedDict):
+    """Wire shape for ``GET /system/admin/runtime/queues/{queue}/tasks``."""
+
+    available: bool
+    tasks: list[dict[str, JsonValue]]
+    page_size: int
+    has_more: bool
+    next_cursor: str | None
+
+
 @router.get("/list")
 async def list_system_admins(
     _auth: AuthDep,
@@ -510,7 +529,7 @@ async def list_system_admins(
     admin_service: SystemAdminServiceDep,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
-) -> dict[str, object]:
+) -> SystemAdminListView:
     """List system administrators (paginated). Returns ``{total, admins}``."""
     admins, total = await admin_service.list_system_admins(
         offset=offset,
@@ -530,7 +549,7 @@ async def list_runtime_tasks(
     state: str = Query(default=""),
     cursor: str = Query(default=""),
     page_size: int = Query(default=20, ge=1, le=100),
-) -> dict[str, object]:
+) -> RuntimeTaskPageView:
     """Return one task-state page for the queue dashboard.
 
     The API process does not hold live ARQ queue state (the worker runs

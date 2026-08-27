@@ -75,9 +75,7 @@ class TosFileService:
 
     # ── File operations ─────────────────────────────────────────────
 
-    async def save_file(
-        self, *, file: FileUpload, tenant_id: int, knowledge_id: str
-    ) -> str:
+    async def save_file(self, *, file: FileUpload, tenant_id: int, knowledge_id: str) -> str:
         """Upload ``file`` to ``{prefix}{tenant}/{knowledge}/{uuid}{ext}``."""
         ext = os.path.splitext(file.filename)[1]
         object_name = join_object_key(
@@ -88,9 +86,7 @@ class TosFileService:
         await self._store.put_object(object_name, data, content_type)
         return f"{TOS_SCHEME}{self._bucket_name}/{object_name}"
 
-    async def save_bytes(
-        self, *, data: bytes, tenant_id: int, file_name: str, temp: bool
-    ) -> str:
+    async def save_bytes(self, *, data: bytes, tenant_id: int, file_name: str, temp: bool) -> str:
         """Persist raw bytes.
 
         ``temp`` writes to the temp bucket (when configured) under
@@ -135,9 +131,7 @@ class TosFileService:
         try:
             src_bucket, src_key = self._parse_path(src_path)
         except StorageBackendError:
-            raise CrossBackendCopyError(
-                message=f"tos copy rejected source {src_path!r}"
-            ) from None
+            raise CrossBackendCopyError(message=f"tos copy rejected source {src_path!r}") from None
         ext = os.path.splitext(src_path)[1]
         dest_key = join_object_key(
             [self._path_prefix, str(tenant_id), knowledge_id, f"{uuid.uuid4()}{ext}"]

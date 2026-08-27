@@ -145,8 +145,7 @@ class AgentShareRepository(GenericRepository[AgentShare]):
     async def count_by_agent(self, agent_id: str) -> int:
         """Count live shares of one agent."""
         stmt = text(
-            f"select count(*) from {_AGENT_SHARE_TABLE} "
-            f"where agent_id = :agent_id and {_LIVE}"
+            f"select count(*) from {_AGENT_SHARE_TABLE} where agent_id = :agent_id and {_LIVE}"
         ).bindparams(agent_id=agent_id)
         return int((await self._session.execute(stmt)).scalar_one())
 

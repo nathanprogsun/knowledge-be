@@ -45,9 +45,7 @@ _ID_FIELDS: tuple[str, ...] = (
 )
 
 
-def resolve_index_name(
-    index_config: IndexConfig | None, env_key: str, default: str
-) -> str:
+def resolve_index_name(index_config: IndexConfig | None, env_key: str, default: str) -> str:
     """Resolve the index name from config, env var, or default.
 
     Priority: ``index_config.index_name`` > env var > ``default``.
@@ -68,9 +66,7 @@ def id_field(name: str, use_keyword_suffix: bool) -> str:
     return name
 
 
-def to_db_vector_embedding(
-    info: IndexInfo, params: IndexSaveParams
-) -> dict[str, Any]:
+def to_db_vector_embedding(info: IndexInfo, params: IndexSaveParams) -> dict[str, Any]:
     """Convert an ``IndexInfo`` to the ES document dict.
 
     The embedding vector is looked up from ``params["embedding"]`` keyed by
@@ -130,7 +126,9 @@ def calculate_storage_size(doc: dict[str, Any]) -> int:
     content_size = len(doc.get("content", ""))
     vec = doc.get("embedding")
     vector_size = len(vec) * 4 if vec else 0
-    index_overhead = (content_size + vector_size) * _INDEX_OVERHEAD_NUMERATOR // _INDEX_OVERHEAD_DENOMINATOR
+    index_overhead = (
+        (content_size + vector_size) * _INDEX_OVERHEAD_NUMERATOR // _INDEX_OVERHEAD_DENOMINATOR
+    )
     return content_size + vector_size + _METADATA_SIZE_BYTES + index_overhead
 
 
@@ -145,13 +143,9 @@ def build_base_conds(
     """
     must: list[dict[str, Any]] = []
     if params.knowledge_base_ids:
-        must.append(
-            {"terms": {id_field_fn("knowledge_base_id"): list(params.knowledge_base_ids)}}
-        )
+        must.append({"terms": {id_field_fn("knowledge_base_id"): list(params.knowledge_base_ids)}})
     if params.knowledge_ids:
-        must.append(
-            {"terms": {id_field_fn("knowledge_id"): list(params.knowledge_ids)}}
-        )
+        must.append({"terms": {id_field_fn("knowledge_id"): list(params.knowledge_ids)}})
     if params.tag_ids:
         must.append({"terms": {id_field_fn("tag_id"): list(params.tag_ids)}})
 
@@ -161,9 +155,7 @@ def build_base_conds(
             {"terms": {id_field_fn("knowledge_id"): list(params.exclude_knowledge_ids)}}
         )
     if params.exclude_chunk_ids:
-        must_not.append(
-            {"terms": {id_field_fn("chunk_id"): list(params.exclude_chunk_ids)}}
-        )
+        must_not.append({"terms": {id_field_fn("chunk_id"): list(params.exclude_chunk_ids)}})
     return [{"bool": {"must": must, "must_not": must_not}}]
 
 

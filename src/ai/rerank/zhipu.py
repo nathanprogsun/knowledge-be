@@ -115,10 +115,7 @@ class ZhipuReranker:
             status = f"{response.status_code} {reason}".strip()
             raise ExternalServiceError(
                 code="rerank.zhipu_api_error",
-                message=(
-                    f"Zhipu rerank API error: Http Status: {status}, "
-                    f"Body: {response.text}"
-                ),
+                message=(f"Zhipu rerank API error: Http Status: {status}, Body: {response.text}"),
             )
         try:
             body = response.json()

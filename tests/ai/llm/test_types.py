@@ -61,9 +61,7 @@ def test_chat_options_serialization_names() -> None:
 def test_chat_options_tools_round_trip() -> None:
     tool = Tool(
         type="function",
-        function=FunctionDef(
-            name="lookup", description="looks up", parameters={"type": "object"}
-        ),
+        function=FunctionDef(name="lookup", description="looks up", parameters={"type": "object"}),
     )
     opts = ChatOptions(tools=[tool])
     dumped = opts.model_dump()

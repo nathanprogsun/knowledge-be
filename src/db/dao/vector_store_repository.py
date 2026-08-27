@@ -135,22 +135,22 @@ def _index_name_of(index_config: JsonObject | None, engine_type: str) -> str:
         prefix = index_config.get("collection_prefix")
         if isinstance(prefix, str) and prefix:
             return prefix
-        return "weknora_embeddings"
+        return "kb_embeddings"
     if engine_type == "milvus":
         name = index_config.get("collection_name")
         if isinstance(name, str) and name:
             return name
-        return "weknora_embeddings"
+        return "kb_embeddings"
     if engine_type == "tencent_vectordb":
         name = index_config.get("collection_name")
         if isinstance(name, str) and name:
             return name
-        return "weknora_embeddings"
+        return "kb_embeddings"
     if engine_type == "weaviate":
         prefix = index_config.get("collection_prefix")
         if isinstance(prefix, str) and prefix:
             return prefix
-        return "Weknora_embeddings"
+        return "kb_embeddings"
     if engine_type == "doris":
         prefix = index_config.get("collection_prefix")
         if isinstance(prefix, str) and prefix:
@@ -158,12 +158,12 @@ def _index_name_of(index_config: JsonObject | None, engine_type: str) -> str:
         name = index_config.get("collection_name")
         if isinstance(name, str) and name:
             return name
-        return "weknora_embeddings"
+        return "kb_embeddings"
     if engine_type == "opensearch":
         name = index_config.get("index_name")
         if isinstance(name, str) and name:
             return name
-        return "weknora"
+        return "kb"
     name = index_config.get("index_name")
     return name if isinstance(name, str) else ""
 

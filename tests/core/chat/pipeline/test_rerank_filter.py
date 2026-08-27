@@ -208,14 +208,14 @@ class _FakeFetcher:
         ("前文 ![图片说明](https://example.com/img.png) 后文", "前文  后文"),
         ("请参考 [官方文档](https://docs.example.com) 了解详情", "请参考 官方文档 了解详情"),
         ("访问 https://example.com/path?q=1&b=2 获取更多信息", "访问  获取更多信息"),
-        ("示例代码：\n```python\nprint('hello')\n```\n以上是示例", "示例代码：\n\n以上是示例"),  # noqa: RUF001
+        ("示例代码：\n```python\nprint('hello')\n```\n以上是示例", "示例代码：\n\n以上是示例"),
         ("公式如下 $$E=mc^2$$ 其中E是能量", "公式如下  其中E是能量"),
         ("| 名称 | 值 |\n| --- | --- |\n| A | 1 |", "名称, 值\n\nA, 1"),
         ("## 第二章 概述\n### 2.1 背景", "第二章 概述\n2.1 背景"),
         ("> 这是一段引用\n> 第二行引用", "这是一段引用\n第二行引用"),
         ("这是 **加粗** 和 *斜体* 以及 ***粗斜体*** 文本", "这是 加粗 和 斜体 以及 粗斜体 文本"),
         ("- 项目一\n- 项目二\n1. 有序一\n2. 有序二", "项目一\n项目二\n有序一\n有序二"),
-        ("文本<br>换行<div class=\"test\">内容</div>结尾", "文本换行内容结尾"),
+        ('文本<br>换行<div class="test">内容</div>结尾', "文本换行内容结尾"),
         ("段落一\n\n\n\n\n段落二", "段落一\n\n段落二"),
         ("| col1 | col2 | col3 |", "col1, col2, col3"),
         (
@@ -235,15 +235,12 @@ def test_clean_passage_for_rerank_combined_real_world() -> None:
         "## 产品介绍\n\n"
         "这是一个 **重要的** 产品。详见 [产品页面](https://example.com/product)。\n\n"
         "![产品截图](images/product.png)\n\n"
-        "> 用户评价：非常好用\n\n"  # noqa: RUF001
+        "> 用户评价：非常好用\n\n"
         "- 功能一\n- 功能二\n\n"
-        "```json\n{\"key\": \"value\"}\n```\n"
+        '```json\n{"key": "value"}\n```\n'
     )
     expected = (
-        "产品介绍\n\n"
-        "这是一个 重要的 产品。详见 产品页面。\n\n"
-        "用户评价：非常好用\n\n"  # noqa: RUF001
-        "功能一\n功能二"
+        "产品介绍\n\n这是一个 重要的 产品。详见 产品页面。\n\n用户评价：非常好用\n\n功能一\n功能二"
     )
     assert clean_passage_for_rerank(passage) == expected
 
@@ -334,9 +331,12 @@ def test_rerank_fallback_min_score_default_and_explicit_scope() -> None:
         )
     ]
     assert rerank_fallback_min_score(explicit) == 0.0
-    assert rerank_fallback_min_score(
-        [SearchTarget(type=SearchTargetType.KNOWLEDGE_BASE, knowledge_base_id="kb")]
-    ) == 0.15
+    assert (
+        rerank_fallback_min_score(
+            [SearchTarget(type=SearchTargetType.KNOWLEDGE_BASE, knowledge_base_id="kb")]
+        )
+        == 0.15
+    )
 
 
 # ── Deterministic sort ─────────────────────────────────────────────────
@@ -355,9 +355,19 @@ def test_sort_search_results_deterministically_by_score() -> None:
 
 def test_sort_search_results_deterministic_tie_breakers() -> None:
     results = [
-        _result(result_id="chunk-b", knowledge_id="doc-b", chunk_type="text", chunk_index=10, score=0.8),
-        _result(result_id="chunk-c", knowledge_id="doc-a", chunk_type="summary", chunk_index=0, score=0.8),
-        _result(result_id="chunk-a", knowledge_id="doc-a", chunk_type="text", chunk_index=0, score=0.8),
+        _result(
+            result_id="chunk-b", knowledge_id="doc-b", chunk_type="text", chunk_index=10, score=0.8
+        ),
+        _result(
+            result_id="chunk-c",
+            knowledge_id="doc-a",
+            chunk_type="summary",
+            chunk_index=0,
+            score=0.8,
+        ),
+        _result(
+            result_id="chunk-a", knowledge_id="doc-a", chunk_type="text", chunk_index=0, score=0.8
+        ),
     ]
     ordered = sort_search_results_deterministically(results)
     assert [item.id for item in ordered] == ["chunk-c", "chunk-a", "chunk-b"]
@@ -384,7 +394,9 @@ def test_apply_mmr_selects_top_k_by_relevance() -> None:
 
 def test_apply_mmr_trades_redundancy_for_relevance() -> None:
     first = _result(result_id="a", content="python programming language guide", score=0.9)
-    near_duplicate = _result(result_id="b", content="python programming language tutorial", score=0.8)
+    near_duplicate = _result(
+        result_id="b", content="python programming language tutorial", score=0.8
+    )
     distinct = _result(result_id="c", content="cooking recipes for pasta dinner", score=0.7)
     # k=2: by relevance the pair would be a+b, but b is a near-duplicate of
     # a, so MMR trades it for the distinct c.
@@ -499,11 +511,17 @@ async def test_rerank_applies_faq_boost() -> None:
     item = pipeline_ctx.rerank_result[0]
     assert item.metadata["faq_boosted"] == "true"
     assert item.metadata["faq_original_score"] == f"{0.6 * 0.5 + 0.3 * 0.4 + 0.1:.4f}"
-    assert item.score == pytest.approx(min(composite_score(
-        _result(result_id="faq-1", content="faq body", score=0.4, chunk_type="faq"),
-        0.5,
-        0.4,
-    ) * 1.5, 1.0))
+    assert item.score == pytest.approx(
+        min(
+            composite_score(
+                _result(result_id="faq-1", content="faq body", score=0.4, chunk_type="faq"),
+                0.5,
+                0.4,
+            )
+            * 1.5,
+            1.0,
+        )
+    )
 
 
 async def test_rerank_skips_faq_boost_when_disabled_or_not_faq() -> None:
@@ -742,7 +760,9 @@ async def test_filter_topk_skips_when_no_results() -> None:
 
 async def test_web_fetch_skips_when_disabled() -> None:
     plugin = WebFetchPlugin(_FakeFetcher({}, {}))
-    pipeline_ctx = PipelineContext(rerank_result=[_result(result_id="http://x", knowledge_source="web_search")])
+    pipeline_ctx = PipelineContext(
+        rerank_result=[_result(result_id="http://x", knowledge_source="web_search")]
+    )
     error = await plugin.on_event(_CTX, EventType.WEB_FETCH, pipeline_ctx, _noop_next)
     assert error is None
     assert pipeline_ctx.rerank_result[0].content == ""
@@ -775,8 +795,16 @@ async def test_web_fetch_replaces_web_snippets_with_full_content() -> None:
         web_fetch_top_n=5,
         rerank_result=[
             _result(result_id="doc-1", knowledge_source="knowledge", content="kb snippet"),
-            _result(result_id="https://a.example", knowledge_source="web_search", content="web snippet A"),
-            _result(result_id="https://b.example", knowledge_source="web_search", content="web snippet B"),
+            _result(
+                result_id="https://a.example",
+                knowledge_source="web_search",
+                content="web snippet A",
+            ),
+            _result(
+                result_id="https://b.example",
+                knowledge_source="web_search",
+                content="web snippet B",
+            ),
         ],
     )
 

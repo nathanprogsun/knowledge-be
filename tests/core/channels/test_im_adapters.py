@@ -217,7 +217,9 @@ class TestSlack:
 
     def test_handle_url_verification(self) -> None:
         adapter = slack_mod.SlackAdapter()
-        assert adapter.handle_url_verification(_callback('{"type": "url_verification", "challenge": "abc"}'))
+        assert adapter.handle_url_verification(
+            _callback('{"type": "url_verification", "challenge": "abc"}')
+        )
         assert not adapter.handle_url_verification(_callback('{"type": "event_callback"}'))
 
     def test_parse_app_mention_strips_mention(self) -> None:
@@ -586,7 +588,9 @@ class TestDingTalk:
     def test_verify_callback_passes_with_valid_signature(self) -> None:
         adapter = dingtalk_mod.DingTalkAdapter(client_id="cid", client_secret="secret")
         timestamp = str(int(time.time() * 1000))
-        request = _callback("{}", headers={"Timestamp": timestamp, "Sign": _dingtalk_sign("secret", timestamp)})
+        request = _callback(
+            "{}", headers={"Timestamp": timestamp, "Sign": _dingtalk_sign("secret", timestamp)}
+        )
         assert adapter.verify_callback(request) is None
 
     def test_verify_callback_rejects_bad_signature(self) -> None:
@@ -771,7 +775,10 @@ class TestMattermost:
     def test_verify_callback_passes_with_json_token(self) -> None:
         adapter = mattermost_mod.MattermostAdapter(outgoing_token="ot")
         body = json.dumps({"token": "ot", "channel_id": "c1"})
-        assert adapter.verify_callback(_callback(body, headers={"Content-Type": "application/json"})) is None
+        assert (
+            adapter.verify_callback(_callback(body, headers={"Content-Type": "application/json"}))
+            is None
+        )
 
     def test_verify_callback_passes_with_form_token(self) -> None:
         adapter = mattermost_mod.MattermostAdapter(outgoing_token="ot")
@@ -796,7 +803,14 @@ class TestMattermost:
     def test_parse_text_message(self) -> None:
         adapter = mattermost_mod.MattermostAdapter(**self._BASE)
         body = json.dumps(
-            {"token": "ot", "user_id": "u1", "user_name": "tester", "channel_id": "c1", "post_id": "p1", "text": " hello "}
+            {
+                "token": "ot",
+                "user_id": "u1",
+                "user_name": "tester",
+                "channel_id": "c1",
+                "post_id": "p1",
+                "text": " hello ",
+            }
         )
         msg = adapter.parse_callback(_callback(body))
         assert msg is not None
@@ -819,7 +833,14 @@ class TestMattermost:
     def test_parse_file_message(self) -> None:
         adapter = mattermost_mod.MattermostAdapter(**self._BASE)
         body = json.dumps(
-            {"token": "ot", "user_id": "u1", "channel_id": "c1", "post_id": "p1", "text": "", "file_ids": ["f1", "f2"]}
+            {
+                "token": "ot",
+                "user_id": "u1",
+                "channel_id": "c1",
+                "post_id": "p1",
+                "text": "",
+                "file_ids": ["f1", "f2"],
+            }
         )
         msg = adapter.parse_callback(_callback(body))
         assert msg is not None
@@ -836,10 +857,17 @@ class TestMattermost:
                 return httpx.Response(200, json={"id": "p2", "root_id": "root-9"})
             return httpx.Response(500, text="unexpected")
 
-        adapter = mattermost_mod.MattermostAdapter(
-            **self._BASE, transport=_transport(handler)
+        adapter = mattermost_mod.MattermostAdapter(**self._BASE, transport=_transport(handler))
+        body = json.dumps(
+            {
+                "token": "ot",
+                "user_id": "u1",
+                "channel_id": "c1",
+                "post_id": "p2",
+                "text": "hi",
+                "root_id": "",
+            }
         )
-        body = json.dumps({"token": "ot", "user_id": "u1", "channel_id": "c1", "post_id": "p2", "text": "hi", "root_id": ""})
         try:
             msg = adapter.parse_callback(_callback(body))
         finally:
@@ -854,7 +882,16 @@ class TestMattermost:
             return httpx.Response(404, text="not found")
 
         adapter = mattermost_mod.MattermostAdapter(**self._BASE, transport=_transport(handler))
-        body = json.dumps({"token": "ot", "user_id": "u1", "channel_id": "c1", "post_id": "p3", "text": "hi", "root_id": ""})
+        body = json.dumps(
+            {
+                "token": "ot",
+                "user_id": "u1",
+                "channel_id": "c1",
+                "post_id": "p3",
+                "text": "hi",
+                "root_id": "",
+            }
+        )
         try:
             msg = adapter.parse_callback(_callback(body))
         finally:
@@ -871,9 +908,7 @@ class TestMattermost:
             captured["body"] = json.loads(request.content)
             return httpx.Response(201, json={"id": "new-post"})
 
-        adapter = mattermost_mod.MattermostAdapter(
-            **self._BASE, transport=_transport(handler)
-        )
+        adapter = mattermost_mod.MattermostAdapter(**self._BASE, transport=_transport(handler))
         incoming = _incoming(chat_id="c1", extra={"thread_root_id": "root-9", "channel_id": "c1"})
         try:
             adapter.send_reply(EventContext(), incoming, _reply("answer"))
@@ -899,7 +934,9 @@ class TestMattermost:
             mattermost_mod.build_mattermost_adapter(_channel("mattermost", {}))
         with pytest.raises(ValidationError):
             mattermost_mod.build_mattermost_adapter(
-                _channel("mattermost", {"outgoing_token": "ot", "site_url": "https://mm.example.com"})
+                _channel(
+                    "mattermost", {"outgoing_token": "ot", "site_url": "https://mm.example.com"}
+                )
             )
         with pytest.raises(ValidationError):
             mattermost_mod.build_mattermost_adapter(
@@ -990,7 +1027,11 @@ class TestQQBot:
 
     def test_parse_c2c_message(self) -> None:
         adapter = qqbot_mod.QQBotAdapter()
-        event = {"id": "msg-1", "content": " hello ", "author": {"user_openid": "u-open", "username": "tester"}}
+        event = {
+            "id": "msg-1",
+            "content": " hello ",
+            "author": {"user_openid": "u-open", "username": "tester"},
+        }
         body = json.dumps({"op": 0, "t": "C2C_MESSAGE_CREATE", "d": json.dumps(event)})
         msg = adapter.parse_callback(_callback(body))
         assert msg is not None
@@ -1002,7 +1043,12 @@ class TestQQBot:
 
     def test_parse_group_message(self) -> None:
         adapter = qqbot_mod.QQBotAdapter()
-        event = {"id": "msg-2", "content": "hi", "group_openid": "g-open", "author": {"member_openid": "m-open"}}
+        event = {
+            "id": "msg-2",
+            "content": "hi",
+            "group_openid": "g-open",
+            "author": {"member_openid": "m-open"},
+        }
         body = json.dumps({"op": 0, "t": "GROUP_AT_MESSAGE_CREATE", "d": json.dumps(event)})
         msg = adapter.parse_callback(_callback(body))
         assert msg is not None
@@ -1036,7 +1082,12 @@ class TestQQBot:
             _close(adapter)
         assert captured["url"] == "https://api.sgroup.qq.com/v2/groups/g-open/messages"
         assert captured["headers"]["Authorization"].startswith("QQBot ")
-        assert captured["body"] == {"content": "answer", "msg_type": 0, "msg_id": "m1", "msg_seq": 1}
+        assert captured["body"] == {
+            "content": "answer",
+            "msg_type": 0,
+            "msg_id": "m1",
+            "msg_seq": 1,
+        }
 
     def test_send_reply_direct_and_token_cached(self) -> None:
         token_requests: list[httpx.Request] = []
@@ -1145,7 +1196,13 @@ class TestYunzhijia:
 
     def test_parse_skips_without_mention(self) -> None:
         adapter = yunzhijia_mod.YunzhijiaAdapter(**self._BASE)
-        payload = {"type": 2, "robotId": "r1", "robotName": "Bot", "msgId": "m1", "content": "no mention"}
+        payload = {
+            "type": 2,
+            "robotId": "r1",
+            "robotName": "Bot",
+            "msgId": "m1",
+            "content": "no mention",
+        }
         assert adapter.parse_callback(_callback(json.dumps(payload))) is None
 
     def test_parse_mentions_via_notify_to(self) -> None:
@@ -1221,7 +1278,9 @@ class TestYunzhijia:
         adapter = yunzhijia_mod.YunzhijiaAdapter(**self._BASE, transport=_transport(handler))
         reply = ReplyMessage(content="answer", extra={"yunzhijia_format_type": "plain"})
         try:
-            adapter.send_reply(EventContext(), _incoming(user_id="o1", extra={"group_type": "2"}), reply)
+            adapter.send_reply(
+                EventContext(), _incoming(user_id="o1", extra={"group_type": "2"}), reply
+            )
         finally:
             _close(adapter)
         assert captured["body"]["param"] == {"formatType": "plain"}
@@ -1257,12 +1316,21 @@ class TestYunzhijia:
             yunzhijia_mod.build_yunzhijia_adapter(_channel("yunzhijia", {}))
         with pytest.raises(ValidationError):
             yunzhijia_mod.build_yunzhijia_adapter(
-                _channel("yunzhijia", {"send_msg_url": "http://evil.example.com/send", "allowed_webhook_host_suffix": "yunzhijia.com"})
+                _channel(
+                    "yunzhijia",
+                    {
+                        "send_msg_url": "http://evil.example.com/send",
+                        "allowed_webhook_host_suffix": "yunzhijia.com",
+                    },
+                )
             )
         adapter = yunzhijia_mod.build_yunzhijia_adapter(
             _channel(
                 "yunzhijia",
-                {"send_msg_url": "https://hook.yunzhijia.com/send", "allowed_webhook_host_suffix": "yunzhijia.com"},
+                {
+                    "send_msg_url": "https://hook.yunzhijia.com/send",
+                    "allowed_webhook_host_suffix": "yunzhijia.com",
+                },
             )
         )
         assert adapter.platform() == "yunzhijia"

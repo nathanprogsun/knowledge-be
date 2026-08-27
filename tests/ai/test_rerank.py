@@ -30,12 +30,12 @@ from src.ai.rerank import (
     validate_rerank_base_url,
 )
 from src.ai.rerank.aliyun import AliyunReranker
+from src.ai.rerank.cloud import CloudReranker
 from src.ai.rerank.jina import JinaReranker
 from src.ai.rerank.lkeap import LKEAPReranker
 from src.ai.rerank.nvidia import NvidiaReranker
 from src.ai.rerank.remote_api import RerankRequest
 from src.ai.rerank.volcengine import VolcengineReranker
-from src.ai.rerank.weknoracloud import WeKnoraCloudReranker
 from src.ai.rerank.zhipu import ZhipuReranker
 from src.common.exception import ExternalServiceError, ValidationError
 from src.core.contracts.infra import Model as WireModel
@@ -355,19 +355,19 @@ async def test_new_reranker_routes_nvidia() -> None:
     assert isinstance(reranker, NvidiaReranker)
 
 
-async def test_new_reranker_routes_weknoracloud() -> None:
+async def test_new_reranker_routes_cloud() -> None:
     reranker = await new_reranker(
         RerankerConfig(
             model_name="rerank",
             model_id="rr-8",
             api_key="sk-test",
             base_url=_BASE_URL,
-            provider="weknoracloud",
+            provider="cloud",
             app_id="app",
             app_secret="secret",
         )
     )
-    assert isinstance(reranker, WeKnoraCloudReranker)
+    assert isinstance(reranker, CloudReranker)
 
 
 async def test_new_reranker_routes_lkeap() -> None:

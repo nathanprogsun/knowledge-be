@@ -137,6 +137,11 @@ class KnowledgeBaseInfo(BaseModel):
         record["storage_config"] = _decode_json(record.pop("cos_config"))
         return cls.model_validate(record)
 
+    @classmethod
+    def from_json(cls, raw: JsonObject | str | None) -> JsonObject | None:
+        """Decode a single JSON column. Aliased to ``_decode_json``."""
+        return _decode_json(raw)
+
 
 __all__ = [
     "FAQ_INDEX_MODE_QUESTION_ANSWER",

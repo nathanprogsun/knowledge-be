@@ -93,12 +93,38 @@ _BYTES_PER_MB = 1024 * 1024
 # File extensions accepted for temporary uploads (lowercase, leading dot).
 TEMPORARY_DOCUMENT_EXTENSIONS: frozenset[str] = frozenset(
     {
-        ".docx", ".doc", ".pdf", ".ppt", ".pptx", ".epub", ".mhtml",
-        ".xlsx", ".xls",
-        ".md", ".markdown", ".txt", ".csv", ".json", ".xml", ".yaml", ".yml",
-        ".log", ".html",
-        ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp",
-        ".mp3", ".wav", ".m4a", ".flac", ".ogg", ".aac",
+        ".docx",
+        ".doc",
+        ".pdf",
+        ".ppt",
+        ".pptx",
+        ".epub",
+        ".mhtml",
+        ".xlsx",
+        ".xls",
+        ".md",
+        ".markdown",
+        ".txt",
+        ".csv",
+        ".json",
+        ".xml",
+        ".yaml",
+        ".yml",
+        ".log",
+        ".html",
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".bmp",
+        ".tiff",
+        ".webp",
+        ".mp3",
+        ".wav",
+        ".m4a",
+        ".flac",
+        ".ogg",
+        ".aac",
     }
 )
 
@@ -120,7 +146,16 @@ _MARKDOWN_IMAGE_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
 _HAN_IDEOGRAPH_RE = re.compile(r"[\u4e00-\u9fff]")
 
 _VISUAL_QUERY_MARKERS: tuple[str, ...] = (
-    "图", "表格", "截图", "页面", "排版", "chart", "figure", "diagram", "image", "layout",
+    "图",
+    "表格",
+    "截图",
+    "页面",
+    "排版",
+    "chart",
+    "figure",
+    "diagram",
+    "image",
+    "layout",
 )
 
 # Batch size for the expiry sweep (bounded loops, Go uses the same 100).
@@ -370,8 +405,7 @@ def select_content_with_budget(
     if budget <= 0:
         budget = TEMPORARY_DOCUMENT_PROMPT_BUDGET
     if not chunks or (
-        document.token_count <= TEMPORARY_DOCUMENT_INLINE_TOKENS
-        and document.token_count <= budget
+        document.token_count <= TEMPORARY_DOCUMENT_INLINE_TOKENS and document.token_count <= budget
     ):
         return document.content or "", len(chunks), len(chunks)
 
@@ -449,10 +483,7 @@ class TemporaryDocumentService:
         if file_size <= 0 or file_size > cap:
             raise ValidationError(
                 code="temporary_document.invalid_file_size",
-                message=(
-                    "file size must be between 1 byte and "
-                    f"{cap // _BYTES_PER_MB}MB"
-                ),
+                message=(f"file size must be between 1 byte and {cap // _BYTES_PER_MB}MB"),
             )
 
         now = datetime.now(UTC)

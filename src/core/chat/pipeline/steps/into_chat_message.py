@@ -79,9 +79,7 @@ class IntoChatMessageStep:
             },
         )
 
-        faq_results, doc_results, has_high_confidence_faq = self._separate_faq_results(
-            pipeline_ctx
-        )
+        faq_results, doc_results, has_high_confidence_faq = self._separate_faq_results(pipeline_ctx)
 
         safe_query, is_valid = validate_input(pipeline_ctx.query)
         if not is_valid:
@@ -301,9 +299,7 @@ class IntoChatMessageStep:
                 "rendered_content_len": len(pipeline_ctx.user_content),
             },
         )
-        task = asyncio.create_task(
-            self._update_rendered_content(ctx, pipeline_ctx)
-        )
+        task = asyncio.create_task(self._update_rendered_content(ctx, pipeline_ctx))
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
 

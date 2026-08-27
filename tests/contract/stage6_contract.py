@@ -40,7 +40,6 @@ from fastapi.testclient import TestClient
 from src.core.contracts import sessions as contracts
 from src.core.tenants.member_service import ROLE_OWNER
 from src.db.models.message import Message as MessageRow
-from src.db.models.session import Session as SessionRow
 from src.web.api.chat.messages.views import (
     ChatHistoryStatsEnvelope,
     DeleteMessageResponse,
@@ -51,7 +50,6 @@ from src.web.api.chat.messages.views import (
 from src.web.api.chat.sessions.views import (
     DeleteSessionResponse,
     PinSessionEnvelope,
-    SessionEnvelope,
     SessionListEnvelope,
 )
 from tests.contract.test_session_invariants import _model_wire_fields
@@ -152,10 +150,7 @@ async def message_seed(
     async with _engine.session_factory() as probe:
         exists = (
             await probe.execute(
-                text(
-                    "SELECT 1 FROM information_schema.tables "
-                    "WHERE table_name = 'messages'"
-                )
+                text("SELECT 1 FROM information_schema.tables WHERE table_name = 'messages'")
             )
         ).first()
     if exists is None:
@@ -215,10 +210,7 @@ async def require_messages_table(_engine) -> None:
     async with _engine.session_factory() as probe:
         exists = (
             await probe.execute(
-                text(
-                    "SELECT 1 FROM information_schema.tables "
-                    "WHERE table_name = 'messages'"
-                )
+                text("SELECT 1 FROM information_schema.tables WHERE table_name = 'messages'")
             )
         ).first()
     if exists is None:
@@ -426,8 +418,10 @@ def test_get_suggestions_matches_reference(message_seed: MessageSeed) -> None:
     ``{success: true, data: null}``).
     """
     from src.core.chat.messages.suggestion_service import (
-        MessageSuggestionSet as SuggestionSetRow,
         MessageSuggestionService,
+    )
+    from src.core.chat.messages.suggestion_service import (
+        MessageSuggestionSet as SuggestionSetRow,
     )
 
     # Seed a minimal suggestion set so the GET returns 200 with a non-null data.
@@ -463,9 +457,7 @@ def test_get_suggestions_matches_reference(message_seed: MessageSeed) -> None:
         ) -> SuggestionSetRow | None:
             return set_row
 
-    message_seed.client.app.dependency_overrides[MessageSuggestionService] = (
-        lambda: _StubService()
-    )
+    message_seed.client.app.dependency_overrides[MessageSuggestionService] = lambda: _StubService()
     try:
         status, keys = _endpoint_spec(
             "GET",
@@ -485,9 +477,7 @@ def test_get_suggestions_matches_reference(message_seed: MessageSeed) -> None:
 def test_record_suggestion_event_matches_reference(message_seed: MessageSeed) -> None:
     """POST /sessions/{session_id}/suggestion-events answers 204 with no body."""
     status, keys = _endpoint_spec("POST", "/api/v1/sessions/{session_id}/suggestion-events")
-    assert not keys, (
-        f"reference says 204 returns no body, fixture declares keys={keys}"
-    )
+    assert not keys, f"reference says 204 returns no body, fixture declares keys={keys}"
     response = message_seed.client.post(
         f"/api/v1/sessions/{message_seed.session_id}/suggestion-events",
         json={

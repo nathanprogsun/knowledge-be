@@ -452,27 +452,27 @@ async def test_vector_retrieve_caps_expanded_topk_above_maximum() -> None:
 async def test_vector_retrieve_falls_back_when_hnsw_guc_unknown() -> None:
     """The transaction-level ``SET LOCAL`` raises; the query is retried."""
     session = _FakeSession()
-    session.set_begin_exception(
-        RuntimeError("unrecognized configuration parameter hnsw.ef_search")
-    )
+    session.set_begin_exception(RuntimeError("unrecognized configuration parameter hnsw.ef_search"))
     # Results queued for the retry path (post-fallback SELECT); the inner
     # transaction's execute was never reached.
-    session.queue_results([
+    session.queue_results(
         [
-            {
-                "id": 1,
-                "content": "x",
-                "source_id": "s",
-                "source_type": 0,
-                "chunk_id": "c",
-                "knowledge_id": "k",
-                "knowledge_base_id": "kb",
-                "tag_id": "",
-                "score": 0.5,
-                "is_enabled": True,
-            }
+            [
+                {
+                    "id": 1,
+                    "content": "x",
+                    "source_id": "s",
+                    "source_type": 0,
+                    "chunk_id": "c",
+                    "knowledge_id": "k",
+                    "knowledge_base_id": "kb",
+                    "tag_id": "",
+                    "score": 0.5,
+                    "is_enabled": True,
+                }
+            ]
         ]
-    ])
+    )
     factory = cast(
         async_sessionmaker[AsyncSession],
         MagicMock(return_value=session),
@@ -725,17 +725,22 @@ async def test_copy_indices_skips_rows_without_chunk_mapping() -> None:
 
 async def test_copy_indices_no_insert_when_no_chunk_matches() -> None:
     repo, session = _make_repo()
-    session.queue_results([[
-        {
-            "content": "x",
-            "source_id": "c-1",
-            "source_type": 0,
-            "chunk_id": "c-1",
-            "knowledge_id": "k-1",
-            "dimension": 1,
-            "embedding": "[0.0]",
-        }
-    ], []])
+    session.queue_results(
+        [
+            [
+                {
+                    "content": "x",
+                    "source_id": "c-1",
+                    "source_type": 0,
+                    "chunk_id": "c-1",
+                    "knowledge_id": "k-1",
+                    "dimension": 1,
+                    "embedding": "[0.0]",
+                }
+            ],
+            [],
+        ]
+    )
     await repo.copy_indices(
         _CTX,
         "src-kb",

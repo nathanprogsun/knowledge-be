@@ -1,4 +1,4 @@
-# ruff: noqa: RUF001  # The copy-name suffix uses fullwidth parentheses.
+# The copy-name suffix uses fullwidth parentheses.
 
 """Unit + integration tests for ``CustomAgentService``.
 
@@ -32,7 +32,11 @@ from sqlalchemy.pool import NullPool
 
 from src.common.exception import ConflictError, DataError, NotFoundError, ValidationError
 from src.common.json import JsonObject
-from src.core.agents.service.custom_agent_service import CustomAgentService
+from src.core.agents.builtin_registry import get_builtin_agent
+from src.core.agents.service.custom_agent_service import (
+    BUILTIN_AGENT_ORDER,
+    CustomAgentService,
+)
 from src.core.agents.service.factory import build_custom_agent_service
 from src.core.agents.types import CustomAgentInfo
 from src.db.dao.custom_agent_repository import CustomAgentRepository
@@ -407,7 +411,13 @@ async def test_list_agents_returns_tenant_rows_only(
 
     infos = await service.list_agents(tenant_id=1001)
 
-    assert [i.name for i in infos] == ["a2", "a1"]
+    # Built-in presets lead in registry order; custom tenant rows follow
+    # newest-first. The other tenant's row never appears.
+    names = [i.name for i in infos]
+    assert names[: len(BUILTIN_AGENT_ORDER)] == [
+        get_builtin_agent(bid, 1001).name for bid in BUILTIN_AGENT_ORDER
+    ]
+    assert names[len(BUILTIN_AGENT_ORDER) :] == ["a2", "a1"]
 
 
 # ── update_agent ──────────────────────────────────────────────────────

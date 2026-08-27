@@ -443,22 +443,20 @@ def parse_graph_output(text: str) -> GraphData:
     elif isinstance(parsed, list):
         items = parsed
     else:
-        raise GraphExtractionError(
-            message="content must be a list of extractions or a dict"
-        )
+        raise GraphExtractionError(message="content must be a list of extractions or a dict")
 
     nodes: list[GraphNode] = []
     relations: list[GraphRelation] = []
     for item in items:
         if not isinstance(item, dict):
-            raise GraphExtractionError(
-                message="each item in the sequence must be a mapping"
-            )
+            raise GraphExtractionError(message="each item in the sequence must be a mapping")
         if item.get(_NODE_PREFIX) is not None:
             nodes.append(
                 GraphNode(
                     name=str(item[_NODE_PREFIX]),
-                    attributes=_string_attributes(item.get(f"{_NODE_PREFIX}{_NODE_ATTRIBUTES_SUFFIX}")),
+                    attributes=_string_attributes(
+                        item.get(f"{_NODE_PREFIX}{_NODE_ATTRIBUTES_SUFFIX}")
+                    ),
                 )
             )
         elif item.get(_RELATION_SOURCE) is not None and item.get(_RELATION_TARGET) is not None:
@@ -517,7 +515,9 @@ def _coerce_nodes(raw: JsonValue | None) -> list[GraphNode]:
             name = value.get("name")
             if name is None:
                 continue
-            nodes.append(GraphNode(name=str(name), attributes=_string_attributes(value.get("attributes"))))
+            nodes.append(
+                GraphNode(name=str(name), attributes=_string_attributes(value.get("attributes")))
+            )
         elif value is not None:
             nodes.append(GraphNode(name=str(value)))
     return nodes

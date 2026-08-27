@@ -35,9 +35,7 @@ class ConcurrencyChat:
     def get_model_id(self) -> str:
         return self._inner.get_model_id()
 
-    async def chat(
-        self, messages: list[Message], opts: ChatOptions | None = None
-    ) -> ChatResponse:
+    async def chat(self, messages: list[Message], opts: ChatOptions | None = None) -> ChatResponse:
         release = await gate_named_n(
             self._inner.get_model_id(), self._inner.get_model_name(), self._limit
         )

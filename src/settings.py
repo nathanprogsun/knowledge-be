@@ -59,6 +59,19 @@ class Settings(BaseSettings):
     cors_allow_origins: list[str] = ["*"]
     default_main_thread_pool_size: int = 40
 
+    # ── Observability (OpenTelemetry tracing) ──────────────────────────
+    # Disabled by default so local dev and tests carry zero OTel overhead.
+    # When enabled without an OTLP endpoint, spans go to the console
+    # exporter (useful for local verification); with an endpoint they are
+    # batched to the collector over OTLP/HTTP.
+    otel_enabled: bool = False
+    otel_service_name: str = "knowledge-be"
+    otel_exporter_otlp_endpoint: str | None = None
+    # ``file`` writes spans as newline-delimited JSON to ``otel_file_dir``
+    # so an agent can ``jq`` / grep a trace locally without a collector.
+    otel_exporter: str = "console"  # one of: console | otlp | file
+    otel_file_dir: str = "traces"
+
     docreader_addr: str = "localhost:50051"
     docreader_transport: str = "grpc"
 

@@ -32,9 +32,7 @@ EMBED_WIDGET_POSITIONS: frozenset[str] = frozenset(
 )
 
 # Supported embed UI locales.
-EMBED_SUPPORTED_LOCALES: frozenset[str] = frozenset(
-    {"zh-CN", "en-US", "ko-KR", "ru-RU"}
-)
+EMBED_SUPPORTED_LOCALES: frozenset[str] = frozenset({"zh-CN", "en-US", "ko-KR", "ru-RU"})
 
 # Prefix tagging sessions created through an embed channel.
 EMBED_SESSION_MARKER_PREFIX = "embed_channel:"

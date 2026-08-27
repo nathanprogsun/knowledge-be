@@ -592,8 +592,7 @@ class GenericRepository(Generic[ModelType]):
                     raise ValidationError(
                         code="db.invalid_order_by",
                         message=(
-                            f"order_by modifier {token!r} is not allowed; "
-                            "expected 'asc' or 'desc'"
+                            f"order_by modifier {token!r} is not allowed; expected 'asc' or 'desc'"
                         ),
                     )
             order_clause = f"order by {order_by}"

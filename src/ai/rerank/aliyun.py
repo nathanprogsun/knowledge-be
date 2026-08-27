@@ -28,9 +28,7 @@ from src.common.exception import ExternalServiceError
 from src.common.json import JsonObject
 
 # Default DashScope text-rerank endpoint (a full URL, not a base).
-_DEFAULT_ENDPOINT = (
-    "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank"
-)
+_DEFAULT_ENDPOINT = "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank"
 
 
 class _AliyunDocument(BaseModel):
@@ -121,10 +119,7 @@ class AliyunReranker:
             status = f"{response.status_code} {reason}".strip()
             raise ExternalServiceError(
                 code="rerank.aliyun_api_error",
-                message=(
-                    f"Aliyun rerank API error: Http Status: {status}, "
-                    f"Body: {response.text}"
-                ),
+                message=(f"Aliyun rerank API error: Http Status: {status}, Body: {response.text}"),
             )
         try:
             body = response.json()

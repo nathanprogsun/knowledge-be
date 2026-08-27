@@ -23,7 +23,6 @@ from src.db.models.system.audit_log import AuditLog
 from src.db.models.system.system_setting import SystemSetting
 from tests.util.service_test import ServiceTest
 
-
 # ── In-memory repository doubles (stateful via side_effect closures) ─
 
 
@@ -174,7 +173,7 @@ class TestSystemSettingService(ServiceTest):
         assert vm.enum == ["self_serve", "invite_only"]
 
     async def test_list_merges_persisted_rows_with_registry(self) -> None:
-        svc, sr_rows, _ = _make_setting_svc()
+        svc, _, _ = _make_setting_svc()
         await svc.update(key="auth.registration_mode", raw_value="invite_only")
 
         infos = await svc.list_settings()

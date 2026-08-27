@@ -42,9 +42,7 @@ from src.ai.retrieval.types import (
 class _FakeEngine:
     """Engine service exposing only what resolution consumes."""
 
-    def __init__(
-        self, engine_type: RetrieverEngineType, support: list[RetrieverType]
-    ) -> None:
+    def __init__(self, engine_type: RetrieverEngineType, support: list[RetrieverType]) -> None:
         self._engine_type = engine_type
         self._support = support
 
@@ -67,9 +65,7 @@ class _FakeOwnership:
         self._error = error
         self.calls: list[tuple[str, int]] = []
 
-    async def store_owned_by(
-        self, _ctx: Context, store_id: str, tenant_id: int
-    ) -> bool:
+    async def store_owned_by(self, _ctx: Context, store_id: str, tenant_id: int) -> bool:
         self.calls.append((store_id, tenant_id))
         if self._error is not None:
             raise self._error
@@ -97,9 +93,7 @@ class _TenantCtx:
 def _params(
     engine_type: RetrieverEngineType, retriever_type: RetrieverType
 ) -> RetrieverEngineParams:
-    return RetrieverEngineParams(
-        retriever_engine_type=engine_type, retriever_type=retriever_type
-    )
+    return RetrieverEngineParams(retriever_engine_type=engine_type, retriever_type=retriever_type)
 
 
 def _type_registry(*engines: _FakeEngine) -> RetrieveEngineRegistry:
@@ -136,14 +130,10 @@ def test_tenant_info_from_context_returns_none_when_absent() -> None:
 
 
 async def test_create_for_kb_unbound_uses_tenant_effective_engines() -> None:
-    es_engine = _FakeEngine(
-        RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS]
-    )
+    es_engine = _FakeEngine(RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS])
     registry = _type_registry(es_engine)
     ownership = _FakeOwnership()
-    tenant = _Tenant(
-        [_params(RetrieverEngineType.ELASTICSEARCH, RetrieverType.KEYWORDS)]
-    )
+    tenant = _Tenant([_params(RetrieverEngineType.ELASTICSEARCH, RetrieverType.KEYWORDS)])
 
     composite = await create_retrieve_engine_for_kb(
         _TenantCtx(tenant_info=tenant), registry, ownership, 1, None
@@ -158,14 +148,10 @@ async def test_create_for_kb_unbound_uses_tenant_effective_engines() -> None:
 
 
 async def test_create_for_kb_empty_store_id_treated_as_unbound() -> None:
-    es_engine = _FakeEngine(
-        RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS]
-    )
+    es_engine = _FakeEngine(RetrieverEngineType.ELASTICSEARCH, [RetrieverType.KEYWORDS])
     registry = _type_registry(es_engine)
     ownership = _FakeOwnership()
-    tenant = _Tenant(
-        [_params(RetrieverEngineType.ELASTICSEARCH, RetrieverType.KEYWORDS)]
-    )
+    tenant = _Tenant([_params(RetrieverEngineType.ELASTICSEARCH, RetrieverType.KEYWORDS)])
 
     composite = await create_retrieve_engine_for_kb(
         _TenantCtx(tenant_info=tenant), registry, ownership, 1, ""
@@ -180,9 +166,7 @@ async def test_create_for_kb_unbound_missing_tenant_raises() -> None:
     ownership = _FakeOwnership()
 
     with pytest.raises(TenantInfoMissingError):
-        await create_retrieve_engine_for_kb(
-            TaskContext(), registry, ownership, 1, None
-        )
+        await create_retrieve_engine_for_kb(TaskContext(), registry, ownership, 1, None)
 
 
 # ── store-bound (ownership verified) ─────────────────────────────────
@@ -211,17 +195,13 @@ async def test_create_for_kb_store_bound() -> None:
 
 
 async def test_create_for_kb_cross_tenant_forbidden() -> None:
-    es_engine = _FakeEngine(
-        RetrieverEngineType.ELASTICSEARCH, [RetrieverType.VECTOR]
-    )
+    es_engine = _FakeEngine(RetrieverEngineType.ELASTICSEARCH, [RetrieverType.VECTOR])
     registry = _store_registry(("store-A", es_engine))
     # store-A is owned by tenant 2, not tenant 1.
     ownership = _FakeOwnership(owned={"store-A": 2})
 
     with pytest.raises(VectorStoreForbiddenError) as excinfo:
-        await create_retrieve_engine_for_kb(
-            TaskContext(), registry, ownership, 1, "store-A"
-        )
+        await create_retrieve_engine_for_kb(TaskContext(), registry, ownership, 1, "store-A")
     # The sentinel must not expose the store UUID.
     assert "store-A" not in str(excinfo.value)
 
@@ -233,47 +213,35 @@ async def test_create_for_kb_unregistered_store_not_found() -> None:
     ownership = _FakeOwnership(owned={"store-A": 1})
 
     with pytest.raises(VectorStoreNotFoundError):
-        await create_retrieve_engine_for_kb(
-            TaskContext(), registry, ownership, 1, "store-A"
-        )
+        await create_retrieve_engine_for_kb(TaskContext(), registry, ownership, 1, "store-A")
 
 
 async def test_create_for_kb_ownership_infra_error_is_unavailable() -> None:
-    es_engine = _FakeEngine(
-        RetrieverEngineType.ELASTICSEARCH, [RetrieverType.VECTOR]
-    )
+    es_engine = _FakeEngine(RetrieverEngineType.ELASTICSEARCH, [RetrieverType.VECTOR])
     registry = _store_registry(("store-A", es_engine))
     ownership = _FakeOwnership(error=RuntimeError("db connection refused"))
 
     with pytest.raises(VectorStoreUnavailableError) as excinfo:
-        await create_retrieve_engine_for_kb(
-            TaskContext(), registry, ownership, 1, "store-A"
-        )
+        await create_retrieve_engine_for_kb(TaskContext(), registry, ownership, 1, "store-A")
     # A database failure says nothing about whether the store exists, so it
     # must be the retryable sentinel, never the permanent not-found one.
     assert not isinstance(excinfo.value, VectorStoreNotFoundError)
 
 
 async def test_create_for_kb_ownership_context_error_propagates() -> None:
-    es_engine = _FakeEngine(
-        RetrieverEngineType.ELASTICSEARCH, [RetrieverType.VECTOR]
-    )
+    es_engine = _FakeEngine(RetrieverEngineType.ELASTICSEARCH, [RetrieverType.VECTOR])
     registry = _store_registry(("store-A", es_engine))
     ownership = _FakeOwnership(error=TimeoutError("deadline exceeded"))
 
     with pytest.raises(TimeoutError, match="deadline exceeded"):
-        await create_retrieve_engine_for_kb(
-            TaskContext(), registry, ownership, 1, "store-A"
-        )
+        await create_retrieve_engine_for_kb(TaskContext(), registry, ownership, 1, "store-A")
 
 
 # ── payload variant (async workers) ──────────────────────────────────
 
 
 async def test_create_engine_from_payload_unbound_uses_payload_engines() -> None:
-    postgres_engine = _FakeEngine(
-        RetrieverEngineType.POSTGRES, [RetrieverType.VECTOR]
-    )
+    postgres_engine = _FakeEngine(RetrieverEngineType.POSTGRES, [RetrieverType.VECTOR])
     registry = _type_registry(postgres_engine)
     ownership = _FakeOwnership()
     engines = [_params(RetrieverEngineType.POSTGRES, RetrieverType.VECTOR)]
@@ -282,7 +250,9 @@ async def test_create_engine_from_payload_unbound_uses_payload_engines() -> None
         TaskContext(), registry, ownership, 1, engines, None
     )
 
-    assert composite._engine_infos[0].retrieve_engine is cast("RetrieveEngineService", postgres_engine)
+    assert composite._engine_infos[0].retrieve_engine is cast(
+        "RetrieveEngineService", postgres_engine
+    )
     assert ownership.calls == []
 
 
@@ -295,7 +265,9 @@ async def test_create_engine_from_payload_bound() -> None:
         TaskContext(), registry, ownership, 42, [], "qd-1"
     )
 
-    assert composite._engine_infos[0].retrieve_engine is cast("RetrieveEngineService", qdrant_engine)
+    assert composite._engine_infos[0].retrieve_engine is cast(
+        "RetrieveEngineService", qdrant_engine
+    )
 
 
 async def test_create_engine_from_payload_tampered_cross_tenant() -> None:

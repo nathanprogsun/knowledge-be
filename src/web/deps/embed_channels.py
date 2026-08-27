@@ -34,7 +34,6 @@ from fastapi import Depends, Header, Request
 
 from src.app_context import request_context
 from src.common.exception import (
-    PermissionDeniedError,
     ValidationError,
 )
 from src.core.channels.embed.factory import (
@@ -45,10 +44,8 @@ from src.core.channels.embed.factory import (
 from src.core.channels.embed.service.embed_channel_service import (
     EmbedChannelService,
 )
-from src.core.channels.embed.session import (
-    EmbedSessionService,
-    verify_embed_session_handle,
-)
+from src.core.channels.embed.session import EmbedSessionService
+from src.core.channels.embed.types import EmbedChannelInfo
 from src.core.channels.embed.webhook import EmbedWebhookDispatcher
 from src.core.chat.factory import build_chat_service
 from src.core.chat.messages.factory import build_message_service
@@ -57,7 +54,6 @@ from src.core.chat.pipeline.types import Context
 from src.core.chat.service import ChatService
 from src.core.knowledge.chunks.factory import build_chunk_service
 from src.core.knowledge.chunks.service.chunk_service import ChunkService
-from src.db.models.embed_channel import EmbedChannel
 from src.web.deps.session import SessionDep
 
 
@@ -136,10 +132,10 @@ def get_embed_chunk_service(session: SessionDep) -> ChunkService:
     return build_chunk_service(session)
 
 
-def _require_state_channel(request: Request) -> EmbedChannel:
+def _require_state_channel(request: Request) -> EmbedChannelInfo:
     """Read the resolved embed channel from ``request.state``, or fail."""
     channel = getattr(request.state, "embed_channel", None)
-    if not isinstance(channel, EmbedChannel):
+    if not isinstance(channel, EmbedChannelInfo):
         raise ValidationError(
             code="embed.channel_context_missing",
             message="embed channel context missing",
@@ -166,22 +162,12 @@ def extract_embed_token(authorization: str | None) -> str:
     return parts[1].strip()
 
 
-def _origin_list(channel: EmbedChannel) -> list[str]:
-    """Narrow the JSONB ``allowed_origins`` column onto a concrete list."""
-    value = channel.allowed_origins
-    if isinstance(value, list):
-        return [item for item in value if isinstance(item, str)]
-    if isinstance(value, str):
-        return [value]
-    return []
-
-
 async def get_embed_channel(
     request: Request,
     channel_id: str,
     session_service: EmbedSessionServiceDep,
     authorization: str | None = Header(default=None, alias="Authorization"),
-) -> EmbedChannel:
+) -> EmbedChannelInfo:
     """Resolve the embed channel for a publish-token-authenticated request.
 
     Mirrors the upstream embed-auth middleware: token lookup (accepting
@@ -191,15 +177,12 @@ async def get_embed_channel(
     dependencies (chat / message services) can read the channel's
     tenant without re-resolving it.
     """
-    channel = await session_service.lookup_for_embed(
+    origin = request.headers.get("origin", "")
+    client_ip = request.client.host if request.client is not None else ""
+    channel = await session_service.resolve_channel_for_request(
         channel_id=channel_id,
         token=extract_embed_token(authorization),
-    )
-    origin = request.headers.get("origin", "")
-    await session_service.assert_origin_allowed(origin, _origin_list(channel))
-    client_ip = request.client.host if request.client is not None else ""
-    await session_service.enforce_rate_limits(
-        channel=channel,
+        origin=origin,
         client_ip=client_ip,
     )
     request.state.embed_channel = channel
@@ -211,8 +194,9 @@ async def require_embed_session(
     request: Request,
     session_id: str,
     channel: EmbedChannelDep,
+    session_service: EmbedSessionServiceDep,
     x_embed_session: str | None = Header(default=None, alias="X-Embed-Session"),
-) -> EmbedChannel:
+) -> EmbedChannelInfo:
     """Gate a session-scoped embed route on the signed visitor handle.
 
     ``X-Embed-Session`` is the HMAC handle minted at session creation
@@ -227,30 +211,22 @@ async def require_embed_session(
             message="session_id is required",
         )
     signature = (x_embed_session or "").strip()
-    if not verify_embed_session_handle(channel, cleaned, signature):
-        raise PermissionDeniedError(
-            code="embed.session_signature_invalid",
-            message="session signature invalid",
-        )
+    await session_service.assert_session_handle(
+        channel_id=channel.id,
+        session_id=cleaned,
+        signature=signature,
+    )
     request.state.embed_session_id = cleaned
     return channel
 
 
-EmbedChannelServiceDep = Annotated[
-    EmbedChannelService, Depends(get_embed_channel_service)
-]
-EmbedSessionServiceDep = Annotated[
-    EmbedSessionService, Depends(get_embed_session_service)
-]
-EmbedWebhookDispatcherDep = Annotated[
-    EmbedWebhookDispatcher, Depends(get_embed_webhook_dispatcher)
-]
-EmbedChannelDep = Annotated[EmbedChannel, Depends(get_embed_channel)]
-EmbedSessionDep = Annotated[EmbedChannel, Depends(require_embed_session)]
+EmbedChannelServiceDep = Annotated[EmbedChannelService, Depends(get_embed_channel_service)]
+EmbedSessionServiceDep = Annotated[EmbedSessionService, Depends(get_embed_session_service)]
+EmbedWebhookDispatcherDep = Annotated[EmbedWebhookDispatcher, Depends(get_embed_webhook_dispatcher)]
+EmbedChannelDep = Annotated[EmbedChannelInfo, Depends(get_embed_channel)]
+EmbedSessionDep = Annotated[EmbedChannelInfo, Depends(require_embed_session)]
 EmbedChatServiceDep = Annotated[ChatService, Depends(get_embed_chat_service)]
-EmbedMessageServiceDep = Annotated[
-    MessageServiceImpl, Depends(get_embed_message_service)
-]
+EmbedMessageServiceDep = Annotated[MessageServiceImpl, Depends(get_embed_message_service)]
 EmbedMessageContextDep = Annotated[Context, Depends(get_embed_message_context)]
 EmbedChunkServiceDep = Annotated[ChunkService, Depends(get_embed_chunk_service)]
 

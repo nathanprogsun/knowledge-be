@@ -12,9 +12,7 @@ from src.common.exception import ValidationError
 
 # Google Gemini API base URLs.
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
-GEMINI_OPENAI_COMPAT_BASE_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/openai"
-)
+GEMINI_OPENAI_COMPAT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
 
 
 def info() -> ProviderInfo:

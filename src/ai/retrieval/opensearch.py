@@ -47,7 +47,7 @@ from src.ai.retrieval.types import (
 )
 from src.common.exception import ApplicationError, ValidationError, VectorStoreError
 
-_DEFAULT_BASE_INDEX: str = "weknora"
+_DEFAULT_BASE_INDEX: str = "kb"
 _ENV_INDEX_KEY: str = "OPENSEARCH_INDEX"
 _COPY_BATCH_SIZE: int = 500
 _BULK_MAX_DOCS: int = 1000
@@ -253,7 +253,9 @@ def _build_filter_must(params: RetrieveParams) -> list[dict[str, Any]]:
     if params.exclude_chunk_ids:
         must.append({"bool": {"must_not": {"terms": {"chunk_id": list(params.exclude_chunk_ids)}}}})
     if params.exclude_knowledge_ids:
-        must.append({"bool": {"must_not": {"terms": {"knowledge_id": list(params.exclude_knowledge_ids)}}}})
+        must.append(
+            {"bool": {"must_not": {"terms": {"knowledge_id": list(params.exclude_knowledge_ids)}}}}
+        )
     must.append({"term": {"is_enabled": True}})
     return must
 
@@ -351,7 +353,7 @@ def _transform_source_id(source_id: str, chunk_id: str, target_chunk_id: str) ->
         return target_chunk_id
     prefix = f"{chunk_id}-"
     if source_id.startswith(prefix):
-        return f"{target_chunk_id}-{source_id[len(prefix):]}"
+        return f"{target_chunk_id}-{source_id[len(prefix) :]}"
     return str(uuid.uuid4())
 
 
@@ -425,9 +427,7 @@ class OpenSearchRepository(RetrieveEngineRepository):
                 exists = await self._alias_exists(ctx, name)
                 if not exists:
                     body = _build_keywords_mapping(self._cfg)
-                    await asyncio.to_thread(
-                        self._client.indices.create, index=name, body=body
-                    )
+                    await asyncio.to_thread(self._client.indices.create, index=name, body=body)
                 self._keywords_ready = True
                 self._keywords_err = None
                 await self._audit.emit_index_created(ctx, name, 0)
@@ -445,9 +445,7 @@ class OpenSearchRepository(RetrieveEngineRepository):
             return
         body = _build_index_mapping(self._cfg, dim)
         try:
-            await asyncio.to_thread(
-                self._client.indices.create, index=real_index, body=body
-            )
+            await asyncio.to_thread(self._client.indices.create, index=real_index, body=body)
             index_created = True
         except Exception as exc:
             if _is_already_exists(exc):
@@ -459,9 +457,7 @@ class OpenSearchRepository(RetrieveEngineRepository):
         else:
             index_created = True
         try:
-            await asyncio.to_thread(
-                self._client.indices.put_alias, index=real_index, name=alias
-            )
+            await asyncio.to_thread(self._client.indices.put_alias, index=real_index, name=alias)
         except Exception as exc:
             if index_created:
                 with contextlib.suppress(Exception):
@@ -508,9 +504,7 @@ class OpenSearchRepository(RetrieveEngineRepository):
 
     # ── protocol: save / batch_save ───────────────────────────────────
 
-    async def save(
-        self, ctx: Context, index_info: IndexInfo, params: IndexSaveParams
-    ) -> None:
+    async def save(self, ctx: Context, index_info: IndexInfo, params: IndexSaveParams) -> None:
         emb = _lookup_embedding(params, index_info.source_id)
         enabled = _lookup_chunk_enabled(params, index_info.chunk_id, index_info.is_enabled)
         dim = len(emb) if emb else 0
@@ -521,9 +515,7 @@ class OpenSearchRepository(RetrieveEngineRepository):
             await self._ensure_keywords_index(ctx)
             target = self._keywords_index()
         doc = _to_doc(index_info, emb, enabled)
-        await asyncio.to_thread(
-            self._client.index, index=target, id=index_info.chunk_id, body=doc
-        )
+        await asyncio.to_thread(self._client.index, index=target, id=index_info.chunk_id, body=doc)
 
     async def batch_save(
         self,
@@ -573,9 +565,7 @@ class OpenSearchRepository(RetrieveEngineRepository):
         del knowledge_type
         await self._delete_by_list(ctx, knowledge_id_list, dimension, "knowledge_id")
 
-    async def _delete_by_list(
-        self, ctx: Context, ids: list[str], dim: int, field: str
-    ) -> None:
+    async def _delete_by_list(self, ctx: Context, ids: list[str], dim: int, field: str) -> None:
         if not ids:
             return
         if len(ids) > _BULK_MAX_DOCS:
@@ -587,15 +577,11 @@ class OpenSearchRepository(RetrieveEngineRepository):
             await self._ensure_ready(ctx, dim)
             index = self._index_alias(dim)
         body = {"query": {"terms": {field: ids}}}
-        await asyncio.to_thread(
-            self._client.delete_by_query, index=index, body=body, refresh=True
-        )
+        await asyncio.to_thread(self._client.delete_by_query, index=index, body=body, refresh=True)
 
     # ── protocol: retrieve ───────────────────────────────────────────
 
-    async def retrieve(
-        self, ctx: Context, params: RetrieveParams
-    ) -> list[RetrieveResult]:
+    async def retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
         dim, multi_index = _resolve_dim(params)
         if params.retriever_type == RetrieverType.VECTOR:
             if dim == 0:
@@ -605,7 +591,9 @@ class OpenSearchRepository(RetrieveEngineRepository):
         if params.retriever_type == RetrieverType.KEYWORDS:
             if multi_index:
                 return await self._keywords_retrieve(ctx, params, f"{self._base_index}_*")
-            await self._ensure_ready(ctx, dim) if dim > 0 else await self._ensure_keywords_index(ctx)
+            await self._ensure_ready(ctx, dim) if dim > 0 else await self._ensure_keywords_index(
+                ctx
+            )
             index = self._index_alias(dim) if dim > 0 else self._keywords_index()
             return await self._keywords_retrieve(ctx, params, index)
         raise ValidationError(
@@ -635,9 +623,7 @@ class OpenSearchRepository(RetrieveEngineRepository):
 
     async def _search(self, index_pattern: str, body: dict[str, Any]) -> list[dict[str, Any]]:
         try:
-            response = await asyncio.to_thread(
-                self._client.search, index=index_pattern, body=body
-            )
+            response = await asyncio.to_thread(self._client.search, index=index_pattern, body=body)
         except NotFoundError as exc:
             raise IndexNotFoundError(f"index {index_pattern} missing") from exc
         except Exception as exc:
@@ -665,12 +651,17 @@ class OpenSearchRepository(RetrieveEngineRepository):
         alias = self._index_alias(dimension)
         total = 0
         for from_val in range(0, _MAX_RESULT_WINDOW, _COPY_BATCH_SIZE):
-            docs = await self._copy_scan_batch(alias, source_knowledge_base_id, from_val, _COPY_BATCH_SIZE)
+            docs = await self._copy_scan_batch(
+                alias, source_knowledge_base_id, from_val, _COPY_BATCH_SIZE
+            )
             if not docs:
                 break
             infos, emb_map, enabled_map = _process_copy_batch(
-                docs, source_to_target_kb_id_map, source_to_target_chunk_id_map,
-                target_knowledge_base_id, knowledge_type,
+                docs,
+                source_to_target_kb_id_map,
+                source_to_target_chunk_id_map,
+                target_knowledge_base_id,
+                knowledge_type,
             )
             if infos:
                 params: IndexSaveParams = {"embedding": emb_map}
@@ -690,15 +681,17 @@ class OpenSearchRepository(RetrieveEngineRepository):
             "query": {"bool": {"filter": [{"term": {"knowledge_base_id": source_kb}}]}},
         }
         try:
-            response = await asyncio.to_thread(
-                self._client.search, index=index, body=body
-            )
+            response = await asyncio.to_thread(self._client.search, index=index, body=body)
         except NotFoundError as exc:
             raise IndexNotFoundError(f"index {index} missing") from exc
         except Exception as exc:
             raise _wrap_transport(exc) from exc
         hits_obj = response.get("hits", {})
-        return [h.get("_source", {}) for h in hits_obj.get("hits", []) if isinstance(h.get("_source"), dict)]
+        return [
+            h.get("_source", {})
+            for h in hits_obj.get("hits", [])
+            if isinstance(h.get("_source"), dict)
+        ]
 
     # ── protocol: batch_update_chunk_* ───────────────────────────────
 
@@ -746,7 +739,9 @@ class OpenSearchRepository(RetrieveEngineRepository):
         }
         await asyncio.to_thread(
             self._client.update_by_query,
-            index=f"{self._base_index}_*", body=body, refresh=True,
+            index=f"{self._base_index}_*",
+            body=body,
+            refresh=True,
         )
 
 
@@ -770,9 +765,7 @@ def _effective_top_k(params: RetrieveParams) -> int:
     return min(params.top_k, _MAX_RESULT_WINDOW)
 
 
-def _wrap_results(
-    hits: list[dict[str, Any]], rt: RetrieverType, mt: MatchType
-) -> RetrieveResult:
+def _wrap_results(hits: list[dict[str, Any]], rt: RetrieverType, mt: MatchType) -> RetrieveResult:
     results: list[IndexWithScore] = []
     for hit in hits:
         doc_id = hit.get("_id", "")
@@ -780,19 +773,21 @@ def _wrap_results(
         source = hit.get("_source", {})
         if not isinstance(source, dict):
             continue
-        results.append(IndexWithScore(
-            id=doc_id,
-            chunk_id=source.get("chunk_id", ""),
-            knowledge_id=source.get("knowledge_id", ""),
-            knowledge_base_id=source.get("knowledge_base_id", ""),
-            source_id=source.get("source_id", ""),
-            source_type=SourceType(source.get("source_type", 0)),
-            tag_id=source.get("tag_id", ""),
-            content=source.get("content", ""),
-            score=score,
-            match_type=mt,
-            is_enabled=source.get("is_enabled", False),
-        ))
+        results.append(
+            IndexWithScore(
+                id=doc_id,
+                chunk_id=source.get("chunk_id", ""),
+                knowledge_id=source.get("knowledge_id", ""),
+                knowledge_base_id=source.get("knowledge_base_id", ""),
+                source_id=source.get("source_id", ""),
+                source_type=SourceType(source.get("source_type", 0)),
+                tag_id=source.get("tag_id", ""),
+                content=source.get("content", ""),
+                score=score,
+                match_type=mt,
+                is_enabled=source.get("is_enabled", False),
+            )
+        )
     return RetrieveResult(
         results=results,
         retriever_engine_type=RetrieverEngineType.OPENSEARCH,
@@ -859,18 +854,20 @@ def _process_copy_batch(
         if emb:
             emb_map[target_source_id] = list(emb)
         enabled_map[target_chunk_id] = d.get("is_enabled", True)
-        infos.append(IndexInfo(
-            content=d.get("content", ""),
-            source_id=target_source_id,
-            source_type=SourceType(d.get("source_type", 0)),
-            chunk_id=target_chunk_id,
-            knowledge_id=target_knowledge_id,
-            knowledge_base_id=target_knowledge_base_id,
-            knowledge_type=knowledge_type,
-            tag_id=d.get("tag_id", ""),
-            is_enabled=d.get("is_enabled", True),
-            is_recommended=d.get("is_recommended", False),
-        ))
+        infos.append(
+            IndexInfo(
+                content=d.get("content", ""),
+                source_id=target_source_id,
+                source_type=SourceType(d.get("source_type", 0)),
+                chunk_id=target_chunk_id,
+                knowledge_id=target_knowledge_id,
+                knowledge_base_id=target_knowledge_base_id,
+                knowledge_type=knowledge_type,
+                tag_id=d.get("tag_id", ""),
+                is_enabled=d.get("is_enabled", True),
+                is_recommended=d.get("is_recommended", False),
+            )
+        )
     return infos, emb_map, enabled_map
 
 
@@ -897,9 +894,7 @@ def _resolve_base_index(store_id: str, index_config: IndexConfig | None) -> str:
         base = os.getenv(_ENV_INDEX_KEY, _DEFAULT_BASE_INDEX)
     if store_id:
         if len(store_id) < 16:
-            raise ConfigInvalidError(
-                f"storeID must be empty or >=16 chars, got {len(store_id)}"
-            )
+            raise ConfigInvalidError(f"storeID must be empty or >=16 chars, got {len(store_id)}")
         base = f"{base}_{store_id[:12]}"
     if not _INDEX_NAME_RE.match(base):
         raise ConfigInvalidError(f"invalid index base name: {base!r}")

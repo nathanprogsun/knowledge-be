@@ -250,7 +250,9 @@ async def test_create_service_duplicate_name_returns_409(web_authed_client: Test
 
 
 async def test_create_service_rejects_blank_name(web_authed_client: TestClient) -> None:
-    resp = web_authed_client.post("/api/v1/mcp-services", json={"name": "  ", "transport_type": "sse"})
+    resp = web_authed_client.post(
+        "/api/v1/mcp-services", json={"name": "  ", "transport_type": "sse"}
+    )
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "mcp_service.name_required"
 

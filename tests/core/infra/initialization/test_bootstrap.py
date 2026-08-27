@@ -7,7 +7,6 @@ chat probe hits a hostname that ``validate_ssrf_safe_url`` accepts
 before it leaves the process.
 """
 # Chinese message strings are asserted verbatim against the Go originals.
-# ruff: noqa: RUF001, RUF003
 
 from __future__ import annotations
 

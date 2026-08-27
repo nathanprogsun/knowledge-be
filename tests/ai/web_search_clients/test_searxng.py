@@ -61,10 +61,7 @@ def test_validate_base_url_strips_trailing_slash(monkeypatch: MonkeyPatch) -> No
 
 
 def test_validate_base_url_accepts_public_domain() -> None:
-    assert (
-        validate_searxng_base_url("https://searxng.example.com")
-        == "https://searxng.example.com"
-    )
+    assert validate_searxng_base_url("https://searxng.example.com") == "https://searxng.example.com"
 
 
 # ── search ────────────────────────────────────────────────────────────
@@ -117,8 +114,7 @@ def test_search_respects_max_results_cap() -> None:
             200,
             json={
                 "results": [
-                    {"title": f"T{i}", "url": f"https://e/{i}", "content": "c"}
-                    for i in range(10)
+                    {"title": f"T{i}", "url": f"https://e/{i}", "content": "c"} for i in range(10)
                 ]
             },
         )

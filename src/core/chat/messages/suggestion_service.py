@@ -8,6 +8,7 @@ vocabulary so downstream callers can depend on the interface.
 
 from __future__ import annotations
 
+from src.common.exception import NotImplementedFeatureError
 from src.db.models.message_suggestion import (
     SUGGESTION_EVENT_CLICK,
     SUGGESTION_EVENT_DISMISS,
@@ -37,7 +38,7 @@ class MessageSuggestionService:
         regenerate: bool,
     ) -> MessageSuggestionSet:
         """Generate (or return the cached) follow-up suggestions."""
-        raise NotImplementedError
+        raise NotImplementedFeatureError
 
     async def get_follow_ups(
         self,
@@ -46,7 +47,7 @@ class MessageSuggestionService:
         assistant_message_id: str,
     ) -> MessageSuggestionSet | None:
         """Return the cached follow-up suggestions for an assistant message."""
-        raise NotImplementedError
+        raise NotImplementedFeatureError
 
     async def record_event(
         self,
@@ -57,7 +58,7 @@ class MessageSuggestionService:
         event_type: str,
     ) -> None:
         """Record a product-analytics event for a suggestion question."""
-        raise NotImplementedError
+        raise NotImplementedFeatureError
 
     async def validate_attribution(
         self,
@@ -68,7 +69,7 @@ class MessageSuggestionService:
         question_id: str,
     ) -> None:
         """Validate that a follow-up click attribution matches a ready set."""
-        raise NotImplementedError
+        raise NotImplementedFeatureError
 
 
 __all__ = [

@@ -118,6 +118,11 @@ def check_file(path: Path) -> list[str]:
     def visit(node: ast.AST) -> None:
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             if node.col_offset > 0:
+                # ``if TYPE_CHECKING:`` imports are intentional and
+                # documented in AGENTS.md §6.2; skip them here so the
+                # gate does not flag legitimate type-only imports.
+                if _describe_enclosing(node, parents) == "TYPE_CHECKING block":
+                    return
                 kind = "import" if isinstance(node, ast.Import) else "from-import"
                 snippet = ast.unparse(node).splitlines()[0][:80]
                 where = _describe_enclosing(node, parents)

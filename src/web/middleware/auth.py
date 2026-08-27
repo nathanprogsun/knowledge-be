@@ -31,7 +31,6 @@ from src.core.auth.factory import build_auth_service
 from src.core.auth.permissions import APIKeyScopeType, TenantAPIKeyScope
 from src.core.auth.types import UserInfo
 from src.core.tenants.factory import build_tenant_api_key_service, build_tenant_member_service
-from src.db.dao.users_repository import UserRepository
 from src.settings import get_settings
 from src.web.deps.session import SessionDep
 
@@ -211,13 +210,9 @@ async def _resolve_header_auth(
             message=f"Invalid {settings.auth_header_tenant_id} header",
         ) from exc
 
-    user_repo = UserRepository(session)
+    auth_service = build_auth_service(session)
     try:
-        user = await user_repo.find_by_id(
-            user_id,
-            not_found_code="auth.user_not_found",
-            not_found_message="User for header-auth not found",
-        )
+        user = await auth_service.get_user_by_id(user_id)
     except NotFoundError as exc:
         raise UnauthorizedError(
             code="auth.user_not_found",

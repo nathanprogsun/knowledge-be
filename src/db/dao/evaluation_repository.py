@@ -57,9 +57,7 @@ class EvaluationRepository(
         contract, so they stay out of the SET clause.
         """
         immutable = {"id", "tenant_id", "created_at"}
-        updates: BindParams = {
-            k: v for k, v in row.model_dump().items() if k not in immutable
-        }
+        updates: BindParams = {k: v for k, v in row.model_dump().items() if k not in immutable}
         persisted = await self.update_by_primary_key({"id": row.id}, updates)
         if persisted is None:
             raise DataError(
@@ -158,9 +156,7 @@ class EvaluationDatasetRepository(
         contract.
         """
         immutable = {"id", "evaluation_id", "created_at"}
-        updates: BindParams = {
-            k: v for k, v in row.model_dump().items() if k not in immutable
-        }
+        updates: BindParams = {k: v for k, v in row.model_dump().items() if k not in immutable}
         persisted = await self.update_by_primary_key({"id": row.id}, updates)
         if persisted is None:
             raise DataError(
@@ -211,9 +207,7 @@ class EvaluationRunRepository(
         contract.
         """
         immutable = {"id", "evaluation_id", "created_at"}
-        updates: BindParams = {
-            k: v for k, v in row.model_dump().items() if k not in immutable
-        }
+        updates: BindParams = {k: v for k, v in row.model_dump().items() if k not in immutable}
         persisted = await self.update_by_primary_key({"id": row.id}, updates)
         if persisted is None:
             raise DataError(
@@ -281,9 +275,7 @@ class EvaluationMetricRepository(
         ``id`` / ``run_id`` / ``created_at`` are immutable by contract.
         """
         immutable = {"id", "run_id", "created_at"}
-        updates: BindParams = {
-            k: v for k, v in row.model_dump().items() if k not in immutable
-        }
+        updates: BindParams = {k: v for k, v in row.model_dump().items() if k not in immutable}
         persisted = await self.update_by_primary_key({"id": row.id}, updates)
         if persisted is None:
             raise DataError(

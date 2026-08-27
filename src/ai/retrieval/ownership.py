@@ -28,9 +28,7 @@ class TenantStoreOwnership(Protocol):
     propagate as exceptions.
     """
 
-    async def store_owned_by(
-        self, ctx: Context, store_id: str, tenant_id: int
-    ) -> bool: ...
+    async def store_owned_by(self, ctx: Context, store_id: str, tenant_id: int) -> bool: ...
 
 
 class VectorStoreRepoOwnership:
@@ -39,9 +37,7 @@ class VectorStoreRepoOwnership:
     def __init__(self, repo: VectorStoreRepositoryLike) -> None:
         self._repo = repo
 
-    async def store_owned_by(
-        self, ctx: Context, store_id: str, tenant_id: int
-    ) -> bool:
+    async def store_owned_by(self, ctx: Context, store_id: str, tenant_id: int) -> bool:
         store = await self._repo.get_by_id(ctx, tenant_id, store_id)
         return store is not None
 

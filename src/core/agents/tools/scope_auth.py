@@ -91,11 +91,7 @@ def search_target_is_whole_kb(target: SearchTarget) -> bool:
     if target is None:
         return False
     knowledge_ids, tag_ids = search_target_scope(target)
-    return (
-        target.type is SearchTargetType.KNOWLEDGE_BASE
-        and not knowledge_ids
-        and not tag_ids
-    )
+    return target.type is SearchTargetType.KNOWLEDGE_BASE and not knowledge_ids and not tag_ids
 
 
 async def authorize_knowledge_in_search_targets(
@@ -190,8 +186,7 @@ async def authorize_chunk_in_search_targets(
         raise PermissionDeniedError(
             code="tool.kb_out_of_scope",
             message=(
-                f"knowledge base {chunk.knowledge_base_id} is not within "
-                "the current Agent scope"
+                f"knowledge base {chunk.knowledge_base_id} is not within the current Agent scope"
             ),
         )
     allowed, error = await search_targets_allow_knowledge_id(

@@ -108,9 +108,7 @@ class KnowledgeSpanRepository(GenericRepository[KnowledgeProcessingSpan]):
         params = row.insert_bind_params()
         params["attempt"] = attempt
         json_bps = [
-            bindparam(col, type_=_JSON)
-            for col in insert_columns
-            if col in self._json_columns
+            bindparam(col, type_=_JSON) for col in insert_columns if col in self._json_columns
         ]
         stmt = text(stmt_text).bindparams(*json_bps, **params)
         result = await self._session.execute(stmt)
@@ -206,9 +204,7 @@ class KnowledgeSpanRepository(GenericRepository[KnowledgeProcessingSpan]):
             if not frontier:
                 break
             placeholders = ", ".join(f":f_{i}" for i in range(len(frontier)))
-            status_placeholders = ", ".join(
-                f":st_{i}" for i in range(len(_OPEN_STATUSES))
-            )
+            status_placeholders = ", ".join(f":st_{i}" for i in range(len(_OPEN_STATUSES)))
             params: BindParams = {
                 "knowledge_id": knowledge_id,
                 "attempt": attempt,
@@ -243,9 +239,7 @@ class KnowledgeSpanRepository(GenericRepository[KnowledgeProcessingSpan]):
                 **update_params,
             )
             affected = await self._session.execute(update_stmt)
-            total_affected += (
-                cast("CursorResult[SqlValue]", affected).rowcount or 0
-            )
+            total_affected += cast("CursorResult[SqlValue]", affected).rowcount or 0
             frontier = child_ids
         return total_affected
 

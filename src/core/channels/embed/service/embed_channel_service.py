@@ -158,9 +158,7 @@ def normalize_default_locale(value: str) -> str:
 
 def generate_publish_token() -> str:
     """Mint a URL-safe-base64 publish token with the upstream prefix."""
-    body = base64.urlsafe_b64encode(
-        secrets.token_bytes(_EMBED_TOKEN_BYTES)
-    ).rstrip(b"=")
+    body = base64.urlsafe_b64encode(secrets.token_bytes(_EMBED_TOKEN_BYTES)).rstrip(b"=")
     return EMBED_PUBLISH_TOKEN_PREFIX + body.decode()
 
 
@@ -177,9 +175,7 @@ class AgentOwnershipLike(Protocol):
     elsewhere).
     """
 
-    async def get_agent_by_id(
-        self, *, tenant_id: int, agent_id: str
-    ) -> CustomAgentInfo:
+    async def get_agent_by_id(self, *, tenant_id: int, agent_id: str) -> CustomAgentInfo:
         """Return the owned agent or raise ``NotFoundError``."""
         ...
 
@@ -190,12 +186,8 @@ class _CustomAgentAdapter:
     def __init__(self, service: CustomAgentService) -> None:
         self._service = service
 
-    async def get_agent_by_id(
-        self, *, tenant_id: int, agent_id: str
-    ) -> CustomAgentInfo:
-        return await self._service.get_agent_by_id(
-            tenant_id=tenant_id, agent_id=agent_id
-        )
+    async def get_agent_by_id(self, *, tenant_id: int, agent_id: str) -> CustomAgentInfo:
+        return await self._service.get_agent_by_id(tenant_id=tenant_id, agent_id=agent_id)
 
 
 # ── Service ──────────────────────────────────────────────────────────
@@ -243,9 +235,7 @@ class EmbedChannelService:
         crosses the wire — every later read returns the
         :class:`EmbedChannelInfo` projection which omits it.
         """
-        cleaned_agent_id = await self._ensure_agent_owned(
-            tenant_id=tenant_id, agent_id=agent_id
-        )
+        cleaned_agent_id = await self._ensure_agent_owned(tenant_id=tenant_id, agent_id=agent_id)
         token = generate_publish_token()
         now = _now()
         row = EmbedChannel(
@@ -269,13 +259,9 @@ class EmbedChannelService:
             ),
             primary_color=request.primary_color.strip(),
             page_title=request.page_title.strip(),
-            header_title_mode=normalize_header_title_mode(
-                request.header_title_mode
-            ),
+            header_title_mode=normalize_header_title_mode(request.header_title_mode),
             show_suggested_questions=request.show_suggested_questions,
-            widget_position=normalize_widget_position(
-                request.widget_position
-            ),
+            widget_position=normalize_widget_position(request.widget_position),
             allow_web_search=request.allow_web_search,
             allow_file_upload=request.allow_file_upload,
             default_locale=normalize_default_locale(request.default_locale),
@@ -287,38 +273,26 @@ class EmbedChannelService:
         persisted = await self._repo.create(row)
         return EmbedChannelInfo.map_from_db(persisted), token
 
-    async def get_channel(
-        self, *, tenant_id: int, channel_id: str
-    ) -> EmbedChannelInfo:
+    async def get_channel(self, *, tenant_id: int, channel_id: str) -> EmbedChannelInfo:
         """Return one channel by id, scoped to ``tenant_id``."""
         self._require_channel_id(channel_id)
-        row = await self._get_owned_row(
-            tenant_id=tenant_id, channel_id=channel_id
-        )
+        row = await self._get_owned_row(tenant_id=tenant_id, channel_id=channel_id)
         return EmbedChannelInfo.map_from_db(row)
 
-    async def get_owned_channel(
-        self, *, tenant_id: int, channel_id: str
-    ) -> EmbedChannel:
+    async def get_owned_channel(self, *, tenant_id: int, channel_id: str) -> EmbedChannel:
         """Return the raw row (with secrets) for internal callers."""
         self._require_channel_id(channel_id)
-        return await self._get_owned_row(
-            tenant_id=tenant_id, channel_id=channel_id
-        )
+        return await self._get_owned_row(tenant_id=tenant_id, channel_id=channel_id)
 
     async def list_channels_by_agent(
         self, *, tenant_id: int, agent_id: str
     ) -> list[EmbedChannelInfo]:
         """Return every live channel of ``agent_id`` within the tenant."""
-        await self._ensure_agent_owned(
-            tenant_id=tenant_id, agent_id=agent_id
-        )
+        await self._ensure_agent_owned(tenant_id=tenant_id, agent_id=agent_id)
         rows = await self._repo.list_by_agent(tenant_id, agent_id)
         return [EmbedChannelInfo.map_from_db(r) for r in rows]
 
-    async def list_channels_by_tenant(
-        self, *, tenant_id: int
-    ) -> list[EmbedChannelInfo]:
+    async def list_channels_by_tenant(self, *, tenant_id: int) -> list[EmbedChannelInfo]:
         """Return every live channel of the tenant, across agents."""
         if tenant_id <= 0:
             raise ValidationError(
@@ -337,9 +311,7 @@ class EmbedChannelService:
     ) -> EmbedChannelInfo:
         """Apply the mutable subset of channel fields; ``None`` means unchanged."""
         self._require_channel_id(channel_id)
-        existing = await self._get_owned_row(
-            tenant_id=tenant_id, channel_id=channel_id
-        )
+        existing = await self._get_owned_row(tenant_id=tenant_id, channel_id=channel_id)
 
         updates: BindParams = {}
         if request.name is not None:
@@ -351,36 +323,22 @@ class EmbedChannelService:
         if request.page_title is not None:
             updates["page_title"] = request.page_title.strip()
         if request.header_title_mode is not None:
-            updates["header_title_mode"] = normalize_header_title_mode(
-                request.header_title_mode
-            )
+            updates["header_title_mode"] = normalize_header_title_mode(request.header_title_mode)
         if request.show_suggested_questions is not None:
-            updates["show_suggested_questions"] = (
-                request.show_suggested_questions
-            )
+            updates["show_suggested_questions"] = request.show_suggested_questions
         if request.allow_web_search is not None:
             updates["allow_web_search"] = request.allow_web_search
         if request.allow_file_upload is not None:
             updates["allow_file_upload"] = request.allow_file_upload
         if request.default_locale is not None:
-            updates["default_locale"] = normalize_default_locale(
-                request.default_locale
-            )
+            updates["default_locale"] = normalize_default_locale(request.default_locale)
         if request.widget_position is not None:
-            updates["widget_position"] = normalize_widget_position(
-                request.widget_position
-            )
+            updates["widget_position"] = normalize_widget_position(request.widget_position)
         if request.enabled is not None:
             updates["enabled"] = request.enabled
-        if (
-            request.rate_limit_per_minute is not None
-            and request.rate_limit_per_minute > 0
-        ):
+        if request.rate_limit_per_minute is not None and request.rate_limit_per_minute > 0:
             updates["rate_limit_per_minute"] = request.rate_limit_per_minute
-        if (
-            request.rate_limit_per_day is not None
-            and request.rate_limit_per_day > 0
-        ):
+        if request.rate_limit_per_day is not None and request.rate_limit_per_day > 0:
             updates["rate_limit_per_day"] = request.rate_limit_per_day
         if request.allowed_origins is not None:
             updates["allowed_origins"] = list(request.allowed_origins)
@@ -402,26 +360,18 @@ class EmbedChannelService:
         persisted = await self._repo.update(updated_row)
         return EmbedChannelInfo.map_from_db(persisted)
 
-    async def delete_channel(
-        self, *, tenant_id: int, channel_id: str
-    ) -> None:
+    async def delete_channel(self, *, tenant_id: int, channel_id: str) -> None:
         """Soft-delete a channel owned by ``tenant_id``."""
         self._require_channel_id(channel_id)
-        await self._get_owned_row(
-            tenant_id=tenant_id, channel_id=channel_id
-        )
-        await self._repo.soft_delete(
-            channel_id=channel_id, tenant_id=tenant_id, now=_now()
-        )
+        await self._get_owned_row(tenant_id=tenant_id, channel_id=channel_id)
+        await self._repo.soft_delete(channel_id=channel_id, tenant_id=tenant_id, now=_now())
 
     async def rotate_token(
         self, *, tenant_id: int, channel_id: str
     ) -> tuple[EmbedChannelInfo, str]:
         """Mint a fresh publish token; outstanding handles are invalidated."""
         self._require_channel_id(channel_id)
-        existing = await self._get_owned_row(
-            tenant_id=tenant_id, channel_id=channel_id
-        )
+        existing = await self._get_owned_row(tenant_id=tenant_id, channel_id=channel_id)
         rotated = existing.model_copy(
             update={
                 "publish_token": generate_publish_token(),
@@ -433,9 +383,7 @@ class EmbedChannelService:
 
     # ── Internal helpers ───────────────────────────────────────────
 
-    async def _get_owned_row(
-        self, *, tenant_id: int, channel_id: str
-    ) -> EmbedChannel:
+    async def _get_owned_row(self, *, tenant_id: int, channel_id: str) -> EmbedChannel:
         if tenant_id <= 0:
             raise ValidationError(
                 code="embed.tenant_id_required",
@@ -449,9 +397,7 @@ class EmbedChannelService:
             )
         return row
 
-    async def _ensure_agent_owned(
-        self, *, tenant_id: int, agent_id: str
-    ) -> str:
+    async def _ensure_agent_owned(self, *, tenant_id: int, agent_id: str) -> str:
         """Verify the agent belongs to the tenant; return the trimmed id.
 
         Defaults a blank id to the built-in quick-answer agent so the
@@ -466,9 +412,7 @@ class EmbedChannelService:
         if self._agent_ownership is None:
             return cleaned
         try:
-            await self._agent_ownership.get_agent_by_id(
-                tenant_id=tenant_id, agent_id=cleaned
-            )
+            await self._agent_ownership.get_agent_by_id(tenant_id=tenant_id, agent_id=cleaned)
         except NotFoundError as exc:
             # The upstream ``ensureAgentOwned`` surfaces a generic
             # not-found; surface the embed flavour so the views layer

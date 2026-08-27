@@ -20,7 +20,7 @@ from src.ai.llm.ollama import OllamaChat
 from src.ai.llm.remote_api import RemoteAPIChat
 from src.ai.llm.types import Chat, ChatConfig
 from src.ai.utils.ollama_service import OllamaService
-from src.common.exception import ValidationError, AIProviderError
+from src.common.exception import AIProviderError, ValidationError
 from src.core.contracts.infra import Model, ModelParameters
 
 

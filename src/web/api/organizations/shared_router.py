@@ -23,13 +23,6 @@ from src.core.contracts.organizations import (
     UpdateSharePermissionRequest,
 )
 from src.core.organizations.service.organization_service import OrganizationService
-from src.web.deps import AuthDep, RoleAdminDep, RoleViewerDep
-from src.web.deps.context import get_tenant_id_dep, get_tenant_role_dep, get_user_id_dep
-from src.web.deps.organizations import (
-    AgentShareServiceDep,
-    OrganizationServiceDep,
-    SharedResourceServiceDep,
-)
 from src.web.api.organizations.shared_views import (
     AgentShareEnvelope,
     AgentShareListEnvelope,
@@ -41,6 +34,13 @@ from src.web.api.organizations.shared_views import (
     shared_agent_disabled_envelope,
     shared_agent_list_envelope,
     shared_knowledge_base_list_envelope,
+)
+from src.web.deps import AuthDep, RoleAdminDep, RoleViewerDep
+from src.web.deps.context import get_tenant_id_dep, get_tenant_role_dep, get_user_id_dep
+from src.web.deps.organizations import (
+    AgentShareServiceDep,
+    OrganizationServiceDep,
+    SharedResourceServiceDep,
 )
 
 router = APIRouter(prefix="", tags=["organizations"])

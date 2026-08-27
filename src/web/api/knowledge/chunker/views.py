@@ -71,9 +71,7 @@ class PreviewChunkingRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     text: str
-    chunking_config: PreviewChunkingPayload = Field(
-        default_factory=PreviewChunkingPayload
-    )
+    chunking_config: PreviewChunkingPayload = Field(default_factory=PreviewChunkingPayload)
 
 
 class PreviewChunkResult(BaseModel):

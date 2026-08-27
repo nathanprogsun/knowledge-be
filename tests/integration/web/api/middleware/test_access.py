@@ -106,7 +106,7 @@ def test_cross_tenant_user_header_is_a_known_blocker(
     # not the header's tenant.
     assert response.status_code == 200, response.text
     payload = response.json()
-    tenant_ids = [t["id"] for t in payload["data"]["items"]]
+    tenant_ids = [t["id"] for t in payload["data"]["data"]]
     assert other_tenant_id in tenant_ids
     assert admin_tenant_id not in tenant_ids
 

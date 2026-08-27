@@ -358,15 +358,24 @@ def _restore_registry() -> Iterator[None]:
     future test that re-registers under the same name would silently
     overwrite it. The fixture is defensive — a no-op today.
     """
+    import src.workers.tasks  # noqa: F401 — pre-warm so the snapshot captures registered handlers.
     from src.workers import registry as registry_module
 
     snapshot = dict(registry_module.all_tasks())
+    # Drop any test-only handler that was registered by ``@register_task``
+    # decorators at import time of this module (e.g. ``test_base``'s
+    # ``test_task``). The canonical handler set is what downstream
+    # invariant tests assert against.
+    baseline = {name: handler for name, handler in snapshot.items() if not name.startswith("test_")}
     yield
-    # Restore the snapshot — drop any entries added during the test.
+    # Restore the baseline after the test: drop anything newly added
+    # (incl. handlers the test itself registered) and re-assert the
+    # canonical handlers from the snapshot.
     current = registry_module.all_tasks()
-    for name in current.keys() - snapshot.keys():
-        current.pop(name, None)
-    for name, handler in snapshot.items():
+    for name in list(current.keys()):
+        if name not in baseline:
+            current.pop(name, None)
+    for name, handler in baseline.items():
         current[name] = handler
 
 

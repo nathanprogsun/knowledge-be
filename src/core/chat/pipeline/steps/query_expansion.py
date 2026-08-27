@@ -84,7 +84,7 @@ _QUESTION_WORDS_RE = re.compile(
 )
 
 #: Common punctuation / whitespace that split a query into candidate segments.
-_DELIMITER_RE = re.compile(r"[,，;；、。！？!?\s]+")  # noqa: RUF001
+_DELIMITER_RE = re.compile(r"[,，;；、。！？!?\s]+")
 
 #: Quote characters that bracket an extractable phrase.
 _QUOTE_CHARS = "\"'「」『』"

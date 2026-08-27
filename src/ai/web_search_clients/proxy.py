@@ -155,9 +155,7 @@ def validate_url_for_ssrf(raw_url: str) -> str:
         raise ValidationError(f"hostname {hostname} is restricted", code=_ERROR_CODE)
     for suffix in _RESTRICTED_SUFFIXES:
         if hostname_lower.endswith(suffix):
-            raise ValidationError(
-                f"hostname suffix {suffix} is restricted", code=_ERROR_CODE
-            )
+            raise ValidationError(f"hostname suffix {suffix} is restricted", code=_ERROR_CODE)
     try:
         ipaddress.ip_address(hostname)
         raise ValidationError(

@@ -180,7 +180,7 @@ def linkify_content(content: str, refs: list[LinkRef], self_slug: str) -> tuple[
         if pos < 0:
             continue
         replacement = f"[[{ref.slug}|{ref.match_text}]]"
-        content = content[:pos] + replacement + content[pos + len(ref.match_text):]
+        content = content[:pos] + replacement + content[pos + len(ref.match_text) :]
         # Shift / extend the forbidden spans so later refs cannot nest a
         # link inside the newly created ``[[...]]``.
         delta = len(replacement) - len(ref.match_text)
@@ -192,9 +192,7 @@ def linkify_content(content: str, refs: list[LinkRef], self_slug: str) -> tuple[
     return content, changed
 
 
-def find_first_safe_match(
-    haystack: str, needle: str, forbidden: list[Span]
-) -> int:
+def find_first_safe_match(haystack: str, needle: str, forbidden: list[Span]) -> int:
     """Return the offset of the first occurrence of ``needle`` outside forbidden spans.
 
     ASCII-letter-led needles also require non-word-character boundaries.
@@ -229,12 +227,7 @@ def has_ascii_letter_edge(s: str) -> bool:
 
 def is_ascii_word_rune(ch: str) -> bool:
     """Whether ``ch`` is an ASCII word rune (letter / digit / underscore)."""
-    return (
-        ch == "_"
-        or "0" <= ch <= "9"
-        or "a" <= ch <= "z"
-        or "A" <= ch <= "Z"
-    )
+    return ch == "_" or "0" <= ch <= "9" or "a" <= ch <= "z" or "A" <= ch <= "Z"
 
 
 def has_word_boundary(s: str, pos: int, end: int) -> bool:
@@ -302,7 +295,7 @@ def compute_forbidden_spans(s: str) -> tuple[list[Span], set[str]]:
             if i + 1 < n and s[i + 1] == "[":
                 close_rel = s.find("]]", i + 2)
                 if close_rel >= 0:
-                    inner = s[i + 2:close_rel]
+                    inner = s[i + 2 : close_rel]
                     slug = extract_wiki_slug(inner)
                     if slug:
                         used.add(slug)
@@ -530,7 +523,7 @@ def match_autolink(s: str, i: int) -> tuple[int, bool]:
     close = s.find(">", i + 1)
     if close < 0:
         return 0, False
-    inner = s[i + 1:close]
+    inner = s[i + 1 : close]
     if not inner or any(c in inner for c in " \t\n"):
         return 0, False
     if "://" not in inner and not inner.startswith("mailto:"):

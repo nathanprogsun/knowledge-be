@@ -81,9 +81,7 @@ def _format_halfvec(embedding: list[float]) -> str:
     return "[" + ",".join(str(x) for x in embedding) + "]"
 
 
-def _to_db_row(
-    index_info: IndexInfo, params: IndexSaveParams
-) -> dict[str, str | int | bool]:
+def _to_db_row(index_info: IndexInfo, params: IndexSaveParams) -> dict[str, str | int | bool]:
     """Convert an ``IndexInfo`` to a column-value dict for INSERT.
 
     Mirrors the upstream ``toDBVectorEmbedding``: base fields come from
@@ -139,9 +137,7 @@ def _from_row_with_score(row: RowMapping, match_type: MatchType) -> IndexWithSco
     )
 
 
-def _build_insert_stmt_text(
-    columns: tuple[str, ...], *, on_conflict_do_nothing: bool
-) -> str:
+def _build_insert_stmt_text(columns: tuple[str, ...], *, on_conflict_do_nothing: bool) -> str:
     """Build an ``INSERT INTO embeddings (...) VALUES (...)`` statement.
 
     The ``embedding`` column receives a ``CAST(:embedding AS halfvec)``
@@ -159,9 +155,7 @@ def _build_insert_stmt_text(
     return f"INSERT INTO {_TABLE} ({col_list}) VALUES ({param_list}){conflict}"
 
 
-def _transform_source_id(
-    src_source_id: str, src_chunk_id: str, target_chunk_id: str
-) -> str:
+def _transform_source_id(src_source_id: str, src_chunk_id: str, target_chunk_id: str) -> str:
     """Transform a source ID during index copy.
 
     Regular chunks have ``source_id == chunk_id`` and adopt the target
@@ -221,9 +215,7 @@ class PostgresRetrieveEngineRepository:
 
     # ── Save / BatchSave ────────────────────────────────────────────
 
-    async def save(
-        self, ctx: Context, index_info: IndexInfo, params: IndexSaveParams
-    ) -> None:
+    async def save(self, ctx: Context, index_info: IndexInfo, params: IndexSaveParams) -> None:
         """Save a single index entry."""
         del ctx
         row = _to_db_row(index_info, params)
@@ -252,9 +244,7 @@ class PostgresRetrieveEngineRepository:
 
     # ── Retrieve ────────────────────────────────────────────────────
 
-    async def retrieve(
-        self, ctx: Context, params: RetrieveParams
-    ) -> list[RetrieveResult]:
+    async def retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
         """Route to keywords or vector retrieval based on retriever type."""
         if params.retriever_type == RetrieverType.KEYWORDS:
             return await self._keywords_retrieve(ctx, params)
@@ -316,9 +306,7 @@ class PostgresRetrieveEngineRepository:
             )
         ]
 
-    async def _vector_retrieve(
-        self, ctx: Context, params: RetrieveParams
-    ) -> list[RetrieveResult]:
+    async def _vector_retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
         """Vector similarity search using pgvector's ``<=>`` cosine distance."""
         del ctx
         dimension = len(params.embedding)
@@ -408,12 +396,8 @@ class PostgresRetrieveEngineRepository:
         """
         try:
             async with self._session_factory() as session, session.begin():
-                await session.execute(
-                    text(f"SET LOCAL hnsw.ef_search = {ef_search}")
-                )
-                await session.execute(
-                    text("SET LOCAL hnsw.iterative_scan = strict_order")
-                )
+                await session.execute(text(f"SET LOCAL hnsw.ef_search = {ef_search}"))
+                await session.execute(text("SET LOCAL hnsw.iterative_scan = strict_order"))
                 result = await session.execute(stmt, dict(bind_params))
                 return list(result.mappings().all())
         except Exception as exc:
@@ -517,9 +501,7 @@ class PostgresRetrieveEngineRepository:
             "dimension",
             "embedding",
         )
-        insert_stmt = text(
-            _build_insert_stmt_text(insert_columns, on_conflict_do_nothing=True)
-        )
+        insert_stmt = text(_build_insert_stmt_text(insert_columns, on_conflict_do_nothing=True))
         while True:
             async with self._session_factory() as session:
                 result = await session.execute(
@@ -566,9 +548,7 @@ class PostgresRetrieveEngineRepository:
             if target_knowledge_id is None:
                 continue
             src_source_id = str(source_row.get("source_id", ""))
-            target_source_id = _transform_source_id(
-                src_source_id, src_chunk_id, target_chunk_id
-            )
+            target_source_id = _transform_source_id(src_source_id, src_chunk_id, target_chunk_id)
             emb_val = source_row.get("embedding")
             target_rows.append(
                 {
@@ -598,14 +578,12 @@ class PostgresRetrieveEngineRepository:
         async with self._session_factory() as session:
             if enabled_ids:
                 stmt = text(
-                    f"UPDATE {_TABLE} SET is_enabled = TRUE "
-                    f"WHERE chunk_id IN :ids"
+                    f"UPDATE {_TABLE} SET is_enabled = TRUE WHERE chunk_id IN :ids"
                 ).bindparams(bindparam("ids", expanding=True))
                 await session.execute(stmt, {"ids": enabled_ids})
             if disabled_ids:
                 stmt = text(
-                    f"UPDATE {_TABLE} SET is_enabled = FALSE "
-                    f"WHERE chunk_id IN :ids"
+                    f"UPDATE {_TABLE} SET is_enabled = FALSE WHERE chunk_id IN :ids"
                 ).bindparams(bindparam("ids", expanding=True))
                 await session.execute(stmt, {"ids": disabled_ids})
             await session.commit()
@@ -623,8 +601,7 @@ class PostgresRetrieveEngineRepository:
         async with self._session_factory() as session:
             for tag_id, chunk_ids in tag_groups.items():
                 stmt = text(
-                    f"UPDATE {_TABLE} SET tag_id = :tag_id "
-                    f"WHERE chunk_id IN :ids"
+                    f"UPDATE {_TABLE} SET tag_id = :tag_id WHERE chunk_id IN :ids"
                 ).bindparams(bindparam("ids", expanding=True))
                 await session.execute(stmt, {"tag_id": tag_id, "ids": chunk_ids})
             await session.commit()

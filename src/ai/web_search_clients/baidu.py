@@ -31,9 +31,7 @@ _MAX_RESULTS = 50
 _MAX_QUERY_UNITS = 72
 _MAX_RESPONSE_BYTES = 2 << 20  # 2MB
 
-_BAIDU_DATE_RE = re.compile(
-    r"^(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?"
-)
+_BAIDU_DATE_RE = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?")
 
 
 def parse_baidu_date(date_str: str) -> datetime | None:
@@ -145,10 +143,7 @@ class BaiduProvider(HttpSearchClient):
         if isinstance(code, int) and code != 0:
             raise ExternalServiceError(
                 code="web_search_provider.search_failed",
-                message=(
-                    f"baidu API error (code {code}): "
-                    f"{coerce_str(data.get('message'))}"
-                ),
+                message=(f"baidu API error (code {code}): {coerce_str(data.get('message'))}"),
             )
         references = data.get("references")
         if not isinstance(references, list):

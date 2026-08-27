@@ -20,20 +20,14 @@ _LLM_PROMPT_PREFIX: ContextVar[str] = ContextVar("llm_prompt_prefix", default=""
 
 
 @contextmanager
-def with_llm_call_metadata(
-    *, purpose: str = "", prefix_fingerprint: str = ""
-) -> Iterator[None]:
+def with_llm_call_metadata(*, purpose: str = "", prefix_fingerprint: str = "") -> Iterator[None]:
     """Annotate the surrounding async scope with cache-observability labels.
 
     ``prefix_fingerprint`` must be a hash, never raw prompt content.
     """
-    purpose_token = (
-        _LLM_CALL_PURPOSE.set(purpose.strip()) if purpose.strip() else None
-    )
+    purpose_token = _LLM_CALL_PURPOSE.set(purpose.strip()) if purpose.strip() else None
     prefix_token = (
-        _LLM_PROMPT_PREFIX.set(prefix_fingerprint.strip())
-        if prefix_fingerprint.strip()
-        else None
+        _LLM_PROMPT_PREFIX.set(prefix_fingerprint.strip()) if prefix_fingerprint.strip() else None
     )
     try:
         yield

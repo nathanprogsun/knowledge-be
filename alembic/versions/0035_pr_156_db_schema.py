@@ -306,17 +306,13 @@ def downgrade() -> None:
     op.drop_table("wiki_page_revisions")
     op.drop_index("idx_wiki_page_issues_status", table_name="wiki_page_issues")
     op.drop_index("idx_wiki_page_issues_slug", table_name="wiki_page_issues")
-    op.drop_index(
-        "idx_wiki_page_issues_knowledge_base_id", table_name="wiki_page_issues"
-    )
+    op.drop_index("idx_wiki_page_issues_knowledge_base_id", table_name="wiki_page_issues")
     op.drop_index("idx_wiki_page_issues_tenant_id", table_name="wiki_page_issues")
     op.drop_table("wiki_page_issues")
     op.drop_index("idx_wiki_log_entries_tenant_id", table_name="wiki_log_entries")
     op.drop_index("idx_wiki_log_entries_kb_id_desc", table_name="wiki_log_entries")
     op.drop_table("wiki_log_entries")
-    op.drop_index(
-        "idx_user_kb_pins_user_tenant_pinned_at", table_name="user_kb_pins"
-    )
+    op.drop_index("idx_user_kb_pins_user_tenant_pinned_at", table_name="user_kb_pins")
     op.drop_table("user_kb_pins")
     op.drop_index(
         "idx_tenant_disabled_shared_agents_tenant_id",

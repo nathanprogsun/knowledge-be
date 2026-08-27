@@ -262,9 +262,7 @@ async def import_faq(
     for _row_number, payload, content in valid:
         chunk_id = str(uuid4())
         is_enabled = payload.is_enabled if payload.is_enabled is not None else True
-        is_recommended = (
-            payload.is_recommended if payload.is_recommended is not None else False
-        )
+        is_recommended = payload.is_recommended if payload.is_recommended is not None else False
         chunk_content = build_faq_chunk_content(content, index_mode=index_mode)
         chunk_rows.append(
             Chunk(

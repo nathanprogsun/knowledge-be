@@ -210,7 +210,7 @@ _EXPECTED_ALL_ROUTES: set[str] = {
     "/api/v1/messages/{session_id}/{message_id}",
     "/api/v1/models",
     "/api/v1/models/providers",
-    "/api/v1/models/weknoracloud/status",
+    "/api/v1/models/cloud/status",
     "/api/v1/models/{model_id}",
     "/api/v1/models/{model_id}/debug",
     "/api/v1/organizations",
@@ -288,7 +288,7 @@ _EXPECTED_ALL_ROUTES: set[str] = {
     "/api/v1/web-search/providers",
     "/api/v1/wechat/qrcode",
     "/api/v1/wechat/qrcode/status",
-    "/api/v1/weknoracloud/credentials",
+    "/api/v1/cloud/credentials",
     "/files",
     "/health",
 }

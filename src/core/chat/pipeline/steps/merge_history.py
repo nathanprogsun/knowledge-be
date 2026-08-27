@@ -34,8 +34,7 @@ def get_search_result_from_history(pipeline_ctx: PipelineContext) -> list[Search
     for entry in reversed(pipeline_ctx.history):
         if entry.references:
             return [
-                ref.model_copy(update={"match_type": MatchType.HISTORY})
-                for ref in entry.references
+                ref.model_copy(update={"match_type": MatchType.HISTORY}) for ref in entry.references
             ]
     return []
 

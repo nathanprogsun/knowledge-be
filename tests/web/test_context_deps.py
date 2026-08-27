@@ -80,4 +80,3 @@ def test_get_user_info_dep_returns_dict_or_none() -> None:
 def test_get_api_key_scope_dep_returns_none_by_default() -> None:
     request = _make_request({})
     assert get_api_key_scope_dep(request) is None
-

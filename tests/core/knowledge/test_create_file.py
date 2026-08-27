@@ -114,9 +114,7 @@ class _FakeFileService:
         self.saved: list[tuple[str, int, str]] = []
         self.deleted: list[str] = []
 
-    async def save_file(
-        self, *, file: object, tenant_id: int, knowledge_id: str
-    ) -> str:
+    async def save_file(self, *, file: object, tenant_id: int, knowledge_id: str) -> str:
         self.saved.append((file.filename, tenant_id, knowledge_id))  # type: ignore[attr-defined]
         return self.saved_path
 
@@ -593,9 +591,7 @@ async def test_create_from_file_requires_storage_engine() -> None:
     repo, _rows = _make_repo()
 
     class _NoStorage:
-        async def resolve_file_service(
-            self, *, knowledge_base_id: str, tenant_id: int
-        ) -> object:
+        async def resolve_file_service(self, *, knowledge_base_id: str, tenant_id: int) -> object:
             return None
 
     with pytest.raises(ValidationError) as exc:

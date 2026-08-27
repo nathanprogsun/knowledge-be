@@ -51,8 +51,8 @@ from src.common.exception import ValidationError, VectorStoreError
 _ENV_TENCENT_VECTORDB_DATABASE = "TENCENT_VECTORDB_DATABASE"
 _ENV_TENCENT_VECTORDB_COLLECTION = "TENCENT_VECTORDB_COLLECTION"
 _ENV_TENCENT_VECTORDB_REPLICA_NUM = "TENCENT_VECTORDB_REPLICA_NUMBER"
-_DEFAULT_DATABASE_NAME = "weknora"
-_DEFAULT_COLLECTION_NAME = "weknora_embeddings"
+_DEFAULT_DATABASE_NAME = "kb"
+_DEFAULT_COLLECTION_NAME = "kb_embeddings"
 _DEFAULT_REPLICA_NUMBER = 1
 _COPY_INDICES_PAGE_SIZE = 500
 
@@ -69,9 +69,15 @@ _FIELD_TAG_ID = "tag_id"
 _FIELD_IS_ENABLED = "is_enabled"
 
 _OUTPUT_FIELDS = [
-    _FIELD_ID, _FIELD_CONTENT, _FIELD_SOURCE_ID, _FIELD_SOURCE_TYPE,
-    _FIELD_CHUNK_ID, _FIELD_KNOWLEDGE_ID, _FIELD_KNOWLEDGE_BASE_ID,
-    _FIELD_TAG_ID, _FIELD_IS_ENABLED,
+    _FIELD_ID,
+    _FIELD_CONTENT,
+    _FIELD_SOURCE_ID,
+    _FIELD_SOURCE_TYPE,
+    _FIELD_CHUNK_ID,
+    _FIELD_KNOWLEDGE_ID,
+    _FIELD_KNOWLEDGE_BASE_ID,
+    _FIELD_TAG_ID,
+    _FIELD_IS_ENABLED,
 ]
 
 
@@ -141,7 +147,7 @@ def _translate_source_id(original: str, source_chunk_id: str, target_chunk_id: s
 
 def _in_expr(field: str, values: list[str]) -> str:
     quoted = ", ".join(f'"{v}"' for v in values)
-    return f'{field} in ({quoted})'
+    return f"{field} in ({quoted})"
 
 
 # ── Domain model ────────────────────────────────────────────────────
@@ -244,21 +250,23 @@ def _base_filter(params: RetrieveParams) -> str:
     if params.tag_ids:
         conditions.append(_in_expr(_FIELD_TAG_ID, list(params.tag_ids)))
     if params.exclude_knowledge_ids:
-        conditions.append(f"not ({_in_expr(_FIELD_KNOWLEDGE_ID, list(params.exclude_knowledge_ids))})")
+        conditions.append(
+            f"not ({_in_expr(_FIELD_KNOWLEDGE_ID, list(params.exclude_knowledge_ids))})"
+        )
     if params.exclude_chunk_ids:
         conditions.append(f"not ({_in_expr(_FIELD_CHUNK_ID, list(params.exclude_chunk_ids))})")
     return " and ".join(conditions)
 
 
-def _retrieve_result(
-    results: list[Any], retriever_type: RetrieverType
-) -> list[RetrieveResult]:
-    return [RetrieveResult(
-        results=results,
-        retriever_engine_type=RetrieverEngineType.TENCENT_VECTORDB,
-        retriever_type=retriever_type,
-        error=None,
-    )]
+def _retrieve_result(results: list[Any], retriever_type: RetrieverType) -> list[RetrieveResult]:
+    return [
+        RetrieveResult(
+            results=results,
+            retriever_engine_type=RetrieverEngineType.TENCENT_VECTORDB,
+            retriever_type=retriever_type,
+            error=None,
+        )
+    ]
 
 
 # ── Repository ──────────────────────────────────────────────────────
@@ -354,14 +362,12 @@ class TencentVectorDBRepository:
             collection_name = self._collection_name(dim)
             docs = [_to_document(e) for e in embeddings]
             try:
-                await self._to_thread(
-                    self._collection(dim).upsert, docs
-                )
+                await self._to_thread(self._collection(dim).upsert, docs)
             except Exception as exc:
                 raise VectorStoreError(
-    code="tencent_vectordb.batch_save_failed",
-    message=f"tencent vectordb batch save {collection_name}: {exc}",
-) from exc
+                    code="tencent_vectordb.batch_save_failed",
+                    message=f"tencent vectordb batch save {collection_name}: {exc}",
+                ) from exc
 
     # ── estimate_storage_size ──
 
@@ -375,8 +381,11 @@ class TencentVectorDBRepository:
             total += len(embedding.embedding) * 4
             total += len(embedding.content) * 2
             total += (
-                len(embedding.source_id) + len(embedding.chunk_id)
-                + len(embedding.knowledge_id) + len(embedding.knowledge_base_id) + 256
+                len(embedding.source_id)
+                + len(embedding.chunk_id)
+                + len(embedding.knowledge_id)
+                + len(embedding.knowledge_base_id)
+                + 256
             )
         return total
 
@@ -395,7 +404,9 @@ class TencentVectorDBRepository:
     async def delete_by_knowledge_id_list(
         self, ctx: Context, knowledge_id_list: list[str], dimension: int, knowledge_type: str
     ) -> None:
-        await self._delete_by_filter(ctx, dimension, _in_expr(_FIELD_KNOWLEDGE_ID, knowledge_id_list))
+        await self._delete_by_filter(
+            ctx, dimension, _in_expr(_FIELD_KNOWLEDGE_ID, knowledge_id_list)
+        )
 
     async def _delete_by_filter(self, ctx: Context, dimension: int, cond: str) -> None:
         if not cond:
@@ -408,9 +419,9 @@ class TencentVectorDBRepository:
             )
         except Exception as exc:
             raise VectorStoreError(
-    code="tencent_vectordb.delete_failed",
-    message=f"tencent vectordb delete from {collection_name}: {exc}",
-) from exc
+                code="tencent_vectordb.delete_failed",
+                message=f"tencent vectordb delete from {collection_name}: {exc}",
+            ) from exc
 
     # ── copy_indices ──
 
@@ -432,9 +443,7 @@ class TencentVectorDBRepository:
         while True:
             conditions = [_in_expr(_FIELD_CHUNK_ID, chunk_ids)]
             if source_knowledge_base_id:
-                conditions.insert(
-                    0, _in_expr(_FIELD_KNOWLEDGE_BASE_ID, [source_knowledge_base_id])
-                )
+                conditions.insert(0, _in_expr(_FIELD_KNOWLEDGE_BASE_ID, [source_knowledge_base_id]))
             filter_expr = " and ".join(conditions)
             try:
                 docs = await self._to_thread(
@@ -447,17 +456,25 @@ class TencentVectorDBRepository:
                 )
             except Exception as exc:
                 raise VectorStoreError(
-    code="tencent_vectordb.query_source_indices_failed",
-    message=f"tencent vectordb query source indices: {exc}",
-) from exc
-            batch = docs if isinstance(docs, list) else docs.get("documents", []) if isinstance(docs, dict) else []
+                    code="tencent_vectordb.query_source_indices_failed",
+                    message=f"tencent vectordb query source indices: {exc}",
+                ) from exc
+            batch = (
+                docs
+                if isinstance(docs, list)
+                else docs.get("documents", [])
+                if isinstance(docs, dict)
+                else []
+            )
             for doc in batch:
                 emb = _from_document(doc)
                 target_chunk_id = source_to_target_chunk_id_map.get(emb.chunk_id, "")
                 if target_chunk_id == "":
                     continue
                 original_source_id = emb.source_id or emb.id
-                target_source_id = _translate_source_id(original_source_id, emb.chunk_id, target_chunk_id)
+                target_source_id = _translate_source_id(
+                    original_source_id, emb.chunk_id, target_chunk_id
+                )
                 emb.id = target_source_id
                 emb.source_id = target_source_id
                 emb.chunk_id = target_chunk_id
@@ -476,9 +493,9 @@ class TencentVectorDBRepository:
             await self._to_thread(self._collection(dimension).upsert, docs)
         except Exception as exc:
             raise VectorStoreError(
-    code="tencent_vectordb.copy_indices_failed",
-    message=f"tencent vectordb copy indices: {exc}",
-) from exc
+                code="tencent_vectordb.copy_indices_failed",
+                message=f"tencent vectordb copy indices: {exc}",
+            ) from exc
 
     # ── batch_update_chunk_* ──
 
@@ -513,12 +530,20 @@ class TencentVectorDBRepository:
             collections = await self._to_thread(self._db().list_collections)
         except Exception as exc:
             raise VectorStoreError(
-    code="tencent_vectordb.list_collections_failed",
-    message=f"tencent vectordb list collections: {exc}",
-) from exc
-        collection_list = collections if isinstance(collections, list) else getattr(collections, "collections", [])
+                code="tencent_vectordb.list_collections_failed",
+                message=f"tencent vectordb list collections: {exc}",
+            ) from exc
+        collection_list = (
+            collections
+            if isinstance(collections, list)
+            else getattr(collections, "collections", [])
+        )
         for collection in collection_list:
-            name = collection if isinstance(collection, str) else getattr(collection, "collection_name", "")
+            name = (
+                collection
+                if isinstance(collection, str)
+                else getattr(collection, "collection_name", "")
+            )
             if not self._matches_collection(name):
                 continue
             try:
@@ -529,9 +554,9 @@ class TencentVectorDBRepository:
                 )
             except Exception as exc:
                 raise VectorStoreError(
-    code="tencent_vectordb.update_chunks_failed",
-    message=f"tencent vectordb update chunks in {name}: {exc}",
-) from exc
+                    code="tencent_vectordb.update_chunks_failed",
+                    message=f"tencent vectordb update chunks in {name}: {exc}",
+                ) from exc
 
     # ── retrieve ──
 
@@ -544,9 +569,9 @@ class TencentVectorDBRepository:
             exists = await self._to_thread(self._db().exists_collection, collection_name)
         except Exception as exc:
             raise VectorStoreError(
-    code="tencent_vectordb.check_collection_failed",
-    message=f"tencent vectordb check collection {collection_name}: {exc}",
-) from exc
+                code="tencent_vectordb.check_collection_failed",
+                message=f"tencent vectordb check collection {collection_name}: {exc}",
+            ) from exc
         if not exists:
             return _retrieve_result([], RetrieverType.VECTOR)
         limit = params.top_k if params.top_k > 0 else 10
@@ -566,10 +591,12 @@ class TencentVectorDBRepository:
             )
         except Exception as exc:
             raise VectorStoreError(
-    code="tencent_vectordb.vector_search_failed",
-    message=f"tencent vectordb vector search {collection_name}: {exc}",
-) from exc
-        docs = search[0] if search and isinstance(search, list) and isinstance(search[0], list) else []
+                code="tencent_vectordb.vector_search_failed",
+                message=f"tencent vectordb vector search {collection_name}: {exc}",
+            ) from exc
+        docs = (
+            search[0] if search and isinstance(search, list) and isinstance(search[0], list) else []
+        )
         results = [
             IndexWithScore(
                 id=d.get("id", ""),
@@ -588,7 +615,9 @@ class TencentVectorDBRepository:
         ]
         return _retrieve_result(results, RetrieverType.VECTOR)
 
-    async def _keywords_retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
+    async def _keywords_retrieve(
+        self, ctx: Context, params: RetrieveParams
+    ) -> list[RetrieveResult]:
         query = params.query.strip()
         if query == "":
             return _retrieve_result([], RetrieverType.KEYWORDS)
@@ -596,16 +625,24 @@ class TencentVectorDBRepository:
             collections = await self._to_thread(self._db().list_collections)
         except Exception as exc:
             raise VectorStoreError(
-    code="tencent_vectordb.list_collections_failed",
-    message=f"tencent vectordb list collections: {exc}",
-) from exc
-        collection_list = collections if isinstance(collections, list) else getattr(collections, "collections", [])
+                code="tencent_vectordb.list_collections_failed",
+                message=f"tencent vectordb list collections: {exc}",
+            ) from exc
+        collection_list = (
+            collections
+            if isinstance(collections, list)
+            else getattr(collections, "collections", [])
+        )
         limit = params.top_k if params.top_k > 0 else 10
         results: list[IndexWithScore] = []
         matched = 0
         failed = 0
         for collection in collection_list:
-            name = collection if isinstance(collection, str) else getattr(collection, "collection_name", "")
+            name = (
+                collection
+                if isinstance(collection, str)
+                else getattr(collection, "collection_name", "")
+            )
             if not self._matches_collection(name):
                 continue
             matched += 1
@@ -622,27 +659,35 @@ class TencentVectorDBRepository:
                 failed += 1
                 logger.warning("keyword search failed in {}: {}", name, exc)
                 continue
-            docs = search_result if isinstance(search_result, list) else search_result.get("documents", []) if isinstance(search_result, dict) else []
+            docs = (
+                search_result
+                if isinstance(search_result, list)
+                else search_result.get("documents", [])
+                if isinstance(search_result, dict)
+                else []
+            )
             for d in docs:
                 doc = d if isinstance(d, dict) else {}
                 fields = doc.get("fields", doc)
-                results.append(IndexWithScore(
-                    id=str(doc.get("id", "")),
-                    content=str(fields.get(_FIELD_CONTENT, "")),
-                    source_id=str(fields.get(_FIELD_SOURCE_ID, "")),
-                    source_type=SourceType(int(fields.get(_FIELD_SOURCE_TYPE, 0))),
-                    chunk_id=str(fields.get(_FIELD_CHUNK_ID, "")),
-                    knowledge_id=str(fields.get(_FIELD_KNOWLEDGE_ID, "")),
-                    knowledge_base_id=str(fields.get(_FIELD_KNOWLEDGE_BASE_ID, "")),
-                    tag_id=str(fields.get(_FIELD_TAG_ID, "")),
-                    score=float(doc.get("score", 0.0)),
-                    match_type=MatchType.KEYWORDS,
-                    is_enabled=int(fields.get(_FIELD_IS_ENABLED, 0)) == 1,
-                ))
+                results.append(
+                    IndexWithScore(
+                        id=str(doc.get("id", "")),
+                        content=str(fields.get(_FIELD_CONTENT, "")),
+                        source_id=str(fields.get(_FIELD_SOURCE_ID, "")),
+                        source_type=SourceType(int(fields.get(_FIELD_SOURCE_TYPE, 0))),
+                        chunk_id=str(fields.get(_FIELD_CHUNK_ID, "")),
+                        knowledge_id=str(fields.get(_FIELD_KNOWLEDGE_ID, "")),
+                        knowledge_base_id=str(fields.get(_FIELD_KNOWLEDGE_BASE_ID, "")),
+                        tag_id=str(fields.get(_FIELD_TAG_ID, "")),
+                        score=float(doc.get("score", 0.0)),
+                        match_type=MatchType.KEYWORDS,
+                        is_enabled=int(fields.get(_FIELD_IS_ENABLED, 0)) == 1,
+                    )
+                )
         if matched > 0 and failed == matched:
             raise VectorStoreError(
-    code="tencent_vectordb.keyword_search_all_failed",
-    message="tencent vectordb keyword search failed in all matched collections; "
+                code="tencent_vectordb.keyword_search_all_failed",
+                message="tencent vectordb keyword search failed in all matched collections; "
                 "ensure collections support text search",
             )
         results.sort(key=lambda r: r.score, reverse=True)
@@ -659,17 +704,17 @@ class TencentVectorDBRepository:
             await self._to_thread(self._client.create_database_if_not_exists, self._database_name)
         except Exception as exc:
             raise VectorStoreError(
-    code="tencent_vectordb.ensure_database_failed",
-    message=f"tencent vectordb ensure database {self._database_name}: {exc}",
-) from exc
+                code="tencent_vectordb.ensure_database_failed",
+                message=f"tencent vectordb ensure database {self._database_name}: {exc}",
+            ) from exc
         collection_name = self._collection_name(dimension)
         try:
             exists = await self._to_thread(self._db().exists_collection, collection_name)
         except Exception as exc:
             raise VectorStoreError(
-    code="tencent_vectordb.check_collection_failed",
-    message=f"tencent vectordb check collection {collection_name}: {exc}",
-) from exc
+                code="tencent_vectordb.check_collection_failed",
+                message=f"tencent vectordb check collection {collection_name}: {exc}",
+            ) from exc
         if exists:
             self._initialized.add(dimension)
             return
@@ -684,15 +729,35 @@ class TencentVectorDBRepository:
                 params=HNSWParams(m=16, efconstruction=200),
             ),
             SparseIndex(name=_FIELD_SPARSE_VECTOR),
-            FilterIndex(name=_FIELD_ID, field_type=FieldType.String, index_type=IndexType.PRIMARY_KEY),
-            FilterIndex(name=_FIELD_CONTENT, field_type=FieldType.String, index_type=IndexType.FILTER),
-            FilterIndex(name=_FIELD_SOURCE_ID, field_type=FieldType.String, index_type=IndexType.FILTER),
-            FilterIndex(name=_FIELD_SOURCE_TYPE, field_type=FieldType.Uint64, index_type=IndexType.FILTER),
-            FilterIndex(name=_FIELD_CHUNK_ID, field_type=FieldType.String, index_type=IndexType.FILTER),
-            FilterIndex(name=_FIELD_KNOWLEDGE_ID, field_type=FieldType.String, index_type=IndexType.FILTER),
-            FilterIndex(name=_FIELD_KNOWLEDGE_BASE_ID, field_type=FieldType.String, index_type=IndexType.FILTER),
-            FilterIndex(name=_FIELD_TAG_ID, field_type=FieldType.String, index_type=IndexType.FILTER),
-            FilterIndex(name=_FIELD_IS_ENABLED, field_type=FieldType.Uint64, index_type=IndexType.FILTER),
+            FilterIndex(
+                name=_FIELD_ID, field_type=FieldType.String, index_type=IndexType.PRIMARY_KEY
+            ),
+            FilterIndex(
+                name=_FIELD_CONTENT, field_type=FieldType.String, index_type=IndexType.FILTER
+            ),
+            FilterIndex(
+                name=_FIELD_SOURCE_ID, field_type=FieldType.String, index_type=IndexType.FILTER
+            ),
+            FilterIndex(
+                name=_FIELD_SOURCE_TYPE, field_type=FieldType.Uint64, index_type=IndexType.FILTER
+            ),
+            FilterIndex(
+                name=_FIELD_CHUNK_ID, field_type=FieldType.String, index_type=IndexType.FILTER
+            ),
+            FilterIndex(
+                name=_FIELD_KNOWLEDGE_ID, field_type=FieldType.String, index_type=IndexType.FILTER
+            ),
+            FilterIndex(
+                name=_FIELD_KNOWLEDGE_BASE_ID,
+                field_type=FieldType.String,
+                index_type=IndexType.FILTER,
+            ),
+            FilterIndex(
+                name=_FIELD_TAG_ID, field_type=FieldType.String, index_type=IndexType.FILTER
+            ),
+            FilterIndex(
+                name=_FIELD_IS_ENABLED, field_type=FieldType.Uint64, index_type=IndexType.FILTER
+            ),
         ]
         try:
             await self._to_thread(
@@ -710,9 +775,9 @@ class TencentVectorDBRepository:
                 self._initialized.add(dimension)
                 return
             raise VectorStoreError(
-    code="tencent_vectordb.create_collection_failed",
-    message=f"tencent vectordb create collection {collection_name}: {exc}",
-) from exc
+                code="tencent_vectordb.create_collection_failed",
+                message=f"tencent vectordb create collection {collection_name}: {exc}",
+            ) from exc
         self._initialized.add(dimension)
 
 

@@ -316,6 +316,15 @@ class AuthService:
         except NotFoundError:
             return None
 
+    async def get_user_by_id(self, user_id: str) -> UserInfo:
+        """Return the user DTO for ``user_id``; raises ``NotFoundError``.
+
+        Exists so the web layer (header-auth middleware) never touches
+        ``UserRepository`` directly.
+        """
+        row = await self._users_repo.find_by_id(user_id)
+        return UserInfo.map_from_db(row)
+
     async def mint_pair_for_user_row(self, user_row: User) -> LoginResult:
         """Mint + persist an access/refresh pair for an existing user row."""
         return await mint_token_pair(

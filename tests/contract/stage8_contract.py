@@ -98,24 +98,56 @@ class _TaskBinding(NamedTuple):
 
 
 _TASK_BINDINGS: dict[str, _TaskBinding] = {
-    "chunk:extract": _TaskBinding(chunk_extract.ChunkExtractTaskPayload, chunk_extract.task_chunk_extract),
-    "datasource_sync": _TaskBinding(datasource_sync.DatasourceSyncPayload, datasource_sync.task_datasource_sync),
-    "datatable:summary": _TaskBinding(datatable_summary.DatatableSummaryPayload, datatable_summary.task_datatable_summary),
-    "document_process": _TaskBinding(document_process.DocumentProcessTaskPayload, document_process.task_document_process),
+    "chunk:extract": _TaskBinding(
+        chunk_extract.ChunkExtractTaskPayload, chunk_extract.task_chunk_extract
+    ),
+    "datasource_sync": _TaskBinding(
+        datasource_sync.DatasourceSyncPayload, datasource_sync.task_datasource_sync
+    ),
+    "datatable:summary": _TaskBinding(
+        datatable_summary.DatatableSummaryPayload, datatable_summary.task_datatable_summary
+    ),
+    "document_process": _TaskBinding(
+        document_process.DocumentProcessTaskPayload, document_process.task_document_process
+    ),
     "faq:import": _TaskBinding(faq_import.FAQImportPayload, faq_import.task_faq_import),
-    "image_multimodal": _TaskBinding(image_multimodal.ImageMultimodalTaskPayload, image_multimodal.task_image_multimodal),
+    "image_multimodal": _TaskBinding(
+        image_multimodal.ImageMultimodalTaskPayload, image_multimodal.task_image_multimodal
+    ),
     "index:delete": _TaskBinding(index_delete.IndexDeletePayload, index_delete.task_index_delete),
     "kb:clone": _TaskBinding(kb_clone.KBClonePayload, kb_clone.task_kb_clone),
     "kb:delete": _TaskBinding(kb_delete.KBDeletePayload, kb_delete.task_kb_delete),
-    "knowledge:list_delete": _TaskBinding(knowledge_list_delete.KnowledgeListDeletePayload, knowledge_list_delete.task_knowledge_list_delete),
-    "knowledge:list_reparse": _TaskBinding(knowledge_list_reparse.KnowledgeListReparsePayload, knowledge_list_reparse.task_knowledge_list_reparse),
-    "knowledge:move": _TaskBinding(knowledge_move.KnowledgeMovePayload, knowledge_move.task_knowledge_move),
-    "knowledge:post_process": _TaskBinding(knowledge_post_process.KnowledgePostProcessTaskPayload, knowledge_post_process.task_knowledge_post_process),
-    "manual_process": _TaskBinding(manual_process.ManualProcessPayload, manual_process.manual_process),
-    "question:generation": _TaskBinding(question_generation.QuestionGenerationTaskPayload, question_generation.task_question_generation),
-    "summary:generation": _TaskBinding(summary_generation.SummaryGenerationTaskPayload, summary_generation.task_summary_generation),
-    "temporary_document:process": _TaskBinding(TemporaryDocumentTaskPayload, temporary_document.task_temporary_document),
-    "wiki:finalize": _TaskBinding(wiki_finalize.WikiFinalizePayload, wiki_finalize.task_wiki_finalize),
+    "knowledge:list_delete": _TaskBinding(
+        knowledge_list_delete.KnowledgeListDeletePayload,
+        knowledge_list_delete.task_knowledge_list_delete,
+    ),
+    "knowledge:list_reparse": _TaskBinding(
+        knowledge_list_reparse.KnowledgeListReparsePayload,
+        knowledge_list_reparse.task_knowledge_list_reparse,
+    ),
+    "knowledge:move": _TaskBinding(
+        knowledge_move.KnowledgeMovePayload, knowledge_move.task_knowledge_move
+    ),
+    "knowledge:post_process": _TaskBinding(
+        knowledge_post_process.KnowledgePostProcessTaskPayload,
+        knowledge_post_process.task_knowledge_post_process,
+    ),
+    "manual_process": _TaskBinding(
+        manual_process.ManualProcessPayload, manual_process.manual_process
+    ),
+    "question:generation": _TaskBinding(
+        question_generation.QuestionGenerationTaskPayload,
+        question_generation.task_question_generation,
+    ),
+    "summary:generation": _TaskBinding(
+        summary_generation.SummaryGenerationTaskPayload, summary_generation.task_summary_generation
+    ),
+    "temporary_document:process": _TaskBinding(
+        TemporaryDocumentTaskPayload, temporary_document.task_temporary_document
+    ),
+    "wiki:finalize": _TaskBinding(
+        wiki_finalize.WikiFinalizePayload, wiki_finalize.task_wiki_finalize
+    ),
     "wiki:ingest": _TaskBinding(wiki_ingest.WikiIngestPayload, wiki_ingest.task_wiki_ingest),
 }
 
@@ -239,9 +271,7 @@ def test_sample_payload_validates_against_payload_model(name: str) -> None:
     serialised = instance.model_dump(mode="json")
     missing = set(payload) - set(serialised)
     if missing:
-        pytest.fail(
-            f"{name}: round-trip payload drops Go-side fields: {sorted(missing)}"
-        )
+        pytest.fail(f"{name}: round-trip payload drops Go-side fields: {sorted(missing)}")
 
 
 # ── Output-schema parity ─────────────────────────────────────────────
@@ -255,9 +285,7 @@ async def test_temporary_document_result_matches_reference() -> None:
     """
     samples = _fixture_samples()
     payload = samples["temporary_document:process"]
-    result = await temporary_document.task_temporary_document(
-        _make_ctx(), **dict(payload)
-    )
+    result = await temporary_document.task_temporary_document(_make_ctx(), **dict(payload))
     expected = _task_result_keys(_fixture_tasks()["temporary_document:process"])
     _assert_keyset(result, expected, "temporary_document:process")
 

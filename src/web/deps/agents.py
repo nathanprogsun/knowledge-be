@@ -30,9 +30,7 @@ def get_skills_manager() -> Manager:
     return build_skills_manager()
 
 
-CustomAgentServiceDep = Annotated[
-    CustomAgentService, Depends(get_custom_agent_service)
-]
+CustomAgentServiceDep = Annotated[CustomAgentService, Depends(get_custom_agent_service)]
 SkillsManagerDep = Annotated[Manager, Depends(get_skills_manager)]
 
 

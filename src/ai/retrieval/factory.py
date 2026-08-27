@@ -134,9 +134,7 @@ async def _new_qdrant_retrieve_engine_repository(
     use_tls: bool,
     index_config: IndexConfig,
 ) -> RetrieveEngineRepository:
-    return await new_qdrant_retrieve_engine_repository(
-        host, port, api_key, use_tls, index_config
-    )
+    return await new_qdrant_retrieve_engine_repository(host, port, api_key, use_tls, index_config)
 
 
 async def _new_milvus_retrieve_engine_repository(
@@ -170,7 +168,9 @@ async def _new_doris_retrieve_engine_repository(
 ) -> RetrieveEngineRepository:
 
     db = _connect_doris(addr, username, password, database)
-    return new_doris_retrieve_engine_repository(db, http_base, username, password, database, index_config)
+    return new_doris_retrieve_engine_repository(
+        db, http_base, username, password, database, index_config
+    )
 
 
 async def _new_tencent_vectordb_retrieve_engine_repository(
@@ -181,9 +181,7 @@ async def _new_tencent_vectordb_retrieve_engine_repository(
     index_config: IndexConfig,
 ) -> RetrieveEngineRepository:
 
-    client = tcvectordb.RPCVectorDBClient(
-        addr, username=username, key=api_key, timeout=10
-    )
+    client = tcvectordb.RPCVectorDBClient(addr, username=username, key=api_key, timeout=10)
     return new_tencent_vectordb_retrieve_engine_repository(client, database, index_config)
 
 

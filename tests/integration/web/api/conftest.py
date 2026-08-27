@@ -80,9 +80,7 @@ def default_create_agent_request() -> dict[str, object]:
     contract defaults for ``config`` so tests can override individual
     fields without re-declaring the full body.
     """
-    return CreateAgentRequest(name="placeholder").model_dump(
-        mode="json", exclude_none=True
-    )
+    return CreateAgentRequest(name="placeholder").model_dump(mode="json", exclude_none=True)
 
 
 @pytest.fixture

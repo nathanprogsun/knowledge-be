@@ -109,7 +109,7 @@ _WIKI_TYPE_CATEGORY_LABELS: frozenset[str] = frozenset(
 )
 
 # Characters stripped from the ends of a raw category label.
-_WIKI_CATEGORY_TRIM_CHARS = "\"'“”‘’[]（）()"  # noqa: RUF001
+_WIKI_CATEGORY_TRIM_CHARS = "\"'“”‘’[]（）()"
 
 
 def is_valid_page_type(page_type: str) -> bool:
@@ -179,7 +179,7 @@ def clean_category_part(part: str) -> list[str]:
     part = part.strip()
     if part == "":
         return []
-    part = part.replace("／", "/").replace("｜", "/").replace("|", "/")  # noqa: RUF001
+    part = part.replace("／", "/").replace("｜", "/").replace("|", "/")
     cleaned: list[str] = []
     for raw in part.split("/"):
         label = raw.strip().strip(_WIKI_CATEGORY_TRIM_CHARS).strip()

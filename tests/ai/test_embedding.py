@@ -17,6 +17,7 @@ import pytest
 from src.ai.embedding import (
     AliyunEmbedder,
     AzureOpenAIEmbedder,
+    CloudEmbedder,
     ConcurrencyEmbedder,
     Config,
     Context,
@@ -28,7 +29,6 @@ from src.ai.embedding import (
     OpenAIEmbedder,
     TaskContext,
     VolcengineEmbedder,
-    WeKnoraCloudEmbedder,
     ZhipuEmbedder,
     apply_custom_headers,
     config_from_model,
@@ -231,10 +231,10 @@ async def test_factory_routes_remote_providers(
     assert isinstance(embedder._inner, expected)
 
 
-async def test_factory_routes_remote_weknoracloud() -> None:
+async def test_factory_routes_remote_cloud() -> None:
     config = Config(
         source="remote",
-        provider="weknoracloud",
+        provider="cloud",
         base_url=_OPENAI_BASE,
         model_name="m",
         model_id="mid",
@@ -243,7 +243,7 @@ async def test_factory_routes_remote_weknoracloud() -> None:
     )
     embedder = await new_embedder(config, None, None)
     assert isinstance(embedder, ConcurrencyEmbedder)
-    assert isinstance(embedder._inner, WeKnoraCloudEmbedder)
+    assert isinstance(embedder._inner, CloudEmbedder)
 
 
 async def test_factory_rejects_unsupported_source() -> None:

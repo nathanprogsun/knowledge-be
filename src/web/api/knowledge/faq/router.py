@@ -24,7 +24,6 @@ Swagger ``description`` strings are Chinese, mirroring the upstream
 annotations; RUF001 is suppressed file-wide for the same reason as
 ``src/web/api/system/router.py``.
 """
-# ruff: noqa: RUF001
 
 from __future__ import annotations
 
@@ -219,7 +218,7 @@ async def export_faq_entries(
         return Response(
             content=build_export_json(entries),
             media_type="application/json; charset=utf-8",
-            headers={"Content-Disposition": 'attachment; filename=faq_export.json'},
+            headers={"Content-Disposition": "attachment; filename=faq_export.json"},
         )
     if export_format != "csv":
         raise ValidationError(
@@ -229,7 +228,7 @@ async def export_faq_entries(
     return Response(
         content=_CSV_BOM + build_export_csv(entries),
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": 'attachment; filename=faq_export.csv'},
+        headers={"Content-Disposition": "attachment; filename=faq_export.csv"},
     )
 
 

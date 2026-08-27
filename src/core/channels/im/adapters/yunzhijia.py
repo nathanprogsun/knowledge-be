@@ -47,7 +47,7 @@ _TEXT_MESSAGE_TYPE = 2
 _MARKDOWN_FORMAT_TYPE = "markdown"
 # Separator characters allowed after the ``@robotName`` mention prefix.
 # The fullwidth punctuation is part of the upstream mention format.
-_AT_SEPARATORS = ":：,，"  # noqa: RUF001
+_AT_SEPARATORS = ":：,，"
 
 
 class YunzhijiaAdapter(IMAdapter):
@@ -223,8 +223,12 @@ def _to_incoming_message(payload: JsonObject) -> IncomingMessage | None:
         payload_string(payload, "operatorId"),
         payload_string(payload, "operatorUserId"),
     )
-    user_name = _first_non_empty(payload_string(payload, "operatorName"), payload_string(payload, "senderName"))
-    chat_id = _first_non_empty(payload_string(payload, "groupId"), payload_string(payload, "robotId"))
+    user_name = _first_non_empty(
+        payload_string(payload, "operatorName"), payload_string(payload, "senderName")
+    )
+    chat_id = _first_non_empty(
+        payload_string(payload, "groupId"), payload_string(payload, "robotId")
+    )
 
     extra: JsonObject = {
         "robot_id": payload_string(payload, "robotId"),

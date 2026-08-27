@@ -34,9 +34,7 @@ async def test_create_get_update_delete_round_trip(session: AsyncSession) -> Non
     service = _service(session)
     tid = make_test_tenant_id()
 
-    created = await service.create_knowledge_base(
-        tenant_id=tid, name="docs", description="notes"
-    )
+    created = await service.create_knowledge_base(tenant_id=tid, name="docs", description="notes")
     await session.commit()
 
     assert created.id

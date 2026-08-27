@@ -205,7 +205,9 @@ class SearchEntityPlugin:
                 },
             )
             nodes = [
-                GraphNode(name=node.name, chunks=list(node.chunks), attributes=list(node.attributes))
+                GraphNode(
+                    name=node.name, chunks=list(node.chunks), attributes=list(node.attributes)
+                )
                 for node in graph.node
             ]
             relations = [

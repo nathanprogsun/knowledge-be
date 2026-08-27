@@ -98,12 +98,9 @@ def duplicate_error_for(new_content: FAQContent, existing: Faq) -> ValidationErr
     with the entry being edited, which callers exclude beforehand).
     """
     existing_similar = set(existing.similar_questions)
-    if (
-        new_content.standard_question
-        and (
-            new_content.standard_question == existing.standard_question
-            or new_content.standard_question in existing_similar
-        )
+    if new_content.standard_question and (
+        new_content.standard_question == existing.standard_question
+        or new_content.standard_question in existing_similar
     ):
         return ValidationError(
             code="faq.duplicate_question",

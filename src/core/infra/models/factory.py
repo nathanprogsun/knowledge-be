@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.infra.models.rerank_service import RerankService
 from src.core.infra.models.service.model_service import ModelService
-from src.core.infra.models.service.provider_service import WeKnoraCloudService
+from src.core.infra.models.service.provider_service import CloudService
 from src.db.dao.model_repository import ModelRepository
 from src.db.dao.tenants_repository import TenantRepository
 
@@ -38,21 +38,21 @@ def build_rerank_service(
     )
 
 
-def build_weknora_cloud_service(
+def build_kb_cloud_service(
     session: AsyncSession,
     *,
     http_client: httpx.AsyncClient | None = None,
-) -> WeKnoraCloudService:
-    """Per-request ``WeKnoraCloudService`` with a fresh repository.
+) -> CloudService:
+    """Per-request ``CloudService`` with a fresh repository.
 
     ``http_client`` may be an APP-scope pooled client from the lifespan
     registry; when omitted the service opens a short-lived client for
     the single credential-verification call.
     """
-    return WeKnoraCloudService(
+    return CloudService(
         tenants_repo=TenantRepository(session),
         http_client=http_client,
     )
 
 
-__all__ = ["build_model_service", "build_rerank_service", "build_weknora_cloud_service"]
+__all__ = ["build_kb_cloud_service", "build_model_service", "build_rerank_service"]

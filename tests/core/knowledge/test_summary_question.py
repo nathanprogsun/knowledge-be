@@ -78,8 +78,7 @@ _INT32_TENANT_SEQ = itertools.count(start=1)
 
 # Shared prompt template used across the question-generation unit tests.
 _QUESTION_PROMPT = (
-    "Generate {{question_count}} questions for '{{doc_name}}':\n"
-    "{{content}}\n{{context}}"
+    "Generate {{question_count}} questions for '{{doc_name}}':\n{{content}}\n{{context}}"
 )
 
 
@@ -548,12 +547,22 @@ async def test_summary_reconstructs_content_by_start_at() -> None:
     k_rows[doc.id] = doc
     c_repo, c_rows = _make_chunk_repo()
     c_rows["c-1"] = _sample_chunk(
-        id="c-1", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id,
-        chunk_index=1, start_at=0, content="Alpha part ",
+        id="c-1",
+        tenant_id=tenant_id,
+        knowledge_base_id="kb-1",
+        knowledge_id=doc.id,
+        chunk_index=1,
+        start_at=0,
+        content="Alpha part ",
     )
     c_rows["c-2"] = _sample_chunk(
-        id="c-2", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id,
-        chunk_index=0, start_at=11, content="beta part",
+        id="c-2",
+        tenant_id=tenant_id,
+        knowledge_base_id="kb-1",
+        knowledge_id=doc.id,
+        chunk_index=0,
+        start_at=11,
+        content="beta part",
     )
     fake = _FakeChat(content="summary")
 
@@ -582,8 +591,13 @@ async def test_summary_updates_existing_summary_chunk() -> None:
         id="c-1", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id
     )
     c_rows["c-sum"] = _sample_chunk(
-        id="c-sum", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id,
-        chunk_index=1, chunk_type=CHUNK_TYPE_SUMMARY, content="# Summary\nold",
+        id="c-sum",
+        tenant_id=tenant_id,
+        knowledge_base_id="kb-1",
+        knowledge_id=doc.id,
+        chunk_index=1,
+        chunk_type=CHUNK_TYPE_SUMMARY,
+        content="# Summary\nold",
     )
     fake = _FakeChat(content="new summary")
 
@@ -708,7 +722,10 @@ async def test_summary_raises_when_no_enabled_text_chunks() -> None:
     k_rows[doc.id] = doc
     c_repo, c_rows = _make_chunk_repo()
     c_rows["c-1"] = _sample_chunk(
-        id="c-1", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id,
+        id="c-1",
+        tenant_id=tenant_id,
+        knowledge_base_id="kb-1",
+        knowledge_id=doc.id,
         is_enabled=False,
     )
 
@@ -733,7 +750,10 @@ async def test_summary_insufficient_content_marks_failed_without_llm() -> None:
     k_rows[doc.id] = doc
     c_repo, c_rows = _make_chunk_repo()
     c_rows["c-1"] = _sample_chunk(
-        id="c-1", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id,
+        id="c-1",
+        tenant_id=tenant_id,
+        knowledge_base_id="kb-1",
+        knowledge_id=doc.id,
         content="![scanned](scan.png)",
     )
     fake = _FakeChat(content="summary")
@@ -762,7 +782,10 @@ async def test_summary_falls_back_to_first_chunk_on_llm_error() -> None:
     k_rows[doc.id] = doc
     c_repo, c_rows = _make_chunk_repo()
     c_rows["c-1"] = _sample_chunk(
-        id="c-1", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id,
+        id="c-1",
+        tenant_id=tenant_id,
+        knowledge_base_id="kb-1",
+        knowledge_id=doc.id,
         content="The quick brown fox jumps over the lazy dog.",
     )
     fake = _FakeChat(error=RuntimeError("boom"))
@@ -831,7 +854,10 @@ async def test_summary_discards_when_chunk_revision_changed() -> None:
     k_rows[doc.id] = doc
     c_repo, c_rows = _make_chunk_repo()
     c_rows["c-1"] = _sample_chunk(
-        id="c-1", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id,
+        id="c-1",
+        tenant_id=tenant_id,
+        knowledge_base_id="kb-1",
+        knowledge_id=doc.id,
         content="The quick brown fox jumps over the lazy dog.",
         content_revision=0,
     )
@@ -866,12 +892,22 @@ async def test_questions_generate_and_bind_metadata() -> None:
     k_rows[doc.id] = doc
     c_repo, c_rows = _make_chunk_repo()
     c_rows["c-1"] = _sample_chunk(
-        id="c-1", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id,
-        chunk_index=0, start_at=0, content="Alpha paragraph about finance.",
+        id="c-1",
+        tenant_id=tenant_id,
+        knowledge_base_id="kb-1",
+        knowledge_id=doc.id,
+        chunk_index=0,
+        start_at=0,
+        content="Alpha paragraph about finance.",
     )
     c_rows["c-2"] = _sample_chunk(
-        id="c-2", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id,
-        chunk_index=1, start_at=40, content="Beta paragraph about budgeting.",
+        id="c-2",
+        tenant_id=tenant_id,
+        knowledge_base_id="kb-1",
+        knowledge_id=doc.id,
+        chunk_index=1,
+        start_at=40,
+        content="Beta paragraph about budgeting.",
     )
     fake = _FakeChat(questions=["What drives cost growth?", "How is the budget split?"])
 
@@ -918,7 +954,10 @@ async def test_questions_applies_kb_config_and_custom_instructions() -> None:
     k_rows[doc.id] = doc
     c_repo, c_rows = _make_chunk_repo()
     c_rows["c-1"] = _sample_chunk(
-        id="c-1", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id,
+        id="c-1",
+        tenant_id=tenant_id,
+        knowledge_base_id="kb-1",
+        knowledge_id=doc.id,
         content="Alpha paragraph about finance.",
     )
     fake = _FakeChat(questions=["One?", "Two?"])
@@ -948,7 +987,10 @@ async def test_questions_explicit_count_wins_and_clamps() -> None:
     k_rows[doc.id] = doc
     c_repo, c_rows = _make_chunk_repo()
     c_rows["c-1"] = _sample_chunk(
-        id="c-1", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id,
+        id="c-1",
+        tenant_id=tenant_id,
+        knowledge_base_id="kb-1",
+        knowledge_id=doc.id,
         content="Alpha paragraph about finance.",
     )
     fake = _FakeChat(questions=["One?", "Two?"])
@@ -1058,7 +1100,10 @@ async def test_questions_raises_ai_provider_error_on_llm_failure() -> None:
     k_rows[doc.id] = doc
     c_repo, c_rows = _make_chunk_repo()
     c_rows["c-1"] = _sample_chunk(
-        id="c-1", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id,
+        id="c-1",
+        tenant_id=tenant_id,
+        knowledge_base_id="kb-1",
+        knowledge_id=doc.id,
         content="Alpha paragraph about finance.",
     )
 
@@ -1083,7 +1128,10 @@ async def test_questions_skips_stale_chunk_revision() -> None:
     k_rows[doc.id] = doc
     c_repo, c_rows = _make_chunk_repo()
     c_rows["c-1"] = _sample_chunk(
-        id="c-1", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id,
+        id="c-1",
+        tenant_id=tenant_id,
+        knowledge_base_id="kb-1",
+        knowledge_id=doc.id,
         content="Alpha paragraph about finance.",
         content_revision=0,
     )
@@ -1116,12 +1164,19 @@ async def test_questions_skips_empty_chunks() -> None:
     k_rows[doc.id] = doc
     c_repo, c_rows = _make_chunk_repo()
     c_rows["c-1"] = _sample_chunk(
-        id="c-1", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id,
+        id="c-1",
+        tenant_id=tenant_id,
+        knowledge_base_id="kb-1",
+        knowledge_id=doc.id,
         content="   ",
     )
     c_rows["c-2"] = _sample_chunk(
-        id="c-2", tenant_id=tenant_id, knowledge_base_id="kb-1", knowledge_id=doc.id,
-        chunk_index=1, content="Real content to ask about.",
+        id="c-2",
+        tenant_id=tenant_id,
+        knowledge_base_id="kb-1",
+        knowledge_id=doc.id,
+        chunk_index=1,
+        content="Real content to ask about.",
     )
     fake = _FakeChat(questions=["One question here?"])
 

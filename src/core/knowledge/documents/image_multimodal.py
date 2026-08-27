@@ -103,9 +103,7 @@ IMAGE_SOURCE_SCANNED_PDF = "scanned_pdf"
 
 _HTML_TAG_PATTERN = re.compile(r"<[^>]+>")
 _CODE_BLOCK_PATTERN = re.compile(r"(?s)^\s*```[a-zA-Z]*\s*\n(.*?)\n\s*```\s*$")
-_HTML_DOC_PATTERN = re.compile(
-    r"(?i)^\s*(<!DOCTYPE|<html|<body|<div|<p[\s>]|<table|<h[1-6][\s>])"
-)
+_HTML_DOC_PATTERN = re.compile(r"(?i)^\s*(<!DOCTYPE|<html|<body|<div|<p[\s>]|<table|<h[1-6][\s>])")
 _MULTIPLE_NEWLINES = re.compile(r"\n{3,}")
 
 #: Replies a vision model produces when the image has no recognizable text.
@@ -149,7 +147,7 @@ def is_known_empty_reply(text: str) -> bool:
     like ``No text content.`` still match ``no text content``.
     """
     lower = text.strip().lower()
-    lower = lower.rstrip(".!?。！？")  # noqa: RUF001
+    lower = lower.rstrip(".!?。！？")
     return lower in _KNOWN_EMPTY_REPLIES
 
 
@@ -483,8 +481,7 @@ def build_ocr_prompt(image_source_type: str, custom_instructions: str = "") -> s
 def build_vlm_caption_prompt(language: str, custom_instructions: str = "") -> str:
     """Build the caption (description) prompt for an image."""
     prompt = (
-        "Provide a brief and concise description of the main content of the "
-        f"image in {language}."
+        f"Provide a brief and concise description of the main content of the image in {language}."
     )
     return append_custom_prompt_instructions(prompt, custom_instructions, "image_description")
 
@@ -648,9 +645,7 @@ class IndexEngineResolver(Protocol):
 class MultimodalFinalizer(Protocol):
     """Count one finished image toward the parent knowledge's pending gate."""
 
-    async def finalize(
-        self, *, tenant_id: int, knowledge_id: str, knowledge_base_id: str
-    ) -> None:
+    async def finalize(self, *, tenant_id: int, knowledge_id: str, knowledge_base_id: str) -> None:
         """Decrement the pending-image counter; enqueue post-process when drained."""
         ...
 
@@ -844,9 +839,7 @@ class ImageMultimodalService:
         try:
             image_bytes = await self._read_image_bytes(payload)
         except ImageReadError as exc:
-            logger.warning(
-                "[ImageMultimodal] Skip unreadable image {}: {}", payload.image_url, exc
-            )
+            logger.warning("[ImageMultimodal] Skip unreadable image {}: {}", payload.image_url, exc)
             return replace(outcome, skipped="unreadable_image", read_error=str(exc))
         outcome = replace(outcome, image_bytes=len(image_bytes))
 
@@ -864,9 +857,7 @@ class ImageMultimodalService:
         try:
             caption = await vlm.predict([image_bytes], caption_prompt)
         except Exception as exc:
-            logger.warning(
-                "[ImageMultimodal] Caption failed for {}: {}", payload.image_url, exc
-            )
+            logger.warning("[ImageMultimodal] Caption failed for {}: {}", payload.image_url, exc)
             outcome = replace(outcome, caption_error=str(exc))
         else:
             if caption != "":
@@ -897,9 +888,7 @@ class ImageMultimodalService:
         try:
             ocr_text = sanitize_ocr_text(await vlm.predict([image_bytes], ocr_prompt))
         except Exception as exc:
-            logger.warning(
-                "[ImageMultimodal] OCR failed for {}: {}", payload.image_url, exc
-            )
+            logger.warning("[ImageMultimodal] OCR failed for {}: {}", payload.image_url, exc)
             return replace(outcome, ocr_error=str(exc)), image_info
         if ocr_text == "":
             logger.warning(
@@ -1013,9 +1002,7 @@ class ImageMultimodalService:
             embedding_model_id=kb.embedding_model_id
         )
         if embedder is None:
-            logger.warning(
-                "[ImageMultimodal] Failed to get embedding model for indexing"
-            )
+            logger.warning("[ImageMultimodal] Failed to get embedding model for indexing")
         return embedder
 
     async def _resolve_engine(

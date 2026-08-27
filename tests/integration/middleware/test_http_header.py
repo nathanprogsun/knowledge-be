@@ -94,7 +94,7 @@ def test_header_only_resolves_principal(
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["success"] is True
-    tenant_ids = [t["id"] for t in payload["data"]["items"]]
+    tenant_ids = [t["id"] for t in payload["data"]["data"]]
     assert tenant_id in tenant_ids
 
 
@@ -133,7 +133,7 @@ def test_jwt_with_header_resolves_via_header_channel(
     response = authed_client.get("/api/v1/tenants", headers=headers)
     assert response.status_code == 200, response.text
     payload = response.json()
-    tenant_ids = [t["id"] for t in payload["data"]["items"]]
+    tenant_ids = [t["id"] for t in payload["data"]["data"]]
     # The header channel wins: the response lists the header
     # principal's tenant, not the JWT principal's.
     assert header_tenant_id in tenant_ids

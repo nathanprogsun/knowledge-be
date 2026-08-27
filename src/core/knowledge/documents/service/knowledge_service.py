@@ -509,8 +509,7 @@ class KnowledgeService:
                 raise ValidationError(
                     code="knowledge.invalid_custom_metadata_value",
                     message=(
-                        f'custom_metadata field "{key}" must be a string, '
-                        "number, boolean, or null"
+                        f'custom_metadata field "{key}" must be a string, number, boolean, or null'
                     ),
                 )
 

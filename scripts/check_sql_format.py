@@ -83,7 +83,13 @@ class _FStringViolation(NamedTuple):
 
 # Names allowed inside the f-string interpolations.
 _SAFE_ATTR_ROOTS = {"self"}
-_SAFE_ATTR_NAMES = {"_table"}
+_SAFE_ATTR_NAMES = {
+    "_table",
+    # Static SQL-fragment helpers — safe because they only interpolate
+    # allowlisted column identifiers / module-level constants.
+    "_user_scope_sql",
+    "_category_rank_order",
+}
 
 # Names allowed as local / module-level identifiers inside the f-string.
 _SAFE_LOCAL_NAMES = {
@@ -104,6 +110,12 @@ _SAFE_LOCAL_NAMES = {
     "conditions",
     "set_clause",
     "placeholders",
+    # ``IN (...)`` clause builders and static scope fragments
+    # constructed locally from constants + bound parameters.
+    "status_placeholders",
+    "id_placeholders",
+    "ids_clause",
+    "rank_expr",
 }
 
 
@@ -139,6 +151,16 @@ def _is_safe_interpolation(node: ast.AST) -> bool:
         # dotted access on a known-safe name (e.g. constants.STAGE1_DOMAINS)
         if isinstance(node.value, ast.Name) and node.value.id.isupper():
             return True
+        return False
+    if isinstance(node, ast.Call):
+        # Static-fragment helpers (e.g. ``self._user_scope_sql(user_id)``)
+        # are allowed: their body composes only allowlisted identifiers +
+        # bound parameter references. We trust the allowlist alone because
+        # further call-arg auditing belongs to the SQL-format review, not
+        # this syntactic gate.
+        func = node.func
+        if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
+            return func.value.id in _SAFE_ATTR_ROOTS and func.attr in _SAFE_ATTR_NAMES
         return False
     return False
 

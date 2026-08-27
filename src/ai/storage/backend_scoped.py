@@ -38,18 +38,14 @@ class BackendScopedFileService:
         """Delegate to the inner service."""
         await self._inner.check_connectivity()
 
-    async def save_file(
-        self, *, file: FileUpload, tenant_id: int, knowledge_id: str
-    ) -> str:
+    async def save_file(self, *, file: FileUpload, tenant_id: int, knowledge_id: str) -> str:
         """Save via the inner service and wrap the returned path."""
         path = await self._inner.save_file(
             file=file, tenant_id=tenant_id, knowledge_id=knowledge_id
         )
         return self._wrap(path)
 
-    async def save_bytes(
-        self, *, data: bytes, tenant_id: int, file_name: str, temp: bool
-    ) -> str:
+    async def save_bytes(self, *, data: bytes, tenant_id: int, file_name: str, temp: bool) -> str:
         """Save bytes via the inner service and wrap the returned path."""
         path = await self._inner.save_bytes(
             data=data, tenant_id=tenant_id, file_name=file_name, temp=temp

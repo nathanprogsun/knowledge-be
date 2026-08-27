@@ -15,6 +15,7 @@ from src.ai.provider import (
     PROVIDER_ALIYUN,
     PROVIDER_ANTHROPIC,
     PROVIDER_AZURE_OPENAI,
+    PROVIDER_CLOUD,
     PROVIDER_DEEPSEEK,
     PROVIDER_GEMINI,
     PROVIDER_GENERIC,
@@ -36,7 +37,6 @@ from src.ai.provider import (
     PROVIDER_REQUESTY,
     PROVIDER_SILICONFLOW,
     PROVIDER_VOLCENGINE,
-    PROVIDER_WEKNORACLOUD,
     PROVIDER_ZHIPU,
     ModelType,
     ProviderConfig,
@@ -71,7 +71,7 @@ def test_all_providers_matches_catalog_values() -> None:
 def test_all_providers_has_canonical_ordering() -> None:
     expected = (
         "generic",
-        "weknoracloud",
+        "cloud",
         "aliyun",
         "zhipu",
         "volcengine",
@@ -102,7 +102,7 @@ def test_all_providers_has_canonical_ordering() -> None:
 
 def test_provider_name_values_are_the_contract_strings() -> None:
     assert PROVIDER_GENERIC == "generic"
-    assert PROVIDER_WEKNORACLOUD == "weknoracloud"
+    assert PROVIDER_CLOUD == "cloud"
     assert PROVIDER_AZURE_OPENAI == "azure_openai"
 
 
@@ -139,7 +139,7 @@ def test_provider_name_values_are_the_contract_strings() -> None:
         ("https://lkeap.tencentcloudapi.com", PROVIDER_LKEAP),
         ("https://integrate.api.nvidia.com/v1", PROVIDER_NVIDIA),
         ("https://api.novita.ai/openai/v1", PROVIDER_NOVITA),
-        ("https://weknora.weixin.qq.com", PROVIDER_WEKNORACLOUD),
+        ("https://kb.weixin.qq.com", PROVIDER_CLOUD),
         ("https://custom.example.com/v1", PROVIDER_GENERIC),
         ("", PROVIDER_GENERIC),
     ],
@@ -228,10 +228,10 @@ def test_azure_default_urls_include_rerank_but_model_types_exclude_it() -> None:
     assert ModelType.RERANK not in azure.model_types
 
 
-def test_weknoracloud_provider_accepts_empty_config() -> None:
-    from src.ai.provider.providers import weknoracloud
+def test_cloud_provider_accepts_empty_config() -> None:
+    from src.ai.provider.providers import cloud
 
-    weknoracloud.validate_config(ProviderConfig(provider="weknoracloud"))
+    cloud.validate_config(ProviderConfig(provider="cloud"))
 
 
 def test_generic_provider_requires_base_url_and_model_name() -> None:

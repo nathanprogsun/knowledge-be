@@ -57,10 +57,7 @@ class LKEAPReranker:
         if len(documents) > _LKEAP_MAX_DOCUMENTS:
             raise ValidationError(
                 code="rerank.lkeap_too_many_documents",
-                message=(
-                    "LKEAP rerank supports at most 60 documents, "
-                    f"got {len(documents)}"
-                ),
+                message=(f"LKEAP rerank supports at most 60 documents, got {len(documents)}"),
             )
         request = RunRerankRequest()
         request.Query = query

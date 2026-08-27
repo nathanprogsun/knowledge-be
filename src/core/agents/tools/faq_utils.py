@@ -237,11 +237,7 @@ def faq_fields_empty(meta: FAQChunkMetadata | None) -> bool:
     """Whether the metadata carries no displayable FAQ fields."""
     if meta is None:
         return True
-    return (
-        not meta.standard_question
-        and not meta.similar_questions
-        and not meta.answers
-    )
+    return not meta.standard_question and not meta.similar_questions and not meta.answers
 
 
 def write_faq_metadata_xml(parts: list[str], meta: FAQChunkMetadata | None) -> None:

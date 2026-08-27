@@ -18,17 +18,18 @@ for the changed behavior — not the full suite on every push.
   failures)
 - `make test` — pytest over `tests/`
 - `make check` — anti-drift gates (layer directionality, DI scope,
-  endpoint coverage, contract invariants, top-level imports, SQL
+  endpoint coverage, DB schema compatibility, top-level imports, SQL
   format, PR-leak scan)
 
 ## Narrowing
 
 - When only `src/core/<domain>/` changed, run that domain's tests first
   (`pytest tests/core/<domain>/`), then the full `make check`.
-- Contract-bearing files (`src/common/pagination.py`,
-  `src/common/exception.py`, `src/core/contracts/*.py`, domain view
-  models) additionally require `make check-contract` and the
-  field-alignment review in `kb-contract-alignment`.
+- API-bearing files (routers, views, `src/core/contracts/*.py`,
+  `src/common/pagination.py`, `src/common/exception.py`) additionally
+  require `make openapi` plus the field-alignment review in
+  `kb-contract-alignment`, and a frontend `npm run type-check` when the
+  OpenAPI schema changed.
 - A non-trivial change must carry an Agent Note (`kb-agent-note`).
 
 ## Never

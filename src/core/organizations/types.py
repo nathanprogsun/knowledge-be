@@ -36,9 +36,7 @@ from src.db.models.organization import (
 # Columns of an `organizations` row that stay inside the service:
 # ``invite_code`` is the join credential and ``deleted_at`` is
 # storage-only.
-_ORGANIZATION_EXCLUDE_COLUMNS: frozenset[str] = frozenset(
-    {"invite_code", "deleted_at"}
-)
+_ORGANIZATION_EXCLUDE_COLUMNS: frozenset[str] = frozenset({"invite_code", "deleted_at"})
 
 # Storage-only column of `organization_tenant_members` rows: the table
 # has no soft-delete column, but the representative user id is
@@ -47,9 +45,7 @@ _MEMBER_EXCLUDE_COLUMNS: frozenset[str] = frozenset()
 
 # Storage-only columns of `organization_join_requests` rows: the review
 # trail (reviewer id / message) is internal to the admin flow.
-_JOIN_REQUEST_EXCLUDE_COLUMNS: frozenset[str] = frozenset(
-    {"reviewed_by", "review_message"}
-)
+_JOIN_REQUEST_EXCLUDE_COLUMNS: frozenset[str] = frozenset({"reviewed_by", "review_message"})
 
 
 class OrganizationInfo(BaseModel):

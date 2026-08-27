@@ -84,9 +84,7 @@ class ChatCompletionStep:
             {"chat_model": pipeline_ctx.chat_model_id},
         )
         try:
-            with with_prompt_cache_metadata(
-                chat_messages, options, KNOWLEDGE_QA_PURPOSE
-            ):
+            with with_prompt_cache_metadata(chat_messages, options, KNOWLEDGE_QA_PURPOSE):
                 chat_response = await chat_model.chat(chat_messages, options)
         except Exception as exc:
             pipeline_error(

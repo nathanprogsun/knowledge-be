@@ -36,9 +36,7 @@ _MCP_SERVICE_EXCLUDE_COLUMNS: frozenset[str] = frozenset({"deleted_at"})
 # Go ``MCPService.Headers`` / ``EnvVars`` columns). Strip them at the
 # service boundary so the wire contract never sees a plaintext bearer
 # token or secret env var.
-_AUTH_HEADER_NAMES: frozenset[str] = frozenset(
-    {"authorization", "cookie", "proxy-authorization"}
-)
+_AUTH_HEADER_NAMES: frozenset[str] = frozenset({"authorization", "cookie", "proxy-authorization"})
 _REDACTED_CREDENTIAL_PLACEHOLDER = "***"
 
 

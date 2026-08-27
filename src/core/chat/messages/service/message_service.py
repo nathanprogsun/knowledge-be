@@ -814,7 +814,8 @@ class MessageServiceImpl:
                 entry.has_assistant = True
 
         incomplete = [
-            rid for rid, roles in roles_by_request.items()
+            rid
+            for rid, roles in roles_by_request.items()
             if not (roles.has_user and roles.has_assistant)
         ]
         if not incomplete:

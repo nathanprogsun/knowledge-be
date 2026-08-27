@@ -190,7 +190,9 @@ async def test_create_tenant_returns_201_with_envelope(
     web_authed_client: TestClient,
     repo: AsyncMock,
 ) -> None:
-    resp = web_authed_client.post("/api/v1/tenants", json={"name": "acme", "description": "the workspace"})
+    resp = web_authed_client.post(
+        "/api/v1/tenants", json={"name": "acme", "description": "the workspace"}
+    )
 
     assert resp.status_code == 201
     body = resp.json()
@@ -319,7 +321,7 @@ async def test_list_all_tenants_returns_items_newest_first(
 
     body = web_authed_client.get("/api/v1/tenants/all").json()
 
-    assert [item["id"] for item in body["data"]["items"]] == [newer.id, older.id]
+    assert [item["id"] for item in body["data"]["data"]] == [newer.id, older.id]
     assert body["data"]["total"] is None
 
 
@@ -333,7 +335,7 @@ async def test_list_all_tenants_excludes_deleted(
 
     body = web_authed_client.get("/api/v1/tenants/all").json()
 
-    assert [item["id"] for item in body["data"]["items"]] == [live.id]
+    assert [item["id"] for item in body["data"]["data"]] == [live.id]
 
 
 # ── GET /tenants/search ─────────────────────────────────────────────
@@ -346,12 +348,14 @@ async def test_search_returns_page_with_total(
     for index in range(5):
         await _seed(repo, name=f"t{index}", created_at=_NOW + timedelta(hours=index))
 
-    body = web_authed_client.get("/api/v1/tenants/search", params={"page": 2, "page_size": 2}).json()
+    body = web_authed_client.get(
+        "/api/v1/tenants/search", params={"page": 2, "page_size": 2}
+    ).json()
 
     assert body["data"]["total"] == 5
     assert body["data"]["page"] == 2
     assert body["data"]["page_size"] == 2
-    assert [item["name"] for item in body["data"]["items"]] == ["t2", "t1"]
+    assert [item["name"] for item in body["data"]["data"]] == ["t2", "t1"]
 
 
 async def test_search_filters_by_keyword(
@@ -363,7 +367,7 @@ async def test_search_filters_by_keyword(
 
     body = web_authed_client.get("/api/v1/tenants/search", params={"keyword": "alpha"}).json()
 
-    assert [item["id"] for item in body["data"]["items"]] == [match.id]
+    assert [item["id"] for item in body["data"]["data"]] == [match.id]
 
 
 async def test_search_filters_by_tenant_id(
@@ -375,7 +379,7 @@ async def test_search_filters_by_tenant_id(
 
     body = web_authed_client.get("/api/v1/tenants/search", params={"tenant_id": wanted.id}).json()
 
-    assert [item["id"] for item in body["data"]["items"]] == [wanted.id]
+    assert [item["id"] for item in body["data"]["data"]] == [wanted.id]
 
 
 @pytest.mark.parametrize(

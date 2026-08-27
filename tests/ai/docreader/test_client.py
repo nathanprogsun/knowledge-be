@@ -173,7 +173,7 @@ def test_build_dial_options_insecure_defaults() -> None:
     assert credentials is None
     assert ("grpc.max_receive_message_length", 2048) in options
     assert ("grpc.max_send_message_length", 2048) in options
-    assert ('{"loadBalancingPolicy":"round_robin"}' in options[0][1])
+    assert '{"loadBalancingPolicy":"round_robin"}' in options[0][1]
 
 
 def test_build_dial_options_tls_with_ca(tmp_path: Path) -> None:

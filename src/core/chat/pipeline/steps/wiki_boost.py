@@ -66,8 +66,7 @@ class WikiBoostPlugin:
         # Fast path: skip all work when no wiki chunk is in the result set,
         # avoiding a KB lookup on every non-wiki turn.
         if not any(
-            result.chunk_type == CHUNK_TYPE_WIKI_PAGE
-            for result in pipeline_ctx.rerank_result
+            result.chunk_type == CHUNK_TYPE_WIKI_PAGE for result in pipeline_ctx.rerank_result
         ):
             return None
 
@@ -81,9 +80,7 @@ class WikiBoostPlugin:
             for result in pipeline_ctx.rerank_result
         ]
         pipeline_ctx.rerank_result = boosted
-        boosted_count = sum(
-            1 for result in boosted if result.chunk_type == CHUNK_TYPE_WIKI_PAGE
-        )
+        boosted_count = sum(1 for result in boosted if result.chunk_type == CHUNK_TYPE_WIKI_PAGE)
         if boosted_count > 0:
             pipeline_info(
                 "WikiBoost",

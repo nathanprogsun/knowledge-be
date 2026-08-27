@@ -64,9 +64,7 @@ class DatatableSummaryRunner(Protocol):
     :func:`src.core.knowledge.documents.datatable_summary.process_datatable_summary`.
     """
 
-    async def __call__(
-        self, *, payload: DatatableSummaryPayload
-    ) -> DataTableSummaryResult: ...
+    async def __call__(self, *, payload: DatatableSummaryPayload) -> DataTableSummaryResult: ...
 
 
 @register_task(TASK_NAME)
@@ -135,9 +133,9 @@ def _serialise_result(result: DataTableSummaryResult) -> dict[str, JsonValue]:
 
 
 __all__ = [
+    "TASK_NAME",
     "DatatableSummaryPayload",
     "DatatableSummaryRunner",
-    "TASK_NAME",
     "parse_payload",
     "run_datatable_summary",
     "task_datatable_summary",

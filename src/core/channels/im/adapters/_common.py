@@ -175,25 +175,19 @@ def build_http_client(
 
 def hmac_sha256_base64(secret: str, message: str) -> str:
     """Return ``base64(HMAC-SHA256(secret, message))``."""
-    digest = hmac.new(
-        secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256
-    ).digest()
+    digest = hmac.new(secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).digest()
     return base64.b64encode(digest).decode("ascii")
 
 
 def hmac_sha256_hex(secret: str, message: str) -> str:
     """Return the lowercase hex HMAC-SHA256 of ``message`` under ``secret``."""
-    digest = hmac.new(
-        secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256
-    ).digest()
+    digest = hmac.new(secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha256).digest()
     return digest.hex()
 
 
 def hmac_sha1_base64(secret: str, message: str) -> str:
     """Return ``base64(HMAC-SHA1(secret, message))``."""
-    digest = hmac.new(
-        secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha1
-    ).digest()
+    digest = hmac.new(secret.encode("utf-8"), message.encode("utf-8"), hashlib.sha1).digest()
     return base64.b64encode(digest).decode("ascii")
 
 
@@ -316,9 +310,7 @@ def validate_http_endpoint(raw_url: str) -> urllib.parse.ParseResult:
     return parsed
 
 
-def validate_https_host_suffix(
-    raw_url: str, allowed_host_suffix: str
-) -> urllib.parse.ParseResult:
+def validate_https_host_suffix(raw_url: str, allowed_host_suffix: str) -> urllib.parse.ParseResult:
     """Validate an HTTPS webhook endpoint against a required host suffix."""
     parsed = validate_http_endpoint(raw_url)
     if parsed.scheme.lower() != "https":

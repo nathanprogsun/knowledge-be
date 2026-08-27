@@ -144,6 +144,7 @@ class ConnectionManagerLike(Protocol):
 
     async def list_resources(self, *, session: MCPSession) -> JSONRPCResponse: ...
 
+
 # Backwards-compatibility alias for code that still imports the
 # underscore-prefixed name from earlier PRs.
 _ConnectionManagerLike = ConnectionManagerLike

@@ -103,9 +103,7 @@ class SearxngProvider(HttpSearchClient):
         """Explain why the most recent search returned no usable results."""
         if self._last_unresponsive:
             detail = "; ".join(" / ".join(pair) for pair in self._last_unresponsive[:5])
-            return (
-                f"{detail}; check that upstream search engines can reach the internet"
-            )
+            return f"{detail}; check that upstream search engines can reach the internet"
         return "verify the instance URL is reachable and JSON format is enabled in settings.yml"
 
     def search(
@@ -125,8 +123,7 @@ class SearxngProvider(HttpSearchClient):
             raise ExternalServiceError(
                 code="web_search_provider.search_failed",
                 message=(
-                    f"searxng returned status {response.status_code}: "
-                    f"{response.text.strip()[:512]}"
+                    f"searxng returned status {response.status_code}: {response.text.strip()[:512]}"
                 ),
             )
         try:
@@ -150,9 +147,7 @@ class SearxngProvider(HttpSearchClient):
         raw_unresponsive = data.get("unresponsive_engines")
         if isinstance(raw_unresponsive, list):
             self._last_unresponsive = [
-                [str(part) for part in pair]
-                for pair in raw_unresponsive
-                if isinstance(pair, list)
+                [str(part) for part in pair] for pair in raw_unresponsive if isinstance(pair, list)
             ]
         else:
             self._last_unresponsive = []

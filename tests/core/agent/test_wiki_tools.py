@@ -277,9 +277,7 @@ class _FakeWikiService:
     ) -> WikiIndexResponse:
         return self.index_views[knowledge_base_id]
 
-    async def inject_cross_links(
-        self, *, knowledge_base_id: str, affected_slugs: list[str]
-    ) -> int:
+    async def inject_cross_links(self, *, knowledge_base_id: str, affected_slugs: list[str]) -> int:
         self.injected.append((knowledge_base_id, affected_slugs))
         return 0
 
@@ -560,7 +558,9 @@ def _issue(
     )
 
 
-def _scope(kb_id: str, *, knowledge_ids: list[str] | None = None, tag_ids: list[str] | None = None) -> WikiScope:
+def _scope(
+    kb_id: str, *, knowledge_ids: list[str] | None = None, tag_ids: list[str] | None = None
+) -> WikiScope:
     """Build one wiki scope."""
     return WikiScope(
         knowledge_base_id=kb_id,
@@ -632,7 +632,9 @@ class TestSlugNormalization:
 class TestUniquePageResolution:
     async def test_resolves_unique_slug(self) -> None:
         service = _FakeWikiService([_page("entity/acme")])
-        page, kb_id = await resolve_unique_wiki_page(_Context(), service, "entity/acme", ["kb-1"], WikiRouteResolver())
+        page, kb_id = await resolve_unique_wiki_page(
+            _Context(), service, "entity/acme", ["kb-1"], WikiRouteResolver()
+        )
         assert page.slug == "entity/acme"
         assert kb_id == "kb-1"
 
@@ -651,7 +653,9 @@ class TestUniquePageResolution:
     async def test_not_found_in_scope(self) -> None:
         service = _FakeWikiService([_page("entity/other")])
         with pytest.raises(WikiPageNotFoundInScopeError):
-            await resolve_unique_wiki_page(_Context(), service, "entity/acme", ["kb-1"], WikiRouteResolver())
+            await resolve_unique_wiki_page(
+                _Context(), service, "entity/acme", ["kb-1"], WikiRouteResolver()
+            )
 
     async def test_empty_slug_is_rejected(self) -> None:
         service = _FakeWikiService()
@@ -692,7 +696,9 @@ class TestPageScope:
 
     async def test_knowledge_whitelist_filters(self) -> None:
         page = _page("entity/acme", source_refs=["d1"])
-        assert await page_passes_wiki_scope(_Context(), page, _scope("kb-1", knowledge_ids=["d1"]), None)
+        assert await page_passes_wiki_scope(
+            _Context(), page, _scope("kb-1", knowledge_ids=["d1"]), None
+        )
         assert not await page_passes_wiki_scope(
             _Context(), page, _scope("kb-1", knowledge_ids=["d2"]), None
         )
@@ -700,7 +706,9 @@ class TestPageScope:
     async def test_tag_scope_filters_by_tag(self) -> None:
         page = _page("entity/acme", source_refs=["d1"])
         fetcher = _FakeTagFetcher({"d1": [_tag("t1")], "d2": []})
-        assert await page_passes_wiki_scope(_Context(), page, _scope("kb-1", tag_ids=["t1"]), fetcher)
+        assert await page_passes_wiki_scope(
+            _Context(), page, _scope("kb-1", tag_ids=["t1"]), fetcher
+        )
         assert not await page_passes_wiki_scope(
             _Context(), page, _scope("kb-1", tag_ids=["t2"]), fetcher
         )
@@ -774,7 +782,9 @@ class TestWikiSearchTool:
 
     async def test_knowledge_base_id_outside_scope_fails(self) -> None:
         tool = self._tool(_FakeWikiService(), [_scope("kb-1")])
-        result = await tool.execute(_Context(), '{"queries": ["acme"], "knowledge_base_id": "kb-9"}')
+        result = await tool.execute(
+            _Context(), '{"queries": ["acme"], "knowledge_base_id": "kb-9"}'
+        )
         assert not result.success
         assert "not within the current wiki scope" in result.error
 
@@ -1041,7 +1051,7 @@ class TestWikiReadSourceDocTool:
         result = await tool.execute(_Context(), '{"knowledge_id": "d1"}')
         assert result.success
         assert "<total_chunks>3</total_chunks>" in result.output
-        assert 'Showing the first 10 chunks as a preview' in result.output
+        assert "Showing the first 10 chunks as a preview" in result.output
         assert result.data["fetched_chunks"] == 3
         assert result.data["total_chunks"] == 3
 
@@ -1081,7 +1091,9 @@ class TestWikiReadSourceDocTool:
         store = _FakeChunkStore()
         targets = _targets(_kb_target("kb-1"))
         docs = [_knowledge(id="d1", knowledge_base_id="kb-2")]
-        tool = self._tool(store, docs, search_targets=targets, knowledge_service=_FakeKnowledgeLookup(docs))
+        tool = self._tool(
+            store, docs, search_targets=targets, knowledge_service=_FakeKnowledgeLookup(docs)
+        )
         result = await tool.execute(_Context(), '{"knowledge_id": "d1"}')
         assert not result.success
         assert "Document not found" in result.error
@@ -1200,7 +1212,10 @@ class TestWikiDeletePageTool:
         tool = self._tool(service)
         result = await tool.execute(_Context(), '{"slug": "entity/acme"}')
         assert result.success
-        assert "Successfully deleted page [[entity/acme]] and cleaned up 1 incoming links." in result.output
+        assert (
+            "Successfully deleted page [[entity/acme]] and cleaned up 1 incoming links."
+            in result.output
+        )
         assert service.deleted == [("kb-1", "entity/acme")]
         assert service.stored()[0].content == "See Acme Corp."
 
@@ -1236,7 +1251,9 @@ class TestWikiRenamePageTool:
             ]
         )
         tool = self._tool(service)
-        result = await tool.execute(_Context(), '{"slug": "entity/acme", "new_slug": "entity/acme-corp"}')
+        result = await tool.execute(
+            _Context(), '{"slug": "entity/acme", "new_slug": "entity/acme-corp"}'
+        )
         assert result.success
         assert "Successfully renamed page [[entity/acme]] → [[entity/acme-corp]]" in result.output
         slugs = {page.slug for page in service.stored()}
@@ -1247,7 +1264,9 @@ class TestWikiRenamePageTool:
 
     async def test_same_slug_rejected(self) -> None:
         tool = self._tool(_FakeWikiService())
-        result = await tool.execute(_Context(), '{"slug": "entity/acme", "new_slug": "entity/acme"}')
+        result = await tool.execute(
+            _Context(), '{"slug": "entity/acme", "new_slug": "entity/acme"}'
+        )
         assert not result.success
         assert "new_slug must be different" in result.error
 
@@ -1342,7 +1361,9 @@ class TestQueryKnowledgeGraphTool:
     async def test_too_many_kb_ids_fails(self) -> None:
         kb_ids = [f"kb-{i}" for i in range(GRAPH_MAX_KB_IDS + 1)]
         tool = self._tool(_FakeKbLoader(), _FakeSearchRunner())
-        result = await tool.execute(_Context(), json.dumps({"query": "rag", "knowledge_base_ids": kb_ids}))
+        result = await tool.execute(
+            _Context(), json.dumps({"query": "rag", "knowledge_base_ids": kb_ids})
+        )
         assert not result.success
         assert "at most 10" in result.error
 
@@ -1369,7 +1390,9 @@ class TestQueryKnowledgeGraphTool:
             }
         )
         tool = self._tool(loader, runner)
-        result = await tool.execute(_Context(), '{"knowledge_base_ids": ["kb-1", "kb-2"], "query": "rag"}')
+        result = await tool.execute(
+            _Context(), '{"knowledge_base_ids": ["kb-1", "kb-2"], "query": "rag"}'
+        )
         assert result.success
         assert result.data["count"] == 2
         assert result.data["kb_counts"] == {"kb-1": 1, "kb-2": 2}
@@ -1385,7 +1408,9 @@ class TestQueryKnowledgeGraphTool:
         assert result.data["errors"] == ["KB kb-1: graph extraction not configured"]
 
     async def test_scope_enforced_kb_outside_targets_rejected(self) -> None:
-        loader = _FakeKbLoader([_kb_info("kb-9", extract_config={"nodes": ["Tech"], "relations": []})])
+        loader = _FakeKbLoader(
+            [_kb_info("kb-9", extract_config={"nodes": ["Tech"], "relations": []})]
+        )
         tool = self._tool(loader, _FakeSearchRunner(), search_targets=_targets(_kb_target("kb-1")))
         result = await tool.execute(_Context(), '{"knowledge_base_ids": ["kb-9"], "query": "rag"}')
         assert not result.success
@@ -1518,9 +1543,7 @@ async def session() -> AsyncIterator[AsyncSession]:
         await engine.dispose()
 
 
-def _integration_doc(
-    *, id: str, tenant_id: int, knowledge_base_id: str
-) -> Document:
+def _integration_doc(*, id: str, tenant_id: int, knowledge_base_id: str) -> Document:
     """Build one document row for the integration tests."""
     return Document(
         id=id,
@@ -1630,7 +1653,9 @@ def _integration_page(
     )
 
 
-async def _seed_kb(session: AsyncSession, tenant_id: int, name: str = "agent-wiki-kb") -> KnowledgeBaseInfo:
+async def _seed_kb(
+    session: AsyncSession, tenant_id: int, name: str = "agent-wiki-kb"
+) -> KnowledgeBaseInfo:
     """Create one knowledge base and return its info record."""
     kb_service = KBService(kb_repo=KnowledgeBaseRepository(session))
     return await kb_service.create_knowledge_base(

@@ -2,8 +2,9 @@ line-length = 100
 target-version = "py311"
 src = ["src", "tests"]
 # `scripts/` holds standalone anti-drift tooling; it is not
-# application code and is not linted.
-extend-exclude = ["scripts"]
+# application code and is not linted. `*_pb2*` files are
+# protoc-generated — never hand-edited, so lint/format skip them.
+extend-exclude = ["scripts", "src/ai/docreader/proto"]
 
 [lint]
 select = [
@@ -31,6 +32,12 @@ ignore = [
     "TC004",
     "TC005",
     "TC006",  # quoted type expressions - keep readable
+    # CJK user-facing strings legitimately contain fullwidth
+    # punctuation; the ambiguous-char rules exist to catch lookalikes
+    # in identifiers, which this codebase does not use.
+    "RUF001",
+    "RUF002",
+    "RUF003",
 ]
 
 [lint.isort]

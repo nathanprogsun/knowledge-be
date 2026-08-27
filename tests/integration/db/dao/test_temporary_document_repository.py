@@ -75,16 +75,22 @@ async def test_get_scoped_requires_session_match(session: AsyncSession) -> None:
     await repo.create(row)
     await session.commit()
 
-    assert await repo.get_scoped(
-        tenant_id=tid,
-        session_id="other-session",
-        document_id=row.id,
-    ) is None
-    assert await repo.get_scoped(
-        tenant_id=tid,
-        session_id=row.session_id,
-        document_id=row.id,
-    ) is not None
+    assert (
+        await repo.get_scoped(
+            tenant_id=tid,
+            session_id="other-session",
+            document_id=row.id,
+        )
+        is None
+    )
+    assert (
+        await repo.get_scoped(
+            tenant_id=tid,
+            session_id=row.session_id,
+            document_id=row.id,
+        )
+        is not None
+    )
 
 
 async def test_get_by_id_isolated_by_tenant(session: AsyncSession) -> None:
@@ -210,11 +216,14 @@ async def test_delete_scoped_soft_deletes(session: AsyncSession) -> None:
     assert deleted is True
     await session.commit()
 
-    assert await repo.get_scoped(
-        tenant_id=tid,
-        session_id=row.session_id,
-        document_id=row.id,
-    ) is None
+    assert (
+        await repo.get_scoped(
+            tenant_id=tid,
+            session_id=row.session_id,
+            document_id=row.id,
+        )
+        is None
+    )
 
     deleted_again = await repo.delete_scoped(
         tenant_id=tid,
@@ -230,12 +239,8 @@ async def test_list_expired_returns_only_stale(session: AsyncSession) -> None:
     repo = TemporaryDocumentRepository(session)
     sid = f"session-{uuid.uuid4().hex[:8]}"
     now = datetime.now(UTC)
-    expired = await repo.create(
-        _make_row(tid, sid, expires_at=now - timedelta(minutes=5))
-    )
-    fresh = await repo.create(
-        _make_row(tid, sid, expires_at=now + timedelta(hours=1))
-    )
+    expired = await repo.create(_make_row(tid, sid, expires_at=now - timedelta(minutes=5)))
+    fresh = await repo.create(_make_row(tid, sid, expires_at=now + timedelta(hours=1)))
     await session.commit()
 
     try:
@@ -253,10 +258,6 @@ async def test_list_expired_returns_only_stale(session: AsyncSession) -> None:
     finally:
         # Self-clean so the global expiry sweep does not accumulate rows
         # across repeated runs on the shared dev DB.
-        await repo.delete_scoped(
-            tenant_id=tid, session_id=sid, document_id=expired.id, now=now
-        )
-        await repo.delete_scoped(
-            tenant_id=tid, session_id=sid, document_id=fresh.id, now=now
-        )
+        await repo.delete_scoped(tenant_id=tid, session_id=sid, document_id=expired.id, now=now)
+        await repo.delete_scoped(tenant_id=tid, session_id=sid, document_id=fresh.id, now=now)
         await session.commit()

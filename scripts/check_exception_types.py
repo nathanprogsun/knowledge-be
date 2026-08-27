@@ -47,8 +47,10 @@ from __future__ import annotations
 
 import argparse
 import ast
+import json
 import os
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import NamedTuple
 
@@ -318,12 +320,32 @@ def _class_inherits_exception(cls: ast.ClassDef) -> bool:
 # Drive
 # ─────────────────────────────────────────────────────────────────────────
 
+EXCEPTION_BASELINE = Path("docs/migration/baselines/exception_baseline.json")
+
+
+def _load_exception_baseline() -> dict[str, int]:
+    if not EXCEPTION_BASELINE.exists():
+        return {}
+    raw = json.loads(EXCEPTION_BASELINE.read_text(encoding="utf-8"))
+    files: dict[str, int] = raw.get("files", {}) if isinstance(raw, dict) else {}
+    return {k: int(v) for k, v in files.items()} if isinstance(files, dict) else {}
+
+
+def _violation_signature(v: _ExceptionViolation) -> str:
+    """Stable signature for ratchet baseline (file:line:hash)."""
+    return f"{v.relpath}:{v.lineno}"
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Enforce exception discipline in non-web layers.",
     )
     parser.add_argument("--src-root", default=None)
+    parser.add_argument(
+        "--update",
+        action="store_true",
+        help="rewrite the baseline from current violations (ratchet in).",
+    )
     args = parser.parse_args()
 
     src = resolve_src_root(args.src_root)
@@ -347,18 +369,54 @@ def main() -> int:
         violations.extend(_scan_raises(rel, tree, hierarchy, helper_names))
         violations.extend(_scan_custom_exception_declarations(rel, tree))
 
-    if not violations:
-        print(
-            f"[PASS] {len(files)} files scanned; every raise in non-web "
-            "layers is a sanctioned ApplicationError subclass or "
-            "NotImplementedError"
-        )
-        return 0
+    # Ratchet mode: only fail if any file's violation count grew vs the
+    # recorded baseline (or a previously-clean file newly violates).
+    if not args.update:
+        baseline = _load_exception_baseline()
+        # Per-file live count
+        per_file: Counter[str] = Counter(v.relpath for v in violations)
+        regressions: list[str] = []
+        improvements: list[str] = []
+        for path, count in sorted(per_file.items()):
+            base = baseline.get(path, 0)
+            if count > base:
+                regressions.append(f"{path}: {base} -> {count} (+{count - base})")
+            elif count < base:
+                improvements.append(f"{path}: {base} -> {count}")
+        for path, base in sorted(baseline.items()):
+            if path not in per_file:
+                improvements.append(f"{path}: {base} -> 0 (clean)")
+        if not regressions:
+            print(
+                f"[PASS] {len(violations)} sanctioned-exception violations "
+                f"(baseline {sum(baseline.values())}); no regressions"
+            )
+            if improvements:
+                print("[improved]")
+                for line in improvements:
+                    print(f"  {line}")
+            return 0
+        for line in regressions:
+            print(f"[REGRESSION] {line}")
+        print(f"[FAIL] {len(violations)} violations vs baseline {sum(baseline.values())}")
+        return 1
 
-    for v in violations:
-        print(f"[FAIL] {v.relpath}:{v.lineno}: {v.message}")
-    print(f"[FAIL] {len(violations)} unsanctioned exception violation(s)")
-    return 1
+    # --update: rewrite baseline
+    EXCEPTION_BASELINE.parent.mkdir(parents=True, exist_ok=True)
+    per_file: Counter[str] = Counter(v.relpath for v in violations)
+    EXCEPTION_BASELINE.write_text(
+        json.dumps(
+            {
+                "files": dict(sorted(per_file.items())),
+                "total": len(violations),
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    print(f"baseline updated: {len(violations)} violations across {len(per_file)} files")
+    return 0
 
 
 if __name__ == "__main__":

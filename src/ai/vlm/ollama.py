@@ -49,9 +49,7 @@ class OllamaVLM:
 
     async def predict(self, img_bytes: list[bytes], prompt: str) -> str:
         """Send images with a text prompt and return the generated text."""
-        images = [
-            base64.b64encode(image).decode("ascii") for image in img_bytes if image
-        ]
+        images = [base64.b64encode(image).decode("ascii") for image in img_bytes if image]
         chat_request: JsonObject = cast(
             JsonObject,
             {

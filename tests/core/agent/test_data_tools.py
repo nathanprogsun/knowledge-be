@@ -307,9 +307,7 @@ def _data_analysis_tool(
 ) -> tuple[DataAnalysisTool, _FakeAnalysisEngine, _FakeFileResolver]:
     service = _FakeKnowledgeService(doc=doc, error=error)
     fake_engine = engine or _FakeAnalysisEngine()
-    fake_resolver = (
-        _FakeFileResolver() if resolver is None else cast("_FakeFileResolver", resolver)
-    )
+    fake_resolver = _FakeFileResolver() if resolver is None else cast("_FakeFileResolver", resolver)
     tool = DataAnalysisTool(
         definition=build_data_analysis_definition(),
         knowledge_service=service,
@@ -503,9 +501,7 @@ class TestDataAnalysisTool:
         )
 
         assert result.success is True
-        assert fake_engine.loaded_excel == [
-            ("k_d1", "/tmp/knowledge-data-analysis-sample.csv", [])
-        ]
+        assert fake_engine.loaded_excel == [("k_d1", "/tmp/knowledge-data-analysis-sample.csv", [])]
 
     async def test_unknown_knowledge_fails(self) -> None:
         tool, _fake_engine, _resolver = _data_analysis_tool(doc=None)
@@ -596,7 +592,7 @@ class TestDataAnalysisTool:
         )
 
         assert result.success is False
-        assert "Did you mean \"Name\"?" in result.error
+        assert 'Did you mean "Name"?' in result.error
 
     async def test_cleanup_drops_created_tables(self) -> None:
         tool, fake_engine, _resolver = _data_analysis_tool(doc=_knowledge())
@@ -628,9 +624,7 @@ class TestDataAnalysisTool:
 
         assert "duckdb package is not installed" in str(exc_info.value)
 
-    async def test_duckdb_engine_describe_and_query(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_duckdb_engine_describe_and_query(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from src.core.agents.tools import data_analysis as module
 
         conn = _FakeDuckDBConnection()
@@ -657,9 +651,7 @@ class TestDataAnalysisTool:
         ]
         assert conn.executed[0].startswith('DESCRIBE "k_d1"')
 
-    async def test_duckdb_engine_list_excel_sheets(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    async def test_duckdb_engine_list_excel_sheets(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from src.core.agents.tools import data_analysis as module
 
         conn = _FakeDuckDBConnection()
@@ -1057,9 +1049,7 @@ class TestDataSchemaTool:
         assert "Failed to list chunks for knowledge ID 'd1'" in result.error
 
     async def test_partial_chunks_fails(self) -> None:
-        store = _FakeChunkStore(
-            chunks=[_schema_chunk(CHUNK_TYPE_TABLE_SUMMARY, "only summary")]
-        )
+        store = _FakeChunkStore(chunks=[_schema_chunk(CHUNK_TYPE_TABLE_SUMMARY, "only summary")])
         tool = DataSchemaTool(
             definition=build_data_schema_definition(),
             knowledge_service=_FakeKnowledgeService(doc=_knowledge()),

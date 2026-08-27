@@ -141,9 +141,7 @@ def select_dedup_candidate_pages(
     if not pages or not new_items or len(pages) <= DEDUP_SMALL_CORPUS_BYPASS:
         return pages
 
-    page_features = [
-        _dedup_surface(page.title, list(page.aliases), page.slug) for page in pages
-    ]
+    page_features = [_dedup_surface(page.title, list(page.aliases), page.slug) for page in pages]
     selected: set[int] = set()
     for item in new_items:
         item_features = _dedup_surface(item.name, list(item.aliases), item.slug)
@@ -192,12 +190,7 @@ def dedup_merge_reject_reason(
     if src_slash <= 0 or dst_slash <= 0:
         return "missing type prefix"
     if src_slug[: src_slash + 1] != dst_slug[: dst_slash + 1]:
-        return (
-            "type mismatch: "
-            + src_slug[: src_slash + 1]
-            + " vs "
-            + dst_slug[: dst_slash + 1]
-        )
+        return "type mismatch: " + src_slug[: src_slash + 1] + " vs " + dst_slug[: dst_slash + 1]
     return ""
 
 

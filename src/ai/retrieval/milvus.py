@@ -77,7 +77,7 @@ ALL_FIELDS: tuple[str, ...] = (
 
 ENV_MILVUS_COLLECTION: str = "MILVUS_COLLECTION"
 ENV_MILVUS_METRIC_TYPE: str = "MILVUS_METRIC_TYPE"
-DEFAULT_COLLECTION_NAME: str = "weknora_embeddings"
+DEFAULT_COLLECTION_NAME: str = "kb_embeddings"
 
 #: Default metric type when ``MILVUS_METRIC_TYPE`` is unset or unrecognized.
 DEFAULT_METRIC_TYPE: str = "IP"
@@ -270,9 +270,7 @@ class MilvusFilterConverter:
             )
         return ConvertedFilter(expr_str=expr, params=params)
 
-    def _convert_in(
-        self, cond: UniversalFilterCondition, counter: list[int]
-    ) -> ConvertedFilter:
+    def _convert_in(self, cond: UniversalFilterCondition, counter: list[int]) -> ConvertedFilter:
         if not cond.field or cond.value is None:
             raise ValidationError(
                 code="milvus.filter_condition_nil",
@@ -588,9 +586,7 @@ class MilvusRetrieveEngineRepository:
                 schema=schema,
                 **create_kwargs,
             )
-            self._client.create_index(
-                collection_name=collection_name, index_params=index_params
-            )
+            self._client.create_index(collection_name=collection_name, index_params=index_params)
             logger.info("[Milvus] Successfully created collection {}", collection_name)
         load_kwargs: dict[str, Any] = {}
         if self._replica_number > 0:
@@ -600,9 +596,7 @@ class MilvusRetrieveEngineRepository:
 
     # ── Save / BatchSave ───────────────────────────────────────────
 
-    async def save(
-        self, ctx: Context, index_info: IndexInfo, params: IndexSaveParams
-    ) -> None:
+    async def save(self, ctx: Context, index_info: IndexInfo, params: IndexSaveParams) -> None:
         logger.debug("[Milvus] Saving index for chunk ID: {}", index_info.chunk_id)
         embedding_db = _to_milvus_vector_embedding(index_info, params)
         if not embedding_db.embedding:
@@ -618,9 +612,7 @@ class MilvusRetrieveEngineRepository:
             collection_name=collection_name,
             data=[_to_upsert_row(embedding_db)],
         )
-        logger.info(
-            "[Milvus] Successfully saved index for chunk ID: {}", index_info.chunk_id
-        )
+        logger.info("[Milvus] Successfully saved index for chunk ID: {}", index_info.chunk_id)
 
     async def batch_save(
         self,
@@ -666,12 +658,8 @@ class MilvusRetrieveEngineRepository:
 
     # ── Retrieve ───────────────────────────────────────────────────
 
-    async def retrieve(
-        self, ctx: Context, params: RetrieveParams
-    ) -> list[RetrieveResult]:
-        logger.debug(
-            "[Milvus] Processing retrieval request of type: {}", params.retriever_type
-        )
+    async def retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
+        logger.debug("[Milvus] Processing retrieval request of type: {}", params.retriever_type)
         if params.retriever_type == RetrieverType.VECTOR:
             return await self.vector_retrieve(ctx, params)
         if params.retriever_type == RetrieverType.KEYWORDS:
@@ -681,9 +669,7 @@ class MilvusRetrieveEngineRepository:
             message=f"invalid retriever type: {params.retriever_type}",
         )
 
-    async def vector_retrieve(
-        self, ctx: Context, params: RetrieveParams
-    ) -> list[RetrieveResult]:
+    async def vector_retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
         del ctx
         dimension = len(params.embedding)
         logger.info(
@@ -716,8 +702,7 @@ class MilvusRetrieveEngineRepository:
         )
         sets = self._convert_search_results(results)
         index_results = [
-            _from_milvus_vector_embedding(s.embedding.id, s, MatchType.EMBEDDING)
-            for s in sets
+            _from_milvus_vector_embedding(s.embedding.id, s, MatchType.EMBEDDING) for s in sets
         ]
         if not index_results:
             logger.warning(
@@ -725,14 +710,10 @@ class MilvusRetrieveEngineRepository:
                 params.threshold,
             )
         else:
-            logger.info(
-                "[Milvus] Vector retrieval found {} results", len(index_results)
-            )
+            logger.info("[Milvus] Vector retrieval found {} results", len(index_results))
         return self._build_retrieve_result(index_results, RetrieverType.VECTOR)
 
-    async def keywords_retrieve(
-        self, ctx: Context, params: RetrieveParams
-    ) -> list[RetrieveResult]:
+    async def keywords_retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
         del ctx
         logger.info(
             "[Milvus] Performing keywords retrieval with query: {}, topK: {}",
@@ -767,13 +748,9 @@ class MilvusRetrieveEngineRepository:
         if len(all_results) > params.top_k:
             all_results = all_results[: params.top_k]
         if not all_results:
-            logger.warning(
-                "[Milvus] No keyword matches found for query: {}", params.query
-            )
+            logger.warning("[Milvus] No keyword matches found for query: {}", params.query)
         else:
-            logger.info(
-                "[Milvus] Keywords retrieval found {} results", len(all_results)
-            )
+            logger.info("[Milvus] Keywords retrieval found {} results", len(all_results))
         return self._build_retrieve_result(all_results, RetrieverType.KEYWORDS)
 
     # ── Delete by * ────────────────────────────────────────────────
@@ -808,9 +785,7 @@ class MilvusRetrieveEngineRepository:
         knowledge_type: str,
     ) -> None:
         del ctx, knowledge_type
-        await self._delete_by_field(
-            FIELD_SOURCE_ID, source_id_list, dimension, "source IDs"
-        )
+        await self._delete_by_field(FIELD_SOURCE_ID, source_id_list, dimension, "source IDs")
 
     async def _delete_by_field(
         self,
@@ -820,9 +795,7 @@ class MilvusRetrieveEngineRepository:
         label: str,
     ) -> None:
         if not ids:
-            logger.warning(
-                "[Milvus] Empty {} list provided for deletion, skipping", label
-            )
+            logger.warning("[Milvus] Empty {} list provided for deletion, skipping", label)
             return
         collection_name = self._get_collection_name(dimension)
         logger.info(
@@ -895,9 +868,7 @@ class MilvusRetrieveEngineRepository:
                         source_chunk_id,
                     )
                     continue
-                target_knowledge_id = source_to_target_kb_id_map.get(
-                    source_knowledge_id
-                )
+                target_knowledge_id = source_to_target_kb_id_map.get(source_knowledge_id)
                 if target_knowledge_id is None:
                     logger.warning(
                         "[Milvus] Source knowledge {} not found in target mapping, skipping",
@@ -997,9 +968,7 @@ class MilvusRetrieveEngineRepository:
         embeddings, _ = self._search_by_filter(
             ctx,
             collection_name,
-            UniversalFilterCondition(
-                field=FIELD_CHUNK_ID, operator="in", value=chunk_ids
-            ),
+            UniversalFilterCondition(field=FIELD_CHUNK_ID, operator="in", value=chunk_ids),
             limit=None,
             offset=None,
         )
@@ -1089,15 +1058,15 @@ class MilvusRetrieveEngineRepository:
             return False
         return collection_name[: len(base)] == base
 
-    def _build_base_filter(
-        self, params: RetrieveParams
-    ) -> tuple[str, dict[str, Any]]:
+    def _build_base_filter(self, params: RetrieveParams) -> tuple[str, dict[str, Any]]:
         """Build the common filter expression from retrieve params."""
         conditions: list[UniversalFilterCondition] = []
         if params.knowledge_base_ids:
             conditions.append(
                 UniversalFilterCondition(
-                    field=FIELD_KNOWLEDGE_BASE_ID, operator="in", value=list(params.knowledge_base_ids)
+                    field=FIELD_KNOWLEDGE_BASE_ID,
+                    operator="in",
+                    value=list(params.knowledge_base_ids),
                 )
             )
         if params.knowledge_ids:
@@ -1129,15 +1098,11 @@ class MilvusRetrieveEngineRepository:
                 )
             )
         conditions.append(
-            UniversalFilterCondition(
-                field=FIELD_IS_ENABLED, operator="eq", value=True
-            )
+            UniversalFilterCondition(field=FIELD_IS_ENABLED, operator="eq", value=True)
         )
         if not conditions:
             return "", {}
-        result = self._filter.convert(
-            UniversalFilterCondition(operator="and", value=conditions)
-        )
+        result = self._filter.convert(UniversalFilterCondition(operator="and", value=conditions))
         return result.expr_str, result.params
 
     def _search_by_filter(

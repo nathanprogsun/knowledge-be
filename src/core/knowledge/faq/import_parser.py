@@ -1,4 +1,4 @@
-# ruff: noqa: RUF001  # Chinese user-facing messages use fullwidth punctuation.
+# Chinese user-facing messages use fullwidth punctuation.
 
 """CSV / Excel row parsing for FAQ batch imports.
 

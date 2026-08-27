@@ -32,7 +32,9 @@ class FakeScript:
     def __init__(self, fake: FakeRedis) -> None:
         self._fake = fake
 
-    async def __call__(self, keys: list[str] | None = None, args: list[object] | None = None) -> int:
+    async def __call__(
+        self, keys: list[str] | None = None, args: list[object] | None = None
+    ) -> int:
         if self._fake.fail_script:
             raise RuntimeError("redis down")
         zkey = (keys or [""])[0]

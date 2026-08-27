@@ -41,9 +41,7 @@ def fingerprint_prompt_prefix(*parts: str) -> str:
     return h.hexdigest()[:_FINGERPRINT_LENGTH]
 
 
-def prompt_prefix_fingerprint(
-    messages: list[Message], opts: ChatOptions | None
-) -> str:
+def prompt_prefix_fingerprint(messages: list[Message], opts: ChatOptions | None) -> str:
     """Hash the stable prefix common to normal chat and agent requests.
 
     Leading system messages plus the deterministic tool schema participate;
@@ -95,9 +93,7 @@ def cached_tokens(details: JsonObject | None) -> int:
     return value if isinstance(value, int) else 0
 
 
-def token_usage_from_openai(
-    usage: JsonObject, provider_name: str
-) -> TokenUsage:
+def token_usage_from_openai(usage: JsonObject, provider_name: str) -> TokenUsage:
     """Build a normalized :class:`TokenUsage` from an OpenAI usage block."""
     u = TokenUsage(
         prompt_tokens=_value_or_zero(_present_int(usage, "prompt_tokens")),
@@ -149,9 +145,7 @@ def apply_raw_prompt_cache_usage(data: bytes, usage: TokenUsage | None) -> None:
     if isinstance(details, dict):
         read = _value_or_zero(_present_int(details, "cached_tokens"))
         write = _value_or_zero(_present_int(details, "cache_write_tokens"))
-        usage.set_prompt_cache_usage(
-            read, write, max(0, usage.prompt_tokens - read), True
-        )
+        usage.set_prompt_cache_usage(read, write, max(0, usage.prompt_tokens - read), True)
 
 
 def _present_int(obj: JsonObject, key: str) -> int | None:

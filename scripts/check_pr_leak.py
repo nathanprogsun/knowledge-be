@@ -12,9 +12,9 @@ Rules (all are reported as violations):
    - ``Mirrors\\ ``internal/``  (any backtick-quoted ``internal/`` path)
    - ``Maps\\ ``internal/``     (same)
    - ``mirroring Go``
-   - ``Mirrors WeKnora``        (the upstream project name)
-   - ``weknoracloud``           (only flagged inside comments; bare
-     string constants like ``value="weknoracloud"`` in a domain model
+   - ``Mirrors Knowledge Base``        (the upstream project name)
+   - ``cloud``           (only flagged inside comments; bare
+     string constants like ``value="cloud"`` in a domain model
      are exempt)
 
 2. **Identifier leaks** — Python identifiers may not contain
@@ -67,8 +67,8 @@ _STAGE_PATTERN = re.compile(r"\b[Ss]tage-\d+\b")
 _CHECKPOINT_PATTERN = re.compile(r"\bcheckpoint-\d+\b")
 _INTERNAL_PATTERN = re.compile(r"(?:Mirrors|Maps)\s+``internal/")
 _MIRRORING_GO_PATTERN = re.compile(r"\bmirroring\s+Go\b", re.IGNORECASE)
-_MIRRORS_WEKNORA_PATTERN = re.compile(r"\bMirrors\s+WeKnora\b")
-_WEKNORACLOUD_COMMENT_PATTERN = re.compile(r"\bweknoracloud\b")
+_MIRRORS_KB_PATTERN = re.compile(r"\bMirrors\s+Knowledge Base\b")
+_CLOUD_COMMENT_PATTERN = re.compile(r"\bcloud\b")
 
 # Identifier name patterns (Python identifiers, attribute names, module
 # names).  We match exact tokens.
@@ -164,7 +164,7 @@ def _scan_text(relpath: str, lineno: int, text: str, is_comment: bool) -> list[_
         out.append(
             _Leak(relpath, lineno, f"mirroring-Go leak: {text.strip()[:120]}")
         )
-    if _MIRRORS_WEKNORA_PATTERN.search(text):
+    if _MIRRORS_KB_PATTERN.search(text):
         out.append(
             _Leak(
                 relpath,
@@ -172,7 +172,7 @@ def _scan_text(relpath: str, lineno: int, text: str, is_comment: bool) -> list[_
                 f"upstream-project-name leak: {text.strip()[:120]}",
             )
         )
-    if is_comment and _WEKNORACLOUD_COMMENT_PATTERN.search(text):
+    if is_comment and _CLOUD_COMMENT_PATTERN.search(text):
         out.append(
             _Leak(
                 relpath,

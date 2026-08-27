@@ -227,7 +227,9 @@ async def test_me_missing_header(web_authed_client: TestClient) -> None:
 async def test_validate_valid_token(web_authed_client: TestClient, users_repo: AsyncMock) -> None:
     _seed_user(users_repo)
     token = await _login(web_authed_client)
-    resp = web_authed_client.get("/api/v1/auth/validate", headers={"Authorization": f"Bearer {token}"})
+    resp = web_authed_client.get(
+        "/api/v1/auth/validate", headers={"Authorization": f"Bearer {token}"}
+    )
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -235,7 +237,9 @@ async def test_validate_valid_token(web_authed_client: TestClient, users_repo: A
 
 
 async def test_validate_invalid_token(web_authed_client: TestClient) -> None:
-    resp = web_authed_client.get("/api/v1/auth/validate", headers={"Authorization": "Bearer not-a-jwt"})
+    resp = web_authed_client.get(
+        "/api/v1/auth/validate", headers={"Authorization": "Bearer not-a-jwt"}
+    )
     assert resp.status_code == 200
     assert resp.json()["success"] is True
     assert resp.json()["user"] is None

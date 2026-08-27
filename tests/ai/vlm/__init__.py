@@ -1,2 +1,1 @@
-"""VLM client tests.
-"""
+"""VLM client tests."""

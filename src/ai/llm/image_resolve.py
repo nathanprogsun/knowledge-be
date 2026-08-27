@@ -105,9 +105,8 @@ def is_multimodal_not_supported_error(err: Exception | None) -> bool:
     if err is None:
         return False
     msg = str(err).lower()
-    return (
-        any(token in msg for token in ("multimodal", "image", "vision"))
-        and any(token in msg for token in ("not support", "unsupported", "400"))
+    return any(token in msg for token in ("multimodal", "image", "vision")) and any(
+        token in msg for token in ("not support", "unsupported", "400")
     )
 
 

@@ -9,6 +9,7 @@ the vector/keyword retrieve dispatch, and the batch-update path.
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -64,19 +65,43 @@ class _FakeCollection:
 
     def search(self, vectors: Any, **_kw: Any) -> list[list[dict[str, Any]]]:
         self.calls.append(("search", {"vectors": vectors, **_kw}))
-        return [[{"id": "row-1", "score": 0.9, "fields": {
-            "content": "hello", "source_id": "src-1", "source_type": 0,
-            "chunk_id": "c-1", "knowledge_id": "k-1",
-            "knowledge_base_id": "kb-1", "tag_id": "t-1", "is_enabled": 1,
-        }}]]
+        return [
+            [
+                {
+                    "id": "row-1",
+                    "score": 0.9,
+                    "fields": {
+                        "content": "hello",
+                        "source_id": "src-1",
+                        "source_type": 0,
+                        "chunk_id": "c-1",
+                        "knowledge_id": "k-1",
+                        "knowledge_base_id": "kb-1",
+                        "tag_id": "t-1",
+                        "is_enabled": 1,
+                    },
+                }
+            ]
+        ]
 
     def search_by_text(self, texts: Any, **_kw: Any) -> list[dict[str, Any]]:
         self.calls.append(("search_by_text", {"texts": texts, **_kw}))
-        return [{"id": "row-2", "score": 0.8, "fields": {
-            "content": "world", "source_id": "src-2", "source_type": 0,
-            "chunk_id": "c-2", "knowledge_id": "k-2",
-            "knowledge_base_id": "kb-2", "tag_id": "t-2", "is_enabled": 1,
-        }}]
+        return [
+            {
+                "id": "row-2",
+                "score": 0.8,
+                "fields": {
+                    "content": "world",
+                    "source_id": "src-2",
+                    "source_type": 0,
+                    "chunk_id": "c-2",
+                    "knowledge_id": "k-2",
+                    "knowledge_base_id": "kb-2",
+                    "tag_id": "t-2",
+                    "is_enabled": 1,
+                },
+            }
+        ]
 
     def fulltext_search(self, data: Any, **_kw: Any) -> list[Any]:
         self.calls.append(("fulltext_search", {"data": data, **_kw}))
@@ -158,7 +183,9 @@ def _new_repo(
     repo._collection_base_name = collection_base
     # Existing collections keyed by the same prefix
     if existing_collections:
-        existing_collections[:] = [c.replace("weknora_embeddings", collection_base) for c in existing_collections]
+        existing_collections[:] = [
+            c.replace("kb_embeddings", collection_base) for c in existing_collections
+        ]
         repo._collection_base_name = collection_base
     # Pretend collections are pre-initialized so upsert skips create.
     if dimensions:
@@ -247,14 +274,16 @@ def test_base_filter_includes_is_enabled() -> None:
 
 
 def test_base_filter_includes_optional_filters() -> None:
-    expr = _base_filter(RetrieveParams(
-        retriever_type=RetrieverType.VECTOR,
-        knowledge_base_ids=["kb-1"],
-        knowledge_ids=["k-1"],
-        tag_ids=["t-1"],
-        exclude_knowledge_ids=["k-ex"],
-        exclude_chunk_ids=["c-ex"],
-    ))
+    expr = _base_filter(
+        RetrieveParams(
+            retriever_type=RetrieverType.VECTOR,
+            knowledge_base_ids=["kb-1"],
+            knowledge_ids=["k-1"],
+            tag_ids=["t-1"],
+            exclude_knowledge_ids=["k-ex"],
+            exclude_chunk_ids=["c-ex"],
+        )
+    )
     assert "knowledge_base_id in" in expr
     assert "not (knowledge_id in" in expr
     assert "not (chunk_id in" in expr
@@ -262,7 +291,10 @@ def test_base_filter_includes_optional_filters() -> None:
 
 def test_to_vector_embedding_extracts_by_source_id() -> None:
     info = IndexInfo(
-        source_id="src-1", chunk_id="c-1", content="hello", is_enabled=True,
+        source_id="src-1",
+        chunk_id="c-1",
+        content="hello",
+        is_enabled=True,
     )
     params: IndexSaveParams = {"embedding": {"src-1": [1.0, 2.0, 3.0]}}
     emb = _to_vector_embedding(info, params)
@@ -286,8 +318,12 @@ def test_to_vector_embedding_no_embedding_returns_empty() -> None:
 def test_to_document_builds_correct_fields() -> None:
     emb = _to_vector_embedding(
         IndexInfo(
-            source_id="src-1", chunk_id="c-1", knowledge_id="k-1",
-            knowledge_base_id="kb-1", tag_id="t-1", is_enabled=True,
+            source_id="src-1",
+            chunk_id="c-1",
+            knowledge_id="k-1",
+            knowledge_base_id="kb-1",
+            tag_id="t-1",
+            is_enabled=True,
         ),
         {"embedding": {"src-1": [1.0]}},
     )
@@ -304,9 +340,14 @@ def test_from_document_parses_dict() -> None:
         "id": "row-1",
         "vector": [1.0, 2.0],
         "fields": {
-            "content": "hello", "source_id": "s-1", "source_type": 0,
-            "chunk_id": "c-1", "knowledge_id": "k-1",
-            "knowledge_base_id": "kb-1", "tag_id": "t-1", "is_enabled": 1,
+            "content": "hello",
+            "source_id": "s-1",
+            "source_type": 0,
+            "chunk_id": "c-1",
+            "knowledge_id": "k-1",
+            "knowledge_base_id": "kb-1",
+            "tag_id": "t-1",
+            "is_enabled": 1,
         },
         "score": 0.85,
     }
@@ -371,11 +412,15 @@ async def test_batch_save_groups_by_dimension() -> None:
         IndexInfo(source_id="s1", chunk_id="c1"),
         IndexInfo(source_id="s2", chunk_id="c2"),
     ]
-    await repo.batch_save(_CTX, infos, {
-        "embedding": {"s1": [1.0, 2.0, 3.0, 4.0], "s2": [0.1] * 768}
-    })
+    await repo.batch_save(
+        _CTX, infos, {"embedding": {"s1": [1.0, 2.0, 3.0, 4.0], "s2": [0.1] * 768}}
+    )
     # Each dimension got its own collection upsert
-    calls = sum(1 for c in db.collections_map["emb_4"].calls + db.collections_map["emb_768"].calls if c[0] == "upsert")
+    calls = sum(
+        1
+        for c in db.collections_map["emb_4"].calls + db.collections_map["emb_768"].calls
+        if c[0] == "upsert"
+    )
     assert calls == 2
 
 
@@ -383,7 +428,9 @@ async def test_batch_save_skips_empty_embedding() -> None:
     repo, db, _ = _new_repo(dimensions=[4])
     infos = [IndexInfo(source_id="s1", chunk_id="c1")]
     await repo.batch_save(_CTX, infos, {"embedding": {}})
-    assert all(c[0] != "upsert" for c in db.collections_map.get("emb_4", _FakeCollection("x")).calls)
+    assert all(
+        c[0] != "upsert" for c in db.collections_map.get("emb_4", _FakeCollection("x")).calls
+    )
 
 
 # ── retrieve ───────────────────────────────────────────────────────
@@ -499,9 +546,7 @@ async def test_delete_by_knowledge_id_list() -> None:
 
 async def test_copy_indices_empty_mapping_is_noop() -> None:
     repo, db, _ = _new_repo()
-    await repo.copy_indices(
-        _CTX, "src-kb", {}, {}, "tgt-kb", dimension=4, knowledge_type=""
-    )
+    await repo.copy_indices(_CTX, "src-kb", {}, {}, "tgt-kb", dimension=4, knowledge_type="")
     assert db.calls == []
 
 
@@ -511,13 +556,23 @@ async def test_copy_indices_queries_and_upserts() -> None:
 
     def _query(**_kw: Any) -> list[dict[str, Any]]:
         coll.calls.append(("query", dict(_kw)))
-        return [{
-            "id": "src-c-1", "vector": [1.0, 2.0, 3.0, 4.0], "fields": {
-                "content": "hello", "source_id": "src-c-1", "source_type": 0,
-                "chunk_id": "src-c-1", "knowledge_id": "src-k-1",
-                "knowledge_base_id": "src-kb-1", "tag_id": "t-1", "is_enabled": 1,
+        return [
+            {
+                "id": "src-c-1",
+                "vector": [1.0, 2.0, 3.0, 4.0],
+                "fields": {
+                    "content": "hello",
+                    "source_id": "src-c-1",
+                    "source_type": 0,
+                    "chunk_id": "src-c-1",
+                    "knowledge_id": "src-k-1",
+                    "knowledge_base_id": "src-kb-1",
+                    "tag_id": "t-1",
+                    "is_enabled": 1,
+                },
             }
-        }]
+        ]
+
     coll.query = _query  # type: ignore[method-assign]
     await repo.copy_indices(
         _CTX,
@@ -539,18 +594,28 @@ async def test_copy_indices_queries_and_upserts() -> None:
 
 async def test_batch_update_chunk_enabled_status_groups_by_value() -> None:
     repo, db, _ = _new_repo(existing_collections=["emb_4"])
-    await repo.batch_update_chunk_enabled_status(_CTX, {
-        "c-1": True, "c-2": False, "c-3": True,
-    })
+    await repo.batch_update_chunk_enabled_status(
+        _CTX,
+        {
+            "c-1": True,
+            "c-2": False,
+            "c-3": True,
+        },
+    )
     update_calls = [c for c in db.collections_map["emb_4"].calls if c[0] == "update"]
     assert len(update_calls) == 2
 
 
 async def test_batch_update_chunk_tag_id_groups_by_tag() -> None:
     repo, db, _ = _new_repo(existing_collections=["emb_4"])
-    await repo.batch_update_chunk_tag_id(_CTX, {
-        "c-1": "tag-a", "c-2": "tag-b", "c-3": "tag-a",
-    })
+    await repo.batch_update_chunk_tag_id(
+        _CTX,
+        {
+            "c-1": "tag-a",
+            "c-2": "tag-b",
+            "c-3": "tag-a",
+        },
+    )
     update_calls = [c for c in db.collections_map["emb_4"].calls if c[0] == "update"]
     assert len(update_calls) == 2
 

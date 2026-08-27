@@ -14,7 +14,7 @@ The FAQ container resolver is here too: the FAQ service requires the
 caller to pass the FAQ knowledge container id for an entry write, so the
 views resolve it from the knowledge base's documents.
 """
-# ruff: noqa: RUF001  # Chinese user-facing messages use fullwidth punctuation.
+# Chinese user-facing messages use fullwidth punctuation.
 
 from __future__ import annotations
 

@@ -213,12 +213,12 @@ async def test_stream_thinking_routes_thinking_and_answer_events() -> None:
     assert response.finish_reason == "stop"
     assert response.answer_streamed is True
 
-    thought_contents = [
-        str(e.data.get("content")) for e in events if isinstance(e.data, dict)
-    ]
+    thought_contents = [str(e.data.get("content")) for e in events if isinstance(e.data, dict)]
     assert "reasoning" in thought_contents
     answer_data = [
-        e.data for e in events if e.type is EventType.AGENT_FINAL_ANSWER and isinstance(e.data, dict)
+        e.data
+        for e in events
+        if e.type is EventType.AGENT_FINAL_ANSWER and isinstance(e.data, dict)
     ]
     assert any(str(d.get("content")) == " answer" for d in answer_data)
 
@@ -247,7 +247,9 @@ async def test_stream_thinking_emits_tool_call_pending_event() -> None:
     events: list[Event] = []
     phase = _make_think(fake, events)
 
-    await phase.stream_thinking_to_events(_FakeContext(), [Message(role="user", content="q")], [], 0, "s1")
+    await phase.stream_thinking_to_events(
+        _FakeContext(), [Message(role="user", content="q")], [], 0, "s1"
+    )
 
     pending = [e for e in events if e.type is EventType.AGENT_TOOL_CALL]
     assert len(pending) == 1
@@ -415,7 +417,7 @@ def test_render_user_turn_builds_runtime_context() -> None:
 
     user_turn = phase.render_user_turn("s1", "What is RAG?")
 
-    assert "<runtime_context scope=\"this_turn\">" in user_turn
+    assert '<runtime_context scope="this_turn">' in user_turn
     assert "<session>s1</session>" in user_turn
     assert user_turn.endswith("What is RAG?")
 
@@ -487,7 +489,11 @@ async def test_execute_tool_calls_runs_through_registry() -> None:
     events: list[Event] = []
     phase = _make_act(registry, events)
     response = ChatResponse(
-        tool_calls=[LLMToolCall(id="call-1", function=FunctionCall(name="web_search", arguments='{"query": "test"}'))]
+        tool_calls=[
+            LLMToolCall(
+                id="call-1", function=FunctionCall(name="web_search", arguments='{"query": "test"}')
+            )
+        ]
     )
 
     tool_calls = await phase.execute_tool_calls(_FakeContext(), response, 0, "s1", "m1")
@@ -545,8 +551,12 @@ async def test_execute_tool_calls_parallel_runs_all_calls() -> None:
     phase = _make_act(registry, [], parallel=True)
     response = ChatResponse(
         tool_calls=[
-            LLMToolCall(id="call-a", function=FunctionCall(name="web_search", arguments='{"query": "a"}')),
-            LLMToolCall(id="call-b", function=FunctionCall(name="web_search", arguments='{"query": "b"}')),
+            LLMToolCall(
+                id="call-a", function=FunctionCall(name="web_search", arguments='{"query": "a"}')
+            ),
+            LLMToolCall(
+                id="call-b", function=FunctionCall(name="web_search", arguments='{"query": "b"}')
+            ),
         ]
     )
 
@@ -564,7 +574,11 @@ async def test_execute_tool_calls_repairs_malformed_arguments() -> None:
     registry.register_tool(stub)
     phase = _make_act(registry, [])
     response = ChatResponse(
-        tool_calls=[LLMToolCall(id="call-1", function=FunctionCall(name="web_search", arguments='{"query": "test"'))]
+        tool_calls=[
+            LLMToolCall(
+                id="call-1", function=FunctionCall(name="web_search", arguments='{"query": "test"')
+            )
+        ]
     )
 
     tool_calls = await phase.execute_tool_calls(_FakeContext(), response, 0, "s1", "m1")
@@ -600,9 +614,7 @@ async def test_execute_tool_calls_converts_unknown_tool_to_failed_result() -> No
     phase = _make_act(ToolRegistry(), [])
     response = ChatResponse(
         tool_calls=[
-            LLMToolCall(
-                id="call-1", function=FunctionCall(name="does_not_exist", arguments="{}")
-            )
+            LLMToolCall(id="call-1", function=FunctionCall(name="does_not_exist", arguments="{}"))
         ]
     )
 
@@ -624,7 +636,9 @@ async def test_execute_tool_calls_times_out_slow_tools() -> None:
     registry.register_tool(_SlowTool("web_search"))
     phase = _make_act(registry, [], tool_exec_timeout=0.05)
     response = ChatResponse(
-        tool_calls=[LLMToolCall(id="call-1", function=FunctionCall(name="web_search", arguments="{}"))]
+        tool_calls=[
+            LLMToolCall(id="call-1", function=FunctionCall(name="web_search", arguments="{}"))
+        ]
     )
 
     tool_calls = await phase.execute_tool_calls(_FakeContext(), response, 0, "s1", "m1")
@@ -752,7 +766,9 @@ async def test_synthesize_final_answer_adds_image_requirement_when_present() -> 
     await finalize.synthesize_final_answer(_FakeContext(), "query", state, "s1")
 
     sent_messages, _ = fake.stream_calls[0]
-    assert any("MUST include at least one relevant Markdown image" in m.content for m in sent_messages)
+    assert any(
+        "MUST include at least one relevant Markdown image" in m.content for m in sent_messages
+    )
 
 
 async def test_synthesize_final_answer_omits_image_requirement_when_absent() -> None:
@@ -764,7 +780,9 @@ async def test_synthesize_final_answer_omits_image_requirement_when_absent() -> 
     await finalize.synthesize_final_answer(_FakeContext(), "query", state, "s1")
 
     sent_messages, _ = fake.stream_calls[0]
-    assert not any("MUST include at least one relevant Markdown image" in m.content for m in sent_messages)
+    assert not any(
+        "MUST include at least one relevant Markdown image" in m.content for m in sent_messages
+    )
 
 
 async def test_synthesize_final_answer_strips_think_blocks() -> None:

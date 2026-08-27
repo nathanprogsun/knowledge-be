@@ -274,9 +274,7 @@ class TestLoginWithOidc(ServiceTest):
 
     async def test_inactive_user_returns_failure(self) -> None:
         """Inactive user -> success=False (HTTP 200 body), not a raise."""
-        users_repo = _make_users_repo(
-            user=_seed_user(email="alice@example.com", is_active=False)
-        )
+        users_repo = _make_users_repo(user=_seed_user(email="alice@example.com", is_active=False))
         tokens_repo, inserted = _make_tokens_repo()
         client = _FakeOidcClient(
             token=OIDCTokenResponse(access_token="at", id_token="idt", token_type="Bearer"),

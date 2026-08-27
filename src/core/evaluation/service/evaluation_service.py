@@ -401,9 +401,7 @@ class EvaluationService:
             self._memory.update(
                 task_id,
                 lambda task, params, metric: (
-                    task.model_copy(update={"finished": finished})
-                    if task is not None
-                    else None
+                    task.model_copy(update={"finished": finished}) if task is not None else None
                 ),
             )
 
@@ -434,9 +432,7 @@ class EvaluationService:
             if self._kb_creator is None:
                 raise ValidationError(
                     code="evaluation.kb_creator_required",
-                    message=(
-                        "knowledge_base_id is required when no KB creator is wired"
-                    ),
+                    message=("knowledge_base_id is required when no KB creator is wired"),
                 )
             embedding_id, llm_id = await self._default_kb_models()
             return await self._kb_creator.create_knowledge_base(

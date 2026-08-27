@@ -106,9 +106,7 @@ class GoogleProvider(HttpSearchClient):
 def build_google_client(params: JsonObject) -> GoogleProvider:
     """Build a :class:`GoogleProvider` from a JSON parameter blob."""
     api_key = coerce_str(params.get("api_key"))
-    cx = coerce_str(
-        params.get("cx") or params.get("engine_id") or params.get("engineId")
-    )
+    cx = coerce_str(params.get("cx") or params.get("engine_id") or params.get("engineId"))
     if not api_key:
         raise ValidationError(
             code="web_search_provider.api_key_required",

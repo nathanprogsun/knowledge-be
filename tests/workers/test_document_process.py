@@ -28,7 +28,6 @@ from src.core.knowledge.documents.process_document import ProcessOutcome
 from src.workers.base import WorkerContext
 from src.workers.registry import get_task
 from src.workers.tasks.document_process import (
-    DocumentProcessTaskPayload,
     parse_payload,
     task_document_process,
 )

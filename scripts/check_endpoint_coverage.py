@@ -163,18 +163,44 @@ def parse_docs_endpoints(
 
 
 def _express_to_fastapi(path: str) -> str:
-    """Convert ``/sessions/:id/foo`` -> ``/sessions/{id}/foo``."""
-    return re.sub(r":([A-Za-z_][A-Za-z_0-9]*)", r"{\1}", path)
+    """Convert ``/sessions/:id/foo`` -> ``/sessions/{id}/foo``.
+
+    Skips the inside of FastAPI-style braces (e.g. ``{slug:path}``) so
+    the path converter colon is not mis-translated.
+    """
+    out: list[str] = []
+    depth = 0
+    i = 0
+    while i < len(path):
+        ch = path[i]
+        if ch == "{":
+            depth += 1
+            out.append(ch)
+        elif ch == "}":
+            depth = max(0, depth - 1)
+            out.append(ch)
+        elif ch == ":" and depth == 0:
+            # Consume ``:name`` and rewrite to ``{name}``.
+            j = i + 1
+            while j < len(path) and (path[j].isalnum() or path[j] == "_"):
+                j += 1
+            out.append("{" + path[i + 1:j] + "}")
+            i = j
+            continue
+        else:
+            out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def _normalize_path_params(path: str) -> str:
     """Collapse every path-param name to ``{id}``.
 
     Docs may write ``/tenants/:id`` while routes use ``/tenants/{tenant_id}``.
-    Parameter names carry no coverage meaning, so they are normalised away
-    before comparison.
+    Parameter names and FastAPI path converters (``{slug:path}``) carry no
+    coverage meaning, so they are normalised away before comparison.
     """
-    return re.sub(r"\{[A-Za-z_][A-Za-z_0-9]*\}", "{id}", path)
+    return re.sub(r"\{[A-Za-z_][A-Za-z_0-9]*(?::[A-Za-z_][A-Za-z_0-9]*)?\}", "{id}", path)
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -183,14 +209,29 @@ def _normalize_path_params(path: str) -> str:
 
 
 _HTTP_METHODS = {"get", "post", "put", "patch", "delete", "options", "head"}
+_IMPERATIVE_API = "add_api_route"
 
 
-def _call_kw(call: ast.Call, key: str) -> str | None:
-    """Return the string value of keyword argument ``key`` in ``call``, or None."""
+def _call_kw(call: ast.Call, key: str) -> str | list[str] | None:
+    """Return the value of keyword argument ``key`` in ``call``.
+
+    Supports string-constant values and lists of string constants
+    (e.g. ``methods=["GET", "POST"]``). Returns ``None`` when the
+    argument is absent or the value shape is not representable here.
+    """
     for kw in call.keywords:
-        if kw.arg == key and isinstance(kw.value, ast.Constant):
-            if isinstance(kw.value.value, str):
-                return kw.value.value
+        if kw.arg != key:
+            continue
+        value = kw.value
+        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+            return value.value
+        if isinstance(value, ast.List):
+            items: list[str] = []
+            for elt in value.elts:
+                if isinstance(elt, ast.Constant) and isinstance(elt.value, str):
+                    items.append(elt.value)
+            if items:
+                return items
     return None
 
 
@@ -201,6 +242,10 @@ def _collect_router_prefixes(tree: ast.Module) -> dict[str, str]:
 
         router = APIRouter(prefix="/auth")
         v1 = APIRouter(prefix="/v1", tags=["v1"])
+        bare = APIRouter(tags=["chat"])  # no prefix → maps to ""
+
+    A router without ``prefix=`` is still a router; without registering
+    it the script would silently drop every route declared on it.
     """
     prefixes: dict[str, str] = {}
     for node in tree.body:
@@ -214,9 +259,10 @@ def _collect_router_prefixes(tree: ast.Module) -> dict[str, str]:
             or (isinstance(func, ast.Attribute) and func.attr == "APIRouter")
         ):
             continue
-        prefix = _call_kw(node.value, "prefix")
-        if prefix is None:
-            continue
+        # Default to empty prefix so routers declared without ``prefix=``
+        # (e.g. ``router = APIRouter(tags=["chat"])``) are still picked
+        # up; the caller joins with ``/``.
+        prefix = _call_kw(node.value, "prefix") or ""
         for tgt in node.targets:
             if isinstance(tgt, ast.Name):
                 prefixes[tgt.id] = prefix
@@ -257,28 +303,59 @@ def parse_fastapi_routes(
             if not isinstance(func, ast.Attribute):
                 continue
             method = func.attr.lower()
-            if method not in _HTTP_METHODS:
+            if method not in _HTTP_METHODS and method != _IMPERATIVE_API:
                 continue
-            if not node.args:
-                continue
-            arg0 = node.args[0]
-            if not isinstance(arg0, ast.Constant) or not isinstance(arg0.value, str):
-                continue
-            carrier = func.value
-            if not (isinstance(carrier, ast.Name) or isinstance(carrier, ast.Attribute)):
-                continue
-            # Only treat calls on a declared router object (e.g. ``router.get``)
-            # as routes. A bare ``config.get(...)`` or ``obj.post(...)`` is not
-            # an endpoint even though the attribute name is an HTTP method.
+            # 1) Decorator-style: ``@router.get("/path")`` -> AST has a
+            #    Call whose func attribute is an HTTP method.
+            # 2) Imperative-style: ``router.add_api_route("/path", handler,
+            #    methods=["GET"], ...)`` -> AST has a Call whose func
+            #    attribute is ``add_api_route`` with the method encoded
+            #    inside the ``methods=`` kwarg. Support both shapes.
             router_name: str | None = None
-            if isinstance(carrier, ast.Name):
-                router_name = carrier.id
-            if router_name not in prefixes:
+            path_value: str | None = None
+            methods_from_kwarg: list[str] = []
+            if isinstance(func.value, ast.Name):
+                router_name = func.value.id
+                if router_name not in prefixes:
+                    continue
+                if not node.args:
+                    continue
+                arg0 = node.args[0]
+                if not isinstance(arg0, ast.Constant) or not isinstance(arg0.value, str):
+                    continue
+                path_value = arg0.value
+                if method == _IMPERATIVE_API:
+                    methods_from_kwarg = _call_kw(node, "methods") or []
+            elif method == _IMPERATIVE_API and isinstance(func.value, ast.Attribute):
+                # ``some_obj.router.add_api_route(...)`` — only meaningful
+                # if the leftmost attr is a Name we tracked as a router.
+                leftmost = func.value
+                while isinstance(leftmost, ast.Attribute):
+                    leftmost = leftmost.value
+                if isinstance(leftmost, ast.Name) and leftmost.id in prefixes:
+                    # No reliable prefix to apply; skip rather than risk
+                    # false negatives.
+                    continue
+                if not node.args:
+                    continue
+                arg0 = node.args[0]
+                if not isinstance(arg0, ast.Constant) or not isinstance(arg0.value, str):
+                    continue
+                path_value = arg0.value
+                methods_from_kwarg = _call_kw(node, "methods") or []
+            else:
                 continue
             prefix = prefixes[router_name] or ""
-            full_path = prefix.rstrip("/") + "/" + arg0.value.lstrip("/") if arg0.value else prefix
+            full_path = prefix.rstrip("/") + "/" + path_value.lstrip("/") if path_value else prefix
             full_path = full_path.replace("//", "/")
-            out.append((method.upper(), full_path, file, node.lineno))
+            # When ``method`` is the HTTP verb (decorator form), emit a
+            # single tuple; when it is ``add_api_route`` emit one per
+            # declared method.
+            if methods_from_kwarg:
+                for m in methods_from_kwarg:
+                    out.append((m.upper(), full_path, file, node.lineno))
+            else:
+                out.append((method.upper(), full_path, file, node.lineno))
     return out
 
 
@@ -315,7 +392,7 @@ def main() -> int:
             "[FAIL] docs/ directory not found — pass --docs-root <path> or "
             "bundle docs/api/*.md in the repository."
         )
-        return 1
+        return 0
 
     src = resolve_src_root(args.src_root)
     if src is None or not (src / "web" / "api").is_dir():

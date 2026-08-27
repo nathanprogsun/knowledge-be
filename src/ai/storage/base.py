@@ -76,15 +76,11 @@ class FileService(Protocol):
         """Verify the backend is reachable and correctly configured."""
         ...
 
-    async def save_file(
-        self, *, file: FileUpload, tenant_id: int, knowledge_id: str
-    ) -> str:
+    async def save_file(self, *, file: FileUpload, tenant_id: int, knowledge_id: str) -> str:
         """Persist an uploaded file and return its provider:// path."""
         ...
 
-    async def save_bytes(
-        self, *, data: bytes, tenant_id: int, file_name: str, temp: bool
-    ) -> str:
+    async def save_bytes(self, *, data: bytes, tenant_id: int, file_name: str, temp: bool) -> str:
         """Persist raw bytes and return their provider:// path.
 
         ``temp`` requests the temporary store when the backend has one.
@@ -103,9 +99,7 @@ class FileService(Protocol):
         """Remove a stored object."""
         ...
 
-    async def copy_file(
-        self, src_path: str, tenant_id: int, knowledge_id: str
-    ) -> str:
+    async def copy_file(self, src_path: str, tenant_id: int, knowledge_id: str) -> str:
         """Copy an object to a new knowledge-owned object.
 
         Returns the new provider:// path. Raises
@@ -441,9 +435,7 @@ class S3ObjectStore:
         path = urllib.parse.quote(raw_path, safe="/~")
         return urllib.parse.urlunsplit((self._parsed.scheme, host, path, "", ""))
 
-    def presigned_get_url(
-        self, key: str, expires_seconds: int = _PRESIGNED_URL_TTL_SECONDS
-    ) -> str:
+    def presigned_get_url(self, key: str, expires_seconds: int = _PRESIGNED_URL_TTL_SECONDS) -> str:
         """A SigV4-presigned GET URL valid for ``expires_seconds``."""
         host, raw_path = self._resolve(key)
         return presign_get_url(
@@ -465,13 +457,17 @@ class S3ObjectStore:
             payload=body,
             extra={"Content-Type": content_type or "application/octet-stream"},
         )
-        await self._request("PUT", self.object_url(key), headers=headers, content=body, action="upload")
+        await self._request(
+            "PUT", self.object_url(key), headers=headers, content=body, action="upload"
+        )
 
     async def get_object(self, key: str) -> bytes:
         """Download the object content at ``key``."""
         self._require_bucket()
         headers = self._signed_headers("GET", key)
-        response = await self._request("GET", self.object_url(key), headers=headers, action="download")
+        response = await self._request(
+            "GET", self.object_url(key), headers=headers, action="download"
+        )
         return response.content
 
     async def delete_object(self, key: str) -> None:
@@ -505,7 +501,9 @@ class S3ObjectStore:
             payload=b"",
             extra={"x-amz-copy-source": source},
         )
-        await self._request("PUT", self.object_url(dest_key), headers=headers, content=b"", action="copy")
+        await self._request(
+            "PUT", self.object_url(dest_key), headers=headers, content=b"", action="copy"
+        )
 
     def _resolve(self, key: str) -> tuple[str, str]:
         """Return ``(host, raw_request_path)`` for an object key."""

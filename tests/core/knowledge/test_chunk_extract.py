@@ -330,9 +330,7 @@ class _FakeEngineService:
     def support(self) -> list[RetrieverType]:
         return list(self._support)
 
-    async def retrieve(
-        self, _ctx: Context, params: RetrieveParams
-    ) -> list[RetrieveResult]:
+    async def retrieve(self, _ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
         return []
 
     async def index(
@@ -428,9 +426,7 @@ class _FakeRegistry:
     def register(self, service: _FakeEngineService) -> None:
         pass
 
-    def get_retrieve_engine_service(
-        self, engine_type: RetrieverEngineType
-    ) -> _FakeEngineService:
+    def get_retrieve_engine_service(self, engine_type: RetrieverEngineType) -> _FakeEngineService:
         return self._service
 
     def register_with_store_id(self, store_id: str, svc: _FakeEngineService) -> None:
@@ -556,9 +552,7 @@ class _FakeTableTool:
         self.loaded.append(knowledge)
         return self.schema
 
-    async def sample_rows(
-        self, *, table_name: str, limit: int
-    ) -> list[dict[str, JsonValue]]:
+    async def sample_rows(self, *, table_name: str, limit: int) -> list[dict[str, JsonValue]]:
         return self.rows[:limit]
 
     def cleanup(self) -> None:
@@ -575,7 +569,10 @@ def test_append_custom_prompt_instructions_blank_is_noop() -> None:
 def test_append_custom_prompt_instructions_appends_labeled_block() -> None:
     result = append_custom_prompt_instructions("prompt", "domain rules", "table_metadata")
     assert result.startswith("prompt\n\n")
-    assert "<table_metadata_business_instructions>\ndomain rules\n</table_metadata_business_instructions>" in result
+    assert (
+        "<table_metadata_business_instructions>\ndomain rules\n</table_metadata_business_instructions>"
+        in result
+    )
     assert "do not conflict" in result
 
 
@@ -626,15 +623,16 @@ def test_render_extraction_messages_roles() -> None:
 
 
 def test_parse_graph_output_fenced_json() -> None:
-    graph = parse_graph_output('```json\n[{"entity": "A"}, {"entity1": "A", "entity2": "B", "relation": "link"}]\n```')
+    graph = parse_graph_output(
+        '```json\n[{"entity": "A"}, {"entity1": "A", "entity2": "B", "relation": "link"}]\n```'
+    )
     assert [n.name for n in graph.node] == ["A", "B"]
     assert graph.relation[0].type == "link"
 
 
 def test_parse_graph_output_merges_duplicate_nodes_and_attributes() -> None:
     graph = parse_graph_output(
-        '[{"entity": "A", "entity_attributes": ["x"]}, '
-        '{"entity": "A", "entity_attributes": ["y"]}]'
+        '[{"entity": "A", "entity_attributes": ["x"]}, {"entity": "A", "entity_attributes": ["y"]}]'
     )
     assert len(graph.node) == 1
     assert graph.node[0].attributes == ["x", "y"]
@@ -760,9 +758,7 @@ def _extractor(
     )
 
 
-def _run_extract(
-    extractor: ChunkExtractor, chat: _FakeChat, chunk_id: str
-) -> ExtractionOutcome:
+def _run_extract(extractor: ChunkExtractor, chat: _FakeChat, chunk_id: str) -> ExtractionOutcome:
     import asyncio
 
     return asyncio.run(
@@ -788,9 +784,7 @@ def test_extract_chunk_skips_when_graph_disabled() -> None:
 def test_extract_chunk_skips_when_knowledge_cancelled() -> None:
     kb = _kb(tenant_id=1, extract_config={"enabled": True})
     chunk = _chunk_row(tenant_id=1, knowledge_base_id=kb.id, knowledge_id="k-1", content="x")
-    knowledge = _doc_row(
-        tenant_id=1, knowledge_base_id=kb.id, parse_status=PARSE_STATUS_CANCELLED
-    )
+    knowledge = _doc_row(tenant_id=1, knowledge_base_id=kb.id, parse_status=PARSE_STATUS_CANCELLED)
     knowledge = knowledge.model_copy(update={"id": "k-1"})
     extractor = _extractor(kb=kb, chunk=chunk, knowledge=knowledge)
     outcome = _run_extract(extractor, _FakeChat(), chunk.id)
@@ -801,9 +795,7 @@ def test_extract_chunk_skips_when_knowledge_cancelled() -> None:
 def test_extract_chunk_skips_when_knowledge_deleting() -> None:
     kb = _kb(tenant_id=1, extract_config={"enabled": True})
     chunk = _chunk_row(tenant_id=1, knowledge_base_id=kb.id, knowledge_id="k-1", content="x")
-    knowledge = _doc_row(
-        tenant_id=1, knowledge_base_id=kb.id, parse_status=PARSE_STATUS_DELETING
-    )
+    knowledge = _doc_row(tenant_id=1, knowledge_base_id=kb.id, parse_status=PARSE_STATUS_DELETING)
     knowledge = knowledge.model_copy(update={"id": "k-1"})
     extractor = _extractor(kb=kb, chunk=chunk, knowledge=knowledge)
     outcome = _run_extract(extractor, _FakeChat(), chunk.id)
@@ -963,7 +955,10 @@ def test_resolve_table_metadata_instructions() -> None:
 
 
 def test_tenant_effective_engines_uses_configured(monkeypatch: pytest.MonkeyPatch) -> None:
-    tenant = _tenant(id=1, engines=[RetrieverEngineEntry(retriever_type="vector", retriever_engine_type="qdrant")])
+    tenant = _tenant(
+        id=1,
+        engines=[RetrieverEngineEntry(retriever_type="vector", retriever_engine_type="qdrant")],
+    )
     carrier = TenantEffectiveEngines(tenant)
     engines = carrier.get_effective_engines()
     assert len(engines) == 1
@@ -1068,7 +1063,9 @@ def test_process_datatable_summary_happy_path() -> None:
     tenant_id = 1
     kb = _kb(tenant_id=tenant_id)
     row = _doc_row(tenant_id=tenant_id, knowledge_base_id=kb.id, file_type="csv")
-    schema = TableSchema(table_name="k_orders", columns=[TableColumn(name="id", type="BIGINT")], row_count=5)
+    schema = TableSchema(
+        table_name="k_orders", columns=[TableColumn(name="id", type="BIGINT")], row_count=5
+    )
     chat = _FakeChat(content="fixture summary")
     service = _FakeEngineService(engine_type=RetrieverEngineType.SQLITE)
     engine = _summary_engine(service)
@@ -1118,9 +1115,7 @@ def test_process_datatable_summary_rejects_non_spreadsheet() -> None:
                 knowledge_repo=knowledge_repo,
                 kb_service=_FakeKBService(_kb(tenant_id=1)),
                 chunk_service=_FakeChunkService(),
-                table_tool=_FakeTableTool(
-                    TableSchema(table_name="t", row_count=0), []
-                ),
+                table_tool=_FakeTableTool(TableSchema(table_name="t", row_count=0), []),
             )
         )
 
@@ -1140,9 +1135,7 @@ def test_process_datatable_summary_raises_on_missing_document() -> None:
                 knowledge_repo=_FakeKnowledgeRepo(),
                 kb_service=_FakeKBService(_kb(tenant_id=1)),
                 chunk_service=_FakeChunkService(),
-                table_tool=_FakeTableTool(
-                    TableSchema(table_name="t", row_count=0), []
-                ),
+                table_tool=_FakeTableTool(TableSchema(table_name="t", row_count=0), []),
             )
         )
 
@@ -1173,7 +1166,9 @@ def test_process_datatable_summary_index_failure_rolls_back() -> None:
                 kb_service=_FakeKBService(kb),
                 chunk_service=chunk_service,
                 table_tool=_FakeTableTool(
-                    TableSchema(table_name="t", columns=[TableColumn(name="id", type="BIGINT")], row_count=1),
+                    TableSchema(
+                        table_name="t", columns=[TableColumn(name="id", type="BIGINT")], row_count=1
+                    ),
                     [{"id": 1}],
                 ),
             )

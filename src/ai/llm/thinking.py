@@ -69,9 +69,7 @@ class EnableThinking:
       requests (Qwen3 rejects thinking in non-stream mode).
     """
 
-    def __init__(
-        self, *, always_send: bool = False, disable_on_non_stream: bool = False
-    ) -> None:
+    def __init__(self, *, always_send: bool = False, disable_on_non_stream: bool = False) -> None:
         self._always_send = always_send
         self._disable_on_non_stream = disable_on_non_stream
 

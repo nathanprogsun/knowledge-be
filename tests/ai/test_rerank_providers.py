@@ -1,7 +1,7 @@
 """Tests for the dedicated rerank provider backends.
 
 Covers the wire shape of each dedicated backend (Aliyun, Zhipu, Jina,
-NVIDIA, managed cloud, LKEAP, Volcengine) and its factory route. All HTTP
+NVIDIA, the kb, LKEAP, Volcengine) and its factory route. All HTTP
 is faked through ``httpx.MockTransport`` and the LKEAP SDK is replaced by
 a fake client — no network. The Volcengine IAM signature is pinned
 against a known answer generated from the upstream Go signer.
@@ -20,6 +20,7 @@ import pytest
 
 from src.ai.rerank.aliyun import AliyunReranker, new_aliyun_reranker
 from src.ai.rerank.base import RerankerConfig, new_reranker
+from src.ai.rerank.cloud import new_cloud_reranker
 from src.ai.rerank.jina import new_jina_reranker
 from src.ai.rerank.lkeap import LKEAPReranker, new_lkeap_reranker
 from src.ai.rerank.nvidia import new_nvidia_reranker
@@ -27,7 +28,6 @@ from src.ai.rerank.volcengine import (
     new_volcengine_reranker,
     sign_rerank_request,
 )
-from src.ai.rerank.weknoracloud import new_weknoracloud_reranker
 from src.ai.rerank.zhipu import new_zhipu_reranker
 from src.ai.utils.signer import sign_request
 from src.common.exception import ExternalServiceError, ValidationError
@@ -59,7 +59,9 @@ def _json_client(
     return httpx.AsyncClient(transport=httpx.MockTransport(handler))
 
 
-def _capture(handler: Callable[[httpx.Request, dict[str, Any]], httpx.Response]) -> tuple[httpx.AsyncClient, dict[str, Any]]:
+def _capture(
+    handler: Callable[[httpx.Request, dict[str, Any]], httpx.Response],
+) -> tuple[httpx.AsyncClient, dict[str, Any]]:
     captured: dict[str, Any] = {}
 
     def wrapped(request: httpx.Request) -> httpx.Response:
@@ -343,10 +345,10 @@ async def test_nvidia_reranker_out_of_range_index_degrades_to_empty() -> None:
     assert results[0].document.text == ""
 
 
-# ── Managed cloud ───────────────────────────────────────────────────
+# ── The kb ───────────────────────────────────────────────────
 
 
-async def test_weknoracloud_reranker_signs_and_sends_expected_request() -> None:
+async def test_cloud_reranker_signs_and_sends_expected_request() -> None:
     def handler(request: httpx.Request, captured: dict[str, Any]) -> httpx.Response:
         captured["path"] = request.url.path
         captured["headers"] = request.headers
@@ -362,7 +364,7 @@ async def test_weknoracloud_reranker_signs_and_sends_expected_request() -> None:
         )
 
     client, captured = _capture(handler)
-    reranker = await new_weknoracloud_reranker(
+    reranker = await new_cloud_reranker(
         RerankerConfig(
             model_name="rerank",
             model_id="wc-1",
@@ -408,13 +410,13 @@ async def test_weknoracloud_reranker_signs_and_sends_expected_request() -> None:
     assert results[0].document.text == "不会保留"
 
 
-async def test_weknoracloud_reranker_uses_remote_model_name() -> None:
+async def test_cloud_reranker_uses_remote_model_name() -> None:
     def handler(request: httpx.Request, captured: dict[str, Any]) -> httpx.Response:
         captured["body"] = json.loads(request.content)
         return httpx.Response(200, json={"results": []})
 
     client, captured = _capture(handler)
-    reranker = await new_weknoracloud_reranker(
+    reranker = await new_cloud_reranker(
         RerankerConfig(
             model_name="local-model",
             model_id="wc-2",
@@ -429,15 +431,13 @@ async def test_weknoracloud_reranker_uses_remote_model_name() -> None:
     assert captured["body"]["model"] == "remote-model"
 
 
-async def test_weknoracloud_reranker_requires_credentials() -> None:
+async def test_cloud_reranker_requires_credentials() -> None:
     with pytest.raises(ValidationError, match="app id is required"):
-        await new_weknoracloud_reranker(
+        await new_cloud_reranker(
             RerankerConfig(model_name="m", model_id="wc-3", app_secret="secret")
         )
     with pytest.raises(ValidationError, match="app secret is required"):
-        await new_weknoracloud_reranker(
-            RerankerConfig(model_name="m", model_id="wc-4", app_id="app")
-        )
+        await new_cloud_reranker(RerankerConfig(model_name="m", model_id="wc-4", app_id="app"))
 
 
 # ── LKEAP ───────────────────────────────────────────────────────────
@@ -607,10 +607,7 @@ async def test_volcengine_reranker_sends_signed_request_and_parses_response() ->
     assert "AKLT-test" in captured["authorization"]
     assert "secret-test" not in captured["authorization"]
     assert captured["x_date"]
-    assert (
-        captured["x_content_sha256"]
-        == hashlib.sha256(captured["body"]).hexdigest()
-    )
+    assert captured["x_content_sha256"] == hashlib.sha256(captured["body"]).hexdigest()
 
     body = json.loads(captured["body"])
     assert body["rerank_model"] == "doubao-seed-rerank"

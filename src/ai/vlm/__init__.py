@@ -18,6 +18,11 @@ from src.ai.vlm.base import (
     config_from_model,
     new_vlm,
 )
+from src.ai.vlm.cloud import (
+    MANAGED_CLOUD_CHAT_PATH,
+    CloudVLM,
+    new_cloud_vlm,
+)
 from src.ai.vlm.concurrency import ConcurrencyVLM, wrap_vlm_concurrency
 from src.ai.vlm.ollama import (
     DEFAULT_TEMPERATURE as OLLAMA_DEFAULT_TEMPERATURE,
@@ -34,11 +39,6 @@ from src.ai.vlm.remote_api import (
     detect_image_mime,
     new_remote_api_vlm,
 )
-from src.ai.vlm.weknoracloud import (
-    MANAGED_CLOUD_CHAT_PATH,
-    WeKnoraCloudVLM,
-    new_weknoracloud_vlm,
-)
 
 __all__ = [
     "DEFAULT_MAX_TOKENS",
@@ -48,6 +48,7 @@ __all__ = [
     "MODEL_SOURCE_REMOTE",
     "OLLAMA_DEFAULT_TEMPERATURE",
     "VLM",
+    "CloudVLM",
     "ConcurrencyVLM",
     "Config",
     "ModelLike",
@@ -55,12 +56,11 @@ __all__ = [
     "OllamaChatService",
     "OllamaVLM",
     "RemoteAPIVLM",
-    "WeKnoraCloudVLM",
     "config_from_model",
     "detect_image_mime",
+    "new_cloud_vlm",
     "new_ollama_vlm",
     "new_remote_api_vlm",
     "new_vlm",
-    "new_weknoracloud_vlm",
     "wrap_vlm_concurrency",
 ]

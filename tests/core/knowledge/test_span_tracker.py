@@ -246,9 +246,7 @@ class _FakeSpanStore:
         return self._rows[(knowledge_id, attempt, span_id)]
 
     def root(self, knowledge_id: str, attempt: int) -> KnowledgeProcessingSpan:
-        return next(
-            r for r in self.rows(knowledge_id, attempt) if r.kind == SPAN_KIND_ROOT
-        )
+        return next(r for r in self.rows(knowledge_id, attempt) if r.kind == SPAN_KIND_ROOT)
 
 
 def _make_tracker() -> tuple[SpanTracker, _FakeSpanStore, _FakeHeartbeat]:
@@ -382,9 +380,7 @@ async def test_abort_attempt_sweeps_and_closes_root() -> None:
     tracker, store, _ = _make_tracker()
     root, attempt = await tracker.open_attempt("kid-1")
     assert root is not None
-    stage = await tracker.begin_stage(
-        knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING
-    )
+    stage = await tracker.begin_stage(knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING)
     assert stage is not None
     await tracker.begin_sub_span(parent=stage, name="chunk[0]")
     await tracker.abort_attempt(knowledge_id="kid-1", attempt=attempt)
@@ -415,26 +411,18 @@ async def test_begin_stage_attaches_to_root() -> None:
 
 async def test_begin_stage_empty_inputs_are_nil_safe() -> None:
     tracker, _, _ = _make_tracker()
-    assert (
-        await tracker.begin_stage(knowledge_id="", attempt=1, stage=STAGE_CHUNKING) is None
-    )
-    assert (
-        await tracker.begin_stage(knowledge_id="kid-1", attempt=1, stage="") is None
-    )
+    assert await tracker.begin_stage(knowledge_id="", attempt=1, stage=STAGE_CHUNKING) is None
+    assert await tracker.begin_stage(knowledge_id="kid-1", attempt=1, stage="") is None
 
 
 async def test_begin_stage_reentry_reuses_span_id() -> None:
     tracker, store, _ = _make_tracker()
     root, attempt = await tracker.open_attempt("kid-1")
     assert root is not None
-    first = await tracker.begin_stage(
-        knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING
-    )
+    first = await tracker.begin_stage(knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING)
     assert first is not None
     await tracker.end_span(span=first, output={"chunks": 12})
-    second = await tracker.begin_stage(
-        knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING
-    )
+    second = await tracker.begin_stage(knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING)
     assert second is not None
     assert second.span_id == first.span_id
     # Exactly one stage row for the name, reset to running.
@@ -449,9 +437,7 @@ async def test_begin_stage_reentry_reuses_span_id() -> None:
 
 async def test_begin_stage_rootless_records_rootless() -> None:
     tracker, store, _ = _make_tracker()
-    stage = await tracker.begin_stage(
-        knowledge_id="kid-1", attempt=1, stage=STAGE_DOCREADER
-    )
+    stage = await tracker.begin_stage(knowledge_id="kid-1", attempt=1, stage=STAGE_DOCREADER)
     assert stage is not None
     assert stage.parent_span_id == ""
     persisted = store.row("kid-1", 1, stage.span_id)
@@ -473,9 +459,7 @@ async def test_begin_sub_span_generation_kind_is_preserved() -> None:
     tracker, store, _ = _make_tracker()
     root, attempt = await tracker.open_attempt("kid-1")
     assert root is not None
-    sub = await tracker.begin_sub_span(
-        parent=root, name="llm.summary", kind=SPAN_KIND_GENERATION
-    )
+    sub = await tracker.begin_sub_span(parent=root, name="llm.summary", kind=SPAN_KIND_GENERATION)
     assert sub is not None
     assert sub.kind == SPAN_KIND_GENERATION
     assert store.row("kid-1", attempt, sub.span_id).kind == SPAN_KIND_GENERATION
@@ -514,19 +498,13 @@ async def test_lookup_stage_and_lookup_span_by_name() -> None:
     tracker, _, _ = _make_tracker()
     root, attempt = await tracker.open_attempt("kid-1")
     assert root is not None
-    stage = await tracker.begin_stage(
-        knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING
-    )
+    stage = await tracker.begin_stage(knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING)
     assert stage is not None
-    found = await tracker.lookup_stage(
-        knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING
-    )
+    found = await tracker.lookup_stage(knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING)
     assert found is not None
     assert found.span_id == stage.span_id
     assert (
-        await tracker.lookup_stage(
-            knowledge_id="kid-1", attempt=attempt, stage=STAGE_EMBEDDING
-        )
+        await tracker.lookup_stage(knowledge_id="kid-1", attempt=attempt, stage=STAGE_EMBEDDING)
         is None
     )
     by_name = await tracker.lookup_span_by_name(
@@ -534,19 +512,9 @@ async def test_lookup_stage_and_lookup_span_by_name() -> None:
     )
     assert by_name is not None
     assert by_name.kind == SPAN_KIND_ROOT
-    assert (
-        await tracker.lookup_span_by_name(
-            knowledge_id="kid-1", attempt=attempt, name=""
-        )
-        is None
-    )
-    assert (
-        await tracker.lookup_span_by_name(knowledge_id="", attempt=1, name="x") is None
-    )
-    assert (
-        await tracker.lookup_span_by_name(knowledge_id="kid-1", attempt=0, name="x")
-        is None
-    )
+    assert await tracker.lookup_span_by_name(knowledge_id="kid-1", attempt=attempt, name="") is None
+    assert await tracker.lookup_span_by_name(knowledge_id="", attempt=1, name="x") is None
+    assert await tracker.lookup_span_by_name(knowledge_id="kid-1", attempt=0, name="x") is None
 
 
 # ── Span transitions (unit) ───────────────────────────────────────────
@@ -556,9 +524,7 @@ async def test_end_span_marks_done_with_output_and_duration() -> None:
     tracker, store, _ = _make_tracker()
     root, attempt = await tracker.open_attempt("kid-1")
     assert root is not None
-    stage = await tracker.begin_stage(
-        knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING
-    )
+    stage = await tracker.begin_stage(knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING)
     assert stage is not None
     await tracker.end_span(span=stage, output={"chunks": 12})
     persisted = store.row("kid-1", attempt, stage.span_id)
@@ -579,9 +545,7 @@ async def test_fail_span_cancels_descendants_with_reason() -> None:
     tracker, store, _ = _make_tracker()
     root, attempt = await tracker.open_attempt("kid-1")
     assert root is not None
-    stage = await tracker.begin_stage(
-        knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING
-    )
+    stage = await tracker.begin_stage(knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING)
     assert stage is not None
     child = await tracker.begin_sub_span(parent=stage, name="chunk[0]")
     assert child is not None
@@ -592,18 +556,14 @@ async def test_fail_span_cancels_descendants_with_reason() -> None:
     child_row = store.row("kid-1", attempt, child.span_id)
     assert child_row.status == SPAN_STATUS_CANCELLED
     assert child_row.error_code == "UPSTREAM_FAILED"
-    assert child_row.error_message == (
-        f"upstream {STAGE_CHUNKING} failed (EMBEDDING_RATE_LIMIT)"
-    )
+    assert child_row.error_message == (f"upstream {STAGE_CHUNKING} failed (EMBEDDING_RATE_LIMIT)")
 
 
 async def test_fail_span_truncates_error_fields() -> None:
     tracker, store, _ = _make_tracker()
     root, attempt = await tracker.open_attempt("kid-1")
     assert root is not None
-    stage = await tracker.begin_stage(
-        knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING
-    )
+    stage = await tracker.begin_stage(knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING)
     assert stage is not None
     await tracker.fail_span(
         span=stage,
@@ -619,9 +579,7 @@ async def test_fail_span_main_stage_finalizes_root_failed() -> None:
     tracker, store, _ = _make_tracker()
     root, attempt = await tracker.open_attempt("kid-1")
     assert root is not None
-    stage = await tracker.begin_stage(
-        knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING
-    )
+    stage = await tracker.begin_stage(knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING)
     assert stage is not None
     await tracker.fail_span(span=stage, error_code="CHUNK_FAILED")
     assert store.root("kid-1", attempt).status == SPAN_STATUS_FAILED
@@ -684,9 +642,7 @@ async def test_skip_span_marks_intentionally_not_run() -> None:
     tracker, store, _ = _make_tracker()
     root, attempt = await tracker.open_attempt("kid-1")
     assert root is not None
-    stage = await tracker.begin_stage(
-        knowledge_id="kid-1", attempt=attempt, stage=STAGE_MULTIMODAL
-    )
+    stage = await tracker.begin_stage(knowledge_id="kid-1", attempt=attempt, stage=STAGE_MULTIMODAL)
     assert stage is not None
     await tracker.skip_span(span=stage, reason="text-only document")
     persisted = store.row("kid-1", attempt, stage.span_id)
@@ -702,9 +658,7 @@ async def test_heartbeat_fires_for_root_and_stage_only() -> None:
     tracker, _, heartbeat = _make_tracker()
     root, attempt = await tracker.open_attempt("kid-1")
     assert root is not None
-    stage = await tracker.begin_stage(
-        knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING
-    )
+    stage = await tracker.begin_stage(knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING)
     assert stage is not None
     sub = await tracker.begin_sub_span(parent=stage, name="chunk[0]")
     assert sub is not None
@@ -719,9 +673,7 @@ async def test_heartbeat_absent_is_skipped() -> None:
     tracker._heartbeat = None
     root, attempt = await tracker.open_attempt("kid-1")
     assert root is not None
-    await tracker.begin_stage(
-        knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING
-    )
+    await tracker.begin_stage(knowledge_id="kid-1", attempt=attempt, stage=STAGE_CHUNKING)
     await tracker.finalize_attempt(knowledge_id="kid-1", attempt=attempt)
 
 
@@ -775,9 +727,7 @@ async def test_list_attempt_spans_returns_insertion_order() -> None:
     tracker, _, _ = _make_tracker()
     root, attempt = await tracker.open_attempt("kid-1")
     assert root is not None
-    stage = await tracker.begin_stage(
-        knowledge_id="kid-1", attempt=attempt, stage=STAGE_DOCREADER
-    )
+    stage = await tracker.begin_stage(knowledge_id="kid-1", attempt=attempt, stage=STAGE_DOCREADER)
     assert stage is not None
     spans = await tracker.list_attempt_spans("kid-1", attempt)
     assert [s.kind for s in spans] == [SPAN_KIND_ROOT, SPAN_KIND_STAGE]
@@ -816,9 +766,7 @@ async def test_integration_full_lifecycle(session: AsyncSession) -> None:
     root, attempt = await tracker.open_attempt(kid, "trace-integration")
     assert root is not None
     for stage_name in ALL_STAGES:
-        stage = await tracker.begin_stage(
-            knowledge_id=kid, attempt=attempt, stage=stage_name
-        )
+        stage = await tracker.begin_stage(knowledge_id=kid, attempt=attempt, stage=stage_name)
         assert stage is not None
         await tracker.end_span(span=stage, output={"stage": stage_name})
     image = await tracker.begin_sub_span(
@@ -850,18 +798,12 @@ async def test_integration_fail_cascades_and_finalizes(session: AsyncSession) ->
     kid = _kid()
     root, attempt = await tracker.open_attempt(kid)
     assert root is not None
-    docreader = await tracker.begin_stage(
-        knowledge_id=kid, attempt=attempt, stage=STAGE_DOCREADER
-    )
+    docreader = await tracker.begin_stage(knowledge_id=kid, attempt=attempt, stage=STAGE_DOCREADER)
     assert docreader is not None
     await tracker.end_span(span=docreader)
-    chunking = await tracker.begin_stage(
-        knowledge_id=kid, attempt=attempt, stage=STAGE_CHUNKING
-    )
+    chunking = await tracker.begin_stage(knowledge_id=kid, attempt=attempt, stage=STAGE_CHUNKING)
     assert chunking is not None
-    embedding = await tracker.begin_stage(
-        knowledge_id=kid, attempt=attempt, stage=STAGE_EMBEDDING
-    )
+    embedding = await tracker.begin_stage(knowledge_id=kid, attempt=attempt, stage=STAGE_EMBEDDING)
     multimodal = await tracker.begin_stage(
         knowledge_id=kid, attempt=attempt, stage=STAGE_MULTIMODAL
     )
@@ -881,9 +823,7 @@ async def test_integration_abort_sweeps_every_open_span(session: AsyncSession) -
     kid = _kid()
     root, attempt = await tracker.open_attempt(kid)
     assert root is not None
-    stage = await tracker.begin_stage(
-        knowledge_id=kid, attempt=attempt, stage=STAGE_CHUNKING
-    )
+    stage = await tracker.begin_stage(knowledge_id=kid, attempt=attempt, stage=STAGE_CHUNKING)
     assert stage is not None
     # Simulate a fan-out that ended its stage row while the child runs.
     await tracker.end_span(span=stage)
@@ -904,20 +844,14 @@ async def test_integration_reentry_keeps_single_stage_row(session: AsyncSession)
     kid = _kid()
     root, attempt = await tracker.open_attempt(kid)
     assert root is not None
-    first = await tracker.begin_stage(
-        knowledge_id=kid, attempt=attempt, stage=STAGE_EMBEDDING
-    )
+    first = await tracker.begin_stage(knowledge_id=kid, attempt=attempt, stage=STAGE_EMBEDDING)
     assert first is not None
     await tracker.end_span(span=first)
-    second = await tracker.begin_stage(
-        knowledge_id=kid, attempt=attempt, stage=STAGE_EMBEDDING
-    )
+    second = await tracker.begin_stage(knowledge_id=kid, attempt=attempt, stage=STAGE_EMBEDDING)
     assert second is not None
     assert second.span_id == first.span_id
     stages = [
-        s
-        for s in await tracker.list_attempt_spans(kid, attempt)
-        if s.kind == SPAN_KIND_STAGE
+        s for s in await tracker.list_attempt_spans(kid, attempt) if s.kind == SPAN_KIND_STAGE
     ]
     assert len(stages) == 1
 
@@ -928,9 +862,7 @@ async def test_integration_attempt_history_preserved(session: AsyncSession) -> N
     _, first = await tracker.open_attempt(kid)
     root, second = await tracker.open_attempt(kid)
     assert root is not None
-    await tracker.begin_stage(
-        knowledge_id=kid, attempt=second, stage=STAGE_DOCREADER
-    )
+    await tracker.begin_stage(knowledge_id=kid, attempt=second, stage=STAGE_DOCREADER)
     assert await tracker.latest_attempt(kid) == 2
     progress = await tracker.get_progress(knowledge_id=kid, attempt=first)
     assert [s.kind for s in progress.spans] == [SPAN_KIND_ROOT]

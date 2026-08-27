@@ -181,6 +181,7 @@ def _result(
 def _fetcher_client(handler: httpx.MockTransportHandler) -> httpx.AsyncClient:
     return httpx.AsyncClient(transport=httpx.MockTransport(handler))
 
+
 # ═══════════════════════════════════════════════════════════════════════
 # WebSearchTool unit tests
 # ═══════════════════════════════════════════════════════════════════════
@@ -214,7 +215,9 @@ class TestWebSearchTool:
     async def test_happy_path_formats_results(self) -> None:
         service = FakeSearchService(
             results=[
-                _result(title="Alpha", url="https://example.com/a", snippet="snip a", content="body a"),
+                _result(
+                    title="Alpha", url="https://example.com/a", snippet="snip a", content="body a"
+                ),
                 _result(title="Beta", url="https://example.com/b", snippet="", source="bing"),
             ]
         )
@@ -254,7 +257,9 @@ class TestWebSearchTool:
 
     async def test_content_truncated_at_500_chars(self) -> None:
         long_content = "x" * 600
-        tool = WebSearchTool(search_service=FakeSearchService(results=[_result(content=long_content)]))
+        tool = WebSearchTool(
+            search_service=FakeSearchService(results=[_result(content=long_content)])
+        )
 
         result = await tool.execute({"query": "hello"}, tenant_id=7)
 
@@ -775,7 +780,10 @@ class TestWebPageFetcher:
 class TestUrlNormalization:
     def test_github_blob_rewritten_to_raw(self) -> None:
         source = "https://github.com/org/repo/blob/main/readme.md"
-        assert normalize_github_url(source) == "https://raw.githubusercontent.com/org/repo/main/readme.md"
+        assert (
+            normalize_github_url(source)
+            == "https://raw.githubusercontent.com/org/repo/main/readme.md"
+        )
 
     def test_non_github_url_unchanged(self) -> None:
         assert normalize_github_url("https://example.com/a") == "https://example.com/a"
@@ -858,7 +866,9 @@ async def test_integration_web_search_tool_runs_through_real_provider_row(
     await session.commit()
 
     registry = FakeRegistry(
-        hits=[{"title": "One", "url": "https://example.com/1", "snippet": "snip", "content": "body"}]
+        hits=[
+            {"title": "One", "url": "https://example.com/1", "snippet": "snip", "content": "body"}
+        ]
     )
     service = WebSearchSearchService(
         provider_repo=WebSearchProviderRepository(session),

@@ -105,7 +105,7 @@
       "name": "VectorStoreService"
     },
     {
-      "name": "WeKnoraCloudService"
+      "name": "CloudService"
     },
     {
       "name": "WebSearchProviderService"

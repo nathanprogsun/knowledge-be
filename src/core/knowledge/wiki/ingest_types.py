@@ -263,9 +263,7 @@ class WikiPendingOpsStore(Protocol):
     tests.
     """
 
-    async def enqueue(
-        self, *, tenant_id: int, knowledge_base_id: str, op: WikiIngestOp
-    ) -> bool:
+    async def enqueue(self, *, tenant_id: int, knowledge_base_id: str, op: WikiIngestOp) -> bool:
         """Append ``op`` to the queue; return whether it was accepted."""
 
     async def peek(self, *, knowledge_base_id: str, limit: int) -> list[WikiIngestOp]:
@@ -304,9 +302,7 @@ class DocumentStore(Protocol):
     async def get_by_id_only(self, id: str) -> Document | None:
         """Return one live document by id without a tenant filter."""
 
-    async def update_columns(
-        self, id: str, values: Mapping[str, SqlValue]
-    ) -> Document | None:
+    async def update_columns(self, id: str, values: Mapping[str, SqlValue]) -> Document | None:
         """Write several columns of one live row in a single statement."""
 
 

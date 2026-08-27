@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
 import pytest
 
-from src.ai.mcp_transport.errors import MCPTransportError
 from src.core.infra.mcp_services.connectivity import (
     ConnectivityResult,
     StaticConnectivityProbe,
@@ -21,7 +21,6 @@ from src.core.infra.mcp_services.service import MCPServiceService
 from src.db.dao.mcp_service_repository import MCPServiceRepository
 from src.db.dao.mcp_tool_approval_repository import MCPToolApprovalRepository
 from src.db.models.infra.mcp_services import MCPService
-from datetime import UTC, datetime
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -71,26 +70,18 @@ def _make_mcp_repo() -> tuple[AsyncMock, dict[str, MCPService]]:
 
     async def _exists_by_tenant_and_name(tenant_id: int, name: str) -> bool:
         return any(
-            row.tenant_id == tenant_id
-            and row.name == name
-            and row.deleted_at is None
+            row.tenant_id == tenant_id and row.name == name and row.deleted_at is None
             for row in rows.values()
         )
 
-    async def _soft_delete(
-        tenant_id: int, id: str, *, deleted_at: datetime
-    ) -> bool:
+    async def _soft_delete(tenant_id: int, id: str, *, deleted_at: datetime) -> bool:
         row = await _find_for_tenant(tenant_id, id)
         if row is None:
             return False
-        rows[id] = row.model_copy(
-            update={"deleted_at": deleted_at, "updated_at": deleted_at}
-        )
+        rows[id] = row.model_copy(update={"deleted_at": deleted_at, "updated_at": deleted_at})
         return True
 
-    async def _update(
-        tenant_id: int, id: str, *, columns: dict[str, object]
-    ) -> MCPService | None:
+    async def _update(tenant_id: int, id: str, *, columns: dict[str, object]) -> MCPService | None:
         row = await _find_for_tenant(tenant_id, id)
         if row is None:
             return None
@@ -111,8 +102,7 @@ def _make_mcp_repo() -> tuple[AsyncMock, dict[str, MCPService]]:
 
 def _make_approvals_repo() -> AsyncMock:
     """Tool-approval repo mock; the discovery tests don't exercise it."""
-    repo = AsyncMock(spec=MCPToolApprovalRepository)
-    return repo
+    return AsyncMock(spec=MCPToolApprovalRepository)
 
 
 @pytest.fixture
@@ -135,9 +125,7 @@ def approvals_repo() -> AsyncMock:
     return _make_approvals_repo()
 
 
-async def _seed(
-    rows: dict[str, MCPService], *, id_: str = "svc-1"
-) -> MCPService:
+async def _seed(rows: dict[str, MCPService], *, id_: str = "svc-1") -> MCPService:
     row = MCPService(
         id=id_,
         tenant_id=1,

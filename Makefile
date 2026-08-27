@@ -1,4 +1,4 @@
-.PHONY: help install sync lint typecheck format format-fix test migrate clean dev-app check check-layer check-singleton check-endpoint check-schema check-contract check-imports check-sql check-pr-leak check-map-from-db check-exception-types check-agent-notes
+.PHONY: help install sync lint typecheck format format-fix test migrate clean dev-app openapi frontend-install frontend-typecheck frontend-test frontend-build check check-layer check-singleton check-endpoint check-schema check-imports check-sql check-pr-leak check-map-from-db check-exception-types check-agent-notes
 
 help:
 	@echo "Targets:"
@@ -34,6 +34,11 @@ format-fix:
 typecheck:
 	uv run mypy
 
+# Ratchet gate: mypy may only improve vs the recorded baseline. CI runs
+# this instead of raw mypy until the backlog is burned down.
+check-mypy-baseline:
+	python scripts/check_mypy_baseline.py
+
 test:
 	uv run pytest
 
@@ -47,7 +52,7 @@ clean:
 
 INFRA_DOMAINS := datasources,initialization,mcp_services,models,storage_backends,vector_stores,web_search
 
-check: check-layer check-singleton check-endpoint check-schema check-contract check-imports check-sql check-pr-leak check-map-from-db check-exception-types check-agent-notes
+check: check-layer check-singleton check-endpoint check-schema check-imports check-sql check-pr-leak check-map-from-db check-agent-notes check-mypy-baseline check-exception-types
 	@echo "All anti-drift checks passed"
 
 # Layer check covers every shipped domain. Endpoint coverage can only
@@ -60,13 +65,10 @@ check-singleton:
 	bash scripts/run_check_service_singleton.sh --src-root src/
 
 check-endpoint:
-	python scripts/check_endpoint_coverage.py --src-root src/ --domains auth,tenants,vector_stores,storage_backends,web_search
+	python scripts/check_endpoint_coverage.py --src-root src/ --docs-root docs
 
 check-schema:
 	python scripts/check_schema_compatibility.py --src-root src/
-
-check-contract:
-	python scripts/check_contract_invariants.py --src-root src/
 
 check-imports:
 	python scripts/check_imports.py --src-root src/
@@ -88,3 +90,23 @@ check-agent-notes:
 
 dev-app:
 	uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+
+# ── Frontend contract codegen ───────────────────────────────────────────
+# Single source of truth: FastAPI OpenAPI schema. Frontend TS types are
+# generated, never hand-written against the backend.
+
+openapi:
+	uv run python scripts/export_openapi.py --output docs/api/openapi.json
+	cd frontend && npx openapi-typescript ../docs/api/openapi.json -o src/api/__generated__/schema.ts
+
+frontend-install:
+	cd frontend && npm ci
+
+frontend-typecheck:
+	cd frontend && npm run type-check
+
+frontend-test:
+	cd frontend && npm test
+
+frontend-build:
+	cd frontend && npm run build

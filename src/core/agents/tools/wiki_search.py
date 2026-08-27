@@ -51,10 +51,10 @@ WIKI_SEARCH_TOOL_DESCRIPTION = (
     "STRONGLY PREFER using regex to search for multiple concepts at once rather than simple plain text queries.\n"
     "Returns matching pages with titles, slugs, and summaries (each tagged with its short bN knowledge_base_id).\n"
     "Examples:\n"
-    "- Alternation (RECOMMENDED): \"stardust|skyvault\" (matches either word)\n"
-    "- Multiple terms (RECOMMENDED): \"psionic.*engine\" (matches both words in order)\n"
-    "- Prefix matching: \"^entity/.*\" (finds all entities)\n"
-    "- Plain text: \"engine\" (matches anywhere in title/content/slug/summary)\n"
+    '- Alternation (RECOMMENDED): "stardust|skyvault" (matches either word)\n'
+    '- Multiple terms (RECOMMENDED): "psionic.*engine" (matches both words in order)\n'
+    '- Prefix matching: "^entity/.*" (finds all entities)\n'
+    '- Plain text: "engine" (matches anywhere in title/content/slug/summary)\n'
     "IMPORTANT — JSON escaping: every backslash in a regex MUST be written as \\\\ inside the JSON tool "
     'arguments (e.g. to search for literal "C++" write "C\\\\+\\\\+", NOT "C\\+\\+"; for "\\d+" write "\\\\d+"). '
     'Plain "\\+" / "\\d" etc. are invalid JSON escapes and will fail to parse.\n'
@@ -306,13 +306,9 @@ def _render_search_results(
         seen_slugs.add(key)
 
         snippet = extract_snippet(page.content, query)
-        snippet_tag = (
-            f"\n<match_snippet>{xml_escape(snippet)}</match_snippet>" if snippet else ""
-        )
+        snippet_tag = f"\n<match_snippet>{xml_escape(snippet)}</match_snippet>" if snippet else ""
         aliases_tag = (
-            f"\n<aliases>{xml_escape(', '.join(page.aliases))}</aliases>"
-            if page.aliases
-            else ""
+            f"\n<aliases>{xml_escape(', '.join(page.aliases))}</aliases>" if page.aliases else ""
         )
 
         summary = page.summary

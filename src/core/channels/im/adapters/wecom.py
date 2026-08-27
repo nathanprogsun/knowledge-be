@@ -58,7 +58,7 @@ from src.db.models.im_channel import IMChannel
 
 logger = logging.getLogger("src.core.channels.im.adapters.wecom")
 
-#: Public-cloud WeCom API origin (no trailing slash).
+#: Public WeCom API origin (no trailing slash).
 _WECOM_API_BASE_URL: Final[str] = "https://qyapi.weixin.qq.com"
 
 #: Per-call HTTP timeout (seconds), matching the upstream client.

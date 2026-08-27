@@ -228,8 +228,7 @@ class OrganizationMemberRepository(GenericRepository[OrganizationTenantMember]):
     async def count_members(self, organization_id: str) -> int:
         """Count membership rows of one organization."""
         stmt = text(
-            f"select count(*) from {_ORG_MEMBER_TABLE} "
-            "where organization_id = :organization_id"
+            f"select count(*) from {_ORG_MEMBER_TABLE} where organization_id = :organization_id"
         ).bindparams(organization_id=organization_id)
         return int((await self._session.execute(stmt)).scalar_one())
 
@@ -324,8 +323,7 @@ class OrganizationJoinRequestRepository(GenericRepository[OrganizationJoinReques
             where = f"{where} and status = :status"
             params["status"] = status
         stmt = text(
-            f"select * from {_JOIN_REQUEST_TABLE} "
-            f"where {where} order by {_JOIN_REQUEST_ORDER}"
+            f"select * from {_JOIN_REQUEST_TABLE} where {where} order by {_JOIN_REQUEST_ORDER}"
         ).bindparams(**params)
         result = await self._session.execute(stmt)
         return [self._hydrate(m) for m in result.mappings().all()]
@@ -342,9 +340,9 @@ class OrganizationJoinRequestRepository(GenericRepository[OrganizationJoinReques
         if status:
             where = f"{where} and status = :status"
             params["status"] = status
-        stmt = text(
-            f"select count(*) from {_JOIN_REQUEST_TABLE} where {where}"
-        ).bindparams(**params)
+        stmt = text(f"select count(*) from {_JOIN_REQUEST_TABLE} where {where}").bindparams(
+            **params
+        )
         return int((await self._session.execute(stmt)).scalar_one())
 
 

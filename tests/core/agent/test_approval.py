@@ -193,9 +193,12 @@ async def test_request_and_wait_approves_with_modified_args() -> None:
     async def on_required(event: Event) -> None:
         data = event.data
         assert isinstance(data, dict)
-        gate.resolve(1, "", str(data["pending_id"]), ApprovalDecision(
-            approved=True, modified_args='{"a": 2}'
-        ))
+        gate.resolve(
+            1,
+            "",
+            str(data["pending_id"]),
+            ApprovalDecision(approved=True, modified_args='{"a": 2}'),
+        )
 
     bus.on(EventType.TOOL_APPROVAL_REQUIRED, on_required)
     decision = await gate.request_and_wait(make_request(event_bus=bus))
@@ -210,9 +213,7 @@ async def test_request_and_wait_denies() -> None:
     async def on_required(event: Event) -> None:
         data = event.data
         assert isinstance(data, dict)
-        gate.resolve(1, "", str(data["pending_id"]), ApprovalDecision(
-            approved=False, reason="no"
-        ))
+        gate.resolve(1, "", str(data["pending_id"]), ApprovalDecision(approved=False, reason="no"))
 
     bus.on(EventType.TOOL_APPROVAL_REQUIRED, on_required)
     decision = await gate.request_and_wait(make_request(event_bus=bus))
@@ -257,9 +258,7 @@ async def test_request_and_wait_emits_required_and_resolved_events() -> None:
     async def on_required(event: Event) -> None:
         data = event.data
         assert isinstance(data, dict)
-        gate.resolve(1, "", str(data["pending_id"]), ApprovalDecision(
-            approved=True, reason="ok"
-        ))
+        gate.resolve(1, "", str(data["pending_id"]), ApprovalDecision(approved=True, reason="ok"))
 
     bus.on(EventType.TOOL_APPROVAL_REQUIRED, on_required)
     await gate.request_and_wait(make_request(args='{"a": 1}', event_bus=bus))

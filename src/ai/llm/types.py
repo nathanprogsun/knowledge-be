@@ -157,9 +157,7 @@ class ChatConfig(BaseModel):
 class Chat(Protocol):
     """Interface implemented by every chat client."""
 
-    async def chat(
-        self, messages: list[Message], opts: ChatOptions | None = None
-    ) -> ChatResponse:
+    async def chat(self, messages: list[Message], opts: ChatOptions | None = None) -> ChatResponse:
         """Perform a non-streaming chat round-trip."""
         ...
 
@@ -209,9 +207,7 @@ class TokenUsage(BaseModel):
     cache_reported: bool = False
     cache_status: PromptCacheStatus | None = None
 
-    def set_prompt_cache_usage(
-        self, read: int, write: int, miss: int, reported: bool
-    ) -> None:
+    def set_prompt_cache_usage(self, read: int, write: int, miss: int, reported: bool) -> None:
         """Normalize provider cache counters into the shared usage model.
 
         ``read`` / ``write`` / ``miss`` are descriptive subsets of the

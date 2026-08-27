@@ -1,7 +1,7 @@
 """Unit tests for the message suggestion domain.
 
 Covers the domain vocabulary constants, the service surface (stub
-methods raise ``NotImplementedError`` until the generation pipeline
+methods raise ``NotImplementedFeatureError`` until the generation pipeline
 lands), and the persistence layer via a stub session that records SQL —
 so the cache-key lookups, the lease-guarded acquisition, and the
 session / message deletes stay pinned without a database.
@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy.sql.expression import TextClause
 
+from src.common.exception import NotImplementedFeatureError
 from src.core.chat.messages.suggestion_service import (
     SUGGESTION_EVENT_CLICK,
     SUGGESTION_EVENT_DISMISS,
@@ -141,22 +142,22 @@ def test_event_vocabulary() -> None:
 async def test_service_stub_methods_raise_not_implemented() -> None:
     service = MessageSuggestionService()
 
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(NotImplementedFeatureError):
         await service.ensure_follow_ups(
             session_id="sess-1",
             assistant_message_id="msg-1",
             regenerate=False,
         )
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(NotImplementedFeatureError):
         await service.get_follow_ups(session_id="sess-1", assistant_message_id="msg-1")
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(NotImplementedFeatureError):
         await service.record_event(
             session_id="sess-1",
             suggestion_set_id="set-1",
             question_id="q-1",
             event_type=SUGGESTION_EVENT_CLICK,
         )
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(NotImplementedFeatureError):
         await service.validate_attribution(
             session_id="sess-1",
             query="follow-up",
@@ -223,7 +224,9 @@ async def test_get_by_cache_key_filters_all_key_columns() -> None:
 
 
 async def test_acquire_generation_inserts_fresh_row() -> None:
-    session = _FakeSession({"insert into message_suggestion_sets": [_row(status=SUGGESTION_STATUS_GENERATING)]})
+    session = _FakeSession(
+        {"insert into message_suggestion_sets": [_row(status=SUGGESTION_STATUS_GENERATING)]}
+    )
     repo = _repo(session)
 
     result, acquired = await repo.acquire_generation(_sample_set(), regenerate=False, now=_NOW)
@@ -284,7 +287,9 @@ async def test_acquire_generation_reacquires_expired_lease() -> None:
 
 
 async def test_save_rewrites_mutable_columns() -> None:
-    session = _FakeSession({"update message_suggestion_sets": [_row(status=SUGGESTION_STATUS_READY)]})
+    session = _FakeSession(
+        {"update message_suggestion_sets": [_row(status=SUGGESTION_STATUS_READY)]}
+    )
     repo = _repo(session)
 
     result = await repo.save(_sample_set())

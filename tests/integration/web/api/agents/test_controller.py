@@ -22,7 +22,7 @@ The load-bearing checks:
 4. The skills list surfaces the discovered catalog and the sandbox
    availability flag.
 """
-# ruff: noqa: RUF001  # The copy-name assertion matches the Chinese suffix.
+# The copy-name assertion matches the Chinese suffix.
 
 from __future__ import annotations
 
@@ -127,9 +127,7 @@ def skills_manager(tmp_path: Path) -> Manager:
         "Search the web with the configured provider.\n",
         encoding="utf-8",
     )
-    manager = Manager(
-        config=ManagerConfig(skill_dirs=[str(tmp_path)], enabled=True)
-    )
+    manager = Manager(config=ManagerConfig(skill_dirs=[str(tmp_path)], enabled=True))
     manager.initialize()
     return manager
 
@@ -604,7 +602,7 @@ async def test_skills_lists_discovered_catalog(
     skills_client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("WEKNORA_SANDBOX_MODE", "local")
+    monkeypatch.setenv("KB_SANDBOX_MODE", "local")
 
     resp = skills_client.get("/api/v1/skills")
 
@@ -619,7 +617,7 @@ async def test_skills_available_false_when_disabled(
     skills_client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("WEKNORA_SANDBOX_MODE", "disabled")
+    monkeypatch.setenv("KB_SANDBOX_MODE", "disabled")
 
     resp = skills_client.get("/api/v1/skills")
 
@@ -632,7 +630,7 @@ async def test_skills_available_false_when_unset(
     skills_client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("WEKNORA_SANDBOX_MODE", raising=False)
+    monkeypatch.delenv("KB_SANDBOX_MODE", raising=False)
 
     resp = skills_client.get("/api/v1/skills")
 

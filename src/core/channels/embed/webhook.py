@@ -65,13 +65,11 @@ def _normalize_signature(signature: str) -> str:
     """Strip the ``sha256=`` envelope so a bare hex digest is accepted too."""
     cleaned = signature.strip()
     if cleaned.startswith(SIGNATURE_PREFIX):
-        return cleaned[len(SIGNATURE_PREFIX):]
+        return cleaned[len(SIGNATURE_PREFIX) :]
     return cleaned
 
 
-def verify_embed_webhook_signature(
-    secret: str, raw: bytes, signature: str
-) -> bool:
+def verify_embed_webhook_signature(secret: str, raw: bytes, signature: str) -> bool:
     """Constant-time check that ``signature`` matches the HMAC of ``raw``.
 
     Accepts either the on-wire form (``"sha256=<hex>"``) or a bare hex
@@ -160,9 +158,7 @@ class EmbedWebhookDispatcher:
 
     async def validate_url(self, raw: str) -> None:
         """Expose :func:`validate_embed_webhook_url` with the injected SSRF hook."""
-        await validate_embed_webhook_url(
-            raw, url_safety_check=self._url_safety_check
-        )
+        await validate_embed_webhook_url(raw, url_safety_check=self._url_safety_check)
 
     def dispatch(
         self,
@@ -199,21 +195,17 @@ class EmbedWebhookDispatcher:
             name=f"embed-webhook-{channel.id}-{event_type}",
         )
 
-    async def _send(
-        self, *, url: str, body: bytes, secret: str
-    ) -> None:
+    async def _send(self, *, url: str, body: bytes, secret: str) -> None:
         """Sign and POST the webhook body; surface no error to the caller."""
         client = self._http_client or self._client_to_close
         if client is None:
             return
         try:
-            await validate_embed_webhook_url(
-                url, url_safety_check=self._url_safety_check
-            )
+            await validate_embed_webhook_url(url, url_safety_check=self._url_safety_check)
             headers = {"Content-Type": "application/json"}
             if secret:
-                headers[SIGNATURE_HEADER_NAME] = (
-                    SIGNATURE_PREFIX + sign_embed_webhook_body(secret, body)
+                headers[SIGNATURE_HEADER_NAME] = SIGNATURE_PREFIX + sign_embed_webhook_body(
+                    secret, body
                 )
             await client.post(url, content=body, headers=headers)
         except Exception:

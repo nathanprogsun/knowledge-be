@@ -47,9 +47,7 @@ class WebFetchPlugin:
             pipeline_info("WebFetch", "skip", {"reason": "disabled"})
             return await next()
 
-        top_n = (
-            pipeline_ctx.web_fetch_top_n if pipeline_ctx.web_fetch_top_n > 0 else _DEFAULT_TOP_N
-        )
+        top_n = pipeline_ctx.web_fetch_top_n if pipeline_ctx.web_fetch_top_n > 0 else _DEFAULT_TOP_N
         web_results: list[tuple[int, SearchResult]] = []
         for index, result in enumerate(pipeline_ctx.rerank_result):
             if result.knowledge_source.lower() == "web_search":
@@ -61,9 +59,7 @@ class WebFetchPlugin:
             pipeline_info("WebFetch", "skip", {"reason": "no_web_results"})
             return await next()
 
-        fetched = await asyncio.gather(
-            *(self._fetch_one(result) for _index, result in web_results)
-        )
+        fetched = await asyncio.gather(*(self._fetch_one(result) for _index, result in web_results))
 
         replacements: dict[int, SearchResult] = {}
         fetched_count = 0

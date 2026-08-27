@@ -39,7 +39,7 @@ _COS_SERVICE_HOST_TEMPLATE: Final = "https://cos.{region}.myqcloud.com"
 _FOREIGN_SCHEMES: Final = ("local://", "minio://", "s3://", "tos://", "oss://", "ks3://", "obs://")
 
 # Default prefix Go applies to COS object keys.
-_DEFAULT_COS_PATH_PREFIX: Final = "weknora"
+_DEFAULT_COS_PATH_PREFIX: Final = "kb"
 
 
 class CosStorageAdapter:
@@ -63,7 +63,7 @@ class CosStorageAdapter:
         self._bucket_name = _qualified_bucket(bucket_name, app_id)
         self._path_prefix = path_prefix.strip().strip("/")
         self._temp_bucket_name = temp_bucket_name.strip()
-        self._temp_region = (temp_region.strip() or self._region)
+        self._temp_region = temp_region.strip() or self._region
         # Region-derived service host; the bucket becomes the leading DNS
         # label, giving ``{bucket}.cos.{region}.myqcloud.com``.
         self._endpoint_url = _COS_SERVICE_HOST_TEMPLATE.format(region=self._region)
@@ -89,9 +89,7 @@ class CosStorageAdapter:
 
     # ── File operations ─────────────────────────────────────────────
 
-    async def save_file(
-        self, *, file: FileUpload, tenant_id: int, knowledge_id: str
-    ) -> str:
+    async def save_file(self, *, file: FileUpload, tenant_id: int, knowledge_id: str) -> str:
         """Upload ``file`` to ``{prefix}/{tenant}/{knowledge}/{uuid}{ext}``."""
         ext = os.path.splitext(file.filename)[1]
         object_name = f"{self._path_prefix}/{tenant_id}/{knowledge_id}/{uuid.uuid4()}{ext}"
@@ -99,9 +97,7 @@ class CosStorageAdapter:
         await self._store.put_object(object_name, data, file.content_type or "")
         return f"{COS_SCHEME}{self._bucket_name}/{self._region}/{object_name}"
 
-    async def save_bytes(
-        self, *, data: bytes, tenant_id: int, file_name: str, temp: bool
-    ) -> str:
+    async def save_bytes(self, *, data: bytes, tenant_id: int, file_name: str, temp: bool) -> str:
         """Persist raw bytes.
 
         ``temp`` writes to the temp bucket (when configured) and returns
@@ -155,9 +151,7 @@ class CosStorageAdapter:
             src_object_key = self._parse_object_name(src_path)
             safe_object_key(src_object_key)
         except StorageBackendError:
-            raise CrossBackendCopyError(
-                message=f"cos copy rejected source {src_path!r}"
-            ) from None
+            raise CrossBackendCopyError(message=f"cos copy rejected source {src_path!r}") from None
         ext = os.path.splitext(src_path)[1]
         dest_key = f"{self._path_prefix}/{tenant_id}/{knowledge_id}/{uuid.uuid4()}{ext}"
         # The copy source is the host + object key WITHOUT a scheme, per the

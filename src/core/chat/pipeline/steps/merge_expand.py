@@ -236,9 +236,7 @@ async def expand_short_context_with_neighbors(
         for chunk_id in [*prev_ids, *next_ids]:
             if chunk_id and not contains_id(sub_ids, chunk_id):
                 sub_ids.append(chunk_id)
-        out[target_index] = result.model_copy(
-            update={"content": merged, "sub_chunk_id": sub_ids}
-        )
+        out[target_index] = result.model_copy(update={"content": merged, "sub_chunk_id": sub_ids})
         fields: dict[str, JsonValue] = {
             "chunk_id": result.id,
             "prev_ids": cast("list[JsonValue]", prev_ids),

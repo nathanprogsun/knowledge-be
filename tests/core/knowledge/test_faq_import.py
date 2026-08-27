@@ -10,7 +10,7 @@ when the database is unreachable.
 int32-safe local counter rather than the 64-bit tenant factory.
 """
 
-# ruff: noqa: RUF001  # Chinese test data uses fullwidth punctuation.
+# Chinese test data uses fullwidth punctuation.
 
 from __future__ import annotations
 
@@ -146,10 +146,7 @@ def test_parse_csv_rejects_invalid_boolean_token() -> None:
 
 
 def test_parse_csv_handles_quoted_fields_with_commas() -> None:
-    data = (
-        f"{_HEADER}\n"
-        '"客服,账户",如何充值？,,,"进入设置,然后充值",true,false,false\n'
-    ).encode()
+    data = (f'{_HEADER}\n"客服,账户",如何充值？,,,"进入设置,然后充值",true,false,false\n').encode()
     parsed = parse_csv(data)
     assert parsed.total == 1
     assert parsed.entries[0].payload.tag_name == "客服,账户"
@@ -294,8 +291,7 @@ def _mock_chunk_repo() -> tuple[AsyncMock, list[Chunk]]:
 
     async def _create_many(chunks: list[Chunk]) -> list[Chunk]:
         persisted = [
-            chunk.model_copy(update={"seq_id": i})
-            for i, chunk in enumerate(chunks, start=1)
+            chunk.model_copy(update={"seq_id": i}) for i, chunk in enumerate(chunks, start=1)
         ]
         stored.extend(persisted)
         return persisted
@@ -393,9 +389,7 @@ async def test_import_faq_uses_question_only_index_content_by_default() -> None:
 
     await _run_import(data=_csv(_R1), faq_repo=faq_repo, chunk_repo=chunk_repo)
 
-    assert chunk_stored[0].content == (
-        "Q: 如何充值？\nSimilar Questions:\n- 怎么充值\n- 充值方法"
-    )
+    assert chunk_stored[0].content == ("Q: 如何充值？\nSimilar Questions:\n- 怎么充值\n- 充值方法")
     assert "进入设置" not in chunk_stored[0].content
 
 

@@ -276,9 +276,7 @@ async def end_retrieval_progress(
 
     success = stage_err is None or stage_err is ERR_SEARCH_NOTHING
     output = (
-        ""
-        if not success
-        else ("未检索到相关内容" if count == 0 else f"检索到 {count} 条相关内容")
+        "" if not success else ("未检索到相关内容" if count == 0 else f"检索到 {count} 条相关内容")
     )
     error = "" if success else _stage_error_message(stage_err)
     data: JsonObject = {

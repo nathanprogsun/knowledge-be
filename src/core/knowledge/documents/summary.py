@@ -295,9 +295,7 @@ def needs_embedding_model(kb: KnowledgeBaseInfo) -> bool:
     strategy = kb.indexing_strategy
     if not strategy:
         return True
-    return bool(strategy.get("vector_enabled", True)) or bool(
-        strategy.get("keyword_enabled", True)
-    )
+    return bool(strategy.get("vector_enabled", True)) or bool(strategy.get("keyword_enabled", True))
 
 
 def _metadata_version(custom_metadata: JsonObject | None) -> str:
@@ -536,7 +534,9 @@ async def process_summary(
     )
     metadata_version = _metadata_version(row.custom_metadata)
 
-    content = sample_long_content(_reconstruct_content(_sort_chunks_for_summary(enabled_text)), max_input_chars)
+    content = sample_long_content(
+        _reconstruct_content(_sort_chunks_for_summary(enabled_text)), max_input_chars
+    )
     if real_text_rune_count(content) < MIN_TEXT_CONTENT_RUNES:
         # Scanned PDF with no OCR / caption: do not call the model (it
         # would hallucinate from the file name alone). Mark failed with an
@@ -564,7 +564,7 @@ async def process_summary(
     except Exception:
         # LLM / IO failure: fall back to the first chunk's opening text
         # rather than failing the row, mirroring the upstream fallback.
-        summary = enabled_text[0].content[: _FALLBACK_SUMMARY_CHARS]
+        summary = enabled_text[0].content[:_FALLBACK_SUMMARY_CHARS]
 
     if await _source_changed(
         knowledge_repo=knowledge_repo,

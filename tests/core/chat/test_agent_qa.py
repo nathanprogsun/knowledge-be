@@ -332,9 +332,7 @@ class TestAgentRequiresRerankModel:
         assert agent_requires_rerank_model(cfg) is False
 
     def test_explicit_whitelist_with_knowledge_search_enables(self) -> None:
-        cfg = _agent_config(
-            allowed_tools=[TOOL_THINKING, TOOL_KNOWLEDGE_SEARCH]
-        )
+        cfg = _agent_config(allowed_tools=[TOOL_THINKING, TOOL_KNOWLEDGE_SEARCH])
         assert agent_requires_rerank_model(cfg) is True
 
     def test_empty_whitelist_falls_back_to_default(self) -> None:
@@ -366,22 +364,23 @@ class TestIntersectPreservingRequestOrder:
     """Tests for the request-order intersection helper."""
 
     def test_intersection_preserves_request_order(self) -> None:
-        assert intersect_preserving_request_order(
-            ["c", "a", "b"], ["a", "b", "c"]
-        ) == ["c", "a", "b"]
+        assert intersect_preserving_request_order(["c", "a", "b"], ["a", "b", "c"]) == [
+            "c",
+            "a",
+            "b",
+        ]
 
     def test_drops_blanks_and_duplicates(self) -> None:
-        assert intersect_preserving_request_order(
-            ["", "a", "a", "b"], ["a", "b", "c"]
-        ) == ["a", "b"]
+        assert intersect_preserving_request_order(["", "a", "a", "b"], ["a", "b", "c"]) == [
+            "a",
+            "b",
+        ]
 
     def test_empty_intersection(self) -> None:
         assert intersect_preserving_request_order(["x"], ["a", "b"]) == []
 
     def test_requested_not_in_allowed(self) -> None:
-        assert intersect_preserving_request_order(
-            ["x", "y"], ["a", "b"]
-        ) == []
+        assert intersect_preserving_request_order(["x", "y"], ["a", "b"]) == []
 
 
 class TestUniqueNonEmpty:
@@ -406,9 +405,7 @@ class TestMergeResolvedTagKnowledgeIds:
             knowledge_base_id="kb-1",
             knowledge_ids=["k-1"],
         )
-        assert merge_resolved_tag_knowledge_ids(
-            ["k-1", "k-2"], [target], []
-        ) == ["k-1", "k-2"]
+        assert merge_resolved_tag_knowledge_ids(["k-1", "k-2"], [target], []) == ["k-1", "k-2"]
 
     def test_merges_tag_targets(self) -> None:
         scope = TagScope(knowledge_base_id="kb-1", tag_ids=("t-1",))
@@ -417,9 +414,7 @@ class TestMergeResolvedTagKnowledgeIds:
             knowledge_base_id="kb-1",
             knowledge_ids=["k-9"],
         )
-        merged = merge_resolved_tag_knowledge_ids(
-            ["k-1", "k-2"], [target], [scope]
-        )
+        merged = merge_resolved_tag_knowledge_ids(["k-1", "k-2"], [target], [scope])
         assert merged == ["k-1", "k-2", "k-9"]
 
     def test_skips_kb_base_targets(self) -> None:
@@ -428,9 +423,7 @@ class TestMergeResolvedTagKnowledgeIds:
             type=SearchTargetType.KNOWLEDGE_BASE,
             knowledge_base_id="kb-1",
         )
-        assert merge_resolved_tag_knowledge_ids(
-            ["k-1"], [target], [scope]
-        ) == ["k-1"]
+        assert merge_resolved_tag_knowledge_ids(["k-1"], [target], [scope]) == ["k-1"]
 
     def test_skips_targets_outside_tag_kbs(self) -> None:
         scope = TagScope(knowledge_base_id="kb-1", tag_ids=("t-1",))
@@ -439,9 +432,7 @@ class TestMergeResolvedTagKnowledgeIds:
             knowledge_base_id="kb-other",
             knowledge_ids=["k-9"],
         )
-        assert merge_resolved_tag_knowledge_ids(
-            ["k-1"], [target], [scope]
-        ) == ["k-1"]
+        assert merge_resolved_tag_knowledge_ids(["k-1"], [target], [scope]) == ["k-1"]
 
     def test_dedupes_after_merge(self) -> None:
         scope = TagScope(knowledge_base_id="kb-1", tag_ids=("t-1",))
@@ -450,9 +441,7 @@ class TestMergeResolvedTagKnowledgeIds:
             knowledge_base_id="kb-1",
             knowledge_ids=["k-1", "k-2"],
         )
-        merged = merge_resolved_tag_knowledge_ids(
-            ["k-1"], [target], [scope]
-        )
+        merged = merge_resolved_tag_knowledge_ids(["k-1"], [target], [scope])
         assert merged == ["k-1", "k-2"]
 
 
@@ -464,16 +453,12 @@ class TestSkillsFromAgentConfig:
 
     def test_skills_unavailable_disables(self) -> None:
         cfg = _agent_config(skills_selection_mode="all")
-        enabled, dirs, allowed = skills_from_agent_config(
-            cfg, skills_available=False
-        )
+        enabled, dirs, allowed = skills_from_agent_config(cfg, skills_available=False)
         assert (enabled, dirs, allowed) == (False, [], [])
 
     def test_all_mode_enables_preloaded(self) -> None:
         cfg = _agent_config(skills_selection_mode="all")
-        enabled, dirs, allowed = skills_from_agent_config(
-            cfg, skills_available=True
-        )
+        enabled, dirs, allowed = skills_from_agent_config(cfg, skills_available=True)
         assert enabled is True
         assert dirs == ["skills/preloaded"]
         assert allowed == []
@@ -483,43 +468,29 @@ class TestSkillsFromAgentConfig:
             skills_selection_mode="selected",
             selected_skills=["alpha", "beta"],
         )
-        enabled, dirs, allowed = skills_from_agent_config(
-            cfg, skills_available=True
-        )
+        enabled, dirs, allowed = skills_from_agent_config(cfg, skills_available=True)
         assert enabled is True
         assert dirs == ["skills/preloaded"]
         assert allowed == ["alpha", "beta"]
 
     def test_selected_mode_without_skills_disables(self) -> None:
-        cfg = _agent_config(
-            skills_selection_mode="selected", selected_skills=[]
-        )
-        enabled, _dirs, allowed = skills_from_agent_config(
-            cfg, skills_available=True
-        )
+        cfg = _agent_config(skills_selection_mode="selected", selected_skills=[])
+        enabled, _dirs, allowed = skills_from_agent_config(cfg, skills_available=True)
         assert (enabled, allowed) == (False, [])
 
     def test_none_mode_disables(self) -> None:
         cfg = _agent_config(skills_selection_mode="none")
-        enabled, dirs, allowed = skills_from_agent_config(
-            cfg, skills_available=True
-        )
+        enabled, dirs, allowed = skills_from_agent_config(cfg, skills_available=True)
         assert (enabled, dirs, allowed) == (False, [], [])
 
     def test_unknown_mode_disables(self) -> None:
         cfg = _agent_config(skills_selection_mode="bogus")
-        enabled, _dirs, _allowed = skills_from_agent_config(
-            cfg, skills_available=True
-        )
+        enabled, _dirs, _allowed = skills_from_agent_config(cfg, skills_available=True)
         assert enabled is False
 
     def test_non_list_selected_skills_disables(self) -> None:
-        cfg = _agent_config(
-            skills_selection_mode="selected", selected_skills="not-a-list"
-        )
-        enabled, _dirs, _allowed = skills_from_agent_config(
-            cfg, skills_available=True
-        )
+        cfg = _agent_config(skills_selection_mode="selected", selected_skills="not-a-list")
+        enabled, _dirs, _allowed = skills_from_agent_config(cfg, skills_available=True)
         assert enabled is False
 
 
@@ -1039,9 +1010,7 @@ class TestResolveChatModelId:
         service = _StubModelService(
             models={
                 "agent-model": ModelInfo(id="agent-model", type="knowledge_qa"),
-                "override-model": ModelInfo(
-                    id="override-model", type="knowledge_qa"
-                ),
+                "override-model": ModelInfo(id="override-model", type="knowledge_qa"),
             }
         )
         req = _make_request(
@@ -1081,11 +1050,7 @@ class TestResolveChatModelId:
         agent = _make_agent(model_id="embedding-model")
         req = _make_request(custom_agent=agent)
         service = _StubModelService(
-            models={
-                "embedding-model": ModelInfo(
-                    id="embedding-model", type="embedding"
-                )
-            }
+            models={"embedding-model": ModelInfo(id="embedding-model", type="embedding")}
         )
         with pytest.raises(RuntimeError, match="is unavailable"):
             await resolve_chat_model_id(
@@ -1119,18 +1084,12 @@ class TestRunAgentQa:
             quoted_context="> quoted",
         )
         model_service = _StubModelService(
-            models={
-                "model-1": ModelInfo(
-                    id="model-1", type="knowledge_qa", supports_vision=False
-                )
-            },
+            models={"model-1": ModelInfo(id="model-1", type="knowledge_qa", supports_vision=False)},
             chats={"model-1": _StubChat()},
         )
         rerank_service = _StubRerankService()
         history_loader = _StubHistoryLoader()
-        tenant_loader = _StubTenantLoader(
-            TenantInfo(id=42, web_search_max_results=10)
-        )
+        tenant_loader = _StubTenantLoader(TenantInfo(id=42, web_search_max_results=10))
         engine = _RecordingEngine()
         factory = _StubEngineFactory(engine)
         bus = _RecordingBus()
@@ -1173,11 +1132,7 @@ class TestRunAgentQa:
             image_urls=("https://img/1", "https://img/2"),
         )
         model_service = _StubModelService(
-            models={
-                "model-1": ModelInfo(
-                    id="model-1", type="knowledge_qa", supports_vision=True
-                )
-            },
+            models={"model-1": ModelInfo(id="model-1", type="knowledge_qa", supports_vision=True)},
             chats={"model-1": _StubChat()},
         )
         engine = _RecordingEngine()
@@ -1288,9 +1243,7 @@ class TestRunAgentQa:
 
     @pytest.mark.asyncio
     async def test_no_rerank_when_kb_selection_none(self) -> None:
-        agent = _make_agent(
-            multi_turn_enabled=False, kb_selection_mode="none"
-        )
+        agent = _make_agent(multi_turn_enabled=False, kb_selection_mode="none")
         req = _make_request(custom_agent=agent)
         model_service = _StubModelService(
             models={"model-1": ModelInfo(id="model-1", type="knowledge_qa")},
@@ -1346,9 +1299,7 @@ class TestRunAgentQa:
             models={"model-1": ModelInfo(id="model-1", type="knowledge_qa")},
             chats={"model-1": _StubChat()},
         )
-        tenant_loader = _StubTenantLoader(
-            TenantInfo(id=42, web_search_max_results=10)
-        )
+        tenant_loader = _StubTenantLoader(TenantInfo(id=42, web_search_max_results=10))
 
         await run_agent_qa(
             ctx=_Ctx(),

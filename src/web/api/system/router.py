@@ -23,7 +23,6 @@ Query-parameter ``description`` strings are intentionally Chinese
 full-width punctuation; suppressed file-wide for the same reason as
 ``src/core/system/registry.py``.
 """
-# ruff: noqa: RUF001
 
 from __future__ import annotations
 

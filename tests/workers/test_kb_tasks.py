@@ -175,25 +175,19 @@ def test_kb_clone_payload_ignores_initiator_and_tracing_fields() -> None:
 def test_kb_clone_payload_rejects_missing_task_id() -> None:
     """The task id is mandatory."""
     with pytest.raises(ValidationError):
-        KBClonePayload.model_validate(
-            {"tenant_id": 1, "source_id": "s-1", "target_id": "d-1"}
-        )
+        KBClonePayload.model_validate({"tenant_id": 1, "source_id": "s-1", "target_id": "d-1"})
 
 
 def test_kb_clone_payload_rejects_missing_source_id() -> None:
     """The source id is mandatory."""
     with pytest.raises(ValidationError):
-        KBClonePayload.model_validate(
-            {"tenant_id": 1, "task_id": "t-1", "target_id": "d-1"}
-        )
+        KBClonePayload.model_validate({"tenant_id": 1, "task_id": "t-1", "target_id": "d-1"})
 
 
 def test_kb_clone_payload_rejects_missing_target_id() -> None:
     """The target id is mandatory."""
     with pytest.raises(ValidationError):
-        KBClonePayload.model_validate(
-            {"tenant_id": 1, "task_id": "t-1", "source_id": "s-1"}
-        )
+        KBClonePayload.model_validate({"tenant_id": 1, "task_id": "t-1", "source_id": "s-1"})
 
 
 def test_kb_clone_payload_is_frozen() -> None:
@@ -342,9 +336,7 @@ def test_kb_delete_payload_parses_full(kb_delete_payload: dict[str, object]) -> 
 
 def test_kb_delete_payload_defaults_optional_fields() -> None:
     """Omitted optional fields fall back to their no-op values."""
-    payload = KBDeletePayload.model_validate(
-        {"tenant_id": 1, "knowledge_base_id": "kb-1"}
-    )
+    payload = KBDeletePayload.model_validate({"tenant_id": 1, "knowledge_base_id": "kb-1"})
     assert payload.data_source_ids == []
     assert payload.effective_engines == []
     assert payload.vector_store_id is None
@@ -386,9 +378,7 @@ def test_kb_delete_payload_rejects_missing_knowledge_base_id() -> None:
 
 def test_kb_delete_payload_is_frozen() -> None:
     """The payload model is immutable; mutations must raise."""
-    payload = KBDeletePayload.model_validate(
-        {"tenant_id": 1, "knowledge_base_id": "kb-1"}
-    )
+    payload = KBDeletePayload.model_validate({"tenant_id": 1, "knowledge_base_id": "kb-1"})
     with pytest.raises(ValidationError):
         payload.knowledge_base_id = "tampered"
 
@@ -576,9 +566,7 @@ def test_index_delete_payload_ignores_tracing_fields() -> None:
 def test_index_delete_payload_rejects_missing_embedding_model_id() -> None:
     """The embedding-model id is mandatory."""
     with pytest.raises(ValidationError):
-        IndexDeletePayload.model_validate(
-            {"tenant_id": 1, "knowledge_base_id": "kb-1"}
-        )
+        IndexDeletePayload.model_validate({"tenant_id": 1, "knowledge_base_id": "kb-1"})
 
 
 def test_index_delete_payload_is_frozen() -> None:
@@ -697,13 +685,22 @@ def _restore_registry() -> Iterator[None]:
     future test that re-registers under the same names would silently
     overwrite them. The fixture is defensive — a no-op today.
     """
+    import src.workers.tasks  # noqa: F401 — pre-warm so the snapshot captures registered handlers.
     from src.workers import registry as registry_module
 
     snapshot = dict(registry_module.all_tasks())
+    # Drop any test-only handler that was registered by ``@register_task``
+    # decorators at import time of this module (e.g. ``test_base``'s
+    # ``test_task``). The canonical handler set is what downstream
+    # invariant tests assert against.
+    baseline = {name: handler for name, handler in snapshot.items() if not name.startswith("test_")}
     yield
-    # Restore the snapshot — drop any entries added during the test.
+    # Restore the baseline after the test: drop anything newly added
+    # (incl. handlers the test itself registered) and re-assert the
+    # canonical handlers from the snapshot.
     current = registry_module.all_tasks()
-    for name in current.keys() - snapshot.keys():
-        current.pop(name, None)
-    for name, handler in snapshot.items():
+    for name in list(current.keys()):
+        if name not in baseline:
+            current.pop(name, None)
+    for name, handler in baseline.items():
         current[name] = handler

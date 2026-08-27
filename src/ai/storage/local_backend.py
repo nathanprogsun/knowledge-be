@@ -127,9 +127,7 @@ class LocalStorageAdapter:
 
     # ── File operations ─────────────────────────────────────────────
 
-    async def save_file(
-        self, *, file: FileUpload, tenant_id: int, knowledge_id: str
-    ) -> str:
+    async def save_file(self, *, file: FileUpload, tenant_id: int, knowledge_id: str) -> str:
         """Store an uploaded file under ``{tenant}/{knowledge}/``.
 
         Returns the ``local://`` relative path of the new object.
@@ -152,9 +150,7 @@ class LocalStorageAdapter:
             ) from exc
         return LOCAL_SCHEME + self._relative(file_path)
 
-    async def save_bytes(
-        self, *, data: bytes, tenant_id: int, file_name: str, temp: bool
-    ) -> str:
+    async def save_bytes(self, *, data: bytes, tenant_id: int, file_name: str, temp: bool) -> str:
         """Persist raw bytes under ``{tenant}/exports/``.
 
         ``temp`` is ignored — a local filesystem has no auto-expiring
@@ -217,9 +213,7 @@ class LocalStorageAdapter:
         ``CrossBackendCopyError``.
         """
         if "://" in src_path and not src_path.startswith(LOCAL_SCHEME):
-            raise CrossBackendCopyError(
-                message=f"local file service cannot copy {src_path!r}"
-            )
+            raise CrossBackendCopyError(message=f"local file service cannot copy {src_path!r}")
         src_candidate = self._normalize_path_for_base(src_path)
         src_resolved = safe_path_under_base(self._base_dir, src_candidate)
 

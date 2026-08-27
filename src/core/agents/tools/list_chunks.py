@@ -48,9 +48,9 @@ LIST_TOOL_DESCRIPTION = (
     "Retrieve full chunk content for a document or a single FAQ entry.\n"
     "\n"
     "## Use After grep_chunks or knowledge_search:\n"
-    "- **FAQ hit** (type faq): list_knowledge_chunks(faq_id=\"cN\") — reads that "
+    '- **FAQ hit** (type faq): list_knowledge_chunks(faq_id="cN") — reads that '
     "one FAQ chunk with answers from metadata.\n"
-    "- **Document hit**: list_knowledge_chunks(knowledge_id=\"dN\") — pages "
+    '- **Document hit**: list_knowledge_chunks(knowledge_id="dN") — pages '
     "through all chunks.\n"
     "\n"
     "## Parameters (provide exactly one id target):\n"
@@ -84,8 +84,7 @@ LIST_TOOL_SCHEMA = json.dumps(
             },
             "limit": {
                 "type": "integer",
-                "description": "Chunks per page when using knowledge_id "
-                "(default 20, max 100)",
+                "description": "Chunks per page when using knowledge_id (default 20, max 100)",
                 "default": 20,
                 "minimum": 1,
                 "maximum": 100,

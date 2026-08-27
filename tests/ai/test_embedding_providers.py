@@ -2,7 +2,7 @@
 
 Covers the eight provider modules that complete the ``new_embedder``
 routing table: Aliyun (multimodal DashScope), Azure OpenAI, Gemini, Jina,
-NVIDIA, Volcengine, the signed managed-cloud endpoint, and Zhipu. Every
+NVIDIA, Volcengine, the signed cloud endpoint, and Zhipu. Every
 outbound HTTP call is faked through ``httpx.MockTransport`` — no network —
 and the SSRF whitelist is pinned to the test hostname so the URL safety
 guard is bypassed.
@@ -31,11 +31,11 @@ from src.ai.embedding import (
 )
 from src.ai.embedding.aliyun import new_aliyun_embedder
 from src.ai.embedding.azure_openai import new_azure_openai_embedder
+from src.ai.embedding.cloud import new_cloud_embedder
 from src.ai.embedding.gemini import new_gemini_embedder
 from src.ai.embedding.jina import new_jina_embedder
 from src.ai.embedding.nvidia import new_nvidia_embedder
 from src.ai.embedding.volcengine import new_volcengine_embedder
-from src.ai.embedding.weknoracloud import new_weknoracloud_embedder
 from src.ai.embedding.zhipu import new_zhipu_embedder
 from src.ai.utils import signer as signer_module
 from src.common.exception import AIProviderError, ValidationError
@@ -700,7 +700,7 @@ async def test_volcengine_sends_dimensions_when_override_supported() -> None:
         await embedder.aclose()
 
 
-# ── Managed cloud (signed) ────────────────────────────────────────────
+# ── The kb (signed) ────────────────────────────────────────────
 
 
 def _signature_is_valid(request: httpx.Request, app_id: str, api_key: str) -> bool:
@@ -716,7 +716,7 @@ def _signature_is_valid(request: httpx.Request, app_id: str, api_key: str) -> bo
     return signed["X-Signature"] == request.headers["X-Signature"]
 
 
-async def test_weknoracloud_batch_embed_signed_request() -> None:
+async def test_cloud_batch_embed_signed_request() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
         assert str(request.url) == f"{_BASE}/api/v1/embeddings"
@@ -739,7 +739,7 @@ async def test_weknoracloud_batch_embed_signed_request() -> None:
             },
         )
 
-    embedder = await new_weknoracloud_embedder(
+    embedder = await new_cloud_embedder(
         Config(
             source="remote",
             base_url=_BASE,
@@ -757,14 +757,14 @@ async def test_weknoracloud_batch_embed_signed_request() -> None:
         await embedder.aclose()
 
 
-async def test_weknoracloud_uses_remote_model_name() -> None:
+async def test_cloud_uses_remote_model_name() -> None:
     captured: dict[str, dict] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured["body"] = json.loads(request.content)
         return httpx.Response(200, json={"data": [{"index": 0, "embedding": [0.1]}]})
 
-    embedder = await new_weknoracloud_embedder(
+    embedder = await new_cloud_embedder(
         Config(
             source="remote",
             base_url=_BASE,
@@ -784,14 +784,14 @@ async def test_weknoracloud_uses_remote_model_name() -> None:
         await embedder.aclose()
 
 
-async def test_weknoracloud_sends_dimensions_when_override() -> None:
+async def test_cloud_sends_dimensions_when_override() -> None:
     captured: dict[str, dict] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured["body"] = json.loads(request.content)
         return httpx.Response(200, json={"data": [{"index": 0, "embedding": [0.1]}]})
 
-    embedder = await new_weknoracloud_embedder(
+    embedder = await new_cloud_embedder(
         Config(
             source="remote",
             base_url=_BASE,
@@ -811,13 +811,13 @@ async def test_weknoracloud_sends_dimensions_when_override() -> None:
         await embedder.aclose()
 
 
-async def test_weknoracloud_requires_credentials() -> None:
+async def test_cloud_requires_credentials() -> None:
     with pytest.raises(ValidationError, match="AppID is required"):
-        await new_weknoracloud_embedder(
+        await new_cloud_embedder(
             Config(source="remote", base_url=_BASE, model_name="m", model_id="mid")
         )
     with pytest.raises(ValidationError, match="AppSecret is required"):
-        await new_weknoracloud_embedder(
+        await new_cloud_embedder(
             Config(
                 source="remote",
                 base_url=_BASE,
@@ -828,11 +828,11 @@ async def test_weknoracloud_requires_credentials() -> None:
         )
 
 
-async def test_weknoracloud_api_error_surfaces_status() -> None:
+async def test_cloud_api_error_surfaces_status() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, text="unauthorized")
 
-    embedder = await new_weknoracloud_embedder(
+    embedder = await new_cloud_embedder(
         Config(
             source="remote",
             base_url=_BASE,

@@ -35,10 +35,10 @@ from src.common.exception import StorageBackendError, ValidationError
 _LOCAL_BASE_DIR_ENV: Final = "LOCAL_STORAGE_BASE_DIR"
 
 # Default object-key prefix applied by the S3-shaped providers.
-_DEFAULT_S3_PREFIX: Final = "weknora/"
+_DEFAULT_S3_PREFIX: Final = "kb/"
 
 # Default COS prefix (no trailing slash; COS joins with ``/``).
-_DEFAULT_COS_PREFIX: Final = "weknora"
+_DEFAULT_COS_PREFIX: Final = "kb"
 
 # Default OBS region when the config leaves it blank.
 _DEFAULT_OBS_REGION: Final = "cn-north-4"
@@ -109,9 +109,7 @@ def new_file_service_from_storage_config(
     if not name and config is not None:
         name = str(getattr(config, "default_provider", "") or "").strip().lower()
     if not name:
-        raise StorageBackendError(
-            code="storage_backend.empty_provider", message="empty provider"
-        )
+        raise StorageBackendError(code="storage_backend.empty_provider", message="empty provider")
 
     base_dir = (local_base_dir or "").strip()
     if not base_dir:
@@ -155,9 +153,7 @@ def _build_local(config: StorageConfig | None, base_dir: str) -> FileService:
             # prefix would escape it.
             prefix = ""
     external_url = os.environ.get("APP_EXTERNAL_URL", "").strip()
-    return LocalStorageAdapter(
-        path_prefix=prefix, base_dir=base_dir, external_url=external_url
-    )
+    return LocalStorageAdapter(path_prefix=prefix, base_dir=base_dir, external_url=external_url)
 
 
 def _build_minio(config: StorageConfig | None) -> FileService:
@@ -203,7 +199,9 @@ def _build_cos(config: StorageConfig | None) -> FileService:
 
 
 def _build_tos(config: StorageConfig | None) -> FileService:
-    _require(config, "tos", ("endpoint", "region", "access_key_id", "secret_access_key", "bucket_name"))
+    _require(
+        config, "tos", ("endpoint", "region", "access_key_id", "secret_access_key", "bucket_name")
+    )
     assert config is not None
     return TosFileService(
         endpoint=_field(config, "endpoint"),
@@ -218,7 +216,9 @@ def _build_tos(config: StorageConfig | None) -> FileService:
 
 
 def _build_s3(config: StorageConfig | None) -> FileService:
-    _require(config, "s3", ("endpoint", "region", "access_key_id", "secret_access_key", "bucket_name"))
+    _require(
+        config, "s3", ("endpoint", "region", "access_key_id", "secret_access_key", "bucket_name")
+    )
     assert config is not None
     return S3StorageAdapter(
         endpoint=_field(config, "endpoint"),
@@ -237,7 +237,9 @@ def _build_obs(config: StorageConfig | None) -> FileService:
     endpoint = _field(config, "endpoint") or os.environ.get("OBS_ENDPOINT", "").strip()
     region = _field(config, "region") or os.environ.get("OBS_REGION", "").strip()
     access_key_id = _field(config, "access_key_id") or os.environ.get("OBS_ACCESS_KEY", "").strip()
-    secret_access_key = _field(config, "secret_access_key") or os.environ.get("OBS_SECRET_KEY", "").strip()
+    secret_access_key = (
+        _field(config, "secret_access_key") or os.environ.get("OBS_SECRET_KEY", "").strip()
+    )
     bucket_name = _field(config, "bucket_name") or os.environ.get("OBS_BUCKET_NAME", "").strip()
     path_prefix = _field(config, "path_prefix") or os.environ.get("OBS_PATH_PREFIX", "").strip()
     if not path_prefix:
@@ -258,7 +260,9 @@ def _build_obs(config: StorageConfig | None) -> FileService:
 
 
 def _build_oss(config: StorageConfig | None) -> FileService:
-    _require(config, "oss", ("endpoint", "region", "access_key_id", "secret_access_key", "bucket_name"))
+    _require(
+        config, "oss", ("endpoint", "region", "access_key_id", "secret_access_key", "bucket_name")
+    )
     assert config is not None
     path_prefix = _field(config, "path_prefix") or _DEFAULT_S3_PREFIX
     if _bool(config, "use_temp_bucket") and _field(config, "temp_bucket_name"):
@@ -283,7 +287,9 @@ def _build_oss(config: StorageConfig | None) -> FileService:
 
 
 def _build_ks3(config: StorageConfig | None) -> FileService:
-    _require(config, "ks3", ("endpoint", "region", "access_key_id", "secret_access_key", "bucket_name"))
+    _require(
+        config, "ks3", ("endpoint", "region", "access_key_id", "secret_access_key", "bucket_name")
+    )
     assert config is not None
     return KS3FileService(
         endpoint=_field(config, "endpoint"),

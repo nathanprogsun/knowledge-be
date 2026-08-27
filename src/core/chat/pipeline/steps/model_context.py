@@ -86,7 +86,9 @@ def prepare_messages_with_model_context(
     request-scoped registry used to decode the response.
     """
     registry = Registry(pipeline_ctx.citations_enabled())
-    llm_messages = [chat_message_to_llm(message) for message in prepare_messages_with_history(pipeline_ctx)]
+    llm_messages = [
+        chat_message_to_llm(message) for message in prepare_messages_with_history(pipeline_ctx)
+    ]
     if llm_messages:
         first = llm_messages[0]
         content = first.content.rstrip(" \t\r\n") + registry.protocol_prompt()

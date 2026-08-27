@@ -86,8 +86,7 @@ async def task_index_delete(
     """
     parsed = IndexDeletePayload.model_validate(payload)
     logger.info(
-        "index:delete: tenant={} kb={} model={} kb_type={!r} chunks={} "
-        "engines={} store={!r}",
+        "index:delete: tenant={} kb={} model={} kb_type={!r} chunks={} engines={} store={!r}",
         parsed.tenant_id,
         parsed.knowledge_base_id,
         parsed.embedding_model_id,

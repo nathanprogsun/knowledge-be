@@ -274,7 +274,9 @@ def build_tag_scopes(
     """
     scopes: list[TagScope] = []
     seen: set[tuple[str, str]] = set()
-    mentioned_tag_ids = {item.id for item in mentioned_items or () if item.type == "tag" and item.id}
+    mentioned_tag_ids = {
+        item.id for item in mentioned_items or () if item.type == "tag" and item.id
+    }
 
     for item in mentioned_items or ():
         if item.type != "tag" or not item.id or not item.kb_id:
@@ -482,15 +484,10 @@ class ChatService:
             runner=self._agent_runner,
         )
 
-    async def _resolve_agent_for_turn(
-        self, request: AgentQARequestLike
-    ) -> CustomAgentInfo | None:
+    async def _resolve_agent_for_turn(self, request: AgentQARequestLike) -> CustomAgentInfo | None:
         """Resolve the agent and enforce the agent-mode gate."""
         agent = await self.resolve_agent(request.agent_id)
-        if (
-            resolve_agent_mode(agent_enabled=request.agent_enabled, agent=agent)
-            and agent is None
-        ):
+        if resolve_agent_mode(agent_enabled=request.agent_enabled, agent=agent) and agent is None:
             raise ValidationError(
                 code="chat.agent_required",
                 message="agent_id is required when agent mode is enabled",
@@ -566,6 +563,7 @@ class ChatService:
                         request_id=self._request_id,
                         data={
                             "error": str(exc),
+                            "error_code": getattr(exc, "code", None),
                             "stage": "qa_execution",
                             "session_id": session_id,
                         },

@@ -664,17 +664,17 @@ class StorageProviderStatus(BaseModel):
     description: str
 
 
-# ── Provider credentials (WeKnoraCloud wire shape) ────────────────────
+# ── Provider credentials (Cloud wire shape) ────────────────────
 
 
-class SaveWeKnoraCloudCredentialsRequest(BaseModel):
+class SaveCloudCredentialsRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     app_id: str
     app_secret: str
 
 
-class WeKnoraCloudStatusResponse(BaseModel):
+class CloudStatusResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     has_models: bool
@@ -698,6 +698,7 @@ class SkillsListResponse(BaseModel):
 
 __all__ = [
     "CheckOllamaModelsRequest",
+    "CloudStatusResponse",
     "CreateDataSourceRequest",
     "CreateMCPServiceRequest",
     "CreateModelRequest",
@@ -729,7 +730,7 @@ __all__ = [
     "OllamaStatusResponse",
     "ProviderTypeMeta",
     "ResolveResourceAncestorsRequest",
-    "SaveWeKnoraCloudCredentialsRequest",
+    "SaveCloudCredentialsRequest",
     "SetMCPToolApprovalRequest",
     "Skill",
     "SkillsListResponse",
@@ -752,7 +753,6 @@ __all__ = [
     "VectorStore",
     "VectorStoreConnectionField",
     "VectorStoreTypeInfo",
-    "WeKnoraCloudStatusResponse",
     "WebSearchBuiltinProvider",
     "WebSearchProvider",
     "WebSearchProviderParameters",

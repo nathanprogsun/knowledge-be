@@ -103,7 +103,7 @@ def _clean(content: str) -> str:
     if lowered.startswith("<think>"):
         end = lowered.find("</think>")
         if end != -1:
-            text = text[end + len("</think>"):].strip()
+            text = text[end + len("</think>") :].strip()
     # Titles are single-line: collapse any embedded newlines.
     return " ".join(text.split())
 

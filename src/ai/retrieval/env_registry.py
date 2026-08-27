@@ -233,7 +233,7 @@ async def _build_driver_repository(
         return await _new_doris_repository(
             os.getenv("DORIS_ADDR", "doris-fe:9030"),
             _env_int("DORIS_HTTP_PORT", 8030),
-            os.getenv("DORIS_DATABASE", "weknora"),
+            os.getenv("DORIS_DATABASE", "kb"),
             os.getenv("DORIS_USERNAME", "root"),
             os.getenv("DORIS_PASSWORD", ""),
         )

@@ -1,4 +1,6 @@
 # Agent Note: Agent Notes system
+Tags: agents, notes, process
+Related files: .agents/notes/, scripts/verify_agent_notes.py
 
 Status: implemented
 Date: 2026-08-19

@@ -94,9 +94,7 @@ def page_repo() -> AsyncMock:
         rows[row.id] = row
         return row
 
-    async def _get_by_slug_or_none(
-        *, knowledge_base_id: str, slug: str
-    ) -> WikiPage | None:
+    async def _get_by_slug_or_none(*, knowledge_base_id: str, slug: str) -> WikiPage | None:
         for page in _live().values():
             if page.knowledge_base_id == knowledge_base_id and page.slug == slug:
                 return page
@@ -123,9 +121,7 @@ def page_repo() -> AsyncMock:
         rows[row.id] = updated
         return updated
 
-    async def _soft_delete_by_slug(
-        *, knowledge_base_id: str, slug: str, now: datetime
-    ) -> bool:
+    async def _soft_delete_by_slug(*, knowledge_base_id: str, slug: str, now: datetime) -> bool:
         for pid, page in rows.items():
             if (
                 page.knowledge_base_id == knowledge_base_id
@@ -150,9 +146,7 @@ def page_repo() -> AsyncMock:
         sort_by: str = "",
         sort_order: str = "desc",
     ) -> tuple[list[WikiPage], int]:
-        candidates = [
-            r for r in _for_kb() if r.knowledge_base_id == knowledge_base_id
-        ]
+        candidates = [r for r in _for_kb() if r.knowledge_base_id == knowledge_base_id]
         if page_types:
             candidates = [r for r in candidates if r.page_type in page_types]
         if status:
@@ -179,19 +173,11 @@ def page_repo() -> AsyncMock:
         return [r for r in _for_kb() if r.knowledge_base_id == knowledge_base_id]
 
     async def _list_all_slugs(*, knowledge_base_id: str) -> list[str]:
-        return [
-            r.slug for r in _for_kb() if r.knowledge_base_id == knowledge_base_id
-        ]
+        return [r.slug for r in _for_kb() if r.knowledge_base_id == knowledge_base_id]
 
-    async def _search(
-        *, knowledge_base_id: str, query: str, limit: int = 10
-    ) -> list[WikiPage]:
+    async def _search(*, knowledge_base_id: str, query: str, limit: int = 10) -> list[WikiPage]:
         needle = query.lower()
-        hits = [
-            r
-            for r in _for_kb()
-            if needle in r.title.lower() or needle in r.content.lower()
-        ]
+        hits = [r for r in _for_kb() if needle in r.title.lower() or needle in r.content.lower()]
         return hits[:limit]
 
     async def _count_by_type(*, knowledge_base_id: str) -> dict[str, int]:
@@ -251,9 +237,7 @@ def page_repo() -> AsyncMock:
                 )
         return out
 
-    async def _exists_slugs(
-        *, knowledge_base_id: str, slugs: list[str]
-    ) -> dict[str, bool]:
+    async def _exists_slugs(*, knowledge_base_id: str, slugs: list[str]) -> dict[str, bool]:
         live_slugs = {page.slug for page in _for_kb()}
         return {slug: slug in live_slugs for slug in slugs}
 
@@ -270,9 +254,7 @@ def page_repo() -> AsyncMock:
     async def _list_pages_by_folder_ids(
         *, knowledge_base_id: str, folder_ids: list[str]
     ) -> list[WikiPage]:
-        return [
-            page for page in _for_kb() if page.folder_id in folder_ids
-        ]
+        return [page for page in _for_kb() if page.folder_id in folder_ids]
 
     repo.create.side_effect = _create
     repo.get_by_slug_or_none.side_effect = _get_by_slug_or_none
@@ -305,9 +287,7 @@ def folder_repo() -> AsyncMock:
     def _live() -> dict[str, WikiFolder]:
         return {fid: r for fid, r in rows.items() if r.deleted_at is None}
 
-    async def _get_by_id_or_none(
-        *, knowledge_base_id: str, id: str
-    ) -> WikiFolder | None:
+    async def _get_by_id_or_none(*, knowledge_base_id: str, id: str) -> WikiFolder | None:
         return _live().get(id)
 
     async def _get_child_by_name_or_none(

@@ -159,9 +159,7 @@ async def update_document_image(
     )
 
     now = datetime.now(UTC)
-    updates: list[Chunk] = [
-        parent.model_copy(update={"image_info": image_info, "updated_at": now})
-    ]
+    updates: list[Chunk] = [parent.model_copy(update={"image_info": image_info, "updated_at": now})]
     creates: list[Chunk] = []
     has_caption = False
     has_ocr = False

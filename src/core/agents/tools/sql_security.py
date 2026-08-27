@@ -380,7 +380,9 @@ class SQLValidationConfig:
 # ── Validation options ────────────────────────────────────────────────
 
 
-def with_input_validation(cfg: SQLValidationConfig, min_length: int, max_length: int) -> SQLValidationConfig:
+def with_input_validation(
+    cfg: SQLValidationConfig, min_length: int, max_length: int
+) -> SQLValidationConfig:
     """Enable basic input validation (null bytes, length bounds)."""
     return replace(
         cfg,
@@ -448,7 +450,9 @@ def with_no_dangerous_functions(cfg: SQLValidationConfig) -> SQLValidationConfig
     return replace(cfg, check_dangerous_functions=True)
 
 
-def with_tenant_isolation(cfg: SQLValidationConfig, tenant_id: int, *tables: str) -> SQLValidationConfig:
+def with_tenant_isolation(
+    cfg: SQLValidationConfig, tenant_id: int, *tables: str
+) -> SQLValidationConfig:
     """Enable automatic tenant_id injection for the given tables."""
     tenant_tables = frozenset(_lower(t) for t in tables) if tables else _DEFAULT_TENANT_TABLES
     return replace(
@@ -496,7 +500,9 @@ def with_search_scope_filter(
     )
 
 
-def with_search_scopes(cfg: SQLValidationConfig, scopes: Sequence[SearchScope]) -> SQLValidationConfig:
+def with_search_scopes(
+    cfg: SQLValidationConfig, scopes: Sequence[SearchScope]
+) -> SQLValidationConfig:
     """Restrict the query with structured OR'd search scopes."""
     if not scopes:
         return cfg
@@ -881,7 +887,17 @@ def _extract_where_clause(sql: str, tokens: Sequence[tuple[int, str]]) -> str:
     where_pos = tokens[where_index][0] + len("WHERE")
     end = len(sql)
     lower = sql[where_pos:].lower()
-    for clause in ("group by", "order by", "limit", "having", "union", "intersect", "except", "offset", "fetch"):
+    for clause in (
+        "group by",
+        "order by",
+        "limit",
+        "having",
+        "union",
+        "intersect",
+        "except",
+        "offset",
+        "fetch",
+    ):
         pos = lower.find(clause)
         if pos != -1 and where_pos + pos < end:
             end = where_pos + pos
@@ -908,25 +924,30 @@ def parse_sql(sql: str) -> SQLParseResult:
     words = _token_words(first_tokens)
 
     if not words:
-        return SQLParseResult(original_sql=sql, parse_error="empty query", statements=tuple(statements))
+        return SQLParseResult(
+            original_sql=sql, parse_error="empty query", statements=tuple(statements)
+        )
 
     first_keyword = words[0]
     is_select = first_keyword == "SELECT"
     has_cte = first_keyword == "WITH"
 
-    aliases, table_names, has_subquery, has_from_function = _extract_from_clause(first, first_tokens)
+    aliases, table_names, has_subquery, has_from_function = _extract_from_clause(
+        first, first_tokens
+    )
     # Scan for function calls at every nesting depth (not just the top
     # level) so dangerous functions hidden inside an allowed subquery are
     # still caught — mirroring the upstream recursive statement inspection.
     functions = _extract_functions(_scan_top_level_tokens(first, include_parens=True))
 
-    has_compound = any(
-        upper in {"UNION", "INTERSECT", "EXCEPT"}
-        for upper in words[1:]
-    )
+    has_compound = any(upper in {"UNION", "INTERSECT", "EXCEPT"} for upper in words[1:])
     select_into = "INTO" in words[1:]
     locking_clause = any(
-        (words[i] == "FOR" and i + 1 < len(words) and words[i + 1] in {"UPDATE", "SHARE", "NO", "KEY"})
+        (
+            words[i] == "FOR"
+            and i + 1 < len(words)
+            and words[i + 1] in {"UPDATE", "SHARE", "NO", "KEY"}
+        )
         for i in range(len(words))
     )
 
@@ -980,7 +1001,9 @@ def _check_input(sql: str, config: SQLValidationConfig, errors: list[SQLValidati
         )
 
 
-def _validate_statement(parsed: SQLParseResult, config: SQLValidationConfig, errors: list[SQLValidationError]) -> None:
+def _validate_statement(
+    parsed: SQLParseResult, config: SQLValidationConfig, errors: list[SQLValidationError]
+) -> None:
     if parsed.has_compound:
         errors.append(
             SQLValidationError(
@@ -1251,7 +1274,7 @@ def inject_and_conditions(sql: str, filter_clause: str) -> str:
     tail_match = _RE_TAIL_CLAUSE.search(sql)
     if tail_match is not None:
         prefix = sql[: tail_match.start()].rstrip(" \t\r\n")
-        suffix = sql[tail_match.start():].lstrip(" \t\r\n")
+        suffix = sql[tail_match.start() :].lstrip(" \t\r\n")
         return f"{prefix} WHERE {filter_clause} {suffix}"
 
     return f"{sql} WHERE {filter_clause}"
@@ -1271,7 +1294,9 @@ def _table_alias_map(sql: str) -> dict[str, str]:
     return dict(parsed.table_aliases)
 
 
-def _inject_tenant_conditions(sql: str, config: SQLValidationConfig, aliases: Mapping[str, str]) -> str:
+def _inject_tenant_conditions(
+    sql: str, config: SQLValidationConfig, aliases: Mapping[str, str]
+) -> str:
     if not config.enable_tenant_injection:
         return sql
     conditions: list[str] = []
@@ -1287,16 +1312,24 @@ def _inject_tenant_conditions(sql: str, config: SQLValidationConfig, aliases: Ma
     return inject_and_conditions(sql, " AND ".join(conditions))
 
 
-def _inject_soft_delete_conditions(sql: str, config: SQLValidationConfig, aliases: Mapping[str, str]) -> str:
+def _inject_soft_delete_conditions(
+    sql: str, config: SQLValidationConfig, aliases: Mapping[str, str]
+) -> str:
     if not config.enable_soft_delete:
         return sql
-    conditions = [f"{alias}.deleted_at IS NULL" for table, alias in aliases.items() if table in config.tables_with_deleted_at]
+    conditions = [
+        f"{alias}.deleted_at IS NULL"
+        for table, alias in aliases.items()
+        if table in config.tables_with_deleted_at
+    ]
     if not conditions:
         return sql
     return inject_and_conditions(sql, " AND ".join(conditions))
 
 
-def _inject_hidden_kb_filter(sql: str, config: SQLValidationConfig, aliases: Mapping[str, str]) -> str:
+def _inject_hidden_kb_filter(
+    sql: str, config: SQLValidationConfig, aliases: Mapping[str, str]
+) -> str:
     if not config.enable_hidden_kb_filter:
         return sql
     alias = aliases.get("knowledge_bases")
@@ -1305,7 +1338,9 @@ def _inject_hidden_kb_filter(sql: str, config: SQLValidationConfig, aliases: Map
     return inject_and_conditions(sql, f"{alias}.is_temporary = false")
 
 
-def _inject_chunk_enabled_filter(sql: str, config: SQLValidationConfig, aliases: Mapping[str, str]) -> str:
+def _inject_chunk_enabled_filter(
+    sql: str, config: SQLValidationConfig, aliases: Mapping[str, str]
+) -> str:
     if not config.enable_chunk_enabled_filter:
         return sql
     alias = aliases.get("chunks")
@@ -1314,7 +1349,9 @@ def _inject_chunk_enabled_filter(sql: str, config: SQLValidationConfig, aliases:
     return inject_and_conditions(sql, f"{alias}.is_enabled = true")
 
 
-def _inject_search_scope_conditions(sql: str, config: SQLValidationConfig, aliases: Mapping[str, str]) -> str:
+def _inject_search_scope_conditions(
+    sql: str, config: SQLValidationConfig, aliases: Mapping[str, str]
+) -> str:
     if not config.enable_search_scope:
         return sql
     if config.search_scopes:
@@ -1331,20 +1368,26 @@ def _inject_search_scope_conditions(sql: str, config: SQLValidationConfig, alias
     if alias:
         conditions.append(f"{alias}.knowledge_base_id IN ({quoted_kb_ids})")
         if config.search_scope_knowledge_ids:
-            quoted_kids = ", ".join(_quote_sql_string(value) for value in config.search_scope_knowledge_ids)
+            quoted_kids = ", ".join(
+                _quote_sql_string(value) for value in config.search_scope_knowledge_ids
+            )
             conditions.append(f"{alias}.id IN ({quoted_kids})")
     alias = aliases.get("chunks")
     if alias:
         conditions.append(f"{alias}.knowledge_base_id IN ({quoted_kb_ids})")
         if config.search_scope_knowledge_ids:
-            quoted_kids = ", ".join(_quote_sql_string(value) for value in config.search_scope_knowledge_ids)
+            quoted_kids = ", ".join(
+                _quote_sql_string(value) for value in config.search_scope_knowledge_ids
+            )
             conditions.append(f"{alias}.knowledge_id IN ({quoted_kids})")
     if not conditions:
         return sql
     return inject_and_conditions(sql, " AND ".join(conditions))
 
 
-def _inject_structured_search_scopes(sql: str, config: SQLValidationConfig, aliases: Mapping[str, str]) -> str:
+def _inject_structured_search_scopes(
+    sql: str, config: SQLValidationConfig, aliases: Mapping[str, str]
+) -> str:
     conditions: list[str] = []
     alias = aliases.get("knowledge_bases")
     if alias:
@@ -1367,7 +1410,9 @@ def _inject_structured_search_scopes(sql: str, config: SQLValidationConfig, alia
 
 
 def _build_knowledge_base_scope_condition(alias: str, scopes: Sequence[SearchScope]) -> str:
-    kb_ids = _unique_preserving_order(scope.knowledge_base_id for scope in scopes if scope.knowledge_base_id)
+    kb_ids = _unique_preserving_order(
+        scope.knowledge_base_id for scope in scopes if scope.knowledge_base_id
+    )
     if not kb_ids:
         return ""
     quoted = ", ".join(_quote_sql_string(value) for value in kb_ids)
@@ -1392,9 +1437,13 @@ def _build_scope_clause(alias: str, knowledge_id_column: str, scope: SearchScope
     return "(" + " AND ".join(conditions) + ")"
 
 
-def _build_document_scope_condition(alias: str, knowledge_id_column: str, scopes: Sequence[SearchScope]) -> str:
+def _build_document_scope_condition(
+    alias: str, knowledge_id_column: str, scopes: Sequence[SearchScope]
+) -> str:
     clauses = [
-        clause for scope in scopes if (clause := _build_scope_clause(alias, knowledge_id_column, scope)) != ""
+        clause
+        for scope in scopes
+        if (clause := _build_scope_clause(alias, knowledge_id_column, scope)) != ""
     ]
     if not clauses:
         return ""
@@ -1403,7 +1452,9 @@ def _build_document_scope_condition(alias: str, knowledge_id_column: str, scopes
     return "(" + " OR ".join(clauses) + ")"
 
 
-def validate_and_secure_sql(sql: str, config: SQLValidationConfig) -> tuple[str, SQLValidationResult]:
+def validate_and_secure_sql(
+    sql: str, config: SQLValidationConfig
+) -> tuple[str, SQLValidationResult]:
     """Validate ``sql`` and return ``(secured_sql, result)``.
 
     ``secured_sql`` is empty when validation fails; otherwise it carries the

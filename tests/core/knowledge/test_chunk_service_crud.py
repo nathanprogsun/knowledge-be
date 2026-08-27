@@ -457,9 +457,7 @@ class TestUpdateDocumentChunk(ServiceTest):
     async def test_missing_expected_revision_resolves_to_current(self) -> None:
         cid = _cid()
         current = _sample_chunk(tenant_id=_TENANT_ID, id=cid, content_revision=3)
-        updated = current.model_copy(
-            update={"content_revision": 4, "index_status": "processing"}
-        )
+        updated = current.model_copy(update={"content_revision": 4, "index_status": "processing"})
         service, repo = self._service(current=current, updated=updated)
         repo.update.return_value = updated.model_copy(update={"index_status": "ready"})
 
@@ -483,9 +481,7 @@ class TestUpdateDocumentChunk(ServiceTest):
     async def test_explicit_expected_revision_is_passed_through(self) -> None:
         cid = _cid()
         current = _sample_chunk(tenant_id=_TENANT_ID, id=cid, content_revision=3)
-        updated = current.model_copy(
-            update={"content_revision": 4, "index_status": "processing"}
-        )
+        updated = current.model_copy(update={"content_revision": 4, "index_status": "processing"})
         service, repo = self._service(current=current, updated=updated)
         repo.update.return_value = updated.model_copy(update={"index_status": "ready"})
 
@@ -791,9 +787,7 @@ class TestChunkServiceIntegration(ServiceTest):
     ) -> None:
         tid = _tenant_id()
         service = ChunkService(chunk_repo=ChunkRepository(db_session))
-        persisted = await service.create_chunks(
-            chunks=[_sample_chunk(tenant_id=tid)]
-        )
+        persisted = await service.create_chunks(chunks=[_sample_chunk(tenant_id=tid)])
         cid = persisted[0].id
         await service.update_document_chunk(
             tenant_id=tid,

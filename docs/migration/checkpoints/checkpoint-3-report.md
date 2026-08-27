@@ -14,9 +14,9 @@ contracts in the read-only reference source under the workspace root.
 - LLM base + Chat/RemoteAPIChat/Message/ChatOptions + 12 provider adapters
 - OpenAI / Anthropic / Ollama chat providers (request + stream)
 - Embedding base factory (11 routes) + openai/ollama real + batch + transport + concurrency
-- Eight additional embedding providers (aliyun/azure-openai/gemini/jina/nvidia/volcengine/weknoracloud/zhipu) — all 11 routes real
+- Eight additional embedding providers (aliyun/azure-openai/gemini/jina/nvidia/volcengine/cloud/zhipu) — all 11 routes real
 - Rerank base factory (8 routes) + OpenAI-compatible real
-- Seven additional rerank providers (aliyun/zhipu/jina/nvidia/weknoracloud/lkeap/volcengine) — all 8 routes real
+- Seven additional rerank providers (aliyun/zhipu/jina/nvidia/cloud/lkeap/volcengine) — all 8 routes real
 - Retrieval base types + interfaces + factory (DB-store path) + env registry (env path) + registry + KV hybrid engine
 - Nine vector engine repositories: pgvector / qdrant / milvus / weaviate / elasticsearch v7 / elasticsearch v8 / opensearch / doris / tencent vectordb / sqlite-vec
 - Full FileService for all 8 storage backends (local/minio/s3/cos/obs/tos/oss/ks3) with factory + backend-scoped + resource-catalog + dummy + errors

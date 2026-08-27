@@ -46,7 +46,7 @@ from src.ai.llm.types import (
 )
 from src.ai.llm.usage import log_usage
 from src.ai.provider.providers.anthropic import ANTHROPIC_BASE_URL
-from src.common.exception import ValidationError, AIProviderError
+from src.common.exception import AIProviderError, ValidationError
 from src.common.json import JsonObject, JsonValue
 
 #: ``anthropic-version`` header value sent on every request.
@@ -272,7 +272,9 @@ class AnthropicChat:
         if config.base_url:
             validate_url_for_ssrf(config.base_url)
         if not config.api_key.strip():
-            raise ValidationError(code="anthropic.api_key_required", message="Anthropic provider: API key is required")
+            raise ValidationError(
+                code="anthropic.api_key_required", message="Anthropic provider: API key is required"
+            )
 
         base_url = config.base_url.rstrip("/")
         if not base_url:

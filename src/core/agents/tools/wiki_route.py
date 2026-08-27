@@ -656,9 +656,7 @@ async def apply_incoming_wiki_content_rewrite(
             )
         except Exception as exc:
             return changes, updated_slugs, f"update incoming page {source_slug}: {exc}"
-        changes.append(
-            AppliedWikiContentChange(page=page, original_content=original)
-        )
+        changes.append(AppliedWikiContentChange(page=page, original_content=original))
         updated_slugs.append(source_slug)
     return changes, updated_slugs, ""
 

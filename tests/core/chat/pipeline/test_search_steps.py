@@ -125,9 +125,7 @@ class _FakeChat:
         self._content = content
         self.requests: list[tuple[list[Message], ChatOptions | None]] = []
 
-    async def chat(
-        self, messages: list[Message], opts: ChatOptions | None = None
-    ) -> ChatResponse:
+    async def chat(self, messages: list[Message], opts: ChatOptions | None = None) -> ChatResponse:
         self.requests.append((messages, opts))
         return ChatResponse(content=self._content)
 
@@ -146,9 +144,7 @@ class _FakeChat:
 class _FakeModelService:
     """Resolves ``_FakeChat`` models, failing for ids in ``failures``."""
 
-    def __init__(
-        self, *, models: Mapping[str, _FakeChat], failures: Sequence[str] = ()
-    ) -> None:
+    def __init__(self, *, models: Mapping[str, _FakeChat], failures: Sequence[str] = ()) -> None:
         self.models = dict(models)
         self.failures = set(failures)
         self.requests: list[tuple[Context, str]] = []
@@ -227,7 +223,9 @@ def _make_query_understand(
 ) -> tuple[QueryUnderstandPlugin, _FakeModelService, _FakeMessageService]:
     """Build a ``QueryUnderstandPlugin`` wired to in-memory fakes."""
     model_service = _FakeModelService(
-        models={model_id: _FakeChat(content=content) for model_id, content in (models or {}).items()},
+        models={
+            model_id: _FakeChat(content=content) for model_id, content in (models or {}).items()
+        },
         failures=failures,
     )
     message_service = _FakeMessageService(stored=stored)
@@ -863,9 +861,10 @@ async def test_entity_search_knowledge_file_scope_searches_each_file() -> None:
     result = await plugin.on_event(_FakeContext(), EventType.ENTITY_SEARCH, pipeline_ctx, _noop)
 
     assert result is None
-    assert sorted(
-        [(q[0].knowledge_base, q[0].knowledge) for q in graph_repo.queries]
-    ) == [("kb-1", "doc-1"), ("kb-1", "doc-2")]
+    assert sorted([(q[0].knowledge_base, q[0].knowledge) for q in graph_repo.queries]) == [
+        ("kb-1", "doc-1"),
+        ("kb-1", "doc-2"),
+    ]
     assert sorted(hit.id for hit in pipeline_ctx.search_result) == ["chunk-1", "chunk-2"]
     assert pipeline_ctx.graph_result is not None
     assert len(pipeline_ctx.graph_result.node) == 2
@@ -988,7 +987,9 @@ async def test_entity_search_enriches_image_info_from_image_children() -> None:
 
 async def test_entity_search_enrich_two_level_resolution() -> None:
     graph = GraphData(node=[GraphNode(name="e", chunks=["chunk-grandparent"])], relation=[])
-    text_child = _chunk(id="text-child", content="text segment", parent_chunk_id="chunk-grandparent")
+    text_child = _chunk(
+        id="text-child", content="text segment", parent_chunk_id="chunk-grandparent"
+    )
     image_grandchild = _chunk(
         id="img-grandchild",
         content="",
@@ -1085,7 +1086,9 @@ async def test_parallel_skips_when_no_retrieval_needed() -> None:
     plugin = _make_parallel_plugin()
     pipeline_ctx = PipelineContext(intent=QueryIntent.CHITCHAT)
 
-    result = await plugin.on_event(_FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop)
+    result = await plugin.on_event(
+        _FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop
+    )
 
     assert result is None
     assert pipeline_ctx.search_result == []
@@ -1109,7 +1112,9 @@ async def test_parallel_merges_chunk_and_entity_results() -> None:
         rewrite_query="rewritten",
     )
 
-    result = await plugin.on_event(_FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop)
+    result = await plugin.on_event(
+        _FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop
+    )
 
     assert result is None
     assert chunk_plugin.calls == 1
@@ -1124,7 +1129,9 @@ async def test_parallel_runs_chunk_search_on_a_clone_not_the_original() -> None:
     plugin = _make_parallel_plugin(chunk_plugin=chunk_plugin)
     pipeline_ctx = PipelineContext(tenant_id=1, rewrite_query="rewritten")
 
-    result = await plugin.on_event(_FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop)
+    result = await plugin.on_event(
+        _FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop
+    )
 
     assert result is None
     carrier = chunk_plugin.seen_carriers[0]
@@ -1137,7 +1144,9 @@ async def test_parallel_no_entities_runs_chunk_search_only() -> None:
     plugin = _make_parallel_plugin(chunk_plugin=chunk_plugin)
     pipeline_ctx = PipelineContext(tenant_id=1)
 
-    result = await plugin.on_event(_FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop)
+    result = await plugin.on_event(
+        _FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop
+    )
 
     assert result is None
     assert chunk_plugin.calls == 1
@@ -1148,7 +1157,9 @@ async def test_parallel_empty_results_returns_err_search_nothing() -> None:
     plugin = _make_parallel_plugin()
     pipeline_ctx = PipelineContext(tenant_id=1)
 
-    result = await plugin.on_event(_FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop)
+    result = await plugin.on_event(
+        _FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop
+    )
 
     assert result is ERR_SEARCH_NOTHING
 
@@ -1159,7 +1170,9 @@ async def test_parallel_chunk_error_surfaced_when_no_results() -> None:
     plugin = _make_parallel_plugin(chunk_plugin=chunk_plugin)
     pipeline_ctx = PipelineContext(tenant_id=1)
 
-    result = await plugin.on_event(_FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop)
+    result = await plugin.on_event(
+        _FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop
+    )
 
     assert result is chunk_error
 
@@ -1177,14 +1190,18 @@ async def test_parallel_chunk_search_nothing_absorbed_with_entity_results() -> N
     )
     pipeline_ctx = PipelineContext(tenant_id=1, entity=["e"], entity_kb_ids=["kb-1"])
 
-    result = await plugin.on_event(_FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop)
+    result = await plugin.on_event(
+        _FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop
+    )
 
     assert result is None
     assert [hit.id for hit in pipeline_ctx.search_result] == ["chunk-b"]
 
 
 async def test_parallel_dedupes_merged_results() -> None:
-    chunk_plugin = _FakeChunkSearchPlugin(results=[SearchResult(id="chunk-x", content="shared payload")])
+    chunk_plugin = _FakeChunkSearchPlugin(
+        results=[SearchResult(id="chunk-x", content="shared payload")]
+    )
     graph = GraphData(node=[GraphNode(name="e", chunks=["chunk-x"])], relation=[])
     chunks = {"chunk-x": _chunk(id="chunk-x", content="shared payload")}
     knowledge = {"doc-1": _doc()}
@@ -1196,7 +1213,9 @@ async def test_parallel_dedupes_merged_results() -> None:
     )
     pipeline_ctx = PipelineContext(tenant_id=1, entity=["e"], entity_kb_ids=["kb-1"])
 
-    result = await plugin.on_event(_FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop)
+    result = await plugin.on_event(
+        _FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop
+    )
 
     assert result is None
     assert len(pipeline_ctx.search_result) == 1
@@ -1269,10 +1288,14 @@ async def test_integration_parallel_merges_chunk_and_entity(session: AsyncSessio
         _doc(id="doc-par", tenant_id=tenant_id, title="Parallel Doc")
     )
     await ChunkRepository(session).create(
-        _chunk(id="chunk-entity", tenant_id=tenant_id, knowledge_id="doc-par", content="entity payload")
+        _chunk(
+            id="chunk-entity", tenant_id=tenant_id, knowledge_id="doc-par", content="entity payload"
+        )
     )
 
-    chunk_plugin = _FakeChunkSearchPlugin(results=[SearchResult(id="chunk-kb", content="chunk payload")])
+    chunk_plugin = _FakeChunkSearchPlugin(
+        results=[SearchResult(id="chunk-kb", content="chunk payload")]
+    )
     graph = GraphData(node=[GraphNode(name="entity-par", chunks=["chunk-entity"])], relation=[])
     plugin = SearchParallelPlugin(
         chunk_search_plugin=chunk_plugin,
@@ -1286,7 +1309,9 @@ async def test_integration_parallel_merges_chunk_and_entity(session: AsyncSessio
         entity_kb_ids=["kb-par"],
     )
 
-    result = await plugin.on_event(_FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop)
+    result = await plugin.on_event(
+        _FakeContext(), EventType.CHUNK_SEARCH_PARALLEL, pipeline_ctx, _noop
+    )
 
     assert result is None
     assert chunk_plugin.calls == 1

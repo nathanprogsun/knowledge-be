@@ -50,8 +50,8 @@ from src.web.deps.tenants import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 #: Default account bootstrapped by the Lite auto-setup flow (mirrors the
-#: upstream contract's ``admin@weknora.local``).
-AUTO_SETUP_DEFAULT_EMAIL = "admin@weknora.local"
+#: upstream contract's ``admin@kb.local``).
+AUTO_SETUP_DEFAULT_EMAIL = "admin@kb.local"
 
 
 # ── View models (inline; not contracts because they're trivial wrappers) ──
@@ -94,15 +94,39 @@ def _user_info_to_auth_user(info: UserInfo) -> AuthUser:
 async def login(
     body: LoginRequest,
     auth_service: AuthServiceDep,
+    tenant_service: TenantServiceDep,
+    member_service: TenantMemberServiceDep,
 ) -> LoginResponse:
-    """Authenticate with email + password and return an access/refresh pair."""
+    """Authenticate with email + password and return an access/refresh pair.
+
+    ``active_tenant`` and ``memberships`` are populated like the Go
+    handler does: the SPA routes straight to the workspace when a home
+    tenant exists and to onboarding when it does not — returning null
+    here would strand every login on the onboarding gate.
+    """
     result = await auth_service.login(email=body.email, password=body.password)
+    memberships = await _memberships_to_contract(
+        await member_service.list_by_user(result.user.id),
+        tenant_service,
+    )
+    # Home tenant id may be null for users whose workspace was created
+    # through POST /tenants (which only writes a membership row); fall
+    # back to the first membership so the SPA still lands in a workspace.
+    active_tenant = None
+    active_tenant_id = result.user.tenant_id or (memberships[0].tenant_id if memberships else None)
+    if active_tenant_id:
+        try:
+            active_tenant = tenant_info_to_contract(
+                await tenant_service.get_tenant(active_tenant_id),
+            )
+        except NotFoundError:
+            active_tenant = None
     return LoginResponse(
         success=True,
         message="Login successful",
         user=_user_info_to_auth_user(result.user),
-        active_tenant=None,
-        memberships=[],
+        active_tenant=active_tenant,
+        memberships=memberships,
         token=result.access_token,
         refresh_token=result.refresh_token,
     )
@@ -203,6 +227,17 @@ async def me(
         await member_service.list_by_user(info.id),
         tenant_service,
     )
+    # Same fallback as /login: users whose only tenant link is a
+    # membership row (home tenant_id null) must still resolve an
+    # active workspace, or the SPA treats them as tenantless and
+    # wipes the tenant snapshot written at login.
+    if tenant is None and memberships:
+        try:
+            tenant = tenant_info_to_contract(
+                await tenant_service.get_tenant(memberships[0].tenant_id),
+            )
+        except NotFoundError:
+            tenant = None
     return MeResponse(
         success=True,
         data=MeData(

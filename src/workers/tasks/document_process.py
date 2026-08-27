@@ -28,6 +28,8 @@ from src.app_logging import logger
 from src.core.knowledge.documents.process_document import (
     DocumentProcessPipeline,
     ProcessOutcome,
+)
+from src.core.knowledge.documents.process_document import (
     process_document as _core_process_document,
 )
 from src.workers.base import WorkerContext

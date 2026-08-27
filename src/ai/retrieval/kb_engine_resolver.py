@@ -108,12 +108,8 @@ async def create_retrieve_engine_for_kb(
         tenant_info = tenant_info_from_context(ctx)
         if tenant_info is None:
             raise TenantInfoMissingError()
-        return new_composite_retrieve_engine(
-            registry, tenant_info.get_effective_engines()
-        )
-    return await _resolve_bound_engine(
-        ctx, registry, ownership, tenant_id, vector_store_id
-    )
+        return new_composite_retrieve_engine(registry, tenant_info.get_effective_engines())
+    return await _resolve_bound_engine(ctx, registry, ownership, tenant_id, vector_store_id)
 
 
 async def create_retrieve_engine_from_payload(
@@ -132,9 +128,7 @@ async def create_retrieve_engine_from_payload(
     """
     if not vector_store_id:
         return new_composite_retrieve_engine(registry, effective_engines)
-    return await _resolve_bound_engine(
-        ctx, registry, ownership, tenant_id, vector_store_id
-    )
+    return await _resolve_bound_engine(ctx, registry, ownership, tenant_id, vector_store_id)
 
 
 async def verify_binding(
@@ -183,8 +177,7 @@ async def _resolve_bound_engine(
         # to the caller. The store itself may be fine, so this is retryable
         # rather than not-found.
         logger.error(
-            "[retriever.kb_resolver] ownership lookup failed: "
-            "tenant={} store={} reason={}",
+            "[retriever.kb_resolver] ownership lookup failed: tenant={} store={} reason={}",
             tenant_id,
             store_id,
             exc,
@@ -193,8 +186,7 @@ async def _resolve_bound_engine(
     if not owned:
         # Cross-tenant attempt (or the store was deleted in the meantime).
         logger.warning(
-            "[retriever.kb_resolver] cross-tenant store access attempted: "
-            "tenant={} store={}",
+            "[retriever.kb_resolver] cross-tenant store access attempted: tenant={} store={}",
             tenant_id,
             store_id,
         )

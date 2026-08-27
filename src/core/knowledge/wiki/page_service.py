@@ -64,8 +64,7 @@ logger = logging.getLogger(__name__)
 
 # Default index page body created on first open of a KB with no index row.
 _DEFAULT_INDEX_CONTENT = (
-    "# Wiki Index\n\n"
-    "This is the index page. It will be automatically updated as pages are added.\n"
+    "# Wiki Index\n\nThis is the index page. It will be automatically updated as pages are added.\n"
 )
 
 # Error codes shared with the persistence layer.
@@ -198,20 +197,18 @@ class WikiPageService:
             )
             persisted = await self._page_repo.update(row=authored, now=now)
             await self._remove_in_links(
-            knowledge_base_id=existing.knowledge_base_id,
-            source_slug=existing.slug,
-            targets=old_out_links,
-        )
+                knowledge_base_id=existing.knowledge_base_id,
+                source_slug=existing.slug,
+                targets=old_out_links,
+            )
             await self._update_in_links(
-            knowledge_base_id=existing.knowledge_base_id,
-            source_slug=existing.slug,
-            targets=persisted.out_links,
-        )
+                knowledge_base_id=existing.knowledge_base_id,
+                source_slug=existing.slug,
+                targets=persisted.out_links,
+            )
             return persisted
 
-        bookkeeping = merged.model_copy(
-            update={"version": existing.version, "updated_at": now}
-        )
+        bookkeeping = merged.model_copy(update={"version": existing.version, "updated_at": now})
         persisted = await self._page_repo.update_meta(row=bookkeeping, now=now)
         await self._remove_in_links(
             knowledge_base_id=existing.knowledge_base_id,
@@ -253,9 +250,7 @@ class WikiPageService:
                 "updated_at": datetime.now(UTC),
             }
         )
-        persisted = await self._page_repo.update_auto_linked_content(
-            row=row, now=datetime.now(UTC)
-        )
+        persisted = await self._page_repo.update_auto_linked_content(row=row, now=datetime.now(UTC))
         await self._remove_in_links(
             knowledge_base_id=existing.knowledge_base_id,
             source_slug=existing.slug,
@@ -394,9 +389,7 @@ class WikiPageService:
         capped at 200). ``cursor`` is an opaque offset string; it applies
         uniformly to every group.
         """
-        index_page = await self.get_index(
-            knowledge_base_id=knowledge_base_id, tenant_id=tenant_id
-        )
+        index_page = await self.get_index(knowledge_base_id=knowledge_base_id, tenant_id=tenant_id)
 
         limit = WIKI_INDEX_DEFAULT_LIMIT if limit <= 0 else min(limit, WIKI_INDEX_MAX_LIMIT)
         offset = 0
@@ -513,9 +506,7 @@ class WikiPageService:
             except NotFoundError:
                 logger.warning("wiki: rebuild links: page %s gone mid-rebuild", page.slug)
 
-    async def inject_cross_links(
-        self, *, knowledge_base_id: str, affected_slugs: list[str]
-    ) -> int:
+    async def inject_cross_links(self, *, knowledge_base_id: str, affected_slugs: list[str]) -> int:
         """Inject ``[[wiki-links]]`` for title/alias mentions in affected pages.
 
         Pure text replacement — no LLM call. Pages that are already fully
@@ -648,9 +639,7 @@ class WikiPageService:
         self, *, knowledge_base_id: str, slugs: list[str]
     ) -> dict[str, WikiPageLite]:
         """Resolve slugs to slim page projections in one IN query."""
-        return await self._page_repo.list_by_slugs(
-            knowledge_base_id=knowledge_base_id, slugs=slugs
-        )
+        return await self._page_repo.list_by_slugs(knowledge_base_id=knowledge_base_id, slugs=slugs)
 
     async def list_summaries_by_knowledge_ids(
         self, *, knowledge_base_id: str, knowledge_ids: list[str]
@@ -660,13 +649,9 @@ class WikiPageService:
             knowledge_base_id=knowledge_base_id, knowledge_ids=knowledge_ids
         )
 
-    async def exists_slugs(
-        self, *, knowledge_base_id: str, slugs: list[str]
-    ) -> dict[str, bool]:
+    async def exists_slugs(self, *, knowledge_base_id: str, slugs: list[str]) -> dict[str, bool]:
         """Report which slugs are live (non-archived, non-deleted) in the KB."""
-        return await self._page_repo.exists_slugs(
-            knowledge_base_id=knowledge_base_id, slugs=slugs
-        )
+        return await self._page_repo.exists_slugs(knowledge_base_id=knowledge_base_id, slugs=slugs)
 
     async def list_all_slugs(self, *, knowledge_base_id: str) -> list[str]:
         """Return every non-archived slug in the KB."""
@@ -815,9 +800,7 @@ def compute_graph_subset(pages: list[WikiPage], request: WikiGraphRequest) -> Wi
         depth = request.depth if request.depth >= 1 else 1
         selected = _bfs_ego_slugs(page_by_slug, request.center, depth, type_allow, request.limit)
     else:
-        candidates = [
-            page for page in pages if not has_type_filter or page.page_type in type_allow
-        ]
+        candidates = [page for page in pages if not has_type_filter or page.page_type in type_allow]
         candidates.sort(key=lambda page: (-link_count[page.slug], page.slug))
         if request.limit > 0 and len(candidates) > request.limit:
             candidates = candidates[: request.limit]
@@ -854,9 +837,7 @@ def compute_graph_subset(pages: list[WikiPage], request: WikiGraphRequest) -> Wi
         truncated=len(nodes) < total,
     )
     if mode == WIKI_GRAPH_MODE_EGO:
-        meta = meta.model_copy(
-            update={"center": request.center, "depth": max(1, request.depth)}
-        )
+        meta = meta.model_copy(update={"center": request.center, "depth": max(1, request.depth)})
     return WikiGraphData(nodes=nodes, edges=edges, meta=meta)
 
 

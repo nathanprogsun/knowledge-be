@@ -66,7 +66,7 @@ EMBEDDING_KEY = "embedding"
 # ── Collection resolution ─────────────────────────────────────────────
 
 ENV_QDRANT_COLLECTION = "QDRANT_COLLECTION"
-DEFAULT_COLLECTION_NAME = "weknora_embeddings"
+DEFAULT_COLLECTION_NAME = "kb_embeddings"
 
 # ── Batch sizes ──────────────────────────────────────────────────────
 
@@ -88,7 +88,7 @@ def _resolve_collection_name(index_config: IndexConfig | None) -> str:
     """Resolve the collection base name (upstream ``ResolveCollectionName``).
 
     Priority: ``collection_prefix`` > ``collection_name`` > env var
-    ``QDRANT_COLLECTION`` > default ``weknora_embeddings``.
+    ``QDRANT_COLLECTION`` > default ``kb_embeddings``.
     """
     if index_config is not None:
         if index_config.collection_prefix:
@@ -185,7 +185,9 @@ def _payload_to_index_with_score(
 ) -> IndexWithScore:
     """Convert a Qdrant point payload to ``IndexWithScore``."""
     source_type_raw = payload.get(FIELD_SOURCE_TYPE, 0)
-    source_type = SourceType(source_type_raw) if isinstance(source_type_raw, int) else SourceType.CHUNK
+    source_type = (
+        SourceType(source_type_raw) if isinstance(source_type_raw, int) else SourceType.CHUNK
+    )
     content = str(payload.get(FIELD_CONTENT, ""))
     source_id = str(payload.get(FIELD_SOURCE_ID, ""))
     chunk_id = str(payload.get(FIELD_CHUNK_ID, ""))
@@ -466,9 +468,7 @@ class QdrantRetrieveEngineRepository:
             message=f"invalid retriever type: {params.retriever_type}",
         )
 
-    async def _vector_retrieve(
-        self, ctx: Context, params: RetrieveParams
-    ) -> list[RetrieveResult]:
+    async def _vector_retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
         """Perform HNSW vector similarity search."""
         del ctx
         dimension = len(params.embedding)
@@ -514,9 +514,7 @@ class QdrantRetrieveEngineRepository:
                     FieldCondition(key=FIELD_CONTENT, match=MatchText(text=token))
                     for token in tokens
                 ]
-                scroll_filter = _build_keyword_filter(
-                    query_filter, should_conditions=should
-                )
+                scroll_filter = _build_keyword_filter(query_filter, should_conditions=should)
             else:
                 must_conditions = list(query_filter.must or [])
                 must_conditions.append(
@@ -534,9 +532,7 @@ class QdrantRetrieveEngineRepository:
             for record in records:
                 payload = record.payload or {}
                 all_results.append(
-                    _payload_to_index_with_score(
-                        str(record.id), payload, 1.0, MatchType.KEYWORDS
-                    )
+                    _payload_to_index_with_score(str(record.id), payload, 1.0, MatchType.KEYWORDS)
                 )
         if limit > 0 and len(all_results) > limit:
             all_results = all_results[:limit]
@@ -787,7 +783,7 @@ class QdrantRetrieveEngineRepository:
             return target_chunk_id
         prefix = f"{source_chunk_id}-"
         if original_source_id.startswith(prefix):
-            question_id = original_source_id[len(prefix):]
+            question_id = original_source_id[len(prefix) :]
             return f"{target_chunk_id}-{question_id}"
         return str(uuid.uuid4())
 

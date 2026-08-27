@@ -13,6 +13,7 @@ from src.ai.provider.registry import (
     PROVIDER_ALIYUN,
     PROVIDER_ANTHROPIC,
     PROVIDER_AZURE_OPENAI,
+    PROVIDER_CLOUD,
     PROVIDER_DEEPSEEK,
     PROVIDER_GEMINI,
     PROVIDER_GENERIC,
@@ -34,7 +35,6 @@ from src.ai.provider.registry import (
     PROVIDER_REQUESTY,
     PROVIDER_SILICONFLOW,
     PROVIDER_VOLCENGINE,
-    PROVIDER_WEKNORACLOUD,
     PROVIDER_ZHIPU,
     ProviderName,
 )
@@ -89,16 +89,14 @@ def detect_provider(base_url: str) -> ProviderName:
         return PROVIDER_QIANFAN
     if _contains_any(base_url, "longcat.chat"):
         return PROVIDER_LONGCAT
-    if _contains_any(
-        base_url, "lkeap.cloud.tencent.com", "api.lkeap", "lkeap.tencentcloudapi.com"
-    ):
+    if _contains_any(base_url, "lkeap.cloud.tencent.com", "api.lkeap", "lkeap.tencentcloudapi.com"):
         return PROVIDER_LKEAP
     if _contains_any(base_url, "nvidia.com"):
         return PROVIDER_NVIDIA
     if _contains_any(base_url, "api.novita.ai", "novita.ai"):
         return PROVIDER_NOVITA
-    if _contains_any(base_url, "weknora.weixin.qq.com"):
-        return PROVIDER_WEKNORACLOUD
+    if _contains_any(base_url, "kb.weixin.qq.com"):
+        return PROVIDER_CLOUD
     return PROVIDER_GENERIC
 
 

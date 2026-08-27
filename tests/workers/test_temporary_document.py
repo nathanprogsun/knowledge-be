@@ -17,11 +17,11 @@ from arq.connections import ArqRedis
 
 from src.workers.base import WorkerContext
 from src.workers.registry import all_tasks, get_task
+from src.workers.settings import reset_worker_settings_cache
 from src.workers.tasks.temporary_document import (
     TASK_NAME,
     task_temporary_document,
 )
-from src.workers.settings import reset_worker_settings_cache
 
 
 def make_ctx() -> WorkerContext:

@@ -30,9 +30,7 @@ from src.common.table_model import TableModel
 RESOURCE_TYPE_KB = "kb"
 RESOURCE_TYPE_AGENT = "agent"
 
-FAVORITE_RESOURCE_TYPES: frozenset[str] = frozenset(
-    {RESOURCE_TYPE_KB, RESOURCE_TYPE_AGENT}
-)
+FAVORITE_RESOURCE_TYPES: frozenset[str] = frozenset({RESOURCE_TYPE_KB, RESOURCE_TYPE_AGENT})
 
 
 class UserResourceFavorite(TableModel):

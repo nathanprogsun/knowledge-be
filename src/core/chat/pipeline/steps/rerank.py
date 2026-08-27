@@ -452,9 +452,7 @@ class RerankPlugin:
                 metadata = dict(updated.metadata)
                 metadata["faq_boosted"] = "true"
                 metadata["faq_original_score"] = f"{original_score:.4f}"
-                updated = updated.model_copy(
-                    update={"score": boosted_score, "metadata": metadata}
-                )
+                updated = updated.model_copy(update={"score": boosted_score, "metadata": metadata})
                 pipeline_info(
                     "Rerank",
                     "faq_boost",

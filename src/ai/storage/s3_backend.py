@@ -81,9 +81,7 @@ class S3StorageAdapter:
 
     # ── File operations ─────────────────────────────────────────────
 
-    async def save_file(
-        self, *, file: FileUpload, tenant_id: int, knowledge_id: str
-    ) -> str:
+    async def save_file(self, *, file: FileUpload, tenant_id: int, knowledge_id: str) -> str:
         """Upload ``file`` to ``{prefix}{tenant}/{knowledge}/{uuid}{ext}``."""
         ext = os.path.splitext(file.filename)[1]
         object_key = self._object_key(tenant_id, knowledge_id, ext)
@@ -92,9 +90,7 @@ class S3StorageAdapter:
         await self._store.put_object(object_key, data, content_type)
         return f"{S3_SCHEME}{self._bucket_name}/{object_key}"
 
-    async def save_bytes(
-        self, *, data: bytes, tenant_id: int, file_name: str, temp: bool
-    ) -> str:
+    async def save_bytes(self, *, data: bytes, tenant_id: int, file_name: str, temp: bool) -> str:
         """Upload raw bytes to ``{prefix}{tenant}/exports/``.
 
         ``temp`` is ignored — S3 has no separate auto-expiring store.
@@ -106,24 +102,18 @@ class S3StorageAdapter:
 
     async def get_file(self, file_path: str) -> BinaryIO:
         """Download the object at ``s3://{bucket}/{key}``."""
-        _, object_key = parse_provider_path(
-            file_path, S3_SCHEME, expected_bucket=self._bucket_name
-        )
+        _, object_key = parse_provider_path(file_path, S3_SCHEME, expected_bucket=self._bucket_name)
         data = await self._store.get_object(object_key)
         return BytesIO(data)
 
     async def get_file_url(self, file_path: str) -> str:
         """A 24h SigV4-presigned GET URL for the object."""
-        _, object_key = parse_provider_path(
-            file_path, S3_SCHEME, expected_bucket=self._bucket_name
-        )
+        _, object_key = parse_provider_path(file_path, S3_SCHEME, expected_bucket=self._bucket_name)
         return self._store.presigned_get_url(object_key)
 
     async def delete_file(self, file_path: str) -> None:
         """Remove the object at ``s3://{bucket}/{key}``."""
-        _, object_key = parse_provider_path(
-            file_path, S3_SCHEME, expected_bucket=self._bucket_name
-        )
+        _, object_key = parse_provider_path(file_path, S3_SCHEME, expected_bucket=self._bucket_name)
         await self._store.delete_object(object_key)
 
     async def copy_file(self, src_path: str, tenant_id: int, knowledge_id: str) -> str:
@@ -133,13 +123,9 @@ class S3StorageAdapter:
         anything else is a cross-backend copy and is refused.
         """
         try:
-            _, src_key = parse_provider_path(
-                src_path, S3_SCHEME, expected_bucket=self._bucket_name
-            )
+            _, src_key = parse_provider_path(src_path, S3_SCHEME, expected_bucket=self._bucket_name)
         except StorageBackendError:
-            raise CrossBackendCopyError(
-                message=f"s3 copy rejected source {src_path!r}"
-            ) from None
+            raise CrossBackendCopyError(message=f"s3 copy rejected source {src_path!r}") from None
         ext = os.path.splitext(src_path)[1]
         dest_key = self._object_key(tenant_id, knowledge_id, ext)
         await self._store.copy_object(self._bucket_name, src_key, dest_key)
@@ -168,7 +154,7 @@ class S3StorageAdapter:
 def _trailing_slash(path_prefix: str) -> str:
     """Normalise a prefix so ``{prefix}{tenant}`` reads naturally.
 
-    ``"weknora"`` becomes ``"weknora/"``; an empty prefix stays empty so
+    ``"kb"`` becomes ``"kb/"``; an empty prefix stays empty so
     keys start at the tenant segment.
     """
     prefix = path_prefix.strip()

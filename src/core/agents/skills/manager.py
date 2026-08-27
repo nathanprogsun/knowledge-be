@@ -148,12 +148,8 @@ class Loader:
         full_path = base / clean_path
         abs_skill = base.resolve()
         abs_file = full_path.resolve()
-        if abs_file != abs_skill and not str(abs_file).startswith(
-            str(abs_skill) + os.sep
-        ):
-            raise SkillPathError(
-                message=f"file path outside skill directory: {relative_path}"
-            )
+        if abs_file != abs_skill and not str(abs_file).startswith(str(abs_skill) + os.sep):
+            raise SkillPathError(message=f"file path outside skill directory: {relative_path}")
 
         try:
             content = full_path.read_text(encoding="utf-8")
@@ -273,9 +269,7 @@ class Manager:
         base_path = self._loader.get_skill_base_path(skill_name)
         skill_file = self._loader.load_skill_file(skill_name, script_path)
         if not skill_file.is_script:
-            raise SkillValidationError(
-                message=f"file is not an executable script: {script_path}"
-            )
+            raise SkillValidationError(message=f"file is not an executable script: {script_path}")
         config = ExecuteConfig(
             script=skill_file.path,
             args=args,

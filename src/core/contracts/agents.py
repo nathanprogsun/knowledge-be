@@ -168,7 +168,7 @@ class Agent(BaseModel):
 
 
 class CreateAgentRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     name: str
     description: str | None = Field(default=None)
@@ -177,7 +177,7 @@ class CreateAgentRequest(BaseModel):
 
 
 class UpdateAgentRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     name: str | None = Field(default=None)
     description: str | None = Field(default=None)

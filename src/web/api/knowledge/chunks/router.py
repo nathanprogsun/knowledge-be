@@ -31,7 +31,6 @@ approximation of the upstream KB-owner-or-Admin gate). The LLM-backed
 regenerate endpoint is wired but returns an empty result until the
 question-generation orchestration lands in the domain.
 """
-# ruff: noqa: RUF001
 
 from __future__ import annotations
 

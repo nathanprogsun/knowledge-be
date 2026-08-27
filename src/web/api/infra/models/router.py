@@ -11,6 +11,7 @@ import time
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from typing_extensions import TypedDict
 
 from src.common.exception import NotFoundError, ValidationError
 from src.common.json import JsonValue
@@ -50,8 +51,8 @@ router = APIRouter(prefix="/models", tags=["models"])
 # protects the debug probe from runaway input sizes.
 _DEBUG_MAX_INPUT_BYTES = 64 * 1024
 
-#: Key under ``tenants.credentials`` that holds the cloud credentials.
-_WCN_CLOUD_CREDENTIALS_KEY = "weknoracloud"
+#: Key under ``tenants.credentials`` that holds the kb credentials.
+_WCN_CLOUD_CREDENTIALS_KEY = "cloud"
 
 
 def _require_tenant(tenant_id: int) -> int:
@@ -67,14 +68,22 @@ def _require_tenant(tenant_id: int) -> int:
 # ── Cloud status ────────────────────────────────────────────────────
 
 
-@router.get("/weknoracloud/status")
-async def weknoracloud_status(
+class CloudStatusView(TypedDict, total=False):
+    """Wire shape for ``GET /models/cloud/status``."""
+
+    has_models: bool
+    needs_reinit: bool
+    reason: str
+
+
+@router.get("/cloud/status")
+async def cloud_status(
     _auth: AuthDep,
     _role: RoleViewerDep,
     tenant_id: _PrincipalTenant,
     tenant_service: TenantServiceDep,
-) -> dict[str, object]:
-    """Check whether the workspace's cloud credentials are healthy.
+) -> CloudStatusView:
+    """Check whether the workspace's kb credentials are healthy.
 
     Mirrors the upstream contract: no credentials → ``has_models`` /
     ``needs_reinit`` both false; credentials whose secret failed to
@@ -96,7 +105,6 @@ async def weknoracloud_status(
             "reason": "云端凭证解密失败（服务重启后加密密钥已变更），请重新填写 APPID 和 APPSECRET",
         }
     return {"has_models": True, "needs_reinit": False}
-
 
 
 # ── Provider catalog ────────────────────────────────────────────────

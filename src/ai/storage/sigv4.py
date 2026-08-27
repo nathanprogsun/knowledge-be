@@ -79,9 +79,7 @@ def sign_request(
     body_hash = _payload_hash(payload)
 
     signed_headers = "host;x-amz-content-sha256;x-amz-date"
-    canonical_headers = (
-        f"host:{host}\nx-amz-content-sha256:{body_hash}\nx-amz-date:{amz_date}\n"
-    )
+    canonical_headers = f"host:{host}\nx-amz-content-sha256:{body_hash}\nx-amz-date:{amz_date}\n"
     canonical_request = "\n".join(
         [
             method.upper(),
@@ -149,8 +147,7 @@ def presign_get_url(
         ("X-Amz-SignedHeaders", "host"),
     ]
     canonical_query = "&".join(
-        f"{urllib.parse.quote(k, safe='')}={urllib.parse.quote(v, safe='')}"
-        for k, v in params
+        f"{urllib.parse.quote(k, safe='')}={urllib.parse.quote(v, safe='')}" for k, v in params
     )
     canonical_request = "\n".join(
         [

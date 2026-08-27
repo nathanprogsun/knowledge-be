@@ -1,4 +1,6 @@
 # Agent Note: Test isolation boundaries
+Tags: testing, boundaries
+Related files: tests/, pyproject.toml
 
 Status: implemented
 Date: 2026-08-19

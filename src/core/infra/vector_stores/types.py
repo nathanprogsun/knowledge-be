@@ -83,7 +83,7 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="index_name",
                 type="string",
                 required=False,
-                default=_scalar("weknora"),
+                default=_scalar("kb"),
                 description="Index Name",
             ),
             VectorStoreConnectionField(
@@ -140,7 +140,7 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="collection_prefix",
                 type="string",
                 required=False,
-                default=_scalar("weknora_embeddings"),
+                default=_scalar("kb_embeddings"),
                 description="Collection Prefix",
             ),
             VectorStoreConnectionField(
@@ -196,7 +196,7 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="collection_name",
                 type="string",
                 required=False,
-                default=_scalar("weknora_embeddings"),
+                default=_scalar("kb_embeddings"),
                 description="Collection Name",
             ),
             VectorStoreConnectionField(
@@ -243,7 +243,7 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="database",
                 type="string",
                 required=False,
-                default=_scalar("weknora"),
+                default=_scalar("kb"),
                 description="Database",
             ),
         ],
@@ -252,7 +252,7 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="collection_name",
                 type="string",
                 required=False,
-                default=_scalar("weknora_embeddings"),
+                default=_scalar("kb_embeddings"),
                 description="Collection Name",
             ),
             VectorStoreConnectionField(
@@ -309,7 +309,7 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="collection_prefix",
                 type="string",
                 required=False,
-                default=_scalar("Weknora_embeddings"),
+                default=_scalar("kb_embeddings"),
                 description="Collection Prefix",
             ),
             VectorStoreConnectionField(
@@ -350,7 +350,7 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="database",
                 type="string",
                 required=True,
-                default=_scalar("weknora"),
+                default=_scalar("kb"),
                 description="Database",
             ),
             VectorStoreConnectionField(
@@ -373,7 +373,7 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="collection_prefix",
                 type="string",
                 required=False,
-                default=_scalar("weknora_embeddings"),
+                default=_scalar("kb_embeddings"),
                 description="Table Prefix",
             ),
             VectorStoreConnectionField(
@@ -433,7 +433,7 @@ _VECTOR_STORE_TYPES: tuple[VectorStoreTypeInfo, ...] = (
                 name="index_name",
                 type="string",
                 required=False,
-                default=_scalar("weknora"),
+                default=_scalar("kb"),
                 description="Index Name",
             ),
             VectorStoreConnectionField(

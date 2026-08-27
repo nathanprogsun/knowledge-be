@@ -151,8 +151,7 @@ _EXECUTE_SKILL_SCRIPT_SCHEMA: JsonObject = {
         "script_path": {
             "type": "string",
             "description": (
-                "Relative path to the script within the skill directory "
-                "(e.g. scripts/analyze.py)"
+                "Relative path to the script within the skill directory (e.g. scripts/analyze.py)"
             ),
         },
         "args": {

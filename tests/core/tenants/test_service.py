@@ -65,9 +65,7 @@ def _make_repo() -> tuple[AsyncMock, dict[int, Tenant]]:
         if row is None:
             raise NotFoundError(code="tenant.not_found", message="Tenant not found")
         used = max(row.storage_used + delta, 0)
-        rows[tenant_id] = row.model_copy(
-            update={"storage_used": used, "updated_at": updated_at}
-        )
+        rows[tenant_id] = row.model_copy(update={"storage_used": used, "updated_at": updated_at})
         return used
 
     async def _bulk_set_storage_quota(
@@ -94,9 +92,7 @@ def _make_repo() -> tuple[AsyncMock, dict[int, Tenant]]:
         wanted = set(ids)
         return _sorted([r for r in _live().values() if r.id in wanted])
 
-    async def _list_all(
-        *, limit: int | None = None, offset: int = 0
-    ) -> list[Tenant]:
+    async def _list_all(*, limit: int | None = None, offset: int = 0) -> list[Tenant]:
         rs = _sorted(list(_live().values()))
         return rs[offset : offset + limit] if limit is not None else rs
 
@@ -107,9 +103,7 @@ def _make_repo() -> tuple[AsyncMock, dict[int, Tenant]]:
         limit: int | None = None,
         offset: int = 0,
     ) -> tuple[list[Tenant], int]:
-        matches = _sorted(
-            [r for r in _live().values() if _matches(r, keyword, tenant_id)]
-        )
+        matches = _sorted([r for r in _live().values() if _matches(r, keyword, tenant_id)])
         page = matches[offset : offset + limit] if limit is not None else matches
         return page, len(matches)
 
@@ -212,7 +206,9 @@ class TestCreateTenant(ServiceTest):
 
 
 class TestGetTenant(ServiceTest):
-    async def test_returns_projection(self, service: TenantService, rows: dict[int, Tenant]) -> None:
+    async def test_returns_projection(
+        self, service: TenantService, rows: dict[int, Tenant]
+    ) -> None:
         stored = _seed(rows, name="acme")
         info = await service.get_tenant(stored.id)
         assert info.id == stored.id
@@ -250,9 +246,7 @@ class TestListTenants(ServiceTest):
 
         assert [i.id for i in infos] == [newer.id, older.id]
 
-    async def test_excludes_deleted(
-        self, service: TenantService, rows: dict[int, Tenant]
-    ) -> None:
+    async def test_excludes_deleted(self, service: TenantService, rows: dict[int, Tenant]) -> None:
         live = _seed(rows, name="live")
         gone = _seed(rows, name="gone")
         await service.delete_tenant(gone.id)
@@ -314,9 +308,7 @@ class TestUpdateTenant(ServiceTest):
         assert info.name == "acme"
         assert info.description == "patched"
 
-    async def test_stamps_updated_at(
-        self, service: TenantService, rows: dict[int, Tenant]
-    ) -> None:
+    async def test_stamps_updated_at(self, service: TenantService, rows: dict[int, Tenant]) -> None:
         stored = _seed(rows, name="acme")
 
         info = await service.update_tenant(stored.id, name="acme corp")
@@ -356,9 +348,7 @@ class TestDeleteTenant(ServiceTest):
         assert await service.delete_tenant(stored.id) is True
         assert rows[stored.id].deleted_at is not None
 
-    async def test_is_idempotent(
-        self, service: TenantService, rows: dict[int, Tenant]
-    ) -> None:
+    async def test_is_idempotent(self, service: TenantService, rows: dict[int, Tenant]) -> None:
         stored = _seed(rows, name="acme")
         await service.delete_tenant(stored.id)
 

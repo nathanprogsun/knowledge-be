@@ -50,9 +50,7 @@ class ResourceCatalog(Protocol):
         """Return ``(physical_path, resource_or_none)`` for ``value``."""
         ...
 
-    async def bind(
-        self, reference: str, owner_type: str, owner_id: str, relation: str
-    ) -> None:
+    async def bind(self, reference: str, owner_type: str, owner_id: str, relation: str) -> None:
         """Attach ``reference`` to an owning entity."""
         ...
 
@@ -97,9 +95,7 @@ class ResourceCatalogFileService:
 
     # ── File operations ─────────────────────────────────────────────
 
-    async def save_file(
-        self, *, file: FileUpload, tenant_id: int, knowledge_id: str
-    ) -> str:
+    async def save_file(self, *, file: FileUpload, tenant_id: int, knowledge_id: str) -> str:
         """Save, register, then bind to the knowledge base when given."""
         physical = await self._inner.save_file(
             file=file, tenant_id=tenant_id, knowledge_id=knowledge_id
@@ -116,9 +112,7 @@ class ResourceCatalogFileService:
             await self._bind_knowledge(ref, knowledge_id)
         return ref
 
-    async def save_bytes(
-        self, *, data: bytes, tenant_id: int, file_name: str, temp: bool
-    ) -> str:
+    async def save_bytes(self, *, data: bytes, tenant_id: int, file_name: str, temp: bool) -> str:
         """Save raw bytes and register them (with a content hash)."""
         physical = await self._inner.save_bytes(
             data=data, tenant_id=tenant_id, file_name=file_name, temp=temp
@@ -147,9 +141,7 @@ class ResourceCatalogFileService:
         """
         physical, is_resource = await self._resolve(file_path)
         if is_resource and self._external_url:
-            token = await self._catalog.create_access_grant(
-                file_path, _RESOURCE_GRANT_TTL_SECONDS
-            )
+            token = await self._catalog.create_access_grant(file_path, _RESOURCE_GRANT_TTL_SECONDS)
             return f"{self._external_url}/r/{token}"
         return await self._inner.get_file_url(physical)
 

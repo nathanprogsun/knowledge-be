@@ -119,15 +119,15 @@ def _clean_invalid_utf8(s: str) -> str:
 # ── CJK bigram tokenizer ────────────────────────────────────────────
 
 _CJK_RANGES = (
-    (0x4E00, 0x9FFF),    # CJK Unified Ideographs
-    (0x3400, 0x4DBF),    # CJK Extension A
+    (0x4E00, 0x9FFF),  # CJK Unified Ideographs
+    (0x3400, 0x4DBF),  # CJK Extension A
     (0x20000, 0x2A6DF),  # CJK Extension B
     (0x2A700, 0x2B73F),  # CJK Extension C
     (0x2B740, 0x2B81F),  # CJK Extension D
-    (0xF900, 0xFAFF),    # CJK Compatibility Ideographs
-    (0x3040, 0x309F),    # Hiragana
-    (0x30A0, 0x30FF),     # Katakana
-    (0xAC00, 0xD7AF),    # Hangul Syllables
+    (0xF900, 0xFAFF),  # CJK Compatibility Ideographs
+    (0x3040, 0x309F),  # Hiragana
+    (0x30A0, 0x30FF),  # Katakana
+    (0xAC00, 0xD7AF),  # Hangul Syllables
 )
 
 
@@ -191,20 +191,26 @@ def _placeholders(n: int) -> str:
 def _build_filter_where(params: RetrieveParams, alias: str) -> list[tuple[str, list[Any]]]:
     parts: list[tuple[str, list[Any]]] = []
     if params.knowledge_base_ids:
-        parts.append((
-            f"{alias}.knowledge_base_id IN ({_placeholders(len(params.knowledge_base_ids))})",
-            list(params.knowledge_base_ids),
-        ))
+        parts.append(
+            (
+                f"{alias}.knowledge_base_id IN ({_placeholders(len(params.knowledge_base_ids))})",
+                list(params.knowledge_base_ids),
+            )
+        )
     if params.knowledge_ids:
-        parts.append((
-            f"{alias}.knowledge_id IN ({_placeholders(len(params.knowledge_ids))})",
-            list(params.knowledge_ids),
-        ))
+        parts.append(
+            (
+                f"{alias}.knowledge_id IN ({_placeholders(len(params.knowledge_ids))})",
+                list(params.knowledge_ids),
+            )
+        )
     if params.tag_ids:
-        parts.append((
-            f"{alias}.tag_id IN ({_placeholders(len(params.tag_ids))})",
-            list(params.tag_ids),
-        ))
+        parts.append(
+            (
+                f"{alias}.tag_id IN ({_placeholders(len(params.tag_ids))})",
+                list(params.tag_ids),
+            )
+        )
     return parts
 
 
@@ -235,6 +241,7 @@ class SQLiteRepository:
             logger.debug("engine has no sync_engine attribute; skipping sqlite-vec registration")
             return
         try:
+
             @sqlalchemy.event.listens_for(sync_engine, "connect")
             def _on_connect(dbapi_conn: Any, _connection_record: Any) -> None:
                 with contextlib.suppress(Exception):
@@ -321,17 +328,20 @@ class SQLiteRepository:
             f":knowledge_base_id, :tag_id, :content, :dimension, :is_enabled)"
         )
         async with self._engine.begin() as conn:
-            result = await conn.execute(sql, {
-                "source_id": info.source_id,
-                "source_type": int(info.source_type),
-                "chunk_id": info.chunk_id,
-                "knowledge_id": info.knowledge_id,
-                "knowledge_base_id": info.knowledge_base_id,
-                "tag_id": info.tag_id,
-                "content": _clean_invalid_utf8(info.content),
-                "dimension": emb_dim,
-                "is_enabled": 1 if info.is_enabled else 0,
-            })
+            result = await conn.execute(
+                sql,
+                {
+                    "source_id": info.source_id,
+                    "source_type": int(info.source_type),
+                    "chunk_id": info.chunk_id,
+                    "knowledge_id": info.knowledge_id,
+                    "knowledge_base_id": info.knowledge_base_id,
+                    "tag_id": info.tag_id,
+                    "content": _clean_invalid_utf8(info.content),
+                    "dimension": emb_dim,
+                    "is_enabled": 1 if info.is_enabled else 0,
+                },
+            )
             row_id = result.lastrowid or 0
             if row_id == 0:
                 # INSERT OR IGNORE skipped; look up existing row by source_id
@@ -351,7 +361,9 @@ class SQLiteRepository:
         table = _vec_table_name(dim)
         async with self._engine.begin() as conn:
             await conn.execute(
-                sqlalchemy.text(f"INSERT OR REPLACE INTO {table} (rowid, embedding) VALUES (:rowid, :blob)"),
+                sqlalchemy.text(
+                    f"INSERT OR REPLACE INTO {table} (rowid, embedding) VALUES (:rowid, :blob)"
+                ),
                 {"rowid": row_id, "blob": blob},
             )
             await conn.execute(
@@ -405,7 +417,9 @@ class SQLiteRepository:
                 results.extend(res)
         return results
 
-    async def _keywords_retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
+    async def _keywords_retrieve(
+        self, ctx: Context, params: RetrieveParams
+    ) -> list[RetrieveResult]:
         if not params.query:
             return []
         fts_query = _sanitize_fts5_query(params.query)
@@ -445,11 +459,13 @@ class SQLiteRepository:
             )
             for r in rows
         ]
-        return [RetrieveResult(
-            results=items,
-            retriever_engine_type=RetrieverEngineType.SQLITE,
-            retriever_type=RetrieverType.KEYWORDS,
-        )]
+        return [
+            RetrieveResult(
+                results=items,
+                retriever_engine_type=RetrieverEngineType.SQLITE,
+                retriever_type=RetrieverType.KEYWORDS,
+            )
+        ]
 
     async def _vector_retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
         if not params.embedding:
@@ -485,23 +501,27 @@ class SQLiteRepository:
             score = 1.0 - distance
             if params.threshold > 0 and score < params.threshold:
                 continue
-            items.append(IndexWithScore(
-                id=str(r[0]),
-                source_id=r[2],
-                source_type=r[3],
-                chunk_id=r[4],
-                knowledge_id=r[5],
-                knowledge_base_id=r[6],
-                tag_id=r[7],
-                content=r[8],
-                score=score,
-                match_type=MatchType.EMBEDDING,
-            ))
-        return [RetrieveResult(
-            results=items,
-            retriever_engine_type=RetrieverEngineType.SQLITE,
-            retriever_type=RetrieverType.VECTOR,
-        )]
+            items.append(
+                IndexWithScore(
+                    id=str(r[0]),
+                    source_id=r[2],
+                    source_type=r[3],
+                    chunk_id=r[4],
+                    knowledge_id=r[5],
+                    knowledge_base_id=r[6],
+                    tag_id=r[7],
+                    content=r[8],
+                    score=score,
+                    match_type=MatchType.EMBEDDING,
+                )
+            )
+        return [
+            RetrieveResult(
+                results=items,
+                retriever_engine_type=RetrieverEngineType.SQLITE,
+                retriever_type=RetrieverType.VECTOR,
+            )
+        ]
 
     # ── delete_by_* ──
 
@@ -551,12 +571,16 @@ class SQLiteRepository:
                     vec_params,
                 )
             await conn.execute(
-                sqlalchemy.text(f"DELETE FROM {_TABLE_FTS} WHERE rowid IN ("
-                               f"SELECT id FROM {_TABLE_LITE_EMBEDDINGS} WHERE {field_name} IN ({ph}))"),
+                sqlalchemy.text(
+                    f"DELETE FROM {_TABLE_FTS} WHERE rowid IN ("
+                    f"SELECT id FROM {_TABLE_LITE_EMBEDDINGS} WHERE {field_name} IN ({ph}))"
+                ),
                 params,
             )
             await conn.execute(
-                sqlalchemy.text(f"DELETE FROM {_TABLE_LITE_EMBEDDINGS} WHERE {field_name} IN ({ph})"),
+                sqlalchemy.text(
+                    f"DELETE FROM {_TABLE_LITE_EMBEDDINGS} WHERE {field_name} IN ({ph})"
+                ),
                 params,
             )
 
@@ -613,8 +637,13 @@ class SQLiteRepository:
                 if new_row_id > 0 and int(src[8]) > 0:
                     await self._copy_vec(conn, int(src[0]), new_row_id, int(src[8]))
                     await self._sync_fts5_insert_row(
-                        conn, new_row_id, src[7], new_source_id,
-                        target_chunk_id, target_knowledge_id, target_knowledge_base_id,
+                        conn,
+                        new_row_id,
+                        src[7],
+                        new_source_id,
+                        target_chunk_id,
+                        target_knowledge_id,
+                        target_knowledge_base_id,
                     )
 
     async def _copy_vec(self, conn: Any, src_id: int, dst_id: int, dim: int) -> None:
@@ -630,8 +659,14 @@ class SQLiteRepository:
         )
 
     async def _sync_fts5_insert_row(
-        self, conn: Any, row_id: int, content: str, source_id: str,
-        chunk_id: str, knowledge_id: str, knowledge_base_id: str,
+        self,
+        conn: Any,
+        row_id: int,
+        content: str,
+        source_id: str,
+        chunk_id: str,
+        knowledge_id: str,
+        knowledge_base_id: str,
     ) -> None:
         tokenized = _tokenize_cjk_bigram(content)
         await conn.execute(
@@ -641,8 +676,11 @@ class SQLiteRepository:
                 f"VALUES (:rowid, :content, :source_id, :chunk_id, :knowledge_id, :knowledge_base_id)"
             ),
             {
-                "rowid": row_id, "content": tokenized, "source_id": source_id,
-                "chunk_id": chunk_id, "knowledge_id": knowledge_id,
+                "rowid": row_id,
+                "content": tokenized,
+                "source_id": source_id,
+                "chunk_id": chunk_id,
+                "knowledge_id": knowledge_id,
                 "knowledge_base_id": knowledge_base_id,
             },
         )

@@ -108,16 +108,11 @@ class Skill:
             raise SkillValidationError(message="skill name is required")
         if len(self.name) > MAX_NAME_LENGTH:
             raise SkillValidationError(
-                message=(
-                    f"skill name exceeds maximum length of {MAX_NAME_LENGTH} characters"
-                )
+                message=(f"skill name exceeds maximum length of {MAX_NAME_LENGTH} characters")
             )
         if not _is_valid_skill_name(self.name):
             raise SkillValidationError(
-                message=(
-                    "skill name must contain only lowercase letters, numbers, "
-                    "and hyphens"
-                )
+                message=("skill name must contain only lowercase letters, numbers, and hyphens")
             )
         for reserved in _RESERVED_WORDS:
             if reserved in self.name:
@@ -194,9 +189,7 @@ def parse_skill_file(content: str) -> Skill:
     or when the parsed metadata fails validation.
     """
     if not content.strip().startswith("---"):
-        raise SkillValidationError(
-            message="SKILL.md must start with YAML frontmatter (---)"
-        )
+        raise SkillValidationError(message="SKILL.md must start with YAML frontmatter (---)")
 
     frontmatter_lines: list[str] = []
     body_lines: list[str] = []
@@ -216,17 +209,13 @@ def parse_skill_file(content: str) -> Skill:
             body_lines.append(line)
 
     if not frontmatter_ended:
-        raise SkillValidationError(
-            message="SKILL.md frontmatter is not properly closed with ---"
-        )
+        raise SkillValidationError(message="SKILL.md frontmatter is not properly closed with ---")
 
     frontmatter = "\n".join(frontmatter_lines)
     try:
         data = yaml.safe_load(frontmatter)
     except yaml.YAMLError as exc:
-        raise SkillValidationError(
-            message=f"failed to parse YAML frontmatter: {exc}"
-        ) from exc
+        raise SkillValidationError(message=f"failed to parse YAML frontmatter: {exc}") from exc
 
     name = ""
     description = ""

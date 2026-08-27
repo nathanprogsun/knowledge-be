@@ -243,7 +243,10 @@ def test_build_tag_scopes_rejects_orphan_tag_ids() -> None:
 
 
 def test_resolve_agent_mode_prefers_agent_config() -> None:
-    assert resolve_agent_mode(agent_enabled=False, agent=_agent(mode=AGENT_MODE_SMART_REASONING)) is True
+    assert (
+        resolve_agent_mode(agent_enabled=False, agent=_agent(mode=AGENT_MODE_SMART_REASONING))
+        is True
+    )
     assert resolve_agent_mode(agent_enabled=True, agent=_agent(mode="quick-answer")) is False
     assert resolve_agent_mode(agent_enabled=True, agent=None) is True
 

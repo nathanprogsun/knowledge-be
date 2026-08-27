@@ -60,9 +60,7 @@ WIKI_DELETE_PAGE_TOOL_NAME = "wiki_delete_page"
 WIKI_RENAME_PAGE_TOOL_NAME = "wiki_rename_page"
 WIKI_REPLACE_TEXT_TOOL_NAME = "wiki_replace_text"
 
-WIKI_WRITE_PAGE_TOOL_DESCRIPTION = (
-    "Create a new Wiki page or completely overwrite an existing one. Automatically handles outbound links."
-)
+WIKI_WRITE_PAGE_TOOL_DESCRIPTION = "Create a new Wiki page or completely overwrite an existing one. Automatically handles outbound links."
 
 WIKI_WRITE_PAGE_TOOL_SCHEMA = json.dumps(
     {
@@ -107,9 +105,7 @@ WIKI_WRITE_PAGE_TOOL_SCHEMA = json.dumps(
     ensure_ascii=False,
 )
 
-WIKI_DELETE_PAGE_TOOL_DESCRIPTION = (
-    "Delete a Wiki page. Automatically cleans up incoming links on other pages to prevent dead links."
-)
+WIKI_DELETE_PAGE_TOOL_DESCRIPTION = "Delete a Wiki page. Automatically cleans up incoming links on other pages to prevent dead links."
 
 WIKI_DELETE_PAGE_TOOL_SCHEMA = json.dumps(
     {
@@ -125,9 +121,7 @@ WIKI_DELETE_PAGE_TOOL_SCHEMA = json.dumps(
     ensure_ascii=False,
 )
 
-WIKI_RENAME_PAGE_TOOL_DESCRIPTION = (
-    "Rename a Wiki page's slug. Automatically cascades the new slug to all pages that linked to the old one."
-)
+WIKI_RENAME_PAGE_TOOL_DESCRIPTION = "Rename a Wiki page's slug. Automatically cascades the new slug to all pages that linked to the old one."
 
 WIKI_RENAME_PAGE_TOOL_SCHEMA = json.dumps(
     {
@@ -337,13 +331,17 @@ class WikiWritePageTool:
                     ctx, resolved_refs or [], self._knowledge_service, self._kb_ids
                 )
             except ApplicationError as exc:
-                return ToolResult(success=False, error=f"Failed to resolve source_refs routing: {exc.message}")
+                return ToolResult(
+                    success=False, error=f"Failed to resolve source_refs routing: {exc.message}"
+                )
             try:
                 kb_id = resolve_wiki_create_kb(
                     params.slug, self._kb_ids, self._routes, *source_kb_hints
                 )
             except ApplicationError as exc:
-                return ToolResult(success=False, error=f"Failed to resolve wiki target: {exc.message}")
+                return ToolResult(
+                    success=False, error=f"Failed to resolve wiki target: {exc.message}"
+                )
         except WikiPageAmbiguousError as exc:
             return ToolResult(success=False, error=f"Failed to resolve wiki target: {exc}")
         except Exception as exc:
@@ -388,9 +386,7 @@ class WikiWritePageTool:
                 updates["source_refs"] = cast("JsonValue", resolved_refs)
             page = existing_page.model_copy(update=updates)
             try:
-                await self._wiki_service.update_page(
-                    page=page, edit_source=WIKI_EDIT_SOURCE_AGENT
-                )
+                await self._wiki_service.update_page(page=page, edit_source=WIKI_EDIT_SOURCE_AGENT)
             except Exception as exc:
                 return ToolResult(success=False, error=f"Failed to update page: {exc}")
             action = "updated"
@@ -552,7 +548,9 @@ class WikiDeletePageTool:
         self._routes.forget(slug, kb_id)
         updated_count = len(updated_slugs)
 
-        output_msg = f"Successfully deleted page [[{slug}]] and cleaned up {updated_count} incoming links."
+        output_msg = (
+            f"Successfully deleted page [[{slug}]] and cleaned up {updated_count} incoming links."
+        )
         if updated_count > 0:
             output_msg += f"\n- Affected pages: {', '.join(updated_slugs)}"
 
@@ -632,9 +630,7 @@ class WikiRenamePageTool:
             }
         )
         try:
-            await self._wiki_service.create_page(
-                page=new_page, edit_source=WIKI_EDIT_SOURCE_AGENT
-            )
+            await self._wiki_service.create_page(page=new_page, edit_source=WIKI_EDIT_SOURCE_AGENT)
         except Exception as exc:
             return ToolResult(success=False, error=f"Failed to create renamed page: {exc}")
 
@@ -676,9 +672,7 @@ class WikiRenamePageTool:
         with suppress(Exception):
             await self._wiki_service.rebuild_index_page(knowledge_base_id=kb_id)
 
-        output_msg = (
-            f"Successfully renamed page [[{slug}]] → [[{new_slug}]] and updated {updated_count} incoming links."
-        )
+        output_msg = f"Successfully renamed page [[{slug}]] → [[{new_slug}]] and updated {updated_count} incoming links."
         if updated_count > 0:
             output_msg += f"\n- Affected pages: {', '.join(updated_slugs)}"
 
@@ -776,7 +770,9 @@ class WikiReplaceTextTool:
                     return ToolResult(success=False, error=f"Invalid source_refs: {exc.message}")
             else:
                 resolved_refs = await resolve_source_refs(ctx, self._knowledge_service, source_refs)
-            page = existing_page.model_copy(update={"content": content, "source_refs": resolved_refs})
+            page = existing_page.model_copy(
+                update={"content": content, "source_refs": resolved_refs}
+            )
         else:
             page = existing_page.model_copy(update={"content": content})
 

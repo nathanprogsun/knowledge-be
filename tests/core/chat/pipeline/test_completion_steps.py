@@ -174,9 +174,7 @@ class _FakeKnowledgeService:
         self._knowledge = knowledge
         self.ids: list[str] = []
 
-    async def get_knowledge_by_id(
-        self, _ctx: object, knowledge_id: str
-    ) -> Knowledge | None:
+    async def get_knowledge_by_id(self, _ctx: object, knowledge_id: str) -> Knowledge | None:
         self.ids.append(knowledge_id)
         return self._knowledge
 
@@ -311,9 +309,7 @@ async def test_data_analysis_skips_when_knowledge_not_found() -> None:
     factory, created = _fake_tool_factory(tool)
     knowledge_service = _FakeKnowledgeService(knowledge=None)
     step = DataAnalysisStep(_FakeModelService(), knowledge_service, factory)
-    pipeline_ctx = PipelineContext(
-        merge_result=[_search_result(knowledge_filename="sales.csv")]
-    )
+    pipeline_ctx = PipelineContext(merge_result=[_search_result(knowledge_filename="sales.csv")])
 
     result = await step.on_event(_CTX, "data_analysis", pipeline_ctx, _noop_next)
 
@@ -346,16 +342,12 @@ async def test_data_analysis_cleanup_failure_does_not_mask_outcome() -> None:
     from src.core.agents.tools.base import ToolResult
 
     schema = TableSchema(table_name="k_1", columns=[], row_count=0)
-    tool = _FakeDataAnalysisTool(
-        schema, result=ToolResult(success=True, output="rows")
-    )
+    tool = _FakeDataAnalysisTool(schema, result=ToolResult(success=True, output="rows"))
     factory, _ = _fake_tool_factory(tool)
     model = _FakeChatModel(
         response=LLMChatResponse(content='{"knowledge_id": "k-1", "sql": "SELECT 1"}')
     )
-    step = DataAnalysisStep(
-        _FakeModelService(model), _FakeKnowledgeService(_knowledge()), factory
-    )
+    step = DataAnalysisStep(_FakeModelService(model), _FakeKnowledgeService(_knowledge()), factory)
     pipeline_ctx = PipelineContext(
         session_id="s-1",
         chat_model_id="cm-1",
@@ -377,9 +369,7 @@ async def test_data_analysis_cleanup_failure_does_not_mask_outcome() -> None:
 async def test_data_analysis_load_failure_continues_chain() -> None:
     tool = _FakeDataAnalysisTool(RuntimeError("cannot load"))
     factory, created = _fake_tool_factory(tool)
-    step = DataAnalysisStep(
-        _FakeModelService(), _FakeKnowledgeService(_knowledge()), factory
-    )
+    step = DataAnalysisStep(_FakeModelService(), _FakeKnowledgeService(_knowledge()), factory)
     pipeline_ctx = PipelineContext(
         session_id="s-1",
         merge_result=[_search_result(knowledge_filename="sales.csv")],
@@ -406,9 +396,7 @@ async def test_data_analysis_returns_get_chat_model_error() -> None:
         async def get_chat_model(self, _ctx: object, model_id: str):
             raise RuntimeError("no model")
 
-    step = DataAnalysisStep(
-        _RaisingModelService(), _FakeKnowledgeService(_knowledge()), factory
-    )
+    step = DataAnalysisStep(_RaisingModelService(), _FakeKnowledgeService(_knowledge()), factory)
     pipeline_ctx = PipelineContext(
         chat_model_id="cm-1",
         merge_result=[_search_result(knowledge_filename="sales.csv")],
@@ -431,15 +419,13 @@ async def test_data_analysis_appends_analysis_result() -> None:
 
     tool = _FakeDataAnalysisTool(
         schema,
-        result=ToolResult(success=True, output="record 1: {\"revenue\": \"100\"}"),
+        result=ToolResult(success=True, output='record 1: {"revenue": "100"}'),
     )
     factory, _ = _fake_tool_factory(tool)
     model = _FakeChatModel(
         response=LLMChatResponse(content='{"knowledge_id": "k-1", "sql": "SELECT 1"}')
     )
-    step = DataAnalysisStep(
-        _FakeModelService(model), _FakeKnowledgeService(_knowledge()), factory
-    )
+    step = DataAnalysisStep(_FakeModelService(model), _FakeKnowledgeService(_knowledge()), factory)
     pipeline_ctx = PipelineContext(
         session_id="s-1",
         chat_model_id="cm-1",
@@ -470,16 +456,10 @@ async def test_data_analysis_plans_with_analysis_schema_format() -> None:
         columns=[ColumnInfo(name="revenue", type="DOUBLE")],
         row_count=10,
     )
-    tool = _FakeDataAnalysisTool(
-        schema, result=ToolResult(success=True, output="rows")
-    )
+    tool = _FakeDataAnalysisTool(schema, result=ToolResult(success=True, output="rows"))
     factory, _ = _fake_tool_factory(tool)
-    model = _FakeChatModel(
-        response=LLMChatResponse(content='{"knowledge_id": "k-1", "sql": ""}')
-    )
-    step = DataAnalysisStep(
-        _FakeModelService(model), _FakeKnowledgeService(_knowledge()), factory
-    )
+    model = _FakeChatModel(response=LLMChatResponse(content='{"knowledge_id": "k-1", "sql": ""}'))
+    step = DataAnalysisStep(_FakeModelService(model), _FakeKnowledgeService(_knowledge()), factory)
     pipeline_ctx = PipelineContext(
         session_id="s-1",
         chat_model_id="cm-1",
@@ -501,14 +481,10 @@ async def test_data_analysis_skips_when_plan_model_fails() -> None:
     from src.core.agents.tools.base import ToolResult
 
     schema = TableSchema(table_name="k_1", columns=[], row_count=0)
-    tool = _FakeDataAnalysisTool(
-        schema, result=ToolResult(success=True, output="")
-    )
+    tool = _FakeDataAnalysisTool(schema, result=ToolResult(success=True, output=""))
     factory, _ = _fake_tool_factory(tool)
     model = _FakeChatModel(response=RuntimeError("provider down"))
-    step = DataAnalysisStep(
-        _FakeModelService(model), _FakeKnowledgeService(_knowledge()), factory
-    )
+    step = DataAnalysisStep(_FakeModelService(model), _FakeKnowledgeService(_knowledge()), factory)
     pipeline_ctx = PipelineContext(
         session_id="s-1",
         chat_model_id="cm-1",
@@ -528,9 +504,7 @@ async def test_data_analysis_skips_when_execute_fails_or_rejected() -> None:
     from src.core.agents.tools.base import ToolResult
 
     schema = TableSchema(table_name="k_1", columns=[], row_count=0)
-    tool = _FakeDataAnalysisTool(
-        schema, result=RuntimeError("modification query rejected")
-    )
+    tool = _FakeDataAnalysisTool(schema, result=RuntimeError("modification query rejected"))
     factory, _ = _fake_tool_factory(tool)
     step = DataAnalysisStep(
         _FakeModelService(),
@@ -550,9 +524,7 @@ async def test_data_analysis_skips_when_execute_fails_or_rejected() -> None:
     assert tool.cleaned_up == 1
     assert len(pipeline_ctx.merge_result) == 1
 
-    failed_tool = _FakeDataAnalysisTool(
-        schema, result=ToolResult(success=False, error="rejected")
-    )
+    failed_tool = _FakeDataAnalysisTool(schema, result=ToolResult(success=False, error="rejected"))
     failed_factory, _ = _fake_tool_factory(failed_tool)
     step = DataAnalysisStep(
         _FakeModelService(), _FakeKnowledgeService(_knowledge()), failed_factory
@@ -569,7 +541,10 @@ async def test_data_analysis_skips_when_execute_fails_or_rejected() -> None:
 def test_table_schema_describe_renders_columns() -> None:
     schema = TableSchema(
         table_name="k_1",
-        columns=[ColumnInfo(name="revenue", type="DOUBLE"), ColumnInfo(name="date", type="VARCHAR")],
+        columns=[
+            ColumnInfo(name="revenue", type="DOUBLE"),
+            ColumnInfo(name="date", type="VARCHAR"),
+        ],
         row_count=42,
     )
     assert schema.describe() == (
@@ -583,9 +558,7 @@ def test_table_schema_describe_renders_columns() -> None:
 
 
 def test_format_query_results_renders_jsonl_records() -> None:
-    rendered = format_query_results(
-        [{"revenue": "100", "month": "Jan"}], "SELECT * FROM k_1"
-    )
+    rendered = format_query_results([{"revenue": "100", "month": "Jan"}], "SELECT * FROM k_1")
     assert rendered.startswith("=== DuckDB Query Results ===\n\nExecuted SQL: SELECT * FROM k_1")
     assert "Returned 1 rows" in rendered
     assert 'record 1: {"month":"Jan","revenue":"100"}' in rendered
@@ -614,9 +587,13 @@ def test_data_analysis_input_schema_shape() -> None:
 
 def test_build_document_header_escapes_and_dedupes() -> None:
     results = [
-        _search_result(id="a", knowledge_id="k-1", knowledge_title="<Sales & Ops>", knowledge_description="d"),
+        _search_result(
+            id="a", knowledge_id="k-1", knowledge_title="<Sales & Ops>", knowledge_description="d"
+        ),
         _search_result(id="b", knowledge_id="k-1", knowledge_title="dup"),
-        _search_result(id="c", knowledge_id="k-2", knowledge_title="", knowledge_filename="alt.pdf"),
+        _search_result(
+            id="c", knowledge_id="k-2", knowledge_title="", knowledge_filename="alt.pdf"
+        ),
         _search_result(id="d", knowledge_id=""),
     ]
     header = build_document_header(results)
@@ -629,7 +606,12 @@ def test_build_document_header_escapes_and_dedupes() -> None:
 
 
 def test_build_document_header_empty_when_no_title() -> None:
-    assert build_document_header([_search_result(id="a", knowledge_id="k-1", knowledge_title="", knowledge_filename="")]) == ""
+    assert (
+        build_document_header(
+            [_search_result(id="a", knowledge_id="k-1", knowledge_title="", knowledge_filename="")]
+        )
+        == ""
+    )
     assert build_document_header([]) == ""
 
 
@@ -742,9 +724,7 @@ async def test_into_chat_message_renders_contexts_default_order() -> None:
 
     assert result is None
     rendered = pipeline_ctx.rendered_contexts
-    assert rendered == (
-        '<context id="1">first</context>\n<context id="2">second</context>'
-    )
+    assert rendered == ('<context id="1">first</context>\n<context id="2">second</context>')
     assert pipeline_ctx.user_content == "question|" + rendered
 
 
@@ -787,7 +767,7 @@ async def test_into_chat_message_faq_priority_without_high_confidence() -> None:
 
     assert result is None
     assert '<context id="FAQ-1">faq</context>' in pipeline_ctx.rendered_contexts
-    assert "match=\"exact\"" not in pipeline_ctx.rendered_contexts
+    assert 'match="exact"' not in pipeline_ctx.rendered_contexts
 
 
 async def test_into_chat_message_persists_rendered_content() -> None:
@@ -1093,9 +1073,7 @@ async def test_stream_decodes_handle_split_across_chunks() -> None:
     event_bus = _FakeEventBus()
     step = ChatCompletionStreamStep(_FakeModelService(model), event_bus)
 
-    await step._emit_stream_events(
-        _CTX, pipeline_ctx, model_context, stream, event_bus
-    )
+    await step._emit_stream_events(_CTX, pipeline_ctx, model_context, stream, event_bus)
 
     answer_events = [e for e in event_bus.events if e.type == ChatEventType.AGENT_FINAL_ANSWER]
     assert len(answer_events) == 2

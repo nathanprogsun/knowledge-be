@@ -31,31 +31,19 @@ def test_empty_url_returns_empty() -> None:
 
 
 def test_https_url_passes_through() -> None:
-    assert (
-        validate_url_for_ssrf("https://example.com/proxy")
-        == "https://example.com/proxy"
-    )
+    assert validate_url_for_ssrf("https://example.com/proxy") == "https://example.com/proxy"
 
 
 def test_http_url_passes_through() -> None:
-    assert (
-        validate_url_for_ssrf("http://example.com:8080/proxy")
-        == "http://example.com:8080/proxy"
-    )
+    assert validate_url_for_ssrf("http://example.com:8080/proxy") == "http://example.com:8080/proxy"
 
 
 def test_url_without_scheme_gets_https() -> None:
-    assert (
-        validate_url_for_ssrf("example.com/proxy")
-        == "https://example.com/proxy"
-    )
+    assert validate_url_for_ssrf("example.com/proxy") == "https://example.com/proxy"
 
 
 def test_url_is_stripped() -> None:
-    assert (
-        validate_url_for_ssrf("  https://example.com/proxy  ")
-        == "https://example.com/proxy"
-    )
+    assert validate_url_for_ssrf("  https://example.com/proxy  ") == "https://example.com/proxy"
 
 
 # ── Length ────────────────────────────────────────────────────────────
@@ -186,10 +174,7 @@ def test_hex_octet_obfuscation_rejected() -> None:
 
 def test_non_ip_like_string_passes_ip_like_check() -> None:
     # A plain alphanumeric hostname is not IP-like.
-    assert (
-        validate_url_for_ssrf("https://proxy.example.com")
-        == "https://proxy.example.com"
-    )
+    assert validate_url_for_ssrf("https://proxy.example.com") == "https://proxy.example.com"
 
 
 # ── Whitelist ─────────────────────────────────────────────────────────
@@ -207,8 +192,7 @@ def test_whitelist_suffix_skips_heavy_checks(
 ) -> None:
     monkeypatch.setenv("SSRF_WHITELIST", "*.trusted.example.com")
     assert (
-        validate_url_for_ssrf("http://api.trusted.example.com")
-        == "http://api.trusted.example.com"
+        validate_url_for_ssrf("http://api.trusted.example.com") == "http://api.trusted.example.com"
     )
 
 
@@ -216,9 +200,7 @@ def test_whitelist_cidr_skips_heavy_checks(
     monkeypatch: MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("SSRF_WHITELIST", "10.0.0.0/8")
-    assert (
-        validate_url_for_ssrf("http://10.5.6.7:8080") == "http://10.5.6.7:8080"
-    )
+    assert validate_url_for_ssrf("http://10.5.6.7:8080") == "http://10.5.6.7:8080"
 
 
 def test_whitelist_with_invalid_cidr_is_ignored(
@@ -227,10 +209,7 @@ def test_whitelist_with_invalid_cidr_is_ignored(
     monkeypatch.setenv("SSRF_WHITELIST", "not-a-cidr,example.com")
     # example.com is whitelisted (bare host), the bad CIDR is silently
     # dropped.
-    assert (
-        validate_url_for_ssrf("https://example.com/x")
-        == "https://example.com/x"
-    )
+    assert validate_url_for_ssrf("https://example.com/x") == "https://example.com/x"
 
 
 def test_unsetting_whitelist_still_blocks_loopback(

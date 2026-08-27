@@ -67,7 +67,7 @@ def main() -> int:
     parser.add_argument("--src-root", default=None)
     args = parser.parse_args()
 
-    go_root = _resolve(args.go_root, Path("/Users/jung/pro/WeKnora"))
+    go_root = _resolve(args.go_root, Path("/Users/jung/pro/Knowledge Base"))
     src_root = _resolve(args.src_root, Path(__file__).resolve().parent.parent)
 
     go_domains = _go_domains(go_root)

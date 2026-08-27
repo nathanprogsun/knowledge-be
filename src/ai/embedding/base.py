@@ -24,6 +24,7 @@ from typing import Protocol, runtime_checkable
 
 from src.ai.embedding.aliyun import new_aliyun_embedder
 from src.ai.embedding.azure_openai import new_azure_openai_embedder
+from src.ai.embedding.cloud import new_cloud_embedder
 from src.ai.embedding.concurrency import wrap_embedding_concurrency
 from src.ai.embedding.gemini import new_gemini_embedder
 from src.ai.embedding.jina import new_jina_embedder
@@ -31,17 +32,16 @@ from src.ai.embedding.nvidia import new_nvidia_embedder
 from src.ai.embedding.ollama import new_ollama_embedder
 from src.ai.embedding.openai import new_openai_embedder
 from src.ai.embedding.volcengine import new_volcengine_embedder
-from src.ai.embedding.weknoracloud import new_weknoracloud_embedder
 from src.ai.embedding.zhipu import new_zhipu_embedder
 from src.ai.provider.detect import detect_provider
 from src.ai.provider.registry import (
     PROVIDER_ALIYUN,
     PROVIDER_AZURE_OPENAI,
+    PROVIDER_CLOUD,
     PROVIDER_GEMINI,
     PROVIDER_JINA,
     PROVIDER_NVIDIA,
     PROVIDER_VOLCENGINE,
-    PROVIDER_WEKNORACLOUD,
     PROVIDER_ZHIPU,
 )
 from src.ai.utils.ollama_service import OllamaService
@@ -435,8 +435,8 @@ async def _route_remote(
         )
         return _apply_custom_headers(embedder, config)
 
-    if provider_name == PROVIDER_WEKNORACLOUD:
-        return await new_weknoracloud_embedder(config)
+    if provider_name == PROVIDER_CLOUD:
+        return await new_cloud_embedder(config)
 
     return await new_openai_embedder(
         api_key=config.api_key,

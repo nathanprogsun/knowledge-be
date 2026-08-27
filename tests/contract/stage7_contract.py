@@ -30,14 +30,12 @@ emit a bare ``{"data": ...}``. Those envelope assertions are marked
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
 from pathlib import Path
 from secrets import token_hex
 from typing import NamedTuple
 
 import pytest
 import pytest_asyncio
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel, ValidationError
 
@@ -46,9 +44,7 @@ from src.web.api.channels.embed.views import EmbedChannelRecord
 from src.web.api.channels.im.views import IMChannelRecord
 
 _REFERENCE = "reference fixture"
-_FIXTURE_PATH: Path = (
-    Path(__file__).parent / "fixtures" / "org_channel_responses.json"
-)
+_FIXTURE_PATH: Path = Path(__file__).parent / "fixtures" / "org_channel_responses.json"
 
 
 class OrgSeed(NamedTuple):
@@ -129,9 +125,7 @@ def _assert_payload(
     expect_exact_fields: bool = True,
 ) -> None:
     """Assert a response ``data`` payload matches ``model`` exactly."""
-    assert isinstance(payload, dict), (
-        f"{label}: expected a JSON object, got {type(payload)}"
-    )
+    assert isinstance(payload, dict), f"{label}: expected a JSON object, got {type(payload)}"
     if expect_exact_fields:
         _assert_keys(payload, model_wire_fields(model), f"{label} data")
     try:
@@ -164,9 +158,7 @@ async def agent_seed(authed_client: TestClient) -> AgentSeed:
 @pytest_asyncio.fixture
 async def org_seed(authed_client: TestClient) -> OrgSeed:
     """An organization minted through the real service + database."""
-    response = authed_client.post(
-        "/api/v1/organizations", json={"name": "contract-org"}
-    )
+    response = authed_client.post("/api/v1/organizations", json={"name": "contract-org"})
     assert response.status_code == 201, response.text
     return OrgSeed(authed_client, response.json()["data"]["id"])
 
@@ -217,9 +209,7 @@ async def im_channel_seed(agent_seed: AgentSeed) -> IMChannelSeed:
 def test_create_organization_matches_reference(authed_client: TestClient) -> None:
     """POST /organizations answers 201 with the reference organization envelope."""
     status, keys = _endpoint_spec("POST", "/api/v1/organizations")
-    response = authed_client.post(
-        "/api/v1/organizations", json={"name": "contract-org-create"}
-    )
+    response = authed_client.post("/api/v1/organizations", json={"name": "contract-org-create"})
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "POST /organizations")
@@ -243,9 +233,7 @@ def test_list_organizations_matches_reference(org_seed: OrgSeed) -> None:
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "GET /organizations")
-    _assert_payload(
-        body["data"], org_contracts.OrganizationList, "GET /organizations"
-    )
+    _assert_payload(body["data"], org_contracts.OrganizationList, "GET /organizations")
 
 
 def test_update_organization_matches_reference(org_seed: OrgSeed) -> None:
@@ -317,8 +305,7 @@ def test_organization_list_wire_field_set_matches_reference(org_seed: OrgSeed) -
     expected = set(_contract_fields("OrganizationList"))
     actual = set(data)
     assert actual != expected, (
-        "OrganizationList wire field set now matches the reference — the "
-        "xfail below can be lifted."
+        "OrganizationList wire field set now matches the reference — the xfail below can be lifted."
     )
     pytest.xfail(
         "Reference ListOrganizationsResponse uses 'organizations'; the "
@@ -346,9 +333,7 @@ def test_list_members_matches_reference(org_seed: OrgSeed) -> None:
 def test_join_requests_matches_reference(org_seed: OrgSeed) -> None:
     """GET /organizations/{id}/join-requests answers 200 with the reference envelope."""
     status, keys = _endpoint_spec("GET", "/api/v1/organizations/{id}/join-requests")
-    response = org_seed.client.get(
-        f"/api/v1/organizations/{org_seed.org_id}/join-requests"
-    )
+    response = org_seed.client.get(f"/api/v1/organizations/{org_seed.org_id}/join-requests")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "GET /organizations/{id}/join-requests")
@@ -373,9 +358,7 @@ def test_search_tenants_matches_reference(org_seed: OrgSeed) -> None:
 def test_invite_code_matches_reference(org_seed: OrgSeed) -> None:
     """POST /organizations/{id}/invite-code answers 200 with the reference envelope."""
     status, keys = _endpoint_spec("POST", "/api/v1/organizations/{id}/invite-code")
-    response = org_seed.client.post(
-        f"/api/v1/organizations/{org_seed.org_id}/invite-code"
-    )
+    response = org_seed.client.post(f"/api/v1/organizations/{org_seed.org_id}/invite-code")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "POST /organizations/{id}/invite-code")
@@ -394,21 +377,15 @@ def test_leave_organization_matches_reference(authed_client: TestClient) -> None
     envelope is the reference shape.
     """
     # Owner creates the org.
-    create_resp = authed_client.post(
-        "/api/v1/organizations", json={"name": "contract-org-leave"}
-    )
+    create_resp = authed_client.post("/api/v1/organizations", json={"name": "contract-org-leave"})
     assert create_resp.status_code == 201, create_resp.text
     org_id = create_resp.json()["data"]["id"]
     # Owner generates a fresh invite code and uses it to enrol a second
     # workspace as a viewer.
-    code_resp = authed_client.post(
-        f"/api/v1/organizations/{org_id}/invite-code"
-    )
+    code_resp = authed_client.post(f"/api/v1/organizations/{org_id}/invite-code")
     assert code_resp.status_code == 200, code_resp.text
     invite_code = code_resp.json()["data"]["invite_code"]
-    join_resp = authed_client.post(
-        "/api/v1/organizations/join", json={"invite_code": invite_code}
-    )
+    join_resp = authed_client.post("/api/v1/organizations/join", json={"invite_code": invite_code})
     assert join_resp.status_code == 200, join_resp.text
     # The owner is the first member; the second tenant is the leaver.
     # Since the join call returns the org the second tenant just joined,
@@ -446,9 +423,7 @@ def test_create_embed_channel_matches_reference(agent_seed: AgentSeed) -> None:
 def test_list_embed_channels_matches_reference(agent_seed: AgentSeed) -> None:
     """GET /agents/{agent_id}/embed-channels answers 200 with the reference envelope."""
     status, keys = _endpoint_spec("GET", "/api/v1/agents/{agent_id}/embed-channels")
-    response = agent_seed.client.get(
-        f"/api/v1/agents/{agent_seed.agent_id}/embed-channels"
-    )
+    response = agent_seed.client.get(f"/api/v1/agents/{agent_seed.agent_id}/embed-channels")
     assert response.status_code == status, response.text
     body = response.json()
     _assert_keys(body, keys, "GET /agents/{agent_id}/embed-channels")
@@ -575,9 +550,7 @@ def test_list_im_channels_payload_matches_reference(
     im_channel_seed: IMChannelSeed,
 ) -> None:
     """GET /agents/{agent_id}/im-channels ``data`` rows validate against the contract."""
-    response = im_channel_seed.client.get(
-        f"/api/v1/agents/{im_channel_seed.agent_id}/im-channels"
-    )
+    response = im_channel_seed.client.get(f"/api/v1/agents/{im_channel_seed.agent_id}/im-channels")
     assert response.status_code == 200, response.text
     body = response.json()
     _assert_keys(
@@ -603,9 +576,7 @@ def test_list_all_im_channels_matches_reference(
     response = im_channel_seed.client.get("/api/v1/im-channels")
     assert response.status_code == status, response.text
     body = response.json()
-    _assert_keys(
-        body, ["success", "data"], "GET /im-channels envelope"
-    )
+    _assert_keys(body, ["success", "data"], "GET /im-channels envelope")
     assert isinstance(body["data"], list)
     for row in body["data"]:
         _assert_payload(row, IMChannelRecord, "GET /im-channels row")
@@ -636,9 +607,7 @@ def test_toggle_im_channel_matches_reference(im_channel_seed: IMChannelSeed) -> 
     )
     assert response.status_code == status, response.text
     body = response.json()
-    _assert_keys(
-        body, ["success", "data"], "POST /im-channels/{channel_id}/toggle envelope"
-    )
+    _assert_keys(body, ["success", "data"], "POST /im-channels/{channel_id}/toggle envelope")
     _assert_payload(
         body["data"],
         IMChannelRecord,
@@ -649,9 +618,7 @@ def test_toggle_im_channel_matches_reference(im_channel_seed: IMChannelSeed) -> 
 def test_delete_im_channel_matches_reference(im_channel_seed: IMChannelSeed) -> None:
     """DELETE /im-channels/{id} matches the reference ack envelope."""
     status, keys = _endpoint_spec("DELETE", "/api/v1/im-channels/{channel_id}")
-    response = im_channel_seed.client.delete(
-        f"/api/v1/im-channels/{im_channel_seed.channel_id}"
-    )
+    response = im_channel_seed.client.delete(f"/api/v1/im-channels/{im_channel_seed.channel_id}")
     assert response.status_code == status, response.text
     _assert_keys(response.json(), keys, "DELETE /im-channels/{channel_id}")
 

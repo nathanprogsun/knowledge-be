@@ -26,15 +26,11 @@ class DummyFileService:
         """Always succeeds for the dummy service."""
         return
 
-    async def save_file(
-        self, *, file: FileUpload, tenant_id: int, knowledge_id: str
-    ) -> str:
+    async def save_file(self, *, file: FileUpload, tenant_id: int, knowledge_id: str) -> str:
         """Pretend to save the file, returning a random ``dummy://`` path."""
         return f"{DUMMY_SCHEME}{tenant_id}/{uuid.uuid4()}"
 
-    async def save_bytes(
-        self, *, data: bytes, tenant_id: int, file_name: str, temp: bool
-    ) -> str:
+    async def save_bytes(self, *, data: bytes, tenant_id: int, file_name: str, temp: bool) -> str:
         """Pretend to save the bytes, returning a random ``dummy://`` path."""
         return f"{DUMMY_SCHEME}{tenant_id}/{uuid.uuid4()}"
 

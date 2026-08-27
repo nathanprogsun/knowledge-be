@@ -20,7 +20,6 @@ strings, and the "endpoint reached ⇒ available" heuristics match Go.
 Operator-facing messages are Chinese to match the strings the frontend
 renders; RUF001 is suppressed file-wide.
 """
-# ruff: noqa: RUF001
 
 from __future__ import annotations
 

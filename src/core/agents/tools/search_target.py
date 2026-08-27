@@ -103,9 +103,7 @@ class SearchTargets:
         """Return the targets whose knowledge base is present in ``kb_ids``."""
         allowed = frozenset(kb_ids)
         return SearchTargets(
-            targets=tuple(
-                target for target in self.targets if target.knowledge_base_id in allowed
-            )
+            targets=tuple(target for target in self.targets if target.knowledge_base_id in allowed)
         )
 
 

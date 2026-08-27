@@ -67,9 +67,7 @@ def _make_repo() -> tuple[AsyncMock, dict[str, VectorStore]]:
 
     async def _list_for_tenant(tenant_id: int) -> list[VectorStore]:
         out = [
-            row
-            for row in rows.values()
-            if row.tenant_id == tenant_id and row.deleted_at is None
+            row for row in rows.values() if row.tenant_id == tenant_id and row.deleted_at is None
         ]
         out.sort(key=lambda r: r.created_at, reverse=True)
         return out
@@ -617,7 +615,7 @@ def test_vector_store_info_map_from_db_round_trip() -> None:
         name="es-hot",
         engine_type="elasticsearch",
         connection_config={"addr": "http://es:9200"},
-        index_config={"index_name": "weknora"},
+        index_config={"index_name": "kb"},
         source="user",
         readonly=False,
         created_at=now,
@@ -629,7 +627,7 @@ def test_vector_store_info_map_from_db_round_trip() -> None:
     assert info.name == "es-hot"
     assert info.engine_type == "elasticsearch"
     assert info.connection_config == {"addr": "http://es:9200"}
-    assert info.index_config == {"index_name": "weknora"}
+    assert info.index_config == {"index_name": "kb"}
 
 
 def test_mask_sensitive_fields_redacts_secrets() -> None:
@@ -716,7 +714,7 @@ def test_validate_connection_config_passes_when_valid() -> None:
         {"addr": "http://x", "username": "u", "api_key": "k"},
     )
     healthcheck_module.validate_connection_config("weaviate", {"host": "weaviate:8080"})
-    healthcheck_module.validate_connection_config("doris", {"addr": "x", "database": "weknora"})
+    healthcheck_module.validate_connection_config("doris", {"addr": "x", "database": "kb"})
     healthcheck_module.validate_connection_config("opensearch", {"addr": "https://os:9200"})
 
 

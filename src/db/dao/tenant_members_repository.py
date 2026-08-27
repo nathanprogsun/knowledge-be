@@ -229,9 +229,9 @@ class TenantMemberRepository(GenericRepository[TenantMember]):
         *,
         where: str = "user_id = :user_id and tenant_id = :tenant_id",
     ) -> int:
-        stmt = text(
-            f"update {_TABLE_NAME} set {set_clause} where {where} and {_LIVE}"
-        ).bindparams(**params)
+        stmt = text(f"update {_TABLE_NAME} set {set_clause} where {where} and {_LIVE}").bindparams(
+            **params
+        )
         result = await self._session.execute(stmt)
         return cast("CursorResult[SqlValue]", result).rowcount
 

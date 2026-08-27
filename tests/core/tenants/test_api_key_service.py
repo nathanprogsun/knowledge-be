@@ -23,7 +23,10 @@ from src.core.tenants.api_key_service import (
     normalize_knowledge_base_ids,
     normalize_scope_type,
 )
-from src.db.dao.tenant_api_keys_repository import PLACEHOLDER_KEY_HASH_PREFIX, TenantAPIKeyRepository
+from src.db.dao.tenant_api_keys_repository import (
+    PLACEHOLDER_KEY_HASH_PREFIX,
+    TenantAPIKeyRepository,
+)
 from src.db.models.tenants.tenant_api_keys import TenantAPIKey
 from tests.util.service_test import ServiceTest
 
@@ -201,9 +204,7 @@ class TestCreateApiKey(ServiceTest):
 
     async def test_platform_key_requires_capabilities(self, service: TenantAPIKeyService) -> None:
         with pytest.raises(ValidationError) as excinfo:
-            await service.create_api_key(
-                name="ops", scope_type=SCOPE_PLATFORM, capabilities=[]
-            )
+            await service.create_api_key(name="ops", scope_type=SCOPE_PLATFORM, capabilities=[])
         assert excinfo.value.code == "tenant_api_key.capabilities_required"
 
     async def test_full_access_clears_narrowing_lists(
@@ -295,12 +296,12 @@ class TestAuthenticate(ServiceTest):
 
 
 class TestListing(ServiceTest):
-    async def test_returns_only_that_tenants_live_keys(
-        self, service: TenantAPIKeyService
-    ) -> None:
+    async def test_returns_only_that_tenants_live_keys(self, service: TenantAPIKeyService) -> None:
         mine = await service.create_api_key(name="mine", tenant_id=_TENANT_ID, full_access=True)
         await service.create_api_key(name="theirs", tenant_id=_TENANT_ID + 1, full_access=True)
-        revoked = await service.create_api_key(name="revoked", tenant_id=_TENANT_ID, full_access=True)
+        revoked = await service.create_api_key(
+            name="revoked", tenant_id=_TENANT_ID, full_access=True
+        )
         await service.revoke_api_key(revoked.key.id, tenant_id=_TENANT_ID)
 
         keys = await service.list_api_keys(_TENANT_ID)

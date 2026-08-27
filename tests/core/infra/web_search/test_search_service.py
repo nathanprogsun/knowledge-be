@@ -78,9 +78,7 @@ def _get_by_id_for(
 ):
     """Return a side_effect that resolves ``(tenant_id, provider_id)``."""
 
-    async def _get_by_id(
-        tenant_id: int, provider_id: str
-    ) -> WebSearchProvider | None:
+    async def _get_by_id(tenant_id: int, provider_id: str) -> WebSearchProvider | None:
         row = rows.get((tenant_id, provider_id))
         if row is None or row.deleted_at is not None:
             return None

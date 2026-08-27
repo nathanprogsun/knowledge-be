@@ -58,9 +58,7 @@ class ObsStorageAdapter:
         self._bucket_name = bucket_name
         self._path_prefix = path_prefix.strip().strip("/")
         configured_proxy = (
-            proxy_domain
-            if proxy_domain is not None
-            else os.environ.get(OBS_PROXY_DOMAIN_ENV, "")
+            proxy_domain if proxy_domain is not None else os.environ.get(OBS_PROXY_DOMAIN_ENV, "")
         )
         self._proxy_domain = configured_proxy.strip().rstrip("/")
         self._store_cache: S3ObjectStore | None = None
@@ -84,9 +82,7 @@ class ObsStorageAdapter:
 
     # ── File operations ─────────────────────────────────────────────
 
-    async def save_file(
-        self, *, file: FileUpload, tenant_id: int, knowledge_id: str
-    ) -> str:
+    async def save_file(self, *, file: FileUpload, tenant_id: int, knowledge_id: str) -> str:
         """Upload ``file`` to ``{prefix}{tenant}/{knowledge}/{uuid}{ext}``."""
         ext = os.path.splitext(file.filename)[1]
         object_key = self._knowledge_key(tenant_id, knowledge_id, ext)
@@ -95,9 +91,7 @@ class ObsStorageAdapter:
         await self._store.put_object(object_key, data, content_type)
         return self._path(object_key)
 
-    async def save_bytes(
-        self, *, data: bytes, tenant_id: int, file_name: str, temp: bool
-    ) -> str:
+    async def save_bytes(self, *, data: bytes, tenant_id: int, file_name: str, temp: bool) -> str:
         """Persist raw bytes.
 
         ``temp`` writes under ``{prefix}temp/{tenant}/`` (auto-expired by

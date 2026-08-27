@@ -42,7 +42,7 @@ from src.ai.llm.types import (
     ToolCall,
 )
 from src.ai.provider.providers.anthropic import ANTHROPIC_BASE_URL
-from src.common.exception import ValidationError, AIProviderError
+from src.common.exception import AIProviderError, ValidationError
 
 BASE_URL = "http://llm.test/v1"
 

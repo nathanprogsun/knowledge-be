@@ -374,9 +374,7 @@ def redact_image_data(content: list[ContentItem]) -> list[ContentItem]:
     redacted: list[ContentItem] = []
     for item in content:
         if item.type == "image" and item.data:
-            redacted.append(
-                replace(item, data=f"[redacted, base64_len={len(item.data)}]")
-            )
+            redacted.append(replace(item, data=f"[redacted, base64_len={len(item.data)}]"))
         else:
             redacted.append(item)
     return redacted
@@ -471,11 +469,7 @@ def is_authorization_required(exc: BaseException | None) -> bool:
     if isinstance(exc, OAuthRequiredError):
         return True
     message = str(exc).lower()
-    return (
-        "authorization required" in message
-        or "no valid token" in message
-        or "401" in message
-    )
+    return "authorization required" in message or "no valid token" in message or "401" in message
 
 
 def oauth_aware_connect_error(service: MCPServiceInfo, exc: BaseException) -> str:

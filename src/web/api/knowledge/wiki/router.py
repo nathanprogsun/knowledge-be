@@ -288,7 +288,9 @@ async def update_page(
             "title": body.title.strip() if body.title is not None else existing.title,
             "content": body.content if body.content is not None else existing.content,
             "summary": body.summary if body.summary is not None else existing.summary,
-            "page_type": body.page_type.strip() if body.page_type is not None else existing.page_type,
+            "page_type": body.page_type.strip()
+            if body.page_type is not None
+            else existing.page_type,
             "status": body.status.strip() if body.status is not None else existing.status,
             "aliases": list(body.aliases) if body.aliases is not None else existing.aliases,
         }

@@ -39,9 +39,7 @@ from src.web.api.channels.embed import views as embed_views
 from src.web.api.channels.im import views as im_views
 from src.web.api.organizations.views import TenantInviteCandidate
 
-_FIXTURE_PATH: Path = (
-    Path(__file__).parent / "fixtures" / "org_channel_responses.json"
-)
+_FIXTURE_PATH: Path = Path(__file__).parent / "fixtures" / "org_channel_responses.json"
 
 #: Contract names whose Python frozen model is known to drift from the
 #: captured reference. Each entry documents the specific drift so future
@@ -52,8 +50,7 @@ KNOWN_CONTRACT_DRIFT: dict[str, str] = {
         "field that OrganizationResponse carries in the upstream contract."
     ),
     "OrganizationList": (
-        "Python OrganizationList renames the reference 'organizations' "
-        "list field to 'items'."
+        "Python OrganizationList renames the reference 'organizations' list field to 'items'."
     ),
     "SearchOrganizationsResponse": (
         "Python SearchOrganizationsResponse renames the reference "

@@ -114,11 +114,7 @@ class EvaluationMemoryStorage:
             task = self._store.get(task_id)
             if task is None:
                 return
-            finished = (
-                task.total
-                if status in (_STATUS_SUCCESS, _STATUS_FAILED)
-                else task.finished
-            )
+            finished = task.total if status in (_STATUS_SUCCESS, _STATUS_FAILED) else task.finished
             self._store[task_id] = task.model_copy(
                 update={"status": status, "finished": finished},
             )

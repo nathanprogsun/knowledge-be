@@ -12,7 +12,6 @@ the service dep override on it; the real ``require_auth`` dep resolves
 the principal via the ``X-User-Id/X-Tenant-ID/X-Roles`` header trio.
 """
 # Chinese message strings are asserted verbatim against the Go originals.
-# ruff: noqa: RUF001
 
 from __future__ import annotations
 

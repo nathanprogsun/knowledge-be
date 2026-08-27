@@ -34,7 +34,6 @@ from src.ai.retrieval.types import (
     RetrieverType,
     SourceType,
 )
-from src.common.exception import ValidationError
 from src.ai.retrieval.weaviate import (
     FIELD_CHUNK_ID,
     FIELD_CONTENT,
@@ -53,6 +52,7 @@ from src.ai.retrieval.weaviate import (
     new_weaviate_retrieve_engine_repository,
     new_weaviate_retrieve_engine_repository_from_env,
 )
+from src.common.exception import ValidationError
 
 _CTX = TaskContext()
 
@@ -121,7 +121,7 @@ class _FakeClient:
 
 
 def _repo(
-    base: str = "weknora_embeddings",
+    base: str = "kb_embeddings",
     *,
     client: _FakeClient | None = None,
     replication: int = 0,
@@ -205,7 +205,7 @@ def test_resolve_collection_name_uses_default_when_nothing_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("WEAVIATE_COLLECTION", raising=False)
-    assert _resolve_collection_name(None) == "weknora_embeddings"
+    assert _resolve_collection_name(None) == "kb_embeddings"
 
 
 def test_resolve_collection_name_config_overrides_env(
@@ -217,16 +217,14 @@ def test_resolve_collection_name_config_overrides_env(
 
 
 def test_collection_name_combines_base_and_dimension() -> None:
-    assert _collection_name("weknora_embeddings", 768) == "weknora_embeddings_768"
+    assert _collection_name("kb_embeddings", 768) == "kb_embeddings_768"
 
 
 def test_calculate_storage_size_includes_vector_and_id_tracker() -> None:
     size_no_vec = _calculate_storage_size("abcde", "s", "c", "k", "kb", [])
     assert size_no_vec == len("abcde") + len("s") + len("c") + len("k") + len("kb") + 8 + 24
 
-    size_with_vec = _calculate_storage_size(
-        "abcde", "s", "c", "k", "kb", [0.0] * 16, hnsw_m=32
-    )
+    size_with_vec = _calculate_storage_size("abcde", "s", "c", "k", "kb", [0.0] * 16, hnsw_m=32)
     assert size_with_vec == size_no_vec + 16 * 4 + 32 * 2 * 8
 
 
@@ -314,7 +312,7 @@ async def test_save_creates_collection_with_expected_vector_config() -> None:
     await r.save(_CTX, info, _save_params("s-1", [0.1] * 4))
     client.collections.create.assert_awaited_once()
     kwargs = client.collections.create.await_args.kwargs
-    assert kwargs["name"] == "weknora_embeddings_4"
+    assert kwargs["name"] == "kb_embeddings_4"
     assert kwargs["vector_config"] == Configure.Vectors.self_provided(
         name=VECTOR_NAME,
         vector_index_config=Configure.VectorIndex.hnsw(
@@ -529,8 +527,8 @@ async def test_keywords_retrieve_filters_collections_by_base_name() -> None:
         return m
 
     client.collections.list_all.return_value = [
-        _collection_entry("weknora_embeddings_4"),
-        _collection_entry("weknora_embeddings_8"),
+        _collection_entry("kb_embeddings_4"),
+        _collection_entry("kb_embeddings_8"),
         _collection_entry("other_collection"),
     ]
     client.collections.get.return_value.query.bm25.return_value = _FakeQueryReturn([])
@@ -555,9 +553,7 @@ async def test_keywords_retrieve_caps_results_to_top_k() -> None:
         m.name = name
         return m
 
-    client.collections.list_all.return_value = [
-        _collection_entry("weknora_embeddings_4")
-    ]
+    client.collections.list_all.return_value = [_collection_entry("kb_embeddings_4")]
     properties = {FIELD_CONTENT: "x", FIELD_CHUNK_ID: "c"}
     client.collections.get.return_value.query.bm25.return_value = _FakeQueryReturn(
         [_obj(f"p-{i}", properties) for i in range(5)]
@@ -571,9 +567,7 @@ async def test_keywords_retrieve_caps_results_to_top_k() -> None:
 
 async def test_keywords_retrieve_returns_empty_when_no_match() -> None:
     client = _FakeClient()
-    client.collections.list_all.return_value = [
-        _collection_entry("other_collection")
-    ]
+    client.collections.list_all.return_value = [_collection_entry("other_collection")]
     r = _repo(client=client)
     params = RetrieveParams(query="x", top_k=3, retriever_type=RetrieverType.KEYWORDS)
     results = await r.retrieve(_CTX, params)
@@ -635,8 +629,8 @@ async def test_delete_by_knowledge_id_list_targets_knowledge_field() -> None:
 async def test_batch_update_chunk_enabled_status_updates_all_collections() -> None:
     client = _FakeClient()
     client.collections.list_all.return_value = [
-        _collection_entry("weknora_embeddings_4"),
-        _collection_entry("weknora_embeddings_8"),
+        _collection_entry("kb_embeddings_4"),
+        _collection_entry("kb_embeddings_8"),
         _collection_entry("unrelated"),
     ]
     r = _repo(client=client)
@@ -655,9 +649,7 @@ async def test_batch_update_chunk_enabled_status_skips_empty_map() -> None:
 
 async def test_batch_update_chunk_tag_id_writes_payload() -> None:
     client = _FakeClient()
-    client.collections.list_all.return_value = [
-        _collection_entry("weknora_embeddings_4")
-    ]
+    client.collections.list_all.return_value = [_collection_entry("kb_embeddings_4")]
     r = _repo(client=client)
     await r.batch_update_chunk_tag_id(_CTX, {"c-1": "tag-a", "c-2": "tag-b"})
     update_calls = client.collections.get.return_value.data.update.await_args_list
@@ -735,9 +727,7 @@ async def test_copy_indices_preserves_question_suffix() -> None:
         FIELD_IS_ENABLED: True,
     }
     client.collections.get.return_value.query.fetch_objects.side_effect = [
-        _FakeQueryReturn(
-            [_obj("p", src_payload, vector={VECTOR_NAME: [0.1] * 4})]
-        ),
+        _FakeQueryReturn([_obj("p", src_payload, vector={VECTOR_NAME: [0.1] * 4})]),
         _FakeQueryReturn([]),
     ]
     r = _repo(client=client)

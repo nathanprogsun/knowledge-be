@@ -32,7 +32,6 @@ from src.core.chat.messages.index_to_kb import (
 )
 from src.core.chat.messages.service.message_service import (
     ChatHistoryConfigProvider,
-    MessageSearchGroupItem,
     MessageSearchParams,
     MessageSearchResult,
     MessageSearchResultItem,
@@ -41,9 +40,9 @@ from src.core.chat.messages.service.message_service import (
     MessageWithSession,
 )
 from src.core.chat.messages.types import (
-    MessageSearchMode,
     ROLE_ASSISTANT,
     ROLE_USER,
+    MessageSearchMode,
 )
 from src.core.chat.pipeline.types import Context
 from src.db.dao.message_repository import MessageRepository
@@ -596,9 +595,7 @@ async def test_list_messages_by_session_before_time_delegates_to_repo() -> None:
     sessions.allow("sess-1")
 
     # Act
-    await service.list_messages_by_session_before_time(
-        _Ctx(), "sess-1", before_time=_NOW, limit=4
-    )
+    await service.list_messages_by_session_before_time(_Ctx(), "sess-1", before_time=_NOW, limit=4)
 
     # Assert
     assert repo.list_before_time == [("sess-1", _NOW, 4)]
@@ -611,9 +608,7 @@ async def test_update_message_writes_columns_and_returns_row() -> None:
     sessions.allow("sess-1")
     existing = _message(id="msg-1", session_id="sess-1", content="before")
     repo.seed(existing)
-    updated_input = _message(
-        id="msg-1", session_id="sess-1", content="after", is_completed=True
-    )
+    updated_input = _message(id="msg-1", session_id="sess-1", content="after", is_completed=True)
 
     # Act
     returned = await service.update_message(_Ctx(), updated_input)
@@ -659,9 +654,7 @@ async def test_update_message_rendered_content_delegates_to_repo() -> None:
     repo.seed(_message(id="msg-1", session_id="sess-1"))
 
     # Act
-    updated = await service.update_message_rendered_content(
-        _Ctx(), "sess-1", "msg-1", "rendered"
-    )
+    updated = await service.update_message_rendered_content(_Ctx(), "sess-1", "msg-1", "rendered")
 
     # Assert
     assert updated.rendered_content == "rendered"
@@ -767,9 +760,7 @@ async def test_search_messages_vector_mode_runs_vector_seam() -> None:
     )
     searcher = _FakeVectorSearcher(results=[vector_hit])
     config = _FakeConfig(enabled=True, kb_id="kb-history")
-    service, _, _ = _service(
-        message_repo=repo, vector_searcher=searcher, config=config
-    )
+    service, _, _ = _service(message_repo=repo, vector_searcher=searcher, config=config)
 
     # Act
     result = await service.search_messages(
@@ -825,9 +816,7 @@ async def test_search_messages_hybrid_mode_fuses_keyword_and_vector() -> None:
     )
     searcher = _FakeVectorSearcher(results=[vector_hit])
     config = _FakeConfig(enabled=True, kb_id="kb-history")
-    service, _, _ = _service(
-        message_repo=repo, vector_searcher=searcher, config=config
-    )
+    service, _, _ = _service(message_repo=repo, vector_searcher=searcher, config=config)
 
     # Act
     result = await service.search_messages(
@@ -901,9 +890,7 @@ async def test_search_messages_groups_partner_message_for_qa_pair() -> None:
     )
     searcher = _FakeVectorSearcher(results=[user_hit])
     config = _FakeConfig(enabled=True, kb_id="kb-history")
-    service, _, _ = _service(
-        message_repo=repo, vector_searcher=searcher, config=config
-    )
+    service, _, _ = _service(message_repo=repo, vector_searcher=searcher, config=config)
 
     # Act
     result = await service.search_messages(

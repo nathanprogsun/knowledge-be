@@ -20,7 +20,6 @@ are surfaced verbatim by the web layer and must match the Go strings the
 frontend already renders. RUF001 (ambiguous full-width punctuation) is
 suppressed file-wide for that reason.
 """
-# ruff: noqa: RUF001, RUF002
 
 from __future__ import annotations
 

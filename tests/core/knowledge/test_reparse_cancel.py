@@ -779,8 +779,13 @@ def _image_info_json(
     ocr_text: str = "",
 ) -> str:
     return (
-        '[{"original_url":"' + original_url + '","caption":"' + caption
-        + '","ocr_text":"' + ocr_text + '"}]'
+        '[{"original_url":"'
+        + original_url
+        + '","caption":"'
+        + caption
+        + '","ocr_text":"'
+        + ocr_text
+        + '"}]'
     )
 
 
@@ -900,7 +905,9 @@ async def test_image_update_non_single_record_is_noop() -> None:
     tenant_id = _int32_tenant_id()
     doc = _doc_row(tenant_id=tenant_id)
     rows[doc.id] = doc
-    parent = _chunk_row(tenant_id=tenant_id, knowledge_base_id=doc.knowledge_base_id, knowledge_id=doc.id)
+    parent = _chunk_row(
+        tenant_id=tenant_id, knowledge_base_id=doc.knowledge_base_id, knowledge_id=doc.id
+    )
     chunk_service = _FakeChunkService({parent.id: parent})
 
     for payload in (

@@ -124,9 +124,7 @@ class NvidiaReranker:
             # The response carries only index + logit; the document text is
             # recovered from the input list. Out-of-range indices degrade to
             # an empty text rather than crashing the whole rerank.
-            document_text = (
-                documents[item.index] if 0 <= item.index < len(documents) else ""
-            )
+            document_text = documents[item.index] if 0 <= item.index < len(documents) else ""
             results.append(
                 RankResult(
                     index=item.index,

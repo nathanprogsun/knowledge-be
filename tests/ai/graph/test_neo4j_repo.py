@@ -157,14 +157,10 @@ class _FakeSession:
         self._tx = tx
         self.closed = False
 
-    async def execute_write(
-        self, fn: Callable[..., Awaitable[object]], *args: object
-    ) -> object:
+    async def execute_write(self, fn: Callable[..., Awaitable[object]], *args: object) -> object:
         return await fn(self._tx, *args)
 
-    async def execute_read(
-        self, fn: Callable[..., Awaitable[object]], *args: object
-    ) -> object:
+    async def execute_read(self, fn: Callable[..., Awaitable[object]], *args: object) -> object:
         return await fn(self._tx, *args)
 
     async def close(self) -> None:
@@ -354,9 +350,7 @@ async def test_connect_driver_retries_then_succeeds(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     driver = AsyncMock()
-    driver.verify_authentication = AsyncMock(
-        side_effect=[RuntimeError("auth down"), None]
-    )
+    driver.verify_authentication = AsyncMock(side_effect=[RuntimeError("auth down"), None])
     sleep = AsyncMock()
     monkeypatch.setattr(AsyncGraphDatabase, "driver", Mock(return_value=driver))
     monkeypatch.setattr(asyncio, "sleep", sleep)

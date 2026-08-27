@@ -157,7 +157,7 @@ def test_analyze_content_empty() -> None:
 
 
 def test_analyze_content_produces_chunks() -> None:
-    text = ("The quick brown fox jumps over the lazy dog. " * 20)
+    text = "The quick brown fox jumps over the lazy dog. " * 20
     chunks, total = analyze_content(text)
     assert len(chunks) >= 1
     assert total >= 1
@@ -176,7 +176,9 @@ def test_analyze_content_respects_chunk_size() -> None:
 # ── Content selection under budget ────────────────────────────────────
 
 
-def _ready_doc(chunks: list[dict[str, object]], *, token_count: int, content: str) -> TemporaryDocument:
+def _ready_doc(
+    chunks: list[dict[str, object]], *, token_count: int, content: str
+) -> TemporaryDocument:
     return _make_doc(
         status=TEMPORARY_DOCUMENT_STATUS_READY,
         token_count=token_count,

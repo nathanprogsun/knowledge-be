@@ -70,9 +70,7 @@ class KS3FileService:
 
     # ── File operations ─────────────────────────────────────────────
 
-    async def save_file(
-        self, *, file: FileUpload, tenant_id: int, knowledge_id: str
-    ) -> str:
+    async def save_file(self, *, file: FileUpload, tenant_id: int, knowledge_id: str) -> str:
         """Upload ``file`` to ``{prefix}{tenant}/{knowledge}/{uuid}{ext}``."""
         ext = os.path.splitext(file.filename)[1]
         object_key = join_object_key(
@@ -83,9 +81,7 @@ class KS3FileService:
         await self._store.put_object(object_key, data, content_type)
         return f"{KS3_SCHEME}{self._bucket_name}/{object_key}"
 
-    async def save_bytes(
-        self, *, data: bytes, tenant_id: int, file_name: str, temp: bool
-    ) -> str:
+    async def save_bytes(self, *, data: bytes, tenant_id: int, file_name: str, temp: bool) -> str:
         """Upload raw bytes to ``{prefix}{tenant}/exports/``.
 
         ``temp`` is ignored — KS3 has no separate auto-expiring store.
@@ -122,9 +118,7 @@ class KS3FileService:
         try:
             src_bucket, src_key = self._parse_path(src_path)
         except StorageBackendError:
-            raise CrossBackendCopyError(
-                message=f"ks3 copy rejected source {src_path!r}"
-            ) from None
+            raise CrossBackendCopyError(message=f"ks3 copy rejected source {src_path!r}") from None
         ext = os.path.splitext(src_path)[1]
         dest_key = join_object_key(
             [self._path_prefix, str(tenant_id), knowledge_id, f"{uuid.uuid4()}{ext}"]

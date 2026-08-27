@@ -140,9 +140,7 @@ class MinioStorageAdapter:
 
     # ── File operations ─────────────────────────────────────────────
 
-    async def save_file(
-        self, *, file: FileUpload, tenant_id: int, knowledge_id: str
-    ) -> str:
+    async def save_file(self, *, file: FileUpload, tenant_id: int, knowledge_id: str) -> str:
         """Upload ``file`` to ``{tenant}/{knowledge}/{uuid}{ext}``."""
         ext = os.path.splitext(file.filename)[1]
         object_key = f"{tenant_id}/{knowledge_id}/{uuid.uuid4()}{ext}"
@@ -151,9 +149,7 @@ class MinioStorageAdapter:
         await self._store.put_object(object_key, data, content_type)
         return f"{MINIO_SCHEME}{self._bucket_name}/{object_key}"
 
-    async def save_bytes(
-        self, *, data: bytes, tenant_id: int, file_name: str, temp: bool
-    ) -> str:
+    async def save_bytes(self, *, data: bytes, tenant_id: int, file_name: str, temp: bool) -> str:
         """Upload raw bytes to ``{tenant}/exports/``.
 
         ``temp`` is ignored — MinIO has no separate auto-expiring store.

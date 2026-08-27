@@ -30,8 +30,8 @@ from src.common.exception import AIProviderError
 
 # ── Configuration ─────────────────────────────────────────────────────
 
-LLM_CHAT_TIMEOUT_ENV = "WEKNORA_LLM_CHAT_TIMEOUT_SECONDS"
-LLM_STREAM_TIMEOUT_ENV = "WEKNORA_LLM_STREAM_TIMEOUT_SECONDS"
+LLM_CHAT_TIMEOUT_ENV = "KB_LLM_CHAT_TIMEOUT_SECONDS"
+LLM_STREAM_TIMEOUT_ENV = "KB_LLM_STREAM_TIMEOUT_SECONDS"
 
 # Fallback deadlines (seconds), honored only when the caller set none.
 DEFAULT_CHAT_TIMEOUT_SECONDS = 300.0
@@ -91,7 +91,22 @@ _RESTRICTED_IPV4_NETWORKS = tuple(
 )
 
 _BLOCKED_PORTS = frozenset(
-    {"22", "23", "25", "445", "3389", "5432", "3306", "6379", "27017", "9200", "2379", "2380", "8500", "4001"}
+    {
+        "22",
+        "23",
+        "25",
+        "445",
+        "3389",
+        "5432",
+        "3306",
+        "6379",
+        "27017",
+        "9200",
+        "2379",
+        "2380",
+        "8500",
+        "4001",
+    }
 )
 
 # Headers users may never override: they are owned by provider auth/signing
@@ -297,9 +312,7 @@ def _validate_resolved_host_ips(host: str) -> None:
         raise SSRFValidationError(f"connection blocked: hostname {host} is restricted")
     for suffix in _RESTRICTED_HOST_SUFFIXES:
         if hostname_lower.endswith(suffix):
-            raise SSRFValidationError(
-                f"connection blocked: hostname suffix {suffix} is restricted"
-            )
+            raise SSRFValidationError(f"connection blocked: hostname suffix {suffix} is restricted")
     if is_ssrf_whitelisted(host):
         return
     _resolve_and_check_host(host)
@@ -340,9 +353,7 @@ def is_reserved_header(key: str) -> bool:
     return key.strip().lower() in _RESERVED_HEADER_KEYS
 
 
-def apply_custom_headers(
-    headers: dict[str, str], custom: dict[str, str] | None
-) -> dict[str, str]:
+def apply_custom_headers(headers: dict[str, str], custom: dict[str, str] | None) -> dict[str, str]:
     """Return ``headers`` with ``custom`` applied, skipping reserved keys."""
     if not custom:
         return headers

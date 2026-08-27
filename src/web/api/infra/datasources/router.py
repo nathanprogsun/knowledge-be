@@ -39,7 +39,6 @@ Query-parameter ``description`` strings are intentionally Chinese
 full-width punctuation; suppressed file-wide for the same reason as
 ``src/web/api/system/router.py``.
 """
-# ruff: noqa: RUF001
 
 from __future__ import annotations
 

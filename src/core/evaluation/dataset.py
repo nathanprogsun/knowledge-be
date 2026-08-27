@@ -191,7 +191,8 @@ class DatasetService:
         base = self._dataset_dir
         if not base.is_dir():
             logger.warning(
-                "sample dataset dir %s not found — using built-in pair", base,
+                "sample dataset dir %s not found — using built-in pair",
+                base,
             )
             return [_fallback_pair()]
         pairs = self.load_csv(
@@ -351,7 +352,7 @@ def _fallback_pair() -> QAPair:
     """Return a single deterministic pair used when samples are missing."""
     return QAPair(
         qid=1,
-        question="什么是知识管理？",  # noqa: RUF001 - intentional CJK content
+        question="什么是知识管理？",
         pids=[1],
         passages=["知识管理是组织收集、整理、共享和利用知识的过程。"],
         aid=1,

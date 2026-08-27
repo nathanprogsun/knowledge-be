@@ -628,7 +628,7 @@ class TestIngestHelpers:
         assert body == "Full body text."
 
     def test_split_summary_line_fullwidth_colon(self) -> None:
-        summary, body = split_summary_line("SUMMARY：One-liner\n\nBody.")  # noqa: RUF001
+        summary, body = split_summary_line("SUMMARY：One-liner\n\nBody.")
         assert summary == "One-liner"
         assert body == "Body."
 
@@ -818,7 +818,9 @@ class TestDedupSimilarity:
 
     def test_dedup_pair_score_is_max_over_surfaces(self) -> None:
         a = DedupSurface(slug_tokens=frozenset(), name_gram_sets=grams_per_surface(["Acme Corp"]))
-        b = DedupSurface(slug_tokens=frozenset(), name_gram_sets=grams_per_surface(["Acme Corporation"]))
+        b = DedupSurface(
+            slug_tokens=frozenset(), name_gram_sets=grams_per_surface(["Acme Corporation"])
+        )
         assert 0 < dedup_pair_score(a, b) < 1
 
 
@@ -833,9 +835,7 @@ class TestDedupCandidateSelection:
         assert {p.slug for p in candidates} == {"entity/acme", "concept/rag"}
 
     def test_small_corpus_bypass_keeps_all_entity_pages(self) -> None:
-        pages = [
-            _page(f"entity/p{i}", WIKI_PAGE_TYPE_ENTITY, f"Page {i}") for i in range(5)
-        ]
+        pages = [_page(f"entity/p{i}", WIKI_PAGE_TYPE_ENTITY, f"Page {i}") for i in range(5)]
         candidates = select_dedup_candidate_pages([_entity("zzz", "entity/zzz")], pages)
         assert len(candidates) == len(pages)
 
@@ -945,9 +945,7 @@ class TestTaxonomyPlanning:
 
     async def test_plan_batch_taxonomy_with_planner(self) -> None:
         store = FakeFolderStore()
-        await store.find_or_create_folder_path(
-            knowledge_base_id="kb", tenant_id=1, path=["AI"]
-        )
+        await store.find_or_create_folder_path(knowledge_base_id="kb", tenant_id=1, path=["AI"])
         updates = {
             "entity/a": [
                 WikiSlugUpdate(
@@ -1041,7 +1039,9 @@ class TestMapOneDocument:
 
     async def test_insufficient_text_skips(self) -> None:
         document_store = FakeDocumentStore()
-        document_store.seed(_doc(tenant_id=1, knowledge_base_id="kb", id="d1", content="![a](b.png)"))
+        document_store.seed(
+            _doc(tenant_id=1, knowledge_base_id="kb", id="d1", content="![a](b.png)")
+        )
         deps = _deps(document_store=document_store, parser=FakeParser("![a](b.png)"))
         op = WikiIngestOp(op=WIKI_OP_INGEST, knowledge_id="d1", language="en")
         result, updates = await map_one_document(
@@ -1287,7 +1287,9 @@ class TestProcessBatch:
         kb_id = _kb()
         document_store = FakeDocumentStore()
         document_store.seed(
-            _doc(tenant_id=tenant_id, knowledge_base_id=kb_id, id="d1", content="Acme makes widgets.")
+            _doc(
+                tenant_id=tenant_id, knowledge_base_id=kb_id, id="d1", content="Acme makes widgets."
+            )
         )
         pending_store = FakePendingStore()
         await pending_store.enqueue(
@@ -1326,7 +1328,9 @@ class TestProcessBatch:
         kb_id = _kb()
         document_store = FakeDocumentStore()
         document_store.seed(
-            _doc(tenant_id=tenant_id, knowledge_base_id=kb_id, id="d1", content="A long enough body.")
+            _doc(
+                tenant_id=tenant_id, knowledge_base_id=kb_id, id="d1", content="A long enough body."
+            )
         )
         pending_store = FakePendingStore()
         await pending_store.enqueue(
@@ -1361,7 +1365,9 @@ class TestProcessBatch:
         kb_id = _kb()
         document_store = FakeDocumentStore()
         document_store.seed(
-            _doc(tenant_id=tenant_id, knowledge_base_id=kb_id, id="d1", content="A long enough body.")
+            _doc(
+                tenant_id=tenant_id, knowledge_base_id=kb_id, id="d1", content="A long enough body."
+            )
         )
         pending_store = FakePendingStore()
         await pending_store.enqueue(
@@ -1454,9 +1460,7 @@ class TestCompositeIndexWriter:
                 calls.append(infos)
 
         writer = CompositeIndexWriter(composite=FakeComposite())  # type: ignore[arg-type]
-        chunks = [
-            _chunk_row(tenant_id=1, knowledge_base_id="kb", knowledge_id="k", content="body")
-        ]
+        chunks = [_chunk_row(tenant_id=1, knowledge_base_id="kb", knowledge_id="k", content="body")]
         # Await the coroutine via anyio/anyio.run in asyncio context.
         import asyncio
 
@@ -1601,18 +1605,14 @@ async def test_integration_batch_end_to_end(db_session: AsyncSession) -> None:
     assert outcome.pages_affected >= 1
 
     # Chunk rows persisted and settled to ready.
-    chunks = await chunk_store.list_by_knowledge_id(
-        tenant_id=tenant_id, knowledge_id=knowledge_id
-    )
+    chunks = await chunk_store.list_by_knowledge_id(tenant_id=tenant_id, knowledge_id=knowledge_id)
     assert len(chunks) == 1
     assert chunks[0].index_status == INDEX_STATUS_READY
     assert chunks[0].tenant_id == tenant_id
 
     # Wiki pages created: the summary and the entity page with its folder.
     summary_slug = f"summary/{slugify(knowledge_id)}"
-    summary_page = await page_service.get_page_by_slug(
-        knowledge_base_id=kb_id, slug=summary_slug
-    )
+    summary_page = await page_service.get_page_by_slug(knowledge_base_id=kb_id, slug=summary_slug)
     assert summary_page.content == "Acme builds widgets."
     entity_page = await page_service.get_page_by_slug(knowledge_base_id=kb_id, slug="entity/acme")
     assert entity_page.page_type == WIKI_PAGE_TYPE_ENTITY
@@ -1635,9 +1635,7 @@ async def test_integration_chunk_rows_tenant_scoped(db_session: AsyncSession) ->
     kb_id = _kb()
     chunk_store = ChunkRepository(db_session)
     row = _chunk_row(tenant_id=tenant_id, knowledge_base_id=kb_id, knowledge_id="k", content="x")
-    row = row.model_copy(
-        update={"created_at": datetime.now(UTC), "updated_at": datetime.now(UTC)}
-    )
+    row = row.model_copy(update={"created_at": datetime.now(UTC), "updated_at": datetime.now(UTC)})
     created = await chunk_store.create_many([row])
     assert created[0].id == row.id
     loaded = await chunk_store.list_by_knowledge_id(tenant_id=tenant_id, knowledge_id="k")

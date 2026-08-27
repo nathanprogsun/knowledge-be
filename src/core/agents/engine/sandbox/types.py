@@ -17,7 +17,7 @@ from src.core.agents.engine.sandbox.errors import SandboxConfigError
 DEFAULT_TIMEOUT = 60.0  # seconds
 DEFAULT_MEMORY_LIMIT = 256 * 1024 * 1024  # 256MB
 DEFAULT_CPU_LIMIT = 1.0  # 1 CPU core
-DEFAULT_DOCKER_IMAGE = "wechatopenai/weknora-sandbox:latest"
+DEFAULT_DOCKER_IMAGE = "wechatopenai/kb-sandbox:latest"
 
 
 class SandboxType(StrEnum):

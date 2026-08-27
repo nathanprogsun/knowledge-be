@@ -32,7 +32,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 BUILTIN_ENGINE_NAME: Final = "builtin"
 SIMPLE_ENGINE_NAME: Final = "simple"
-WEKNORA_CLOUD_ENGINE_NAME: Final = "weknoracloud"
+KB_CLOUD_ENGINE_NAME: Final = "cloud"
 MINERU_ENGINE_NAME: Final = "mineru"
 MINERU_CLOUD_ENGINE_NAME: Final = "mineru_cloud"
 PADDLEOCR_VL_ENGINE_NAME: Final = "paddleocr_vl"
@@ -40,7 +40,7 @@ PADDLEOCR_VL_CLOUD_ENGINE_NAME: Final = "paddleocr_vl_cloud"
 
 # ── Override keys read from ``ParserEngineConfig.ToOverridesMap()`` ──
 
-WEKNORA_CLOUD_APP_ID_OVERRIDE: Final = "weknoracloud_app_id"
+KB_CLOUD_APP_ID_OVERRIDE: Final = "cloud_app_id"
 MINERU_ENDPOINT_OVERRIDE: Final = "mineru_endpoint"
 MINERU_API_KEY_OVERRIDE: Final = "mineru_api_key"
 PADDLEOCR_VL_ENDPOINT_OVERRIDE: Final = "paddleocr_vl_endpoint"
@@ -94,7 +94,7 @@ _SIMPLE_FILE_TYPES: Final[tuple[str, ...]] = (
     "ogg",
 )
 
-_WEKNORA_CLOUD_FILE_TYPES: Final[tuple[str, ...]] = (
+_KB_CLOUD_FILE_TYPES: Final[tuple[str, ...]] = (
     "docx",
     "doc",
     "pdf",
@@ -131,9 +131,7 @@ _PADDLEOCR_VL_FILE_TYPES: Final[tuple[str, ...]] = (
 # ── Unavailable reasons (verbatim from Go) ──────────────────────────
 
 _DOCREADER_DISCONNECTED_REASON: Final = "DocReader service not connected"
-_WEKNORA_CLOUD_UNCONFIGURED_REASON: Final = (
-    "WeKnora Cloud credentials not configured. Go to Settings → WeKnora Cloud to set up."
-)
+_KB_CLOUD_UNCONFIGURED_REASON: Final = "Knowledge Base Cloud credentials not configured. Go to Settings → Knowledge Base Cloud to set up."
 _MINERU_UNCONFIGURED_REASON: Final = "MinerU service not configured"
 _MINERU_CLOUD_UNCONFIGURED_REASON: Final = "MinerU API Key not configured"
 _PADDLEOCR_VL_UNCONFIGURED_REASON: Final = "PaddleOCR-VL service not configured"
@@ -190,11 +188,11 @@ LOCAL_PARSER_ENGINES: Final[tuple[ParserEngineSpec, ...]] = (
         file_types=_SIMPLE_FILE_TYPES,
     ),
     ParserEngineSpec(
-        name=WEKNORA_CLOUD_ENGINE_NAME,
-        description="WeKnoraCloud document reader",
-        file_types=_WEKNORA_CLOUD_FILE_TYPES,
-        required_override=WEKNORA_CLOUD_APP_ID_OVERRIDE,
-        unconfigured_reason=_WEKNORA_CLOUD_UNCONFIGURED_REASON,
+        name=KB_CLOUD_ENGINE_NAME,
+        description="Cloud document reader",
+        file_types=_KB_CLOUD_FILE_TYPES,
+        required_override=KB_CLOUD_APP_ID_OVERRIDE,
+        unconfigured_reason=_KB_CLOUD_UNCONFIGURED_REASON,
     ),
     ParserEngineSpec(
         name=MINERU_ENGINE_NAME,
@@ -308,6 +306,8 @@ def list_all_engines(
 
 __all__ = [
     "BUILTIN_ENGINE_NAME",
+    "KB_CLOUD_APP_ID_OVERRIDE",
+    "KB_CLOUD_ENGINE_NAME",
     "LOCAL_PARSER_ENGINES",
     "MINERU_API_KEY_OVERRIDE",
     "MINERU_CLOUD_ENGINE_NAME",
@@ -318,8 +318,6 @@ __all__ = [
     "PADDLEOCR_VL_ENDPOINT_OVERRIDE",
     "PADDLEOCR_VL_ENGINE_NAME",
     "SIMPLE_ENGINE_NAME",
-    "WEKNORA_CLOUD_APP_ID_OVERRIDE",
-    "WEKNORA_CLOUD_ENGINE_NAME",
     "ParserEngineInfo",
     "ParserEngineSpec",
     "check_engine_available",

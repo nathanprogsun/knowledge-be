@@ -15,8 +15,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from src.core.agents.types import CustomAgentInfo
 from src.common.json import JsonObject
+from src.core.agents.types import CustomAgentInfo
 
 # Fixed display order of the built-in presets in the tenant agent list.
 # The wiki fixer is intentionally excluded: it is an internal agent

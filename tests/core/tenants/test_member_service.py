@@ -92,15 +92,11 @@ def _make_repo() -> tuple[AsyncMock, dict[int, TenantMember], dict[str, str]]:
         affected = 0
         for k, r in list(rows.items()):
             if r.tenant_id == tenant_id and r.deleted_at is None:
-                rows[k] = r.model_copy(
-                    update={"deleted_at": deleted_at, "updated_at": deleted_at}
-                )
+                rows[k] = r.model_copy(update={"deleted_at": deleted_at, "updated_at": deleted_at})
                 affected += 1
         return affected
 
-    async def _find_membership(
-        *, user_id: str, tenant_id: int
-    ) -> TenantMember | None:
+    async def _find_membership(*, user_id: str, tenant_id: int) -> TenantMember | None:
         for r in _live():
             if r.user_id == user_id and r.tenant_id == tenant_id:
                 return r
@@ -113,9 +109,7 @@ def _make_repo() -> tuple[AsyncMock, dict[int, TenantMember], dict[str, str]]:
         return _sorted([r for r in _live() if r.tenant_id == tenant_id])
 
     async def _has_any_members(tenant_id: int) -> bool:
-        return any(
-            r.tenant_id == tenant_id and r.status == "active" for r in _live()
-        )
+        return any(r.tenant_id == tenant_id and r.status == "active" for r in _live())
 
     def _matching(tenant_id: int, search: str | None) -> list[TenantMember]:
         rs = [r for r in _live() if r.tenant_id == tenant_id]
@@ -124,9 +118,7 @@ def _make_repo() -> tuple[AsyncMock, dict[int, TenantMember], dict[str, str]]:
             rs = [r for r in rs if term in user_index.get(r.user_id, "").lower()]
         return _sorted(rs)
 
-    async def _count_by_tenant(
-        tenant_id: int, *, search: str | None = None
-    ) -> int:
+    async def _count_by_tenant(tenant_id: int, *, search: str | None = None) -> int:
         return len(_matching(tenant_id, search))
 
     async def _list_page_by_tenant(
@@ -174,9 +166,7 @@ def _make_repo() -> tuple[AsyncMock, dict[int, TenantMember], dict[str, str]]:
     repo.count_by_tenant.side_effect = _count_by_tenant
     repo.list_page_by_tenant.side_effect = _list_page_by_tenant
     repo.count_active_owners.side_effect = _count_active_owners
-    repo.count_other_active_owners_for_update.side_effect = (
-        _count_other_active_owners_for_update
-    )
+    repo.count_other_active_owners_for_update.side_effect = _count_other_active_owners_for_update
     return repo, rows, user_index
 
 
@@ -191,7 +181,9 @@ def repo(state: tuple[AsyncMock, dict[int, TenantMember], dict[str, str]]) -> As
 
 
 @pytest.fixture
-def rows(state: tuple[AsyncMock, dict[int, TenantMember], dict[str, str]]) -> dict[int, TenantMember]:
+def rows(
+    state: tuple[AsyncMock, dict[int, TenantMember], dict[str, str]],
+) -> dict[int, TenantMember]:
     return state[1]
 
 
@@ -293,9 +285,7 @@ class TestReads(ServiceTest):
     async def test_get_membership_returns_none_when_absent(
         self, service: TenantMemberService
     ) -> None:
-        assert (
-            await service.get_membership(user_id="ghost", tenant_id=_TENANT_ID) is None
-        )
+        assert await service.get_membership(user_id="ghost", tenant_id=_TENANT_ID) is None
 
     async def test_list_by_user_returns_every_workspace(
         self, service: TenantMemberService, rows: dict[int, TenantMember]
@@ -368,9 +358,7 @@ class TestReads(ServiceTest):
         for index in range(3):
             _seed(rows, user_id=f"usr-{index}", joined_at=_NOW + timedelta(hours=index))
 
-        members, _ = await service.list_members_page(
-            _TENANT_ID, page=page, page_size=page_size
-        )
+        members, _ = await service.list_members_page(_TENANT_ID, page=page, page_size=page_size)
 
         assert len(members) == expected_count
 
@@ -415,9 +403,7 @@ class TestUpdateRole(ServiceTest):
 
     async def test_missing_membership_raises(self, service: TenantMemberService) -> None:
         with pytest.raises(NotFoundError) as excinfo:
-            await service.update_role(
-                user_id="ghost", tenant_id=_TENANT_ID, role=ROLE_ADMIN
-            )
+            await service.update_role(user_id="ghost", tenant_id=_TENANT_ID, role=ROLE_ADMIN)
         assert excinfo.value.code == "tenant_member.not_found"
 
     async def test_last_owner_cannot_be_demoted(
@@ -475,9 +461,7 @@ class TestRemoveMember(ServiceTest):
         await service.remove_member(user_id="usr-1", tenant_id=_TENANT_ID)
 
         assert rows[seeded.id].deleted_at is not None
-        assert (
-            await service.get_membership(user_id="usr-1", tenant_id=_TENANT_ID) is None
-        )
+        assert await service.get_membership(user_id="usr-1", tenant_id=_TENANT_ID) is None
 
     async def test_missing_membership_raises(self, service: TenantMemberService) -> None:
         with pytest.raises(NotFoundError):
@@ -502,6 +486,4 @@ class TestRemoveMember(ServiceTest):
 
         await service.remove_member(user_id="usr-owner", tenant_id=_TENANT_ID)
 
-        assert (
-            await service.get_membership(user_id="usr-owner", tenant_id=_TENANT_ID) is None
-        )
+        assert await service.get_membership(user_id="usr-owner", tenant_id=_TENANT_ID) is None

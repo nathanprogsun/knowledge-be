@@ -106,9 +106,11 @@ class SystemAdminService:
                 details={"changed": False},
             )
             return UserInfo.map_from_db(user)
-        admin_count = len(await self._users_repo.find_all_by_column_values(
-            {"is_system_admin": True},
-        ))
+        admin_count = len(
+            await self._users_repo.find_all_by_column_values(
+                {"is_system_admin": True},
+            )
+        )
         if admin_count <= 1:
             raise ValidationError(
                 code="system.last_system_admin",

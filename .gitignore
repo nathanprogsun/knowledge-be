@@ -237,3 +237,6 @@ __marimo__/
 .claude/*
 !.claude/skills
 
+
+# Runtime telemetry export (console/OTLP dumps)
+traces/

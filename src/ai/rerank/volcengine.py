@@ -329,8 +329,7 @@ async def new_volcengine_reranker(
     model_name = config.model_name.strip() or _VOLCENGINE_DEFAULT_MODEL
     region = config.extra_config.get("region", "").strip() or _VOLCENGINE_DEFAULT_REGION
     instruction = (
-        config.extra_config.get("instruction", "").strip()
-        or _VOLCENGINE_DEFAULT_INSTRUCTION
+        config.extra_config.get("instruction", "").strip() or _VOLCENGINE_DEFAULT_INSTRUCTION
     )
     parsed = urllib.parse.urlsplit(base_url)
     host = parsed.netloc

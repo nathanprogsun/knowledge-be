@@ -47,10 +47,10 @@ from src.ai.provider.detect import detect_provider
 from src.ai.provider.providers.deepseek import DEEPSEEK_BASE_URL
 from src.ai.provider.registry import (
     PROVIDER_AZURE_OPENAI,
+    PROVIDER_CLOUD,
     PROVIDER_DEEPSEEK,
-    PROVIDER_WEKNORACLOUD,
 )
-from src.common.exception import ValidationError, AIProviderError
+from src.common.exception import AIProviderError, ValidationError
 from src.common.json import JsonObject, JsonValue
 
 # Default api-version used for the Azure OpenAI endpoint.
@@ -84,11 +84,17 @@ class RemoteAPIChat:
         if provider_name == PROVIDER_AZURE_OPENAI and config.extra_config:
             api_version = (config.extra_config.get("api_version") or "").strip()
 
-        if provider_name == PROVIDER_WEKNORACLOUD:
+        if provider_name == PROVIDER_CLOUD:
             if not config.app_id:
-                raise ValidationError(code="managed_cloud.app_id_required", message="managed cloud provider: AppID is required")
+                raise ValidationError(
+                    code="managed_cloud.app_id_required",
+                    message="managed cloud provider: AppID is required",
+                )
             if not config.app_secret:
-                raise ValidationError(code="managed_cloud.app_secret_required", message="managed cloud provider: AppSecret is required")
+                raise ValidationError(
+                    code="managed_cloud.app_secret_required",
+                    message="managed cloud provider: AppSecret is required",
+                )
 
         model_name = config.model_name
         if config.extra_config:

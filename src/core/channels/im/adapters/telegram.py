@@ -152,9 +152,7 @@ def _parse_telegram_message(message: JsonObject) -> IncomingMessage | None:
 
     chat = payload_dict(message, "chat")
     chat_type_name = payload_string(chat, "type")
-    chat_type = (
-        CHAT_TYPE_GROUP if chat_type_name in ("group", "supergroup") else CHAT_TYPE_DIRECT
-    )
+    chat_type = CHAT_TYPE_GROUP if chat_type_name in ("group", "supergroup") else CHAT_TYPE_DIRECT
     chat_id = str(payload_int(chat, "id")) if chat_type == CHAT_TYPE_GROUP else ""
 
     user_id = ""
@@ -163,7 +161,9 @@ def _parse_telegram_message(message: JsonObject) -> IncomingMessage | None:
     if sender:
         user_id = str(payload_int(sender, "id"))
         user_name = " ".join(
-            part for part in (payload_string(sender, "first_name"), payload_string(sender, "last_name")) if part
+            part
+            for part in (payload_string(sender, "first_name"), payload_string(sender, "last_name"))
+            if part
         ).strip()
         if not user_name:
             user_name = payload_string(sender, "username")

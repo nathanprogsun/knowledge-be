@@ -198,9 +198,7 @@ def _make_page_repo() -> AsyncMock:
         rows[row.id] = stored
         return stored
 
-    async def _soft_delete_by_slug(
-        *, knowledge_base_id: str, slug: str, now: datetime
-    ) -> bool:
+    async def _soft_delete_by_slug(*, knowledge_base_id: str, slug: str, now: datetime) -> bool:
         for row in rows.values():
             if (
                 row.knowledge_base_id == knowledge_base_id
@@ -291,9 +289,7 @@ def _make_page_repo() -> AsyncMock:
         }
         return {slug: slug in live for slug in slugs}
 
-    async def _list_by_slugs(
-        *, knowledge_base_id: str, slugs: list[str]
-    ) -> dict[str, object]:
+    async def _list_by_slugs(*, knowledge_base_id: str, slugs: list[str]) -> dict[str, object]:
         out: dict[str, object] = {}
         for row in rows.values():
             if row.knowledge_base_id == knowledge_base_id and row.slug in slugs:
@@ -473,9 +469,9 @@ class TestRewriteDeadWikiLinks:
         content = "see [[summary/abcdef|The Report]] and [[live-page]]"
         out, changed = rewrite_dead_wiki_links(
             content,
-            lambda norm, _disp: ("summary/abcdef12", True)
-            if norm == "summary/abcdef"
-            else ("", False),
+            lambda norm, _disp: (
+                ("summary/abcdef12", True) if norm == "summary/abcdef" else ("", False)
+            ),
         )
         assert changed is True
         assert out == "see [[summary/abcdef12|The Report]] and [[live-page]]"
@@ -499,7 +495,9 @@ class TestLinkifyContent:
         refs = [LinkRef(slug="concept/rag", match_text="RAG")]
         content = "```\nRAG inside fence\n```\nand `RAG` inline, then RAG plain."
         out, _ = linkify_content(content, refs, self_slug="self")
-        assert out == "```\nRAG inside fence\n```\nand `RAG` inline, then [[concept/rag|RAG]] plain."
+        assert (
+            out == "```\nRAG inside fence\n```\nand `RAG` inline, then [[concept/rag|RAG]] plain."
+        )
 
     def test_requires_word_boundary_for_ascii_needles(self) -> None:
         refs = [LinkRef(slug="concept/rag", match_text="RAG")]
@@ -538,7 +536,9 @@ class TestResolveDeadSlug:
 
     def test_display_text_reverse_lookup(self) -> None:
         live = {"entity/acme-corp"}
-        assert resolve_dead_slug("entity/acme-copr", "Acme Corp", live, {"Acme Corp": "entity/acme-corp"}) == (
+        assert resolve_dead_slug(
+            "entity/acme-copr", "Acme Corp", live, {"Acme Corp": "entity/acme-corp"}
+        ) == (
             "entity/acme-corp",
             True,
         )
@@ -749,7 +749,9 @@ class TestUpdatePage:
         service, _ = _services(page_repo, folder_repo)
         existing = _sample_page(knowledge_base_id="kb-1", slug="entity/acme", version=3)
         page_repo.rows[existing.id] = existing  # type: ignore[attr-defined]
-        updated = await service.update_page_meta(page=existing.model_copy(update={"status": "archived"}))
+        updated = await service.update_page_meta(
+            page=existing.model_copy(update={"status": "archived"})
+        )
         assert updated.version == 3
         page_repo.update.assert_not_called()  # type: ignore[attr-defined]
 
@@ -785,9 +787,7 @@ class TestGetPage:
         page_repo = _make_page_repo()
         folder_repo = _make_folder_repo()
         service, _ = _services(page_repo, folder_repo)
-        existing = _sample_page(
-            knowledge_base_id="kb-1", slug="entity/acme", content="body [c003]"
-        )
+        existing = _sample_page(knowledge_base_id="kb-1", slug="entity/acme", content="body [c003]")
         page_repo.rows[existing.id] = existing  # type: ignore[attr-defined]
         page = await service.get_page_by_slug(knowledge_base_id="kb-1", slug="entity/acme")
         assert page.content == "body"
@@ -852,7 +852,9 @@ class TestGetIndex:
     async def test_returns_existing_index(self) -> None:
         page_repo = _make_page_repo()
         service, _ = _services(page_repo, _make_folder_repo())
-        index = _sample_page(knowledge_base_id="kb-1", slug="index", title="Index", page_type="index")
+        index = _sample_page(
+            knowledge_base_id="kb-1", slug="index", title="Index", page_type="index"
+        )
         page_repo.rows[index.id] = index  # type: ignore[attr-defined]
         page = await service.get_index(knowledge_base_id="kb-1", tenant_id=1)
         assert page.slug == "index"
@@ -872,7 +874,13 @@ class TestGetIndexView:
     async def test_builds_groups_and_cursor(self) -> None:
         page_repo = _make_page_repo()
         service, _ = _services(page_repo, _make_folder_repo())
-        index = _sample_page(knowledge_base_id="kb-1", slug="index", title="Index", page_type="index", content="intro text")
+        index = _sample_page(
+            knowledge_base_id="kb-1",
+            slug="index",
+            title="Index",
+            page_type="index",
+            content="intro text",
+        )
         page_repo.rows[index.id] = index  # type: ignore[attr-defined]
         for i in range(3):
             row = _sample_page(
@@ -901,11 +909,25 @@ class TestGetIndexView:
 class TestGetGraph:
     def _pages(self) -> list[WikiPage]:
         return [
-            _sample_page(knowledge_base_id="kb-1", slug="entity/a", title="A", out_links=["entity/b"]),
-            _sample_page(knowledge_base_id="kb-1", slug="entity/b", title="B", in_links=["entity/a"], out_links=["entity/c"]),
-            _sample_page(knowledge_base_id="kb-1", slug="entity/c", title="C", in_links=["entity/b"]),
             _sample_page(
-                knowledge_base_id="kb-1", slug="concept/x", title="X", page_type="concept", out_links=[]
+                knowledge_base_id="kb-1", slug="entity/a", title="A", out_links=["entity/b"]
+            ),
+            _sample_page(
+                knowledge_base_id="kb-1",
+                slug="entity/b",
+                title="B",
+                in_links=["entity/a"],
+                out_links=["entity/c"],
+            ),
+            _sample_page(
+                knowledge_base_id="kb-1", slug="entity/c", title="C", in_links=["entity/b"]
+            ),
+            _sample_page(
+                knowledge_base_id="kb-1",
+                slug="concept/x",
+                title="X",
+                page_type="concept",
+                out_links=[],
             ),
         ]
 
@@ -930,7 +952,9 @@ class TestGetGraph:
     def test_ego_bfs_neighborhood(self) -> None:
         data = compute_graph_subset(
             self._pages(),
-            WikiGraphRequest(knowledge_base_id="kb-1", mode=WIKI_GRAPH_MODE_EGO, center="entity/a", depth=2),
+            WikiGraphRequest(
+                knowledge_base_id="kb-1", mode=WIKI_GRAPH_MODE_EGO, center="entity/a", depth=2
+            ),
         )
         assert {n.slug for n in data.nodes} == {"entity/a", "entity/b", "entity/c"}
         assert data.meta.center == "entity/a"
@@ -951,7 +975,9 @@ class TestGetStats:
             [("entity/a", "entity"), ("entity/b", "entity"), ("concept/x", "concept")]
         ):
             row = _sample_page(
-                knowledge_base_id="kb-1", slug=slug, page_type=page_type,
+                knowledge_base_id="kb-1",
+                slug=slug,
+                page_type=page_type,
                 out_links=["entity/a"] if i else [],
             )
             page_repo.rows[row.id] = row  # type: ignore[attr-defined]
@@ -1062,7 +1088,9 @@ class TestCreateFolder:
 
         await service.create_folder(knowledge_base_id="kb-1", tenant_id=1, parent_id="", name="AI")
         with pytest.raises(ConflictError) as excinfo:
-            await service.create_folder(knowledge_base_id="kb-1", tenant_id=1, parent_id="", name="AI")
+            await service.create_folder(
+                knowledge_base_id="kb-1", tenant_id=1, parent_id="", name="AI"
+            )
         assert excinfo.value.code == "wiki.folder_conflict"
 
 
@@ -1104,11 +1132,19 @@ class TestRenameOrMoveFolder:
         )
         page_repo.rows["p1"] = _sample_page(  # type: ignore[attr-defined]
             id="p1",
-            knowledge_base_id="kb-1", slug="entity/e1", folder_id="rag", category_path=["AI", "RAG"], depth=2,
+            knowledge_base_id="kb-1",
+            slug="entity/e1",
+            folder_id="rag",
+            category_path=["AI", "RAG"],
+            depth=2,
         )
 
         updated = await service.rename_or_move_folder(
-            knowledge_base_id="kb-1", id="ai", new_name="Intelligence", new_parent_id="", move_parent=False
+            knowledge_base_id="kb-1",
+            id="ai",
+            new_name="Intelligence",
+            new_parent_id="",
+            move_parent=False,
         )
         assert updated.name == "Intelligence"
         assert updated.path == "Intelligence"
@@ -1138,7 +1174,11 @@ class TestRenameOrMoveFolder:
         )
         with pytest.raises(ValidationError) as excinfo:
             await service.rename_or_move_folder(
-                knowledge_base_id="kb-1", id="ai", new_name="", new_parent_id="rag", move_parent=True
+                knowledge_base_id="kb-1",
+                id="ai",
+                new_name="",
+                new_parent_id="rag",
+                move_parent=True,
             )
         assert excinfo.value.code == "wiki.folder_move_descendant"
 

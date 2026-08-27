@@ -215,7 +215,7 @@ class WebSearchProviderInfo(BaseModel):
 
 
 def _parameters_from_raw(
-    raw: JsonObject | None | str,
+    raw: JsonObject | str | None,
 ) -> WebSearchProviderParameters | None:
     """Coerce the stored JSONB blob to the typed parameters DTO.
 

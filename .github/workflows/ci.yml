@@ -28,6 +28,21 @@ jobs:
       - name: Lint (ruff check)
         run: uv run ruff check .
 
+  hygiene:
+    name: hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Whitespace / conflict-marker / EOF check
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            git diff --check "origin/${{ github.base_ref }}...HEAD"
+          else
+            git diff --check HEAD~1 HEAD || git diff-tree --check --root HEAD
+          fi
+
   format:
     name: format
     runs-on: ubuntu-latest
@@ -49,8 +64,11 @@ jobs:
         uses: astral-sh/setup-uv@v4
         with:
           version: "0.10.9"
-      - name: Typecheck (mypy --strict)
-        run: uv run mypy
+      - name: Typecheck (mypy ratchet — no new errors vs baseline)
+        # Raw `uv run mypy` carries a pre-existing backlog; the ratchet
+        # blocks regressions while the backlog burns down. See
+        # scripts/check_mypy_baseline.py.
+        run: python scripts/check_mypy_baseline.py
 
   test:
     name: test
@@ -68,10 +86,10 @@ jobs:
       - name: Sync dependencies
         run: uv sync --all-extras
       - name: Run pytest with coverage report
-        # Coverage is reported for visibility only; no fail_under yet.
-        # Decide the baseline threshold in a follow-up PR after observing
-        # the reported numbers for a release cycle.
-        run: uv run pytest -q --cov=src --cov-report=term-missing --cov-report=xml
+        # Integration suites (tests/integration) need live Postgres/Redis
+        # and are excluded until the CI job grows a services: block —
+        # tracked in AGENTS.md §14.
+        run: uv run pytest -q --ignore=tests/integration --cov=src --cov-report=term-missing --cov-report=xml
 
   check:
     name: anti-drift check
@@ -85,10 +103,53 @@ jobs:
       - name: Anti-drift checks
         run: make check
 
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    env:
+      NODE_VERSION: "22"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "0.10.9"
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        # .npmrc in frontend/ carries legacy-peer-deps (TS 6 vs
+        # openapi-typescript peer range); npm ci respects it.
+        run: npm ci
+        working-directory: frontend
+      - name: Contract drift check (openapi-typescript)
+        # Regenerate from the live FastAPI schema and fail if the
+        # committed schema.ts differs — hand-edits and backend drift
+        # both surface here.
+        run: |
+          uv run python scripts/export_openapi.py --output docs/api/openapi.json
+          npm run gen:api
+          git diff --exit-code -- src/api/__generated__/schema.ts
+        working-directory: frontend
+      - name: Type-check (vue-tsc)
+        run: npm run type-check
+        working-directory: frontend
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+      - name: Unit tests (tsx --test)
+        run: npm test
+        working-directory: frontend
+      - name: Build (vite)
+        run: npm run build
+        working-directory: frontend
+
   all-checks-passed:
     name: all-checks-passed
     runs-on: ubuntu-latest
-    needs: [lint, format, typecheck, test, check]
+    needs: [lint, format, typecheck, test, check, frontend, hygiene]
     if: always()
     steps:
       - name: Verify every blocking job succeeded
@@ -97,7 +158,9 @@ jobs:
              [ "${{ needs.format.result }}" != "success" ] || \
              [ "${{ needs.typecheck.result }}" != "success" ] || \
              [ "${{ needs.test.result }}" != "success" ] || \
-             [ "${{ needs.check.result }}" != "success" ]; then
+             [ "${{ needs.check.result }}" != "success" ] || \
+             [ "${{ needs.frontend.result }}" != "success" ] || \
+             [ "${{ needs.hygiene.result }}" != "success" ]; then
             echo "One or more blocking checks failed."
             exit 1
           fi

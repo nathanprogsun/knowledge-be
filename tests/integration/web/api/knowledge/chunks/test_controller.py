@@ -84,9 +84,7 @@ def chunk_service() -> AsyncMock:
         out = [
             r
             for r in rows.values()
-            if r.tenant_id == tenant_id
-            and r.knowledge_id == knowledge_id
-            and r.deleted_at is None
+            if r.tenant_id == tenant_id and r.knowledge_id == knowledge_id and r.deleted_at is None
         ]
         return sorted(out, key=lambda r: r.chunk_index)
 
@@ -683,9 +681,7 @@ async def test_upsert_question_replaces_known_id(
 ) -> None:
     chunk_service._rows[CHUNK_ID] = _chunk(  # type: ignore[attr-defined]
         metadata={
-            "generated_questions": [
-                {"id": "q-1", "question": "old", "content_revision": 0}
-            ],
+            "generated_questions": [{"id": "q-1", "question": "old", "content_revision": 0}],
             "generated_questions_revision": 0,
         }
     )

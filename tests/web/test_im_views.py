@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, ClassVar
 
 import pytest
 from fastapi import FastAPI, Request
@@ -145,9 +145,7 @@ class _FakeIMService:
         self._maybe_raise()
         return self.create_result
 
-    async def list_channels_by_agent(
-        self, *, tenant_id: int, agent_id: str
-    ) -> list[IMChannelInfo]:
+    async def list_channels_by_agent(self, *, tenant_id: int, agent_id: str) -> list[IMChannelInfo]:
         self._maybe_raise()
         return self.list_by_agent
 
@@ -170,16 +168,12 @@ class _FakeIMService:
         self.deleted.append((tenant_id, channel_id))
         self._maybe_raise()
 
-    async def toggle_channel_enabled(
-        self, *, tenant_id: int, channel_id: str
-    ) -> IMChannelInfo:
+    async def toggle_channel_enabled(self, *, tenant_id: int, channel_id: str) -> IMChannelInfo:
         self.toggled.append((tenant_id, channel_id))
         self._maybe_raise()
         return self.toggle_result or _channel_info(enabled=False)
 
-    async def ensure_channel_adapter(
-        self, channel_id: str
-    ) -> tuple[Any, IMChannelInfo]:
+    async def ensure_channel_adapter(self, channel_id: str) -> tuple[Any, IMChannelInfo]:
         if self.raise_on_ensure is not None:
             raise self.raise_on_ensure
         return self.adapter, self.channel
@@ -214,9 +208,7 @@ class _FakeAdapter:
             raise self.parse_error
         return self.parsed
 
-    def send_reply(
-        self, ctx: Context, incoming: IncomingMessage, reply: ReplyMessage
-    ) -> None:
+    def send_reply(self, ctx: Context, incoming: IncomingMessage, reply: ReplyMessage) -> None:
         self.sent.append((incoming, reply))
 
 
@@ -399,27 +391,21 @@ def test_help_unknown_command(registry: CommandRegistry) -> None:
 
 
 def test_clear_requests_reset_action(registry: CommandRegistry) -> None:
-    result = asyncio.run(
-        registry.get("clear").execute(CommandContext(incoming=_incoming()), [])
-    )
+    result = asyncio.run(registry.get("clear").execute(CommandContext(incoming=_incoming()), []))
 
     assert result.action is CommandAction.CLEAR
     assert "对话已清空" in result.content
 
 
 def test_stop_requests_stop_action(registry: CommandRegistry) -> None:
-    result = asyncio.run(
-        registry.get("stop").execute(CommandContext(incoming=_incoming()), [])
-    )
+    result = asyncio.run(registry.get("stop").execute(CommandContext(incoming=_incoming()), []))
 
     assert result.action is CommandAction.STOP
     assert "中止" in result.content
 
 
 def test_info_unbound_agent(registry: CommandRegistry) -> None:
-    result = asyncio.run(
-        registry.get("info").execute(CommandContext(incoming=_incoming()), [])
-    )
+    result = asyncio.run(registry.get("info").execute(CommandContext(incoming=_incoming()), []))
 
     assert "未绑定智能体" in result.content
 
@@ -432,11 +418,11 @@ def test_info_with_agent_renders_capabilities(registry: CommandRegistry) -> None
         class config:
             agent_mode = True
             kb_selection_mode = "selected"
-            knowledge_base_ids = ["kb-1"]
+            knowledge_base_ids: ClassVar[list[str]] = ["kb-1"]
             skills_selection_mode = "all"
-            selected_skills = []
+            selected_skills: ClassVar[list[str]] = []
             mcp_selection_mode = "none"
-            mcp_service_ids = []
+            mcp_service_ids: ClassVar[list[str]] = []
             web_search_enabled = True
 
     ctx = CommandContext(
@@ -456,9 +442,7 @@ def test_info_with_agent_renders_capabilities(registry: CommandRegistry) -> None
 
 
 def test_search_requires_query(registry: CommandRegistry) -> None:
-    result = asyncio.run(
-        registry.get("search").execute(CommandContext(incoming=_incoming()), [])
-    )
+    result = asyncio.run(registry.get("search").execute(CommandContext(incoming=_incoming()), []))
 
     assert "请输入搜索内容" in result.content
 
@@ -657,7 +641,12 @@ def test_admin_viewer_can_list_but_not_mutate() -> None:
     client = TestClient(app)
 
     assert client.get(f"/api/v1/agents/{_AGENT_ID}/im-channels").status_code == 200
-    assert client.post(f"/api/v1/agents/{_AGENT_ID}/im-channels", json={"platform": "slack"}).status_code == 403
+    assert (
+        client.post(
+            f"/api/v1/agents/{_AGENT_ID}/im-channels", json={"platform": "slack"}
+        ).status_code
+        == 403
+    )
 
 
 # ── Callback: verification / parsing / ack ────────────────────────────

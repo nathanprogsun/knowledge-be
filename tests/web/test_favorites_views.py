@@ -23,10 +23,8 @@ from src.common.exception import ValidationError
 from src.db.models.user_resource_favorite import UserResourceFavorite
 from src.web.api.favorites.router import router as favorites_router
 from src.web.api.system.service_views import router as system_service_router
-from src.web.deps import AuthDep
 from src.web.deps.context import get_tenant_id_dep, get_user_id_dep
 from src.web.deps.system import get_favorite_service, get_system_info_service
-from src.web.middleware.auth import require_auth
 from src.web.exception_handler import register_exception_handlers
 from src.web.middleware.auth import require_auth
 
@@ -162,7 +160,7 @@ def system_client() -> TestClient:
     def _fake_admin_auth(request: Request) -> None:
         request.state.tenant_id = "7"
         request.state.tenant_role = "admin"
-        return None
+        return
 
     app.dependency_overrides[require_auth] = _fake_admin_auth
     app.dependency_overrides[get_system_info_service] = lambda: _FakeInfoService()

@@ -51,17 +51,17 @@ GREP_TOOL_DESCRIPTION = (
     "Returns matching chunks with a short cN chunk source ID, a parent dN "
     "document ID, and a <match> snippet around the first match.\n"
     "Examples:\n"
-    "- Alternation (RECOMMENDED): \"stardust|skyvault|psionic\" (matches any "
+    '- Alternation (RECOMMENDED): "stardust|skyvault|psionic" (matches any '
     "of the words)\n"
-    "- Multiple terms in order: \"psionic.*engine\" (matches both words in "
+    '- Multiple terms in order: "psionic.*engine" (matches both words in '
     "order)\n"
-    "- Word boundary / anchor: \"\\brag\\b\" or \"^chapter\\s+\\d+\"\n"
-    "- Plain text: \"engine\" (matches literal substring anywhere in chunk "
+    '- Word boundary / anchor: "\\brag\\b" or "^chapter\\s+\\d+"\n'
+    '- Plain text: "engine" (matches literal substring anywhere in chunk '
     "content)\n"
     "IMPORTANT — JSON escaping: every backslash in a regex MUST be written as "
-    "\\\\ inside the JSON tool arguments (e.g. to search for literal \"C++\" "
-    "write \"C\\\\+\\\\+\", NOT \"C\\+\\+\"; for \"\\d+\" write \"\\\\d+\"). Plain "
-    "\"\\+\" / \"\\d\" etc. are invalid JSON escapes and will fail to parse.\n"
+    '\\\\ inside the JSON tool arguments (e.g. to search for literal "C++" '
+    'write "C\\\\+\\\\+", NOT "C\\+\\+"; for "\\d+" write "\\\\d+"). Plain '
+    '"\\+" / "\\d" etc. are invalid JSON escapes and will fail to parse.\n'
     "Use this to locate candidate chunks by exact identifiers, error codes, "
     "product names, or recurring terms.\n"
     "\n"
@@ -80,8 +80,8 @@ GREP_TOOL_SCHEMA = json.dumps(
                 "type": "string",
                 "description": (
                     "A single POSIX regex applied directly to chunk content "
-                    "(case-insensitive). Combine multiple concepts with \"|\" "
-                    "alternation in ONE regex (e.g. \"stardust|skyvault|psionic\") "
+                    '(case-insensitive). Combine multiple concepts with "|" '
+                    'alternation in ONE regex (e.g. "stardust|skyvault|psionic") '
                     "— do not split into multiple calls."
                 ),
                 "minLength": 1,
@@ -298,10 +298,7 @@ class GrepChunksTool:
                 tag_ids = target_tag_ids
                 if not tag_ids or tenant_id == 0:
                     continue
-                scope_key = (
-                    f"{target.knowledge_base_id}:{tenant_id}:"
-                    + "\x00".join(tag_ids)
-                )
+                scope_key = f"{target.knowledge_base_id}:{tenant_id}:" + "\x00".join(tag_ids)
                 if scope_key in seen_tag_scope:
                     continue
                 seen_tag_scope.add(scope_key)
@@ -474,7 +471,7 @@ class GrepChunksTool:
                     f'<faq faq_id="{xml_escape(row.chunk.id)}" '
                     f'knowledge_title="{xml_escape(row.knowledge_title)}"{extra_attr} '
                     f'index="{row.chunk.chunk_index}" score="{row.match_score:.3f}"'
-                    f'{seen_attr}>\n'
+                    f"{seen_attr}>\n"
                 )
             else:
                 seen_attr = ' already_seen="true"' if seen else ""
@@ -483,7 +480,7 @@ class GrepChunksTool:
                     f'knowledge_id="{xml_escape(row.chunk.knowledge_id)}" '
                     f'knowledge_title="{xml_escape(row.knowledge_title)}"{extra_attr} '
                     f'chunk_index="{row.chunk.chunk_index}" score="{row.match_score:.3f}"'
-                    f'{seen_attr}>\n'
+                    f"{seen_attr}>\n"
                 )
 
             for query in queries:
@@ -555,9 +552,7 @@ class GrepChunksTool:
 
         result_slice = list(aggregated.values())
         for entry in result_slice:
-            entry.distinct_patterns = sum(
-                1 for count in entry.pattern_counts.values() if count > 0
-            )
+            entry.distinct_patterns = sum(1 for count in entry.pattern_counts.values() if count > 0)
         result_slice.sort(key=_aggregation_sort_key)
         return [entry.to_json() for entry in result_slice]
 
@@ -711,8 +706,7 @@ class SqlChunkGrepStore:
         ).bindparams(**params)
         result = await self._session.execute(sql)
         return {
-            str(mapping["knowledge_id"]): int(mapping["cnt"])
-            for mapping in result.mappings().all()
+            str(mapping["knowledge_id"]): int(mapping["cnt"]) for mapping in result.mappings().all()
         }
 
     def _to_chunk_with_title(self, mapping: RowMapping) -> ChunkWithTitle:
@@ -752,18 +746,12 @@ def _scope_clause(
         params.update({f"kid_{i}": kid for i, kid in enumerate(knowledge_ids)})
 
     for tag_index, target in enumerate(tag_targets):
-        if (
-            target is None
-            or not target.knowledge_base_id
-            or not target.tag_ids
-        ):
+        if target is None or not target.knowledge_base_id or not target.tag_ids:
             continue
         tenant_id = target.tenant_id or kb_tenant_map.get(target.knowledge_base_id, 0)
         if tenant_id == 0:
             continue
-        tag_placeholders = ", ".join(
-            f":tag_{tag_index}_{i}" for i in range(len(target.tag_ids))
-        )
+        tag_placeholders = ", ".join(f":tag_{tag_index}_{i}" for i in range(len(target.tag_ids)))
         clauses.append(
             f"(chunks.knowledge_base_id = :tkb_{tag_index} "
             f"and chunks.tenant_id = :tten_{tag_index} and exists ("
@@ -773,17 +761,14 @@ def _scope_clause(
         )
         params[f"tkb_{tag_index}"] = target.knowledge_base_id
         params[f"tten_{tag_index}"] = tenant_id
-        params.update(
-            {f"tag_{tag_index}_{i}": tag_id for i, tag_id in enumerate(target.tag_ids)}
-        )
+        params.update({f"tag_{tag_index}_{i}": tag_id for i, tag_id in enumerate(target.tag_ids)})
 
     for kb_index, kb_id in enumerate(full_kb_ids):
         tenant_id = kb_tenant_map.get(kb_id, 0)
         if tenant_id == 0:
             continue
         clauses.append(
-            f"(chunks.knowledge_base_id = :fkb_{kb_index} "
-            f"and chunks.tenant_id = :ften_{kb_index})"
+            f"(chunks.knowledge_base_id = :fkb_{kb_index} and chunks.tenant_id = :ften_{kb_index})"
         )
         params[f"fkb_{kb_index}"] = kb_id
         params[f"ften_{kb_index}"] = tenant_id

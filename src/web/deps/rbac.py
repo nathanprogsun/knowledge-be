@@ -14,6 +14,7 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing_extensions import TypedDict
 
 from src.common.exception import PermissionDeniedError, UnauthorizedError
 from src.core.auth.permissions import TenantAPIKeyScope, TenantRole
@@ -155,8 +156,7 @@ async def require_path_tenant_match_dep(request: Request) -> None:
         raise PermissionDeniedError(
             code="rbac.not_a_member",
             message=(
-                f"Active workspace {active_tid} is not a member of "
-                f"addressed workspace {path_tid}"
+                f"Active workspace {active_tid} is not a member of addressed workspace {path_tid}"
             ),
         )
 
@@ -174,12 +174,21 @@ def _get_principal_tenant_id(request: Request) -> int:
     return _principal_tenant_id(request)
 
 
+class TenantAssociation(TypedDict):
+    """Resolved caller↔workspace link returned by the membership gate."""
+
+    user_id: str
+    tenant_id: int
+    role: str
+    membership_id: str | None
+
+
 async def validate_active_tenant_association(
     request: Request,
     session: AsyncSession,
     user_id: Annotated[str | None, Depends(_get_principal_user_id)] = None,
     tenant_id: Annotated[int, Depends(_get_principal_tenant_id)] = 0,
-) -> dict[str, object]:
+) -> TenantAssociation:
     """DB-backed gate: confirm the caller has an active tenant membership.
 
     Reads the principal (user id, tenant id) from ``request.state`` via
@@ -230,7 +239,7 @@ async def validate_active_tenant_association(
 CrossTenantDep = Annotated[None, Depends(require_cross_tenant_dep)]
 PathTenantMatchDep = Annotated[None, Depends(require_path_tenant_match_dep)]
 ValidateActiveTenantAssociationDep = Annotated[
-    dict[str, object], Depends(validate_active_tenant_association)
+    TenantAssociation, Depends(validate_active_tenant_association)
 ]
 
 

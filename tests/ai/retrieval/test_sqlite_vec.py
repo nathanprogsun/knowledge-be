@@ -173,7 +173,7 @@ def test_tokenize_cjk_bigram_handles_mixed_text() -> None:
     assert _tokenize_cjk_bigram("") == ""
     result = _tokenize_cjk_bigram("中文 ab")
     assert "中文" in result  # CJK bigram
-    assert "ab" in result    # non-CJK word preserved
+    assert "ab" in result  # non-CJK word preserved
 
 
 def test_tokenize_cjk_bigram_single_cjk() -> None:
@@ -254,9 +254,14 @@ def test_estimate_storage_size_accumulates() -> None:
 async def test_save_writes_metadata_and_embedding() -> None:
     repo, db = _new_repo()
     info = IndexInfo(
-        source_id="s-1", chunk_id="c-1", content="hello",
-        knowledge_id="k-1", knowledge_base_id="kb-1", tag_id="t-1",
-        is_enabled=True, source_type=SourceType.CHUNK,
+        source_id="s-1",
+        chunk_id="c-1",
+        content="hello",
+        knowledge_id="k-1",
+        knowledge_base_id="kb-1",
+        tag_id="t-1",
+        is_enabled=True,
+        source_type=SourceType.CHUNK,
     )
     await repo.save(_CTX, info, {"embedding": {"s-1": [1.0, 2.0, 3.0, 4.0]}})
     executed_sqls = " | ".join(s for s, _ in db.engine.executed)
@@ -282,8 +287,7 @@ async def test_batch_save_empty_list_is_noop() -> None:
 async def test_batch_save_processes_all_items() -> None:
     repo, db = _new_repo()
     infos = [
-        IndexInfo(source_id=f"s-{i}", chunk_id=f"c-{i}", content=f"text-{i}")
-        for i in range(3)
+        IndexInfo(source_id=f"s-{i}", chunk_id=f"c-{i}", content=f"text-{i}") for i in range(3)
     ]
     embeddings = {f"s-{i}": [float(i)] * 4 for i in range(3)}
     await repo.batch_save(_CTX, infos, {"embedding": embeddings})
@@ -299,7 +303,9 @@ async def test_retrieve_with_keywords_type_runs_keywords_path() -> None:
     repo, db = _new_repo()
     db.engine.set_select_responses([[]])
     params = RetrieveParams(
-        query="hello", top_k=5, retriever_type=RetrieverType.KEYWORDS,
+        query="hello",
+        top_k=5,
+        retriever_type=RetrieverType.KEYWORDS,
     )
     await repo.retrieve(_CTX, params)
     executed = db.engine.executed
@@ -310,7 +316,8 @@ async def test_retrieve_with_vector_type_runs_vector_path() -> None:
     repo, db = _new_repo(existing_dims=[4])
     db.engine.set_select_responses([[]])
     params = RetrieveParams(
-        embedding=[1.0, 2.0, 3.0, 4.0], top_k=5,
+        embedding=[1.0, 2.0, 3.0, 4.0],
+        top_k=5,
         retriever_type=RetrieverType.VECTOR,
     )
     await repo.retrieve(_CTX, params)
@@ -326,9 +333,11 @@ async def test_keywords_retrieve_empty_query_returns_empty() -> None:
 
 async def test_keywords_retrieve_returns_results() -> None:
     repo, db = _new_repo()
-    db.engine.set_select_responses([
-        (1, "s-1", 0, "c-1", "k-1", "kb-1", "t-1", "hello", 1.5),
-    ])
+    db.engine.set_select_responses(
+        [
+            (1, "s-1", 0, "c-1", "k-1", "kb-1", "t-1", "hello", 1.5),
+        ]
+    )
     results = await repo._keywords_retrieve(
         _CTX,
         RetrieveParams(query="hello", top_k=5, retriever_type=RetrieverType.KEYWORDS),
@@ -349,14 +358,18 @@ async def test_vector_retrieve_empty_embedding_returns_empty() -> None:
 
 async def test_vector_retrieve_returns_results() -> None:
     repo, db = _new_repo()
-    db.engine.set_select_responses([
-        (1, 0.1, "s-1", 0, "c-1", "k-1", "kb-1", "t-1", "hello"),
-    ])
+    db.engine.set_select_responses(
+        [
+            (1, 0.1, "s-1", 0, "c-1", "k-1", "kb-1", "t-1", "hello"),
+        ]
+    )
     results = await repo._vector_retrieve(
         _CTX,
         RetrieveParams(
-            embedding=[1.0, 2.0, 3.0, 4.0], top_k=5,
-            threshold=0.0, retriever_type=RetrieverType.VECTOR,
+            embedding=[1.0, 2.0, 3.0, 4.0],
+            top_k=5,
+            threshold=0.0,
+            retriever_type=RetrieverType.VECTOR,
         ),
     )
     assert len(results) == 1
@@ -369,14 +382,18 @@ async def test_vector_retrieve_returns_results() -> None:
 
 async def test_vector_retrieve_filters_by_threshold() -> None:
     repo, db = _new_repo()
-    db.engine.set_select_responses([
-        (1, 0.5, "s-1", 0, "c-1", "k-1", "kb-1", "t-1", "hello"),  # distance 0.5 -> score 0.5
-    ])
+    db.engine.set_select_responses(
+        [
+            (1, 0.5, "s-1", 0, "c-1", "k-1", "kb-1", "t-1", "hello"),  # distance 0.5 -> score 0.5
+        ]
+    )
     results = await repo._vector_retrieve(
         _CTX,
         RetrieveParams(
-            embedding=[1.0, 2.0, 3.0, 4.0], top_k=5,
-            threshold=0.8, retriever_type=RetrieverType.VECTOR,
+            embedding=[1.0, 2.0, 3.0, 4.0],
+            top_k=5,
+            threshold=0.8,
+            retriever_type=RetrieverType.VECTOR,
         ),
     )
     assert results[0].results == []
@@ -388,9 +405,11 @@ async def test_vector_retrieve_filters_by_threshold() -> None:
 async def test_delete_by_chunk_id_list() -> None:
     repo, db = _new_repo(existing_dims=[4])
     # First query: look up rows to find vec IDs
-    db.engine.set_select_responses([
-        [(1, 4)],  # SELECT id, dimension
-    ])
+    db.engine.set_select_responses(
+        [
+            [(1, 4)],  # SELECT id, dimension
+        ]
+    )
     await repo.delete_by_chunk_id_list(_CTX, ["c-1", "c-2"], dimension=4, knowledge_type="")
     executed_sqls = " | ".join(s for s, _ in db.engine.executed)
     assert "DELETE FROM" in executed_sqls.upper()
@@ -428,12 +447,11 @@ async def test_copy_indices_empty_mapping_is_noop() -> None:
     repo, db = _new_repo()
     # First SELECT goes to _ensure_existing_vec_tables (returns empty)
     db.engine.set_select_responses([[]])
-    await repo.copy_indices(
-        _CTX, "src-kb", {}, {}, "tgt-kb", dimension=4, knowledge_type=""
-    )
+    await repo.copy_indices(_CTX, "src-kb", {}, {}, "tgt-kb", dimension=4, knowledge_type="")
     # No INSERT should have been executed
     insert_count = sum(
-        1 for s, _ in db.engine.executed
+        1
+        for s, _ in db.engine.executed
         if s.strip().upper().startswith("INSERT INTO LITE_EMBEDDINGS")
     )
     assert insert_count == 0
@@ -443,11 +461,13 @@ async def test_copy_indices_copies_one_chunk() -> None:
     repo, db = _new_repo(existing_dims=[4])
     # SELECT 1: _ensure_existing_vec_tables (empty)
     # SELECT 2: look up source row
-    db.engine.set_select_responses([
-        [],  # ensure_existing_vec_tables
-        # id, source_id, source_type, chunk_id, knowledge_id, knowledge_base_id, tag_id, content, dimension, is_enabled
-        (100, "src-1", 0, "src-c-1", "src-k-1", "src-kb-1", "t-1", "hello", 4, 1),
-    ])
+    db.engine.set_select_responses(
+        [
+            [],  # ensure_existing_vec_tables
+            # id, source_id, source_type, chunk_id, knowledge_id, knowledge_base_id, tag_id, content, dimension, is_enabled
+            (100, "src-1", 0, "src-c-1", "src-k-1", "src-kb-1", "t-1", "hello", 4, 1),
+        ]
+    )
     await repo.copy_indices(
         _CTX,
         "src-kb",
@@ -475,7 +495,8 @@ async def test_copy_indices_skips_missing_source_chunk() -> None:
         knowledge_type="",
     )
     insert_count = sum(
-        1 for s, _ in db.engine.executed
+        1
+        for s, _ in db.engine.executed
         if s.strip().upper().startswith("INSERT INTO") and "lite_embeddings" in s
     )
     assert insert_count == 0
@@ -488,8 +509,7 @@ async def test_batch_update_chunk_enabled_status() -> None:
     repo, db = _new_repo()
     await repo.batch_update_chunk_enabled_status(_CTX, {"c-1": True, "c-2": False})
     update_count = sum(
-        1 for s, _ in db.engine.executed
-        if s.strip().upper().startswith("UPDATE LITE_EMBEDDINGS")
+        1 for s, _ in db.engine.executed if s.strip().upper().startswith("UPDATE LITE_EMBEDDINGS")
     )
     assert update_count == 2
 
@@ -498,8 +518,7 @@ async def test_batch_update_chunk_tag_id() -> None:
     repo, db = _new_repo()
     await repo.batch_update_chunk_tag_id(_CTX, {"c-1": "t-a", "c-2": "t-b"})
     update_count = sum(
-        1 for s, _ in db.engine.executed
-        if s.strip().upper().startswith("UPDATE LITE_EMBEDDINGS")
+        1 for s, _ in db.engine.executed if s.strip().upper().startswith("UPDATE LITE_EMBEDDINGS")
     )
     assert update_count == 2
 
@@ -510,8 +529,7 @@ async def test_batch_update_empty_map_is_noop() -> None:
     await repo.batch_update_chunk_enabled_status(_CTX, {})
     await repo.batch_update_chunk_tag_id(_CTX, {})
     update_count = sum(
-        1 for s, _ in db.engine.executed
-        if s.strip().upper().startswith("UPDATE LITE_EMBEDDINGS")
+        1 for s, _ in db.engine.executed if s.strip().upper().startswith("UPDATE LITE_EMBEDDINGS")
     )
     assert update_count == 0
 

@@ -62,9 +62,7 @@ async def _build_duplicate_name(
         base = _default_base_name(locale)
     suffix = _duplicate_suffix(locale)
     try:
-        existing = {
-            info.name for info in await service.list_knowledge_bases(tenant_id=tenant_id)
-        }
+        existing = {info.name for info in await service.list_knowledge_bases(tenant_id=tenant_id)}
     except Exception:
         return base + suffix
     candidate = base + suffix

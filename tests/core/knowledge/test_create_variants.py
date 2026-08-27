@@ -115,6 +115,7 @@ def _kb_service(*, info: KnowledgeBaseInfo | None = None) -> AsyncMock:
     svc = AsyncMock(spec=KBService)
     if info is None:
         raise AssertionError("_kb_service requires an info")
+
     async def _get_kb(*, knowledge_base_id: str) -> KnowledgeBaseInfo:
         return info
 
@@ -232,7 +233,9 @@ def _make_tag_repo() -> tuple[AsyncMock, dict[str, KnowledgeTag]]:
 
     async def _get_by_ids(tenant_id: int, ids: list[str]) -> list[KnowledgeTag]:
         return [
-            tag for tag_id in ids if (tag := tags.get(tag_id)) is not None and tag.tenant_id == tenant_id
+            tag
+            for tag_id in ids
+            if (tag := tags.get(tag_id)) is not None and tag.tenant_id == tenant_id
         ]
 
     repo.get_by_ids.side_effect = _get_by_ids
@@ -440,9 +443,7 @@ async def test_create_url_file_url_rejects_faq_kb() -> None:
             kb_id=kb_id,
             url="https://example.com/file.pdf",
             knowledge_repo=repo,
-            kb_service=_kb_service(
-                info=_kb_info(tenant_id=tenant_id, kb_id=kb_id, kb_type="faq")
-            ),
+            kb_service=_kb_service(info=_kb_info(tenant_id=tenant_id, kb_id=kb_id, kb_type="faq")),
             url_guard=_url_guard_ok,
         )
     assert exc_info.value.code == "knowledge.faq_file_unsupported"
@@ -676,9 +677,7 @@ async def test_create_passage_rejects_empty_list() -> None:
             kb_id=_kbid(),
             passages=[],
             knowledge_repo=repo,
-            kb_service=_kb_service(
-                info=_kb_info(tenant_id=make_test_tenant_id(), kb_id=_kbid())
-            ),
+            kb_service=_kb_service(info=_kb_info(tenant_id=make_test_tenant_id(), kb_id=_kbid())),
         )
     assert exc_info.value.code == "knowledge.passage_required"
 

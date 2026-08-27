@@ -74,9 +74,9 @@ class SSEClient:
         # into this queue so :meth:`_wait_for_endpoint` and
         # :meth:`_await_message` can read sequentially without
         # exhausting the response.
-        self._event_queue: (
-            asyncio.Queue[ServerSentEvent | BaseException | _StreamClosed] | None
-        ) = None
+        self._event_queue: asyncio.Queue[ServerSentEvent | BaseException | _StreamClosed] | None = (
+            None
+        )
         self._drain_task: asyncio.Task[None] | None = None
 
     # ── Lifecycle ──────────────────────────────────────────────────
@@ -306,7 +306,6 @@ class SSEClient:
 # so consumers cannot accidentally inject an instance from outside.
 class _StreamClosed:
     """Marker instance pushed onto the SSE event queue at stream end."""
-
 
 
 _STREAM_CLOSED = _StreamClosed()

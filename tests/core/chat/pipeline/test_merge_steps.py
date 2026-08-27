@@ -241,9 +241,7 @@ def test_remove_partial_overlaps_keeps_both_when_below_threshold() -> None:
 
 
 def test_filter_image_info_by_content_urls() -> None:
-    infos = json.dumps(
-        [{"url": "u1", "ocr_text": "one"}, {"url": "u2", "ocr_text": "two"}]
-    )
+    infos = json.dumps([{"url": "u1", "ocr_text": "one"}, {"url": "u2", "ocr_text": "two"}])
     content = "![p2](u2)"
     assert filter_image_info_by_content_urls(content, infos) == json.dumps(
         [{"url": "u2", "ocr_text": "two"}], ensure_ascii=False
@@ -260,9 +258,7 @@ def test_prune_markdown_images_by_image_info() -> None:
 
 def test_merge_image_info_json_dedup_by_url() -> None:
     target = json.dumps([{"url": "u1", "caption": "first"}])
-    source = json.dumps(
-        [{"url": "u1", "caption": "updated"}, {"url": "u2", "ocr_text": "two"}]
-    )
+    source = json.dumps([{"url": "u1", "caption": "updated"}, {"url": "u2", "ocr_text": "two"}])
     merged, error = merge_image_info_json(target, source)
     assert error is False
     decoded = json.loads(merged)
@@ -303,7 +299,9 @@ def test_merge_sequential_chunks_merges_contained_or_sequential() -> None:
 def test_merge_sequential_chunks_does_not_merge_gapped_chunks() -> None:
     chunks = [
         SearchResult(id="one", knowledge_id="doc", chunk_type="text", chunk_index=1, content="one"),
-        SearchResult(id="three", knowledge_id="doc", chunk_type="text", chunk_index=3, content="three"),
+        SearchResult(
+            id="three", knowledge_id="doc", chunk_type="text", chunk_index=3, content="three"
+        ),
     ]
     merged = merge_sequential_chunks(_FakeContext(), "doc", chunks)
     assert len(merged) == 2
@@ -311,8 +309,22 @@ def test_merge_sequential_chunks_does_not_merge_gapped_chunks() -> None:
 
 def test_merge_sequential_chunks_sorts_by_score_descending() -> None:
     chunks = [
-        SearchResult(id="low", knowledge_id="doc", chunk_type="text", chunk_index=0, content="low body", score=0.4),
-        SearchResult(id="high", knowledge_id="doc", chunk_type="text", chunk_index=2, content="high body", score=0.9),
+        SearchResult(
+            id="low",
+            knowledge_id="doc",
+            chunk_type="text",
+            chunk_index=0,
+            content="low body",
+            score=0.4,
+        ),
+        SearchResult(
+            id="high",
+            knowledge_id="doc",
+            chunk_type="text",
+            chunk_index=2,
+            content="high body",
+            score=0.9,
+        ),
     ]
     merged = merge_sequential_chunks(_FakeContext(), "doc", chunks)
     assert [result.id for result in merged] == ["high", "low"]
@@ -324,8 +336,12 @@ def test_merge_sequential_chunks_sorts_by_score_descending() -> None:
 async def test_group_and_merge_deterministic_order() -> None:
     chunks = [
         SearchResult(id="low", knowledge_id="kb-001", chunk_type="text", content="low", score=0.4),
-        SearchResult(id="high", knowledge_id="kb-001", chunk_type="summary", content="high", score=0.9),
-        SearchResult(id="mid", knowledge_id="kb-001", chunk_type="parent_text", content="mid", score=0.6),
+        SearchResult(
+            id="high", knowledge_id="kb-001", chunk_type="summary", content="high", score=0.9
+        ),
+        SearchResult(
+            id="mid", knowledge_id="kb-001", chunk_type="parent_text", content="mid", score=0.6
+        ),
     ]
     results = await group_and_merge_current_content(_FakeContext(), chunks)
     assert [result.id for result in results] == ["high", "mid", "low"]
@@ -624,7 +640,11 @@ async def test_plugin_merge_no_candidates_proceeds() -> None:
 async def test_plugin_merge_full_orchestration() -> None:
     parent_content = "parent body " * 60  # long enough to skip short-context expansion
     fake = _FakeChunkSource(
-        chunks={"parent": _make_chunk(chunk_id="parent", content=parent_content, chunk_type="parent_text")},
+        chunks={
+            "parent": _make_chunk(
+                chunk_id="parent", content=parent_content, chunk_type="parent_text"
+            )
+        },
         children={},
     )
     plugin = PluginMerge(fake)
@@ -641,9 +661,7 @@ async def test_plugin_merge_full_orchestration() -> None:
             )
         ],
     )
-    result = await plugin.on_event(
-        _FakeContext(), EventType.CHUNK_MERGE, pipeline_ctx, _noop_next
-    )
+    result = await plugin.on_event(_FakeContext(), EventType.CHUNK_MERGE, pipeline_ctx, _noop_next)
     assert result is None
     assert len(pipeline_ctx.merge_result) == 1
     merged = pipeline_ctx.merge_result[0]
@@ -711,9 +729,7 @@ async def test_integration_merge_resolves_parent_and_enriches(session: AsyncSess
             )
         ],
     )
-    result = await plugin.on_event(
-        _FakeContext(), EventType.CHUNK_MERGE, pipeline_ctx, _noop_next
-    )
+    result = await plugin.on_event(_FakeContext(), EventType.CHUNK_MERGE, pipeline_ctx, _noop_next)
     assert result is None
     assert len(pipeline_ctx.merge_result) == 1
     merged = pipeline_ctx.merge_result[0]
@@ -759,9 +775,7 @@ async def test_integration_merge_enriches_faq_content(session: AsyncSession) -> 
             )
         ],
     )
-    result = await plugin.on_event(
-        _FakeContext(), EventType.CHUNK_MERGE, pipeline_ctx, _noop_next
-    )
+    result = await plugin.on_event(_FakeContext(), EventType.CHUNK_MERGE, pipeline_ctx, _noop_next)
     assert result is None
     assert len(pipeline_ctx.merge_result) == 1
     merged = pipeline_ctx.merge_result[0]

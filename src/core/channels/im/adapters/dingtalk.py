@@ -83,8 +83,12 @@ class DingTalkAdapter(IMAdapter):
             return
         timestamp = header_value(request.headers, "Timestamp")
         sign = header_value(request.headers, "Sign")
-        if not timestamp or not sign or not timestamp_ms_is_fresh(
-            request.headers, "Timestamp", _DINGTALK_TIMESTAMP_TOLERANCE_SECONDS
+        if (
+            not timestamp
+            or not sign
+            or not timestamp_ms_is_fresh(
+                request.headers, "Timestamp", _DINGTALK_TIMESTAMP_TOLERANCE_SECONDS
+            )
         ):
             raise UnauthorizedError(
                 code="im.verify_failed",
@@ -214,7 +218,11 @@ def _parse_callback_message(payload: JsonObject) -> IncomingMessage | None:
     if not payload:
         return None
 
-    chat_type = CHAT_TYPE_GROUP if payload_string(payload, "conversationType") == _DINGTALK_CONVERSATION_TYPE_GROUP else CHAT_TYPE_DIRECT
+    chat_type = (
+        CHAT_TYPE_GROUP
+        if payload_string(payload, "conversationType") == _DINGTALK_CONVERSATION_TYPE_GROUP
+        else CHAT_TYPE_DIRECT
+    )
     chat_id = payload_string(payload, "conversationId") if chat_type == CHAT_TYPE_GROUP else ""
 
     user_id = payload_string(payload, "senderStaffId") or payload_string(payload, "senderId")

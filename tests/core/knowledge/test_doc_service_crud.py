@@ -460,7 +460,9 @@ async def test_list_documents_orders_newest_first() -> None:
     repo, rows = _make_repo()
     tenant_id = make_test_tenant_id()
     kb_id = _kbid()
-    older = _sample_row(tenant_id=tenant_id, knowledge_base_id=kb_id, created_at=_NOW - timedelta(days=1))
+    older = _sample_row(
+        tenant_id=tenant_id, knowledge_base_id=kb_id, created_at=_NOW - timedelta(days=1)
+    )
     newer = _sample_row(tenant_id=tenant_id, knowledge_base_id=kb_id, created_at=_NOW)
     rows[older.id] = older
     rows[newer.id] = newer
@@ -599,9 +601,9 @@ async def test_count_documents_and_by_status() -> None:
         tenant_id=tenant_id,
         knowledge_base_id=kb_id,
     )
-    rows[_sample_row(tenant_id=tenant_id, knowledge_base_id=kb_id, parse_status="processing").id] = (
-        _sample_row(tenant_id=tenant_id, knowledge_base_id=kb_id, parse_status="processing")
-    )
+    rows[
+        _sample_row(tenant_id=tenant_id, knowledge_base_id=kb_id, parse_status="processing").id
+    ] = _sample_row(tenant_id=tenant_id, knowledge_base_id=kb_id, parse_status="processing")
     service = _service(repo)
     assert await service.count_documents(tenant_id=tenant_id, knowledge_base_id=kb_id) == 2
     assert (

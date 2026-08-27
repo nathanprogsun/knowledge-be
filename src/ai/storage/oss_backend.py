@@ -76,9 +76,7 @@ class OssFileService:
 
     # ── File operations ─────────────────────────────────────────────
 
-    async def save_file(
-        self, *, file: FileUpload, tenant_id: int, knowledge_id: str
-    ) -> str:
+    async def save_file(self, *, file: FileUpload, tenant_id: int, knowledge_id: str) -> str:
         """Upload ``file`` to ``{prefix}{tenant}/{knowledge}/{uuid}{ext}``."""
         ext = os.path.splitext(file.filename)[1]
         object_name = f"{self._path_prefix}{tenant_id}/{knowledge_id}/{uuid.uuid4()}{ext}"
@@ -87,9 +85,7 @@ class OssFileService:
         await self._store.put_object(object_name, data, content_type)
         return f"{OSS_SCHEME}{self._bucket_name}/{object_name}"
 
-    async def save_bytes(
-        self, *, data: bytes, tenant_id: int, file_name: str, temp: bool
-    ) -> str:
+    async def save_bytes(self, *, data: bytes, tenant_id: int, file_name: str, temp: bool) -> str:
         """Persist raw bytes.
 
         ``temp`` writes to the temp bucket (when configured) under
@@ -132,9 +128,7 @@ class OssFileService:
         try:
             src_bucket, src_key = self._parse_path(src_path)
         except StorageBackendError:
-            raise CrossBackendCopyError(
-                message=f"oss copy rejected source {src_path!r}"
-            ) from None
+            raise CrossBackendCopyError(message=f"oss copy rejected source {src_path!r}") from None
         ext = os.path.splitext(src_path)[1]
         dest_key = f"{self._path_prefix}{tenant_id}/{knowledge_id}/{uuid.uuid4()}{ext}"
         await self._store.copy_object(src_bucket, src_key, dest_key)

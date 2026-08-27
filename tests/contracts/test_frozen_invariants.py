@@ -106,7 +106,10 @@ def _required_only(model: type[BaseModel]) -> dict[str, Any]:
     hints = _resolved_hints(model)
     for fname, field in model.model_fields.items():
         if field.is_required():
-            kwargs[fname] = _dummy_for(hints.get(fname, field.annotation))
+            # Alias-strict models (no populate_by_name) only accept the
+            # wire alias at construction, e.g. ``refreshToken``.
+            key = field.alias if field.alias else fname
+            kwargs[key] = _dummy_for(hints.get(fname, field.annotation))
     return kwargs
 
 

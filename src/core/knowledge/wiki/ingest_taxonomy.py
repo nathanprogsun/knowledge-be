@@ -244,9 +244,7 @@ async def select_relevant_folders(
         return cap_folders(pool, WIKI_TAXONOMY_PROMPT_MAX_PATHS)
 
     folder_texts = [" / ".join(path) for path in deeper]
-    item_texts = [
-        " ".join([item.title, _preview_text(item.about, 120)]).strip() for item in items
-    ]
+    item_texts = [" ".join([item.title, _preview_text(item.about, 120)]).strip() for item in items]
     if not item_texts:
         return cap_folders(pool, WIKI_TAXONOMY_PROMPT_MAX_PATHS)
     try:

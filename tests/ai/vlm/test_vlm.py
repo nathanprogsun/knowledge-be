@@ -2,7 +2,7 @@
 
 All HTTP is faked through ``httpx.MockTransport`` — no network calls.
 The config mapping, the three backend wire shapes (Ollama, remote
-OpenAI-compatible, managed cloud with signed headers) and the
+OpenAI-compatible, the kb with signed headers) and the
 concurrency governor are pinned here.
 """
 
@@ -15,7 +15,7 @@ from typing import cast
 import httpx
 import pytest
 
-from src.ai.provider.registry import PROVIDER_AZURE_OPENAI, PROVIDER_WEKNORACLOUD
+from src.ai.provider.registry import PROVIDER_AZURE_OPENAI, PROVIDER_CLOUD
 from src.ai.utils.ollama_service import OllamaService
 from src.ai.utils.signer import sign_request
 from src.ai.vlm import Config, RemoteAPIVLM, config_from_model, detect_image_mime, new_vlm
@@ -24,6 +24,7 @@ from src.ai.vlm.base import (
     MODEL_SOURCE_REMOTE,
     ModelParametersLike,
 )
+from src.ai.vlm.cloud import CloudVLM, new_cloud_vlm
 from src.ai.vlm.concurrency import ConcurrencyVLM, _ModelGate, wrap_vlm_concurrency
 from src.ai.vlm.ollama import OllamaVLM, new_ollama_vlm
 from src.ai.vlm.remote_api import (
@@ -36,7 +37,6 @@ from src.ai.vlm.transport import (
     validate_vlm_base_url,
     vlm_http_timeout,
 )
-from src.ai.vlm.weknoracloud import WeKnoraCloudVLM, new_weknoracloud_vlm
 from src.common.exception import AIProviderError, ExternalServiceError, ValidationError
 from src.common.json import JsonObject, JsonValue
 
@@ -520,12 +520,12 @@ async def test_remote_api_temperature_from_extra(ssrf_whitelist: None) -> None:
     assert sent_body["temperature"] == 0.7
 
 
-# ── managed-cloud backend ───────────────────────────────────────────
+# ── kb backend ───────────────────────────────────────────
 
 
-async def test_new_weknoracloud_vlm_requires_app_credentials() -> None:
+async def test_new_cloud_vlm_requires_app_credentials() -> None:
     with pytest.raises(ValidationError, match="app id is required"):
-        await new_weknoracloud_vlm(
+        await new_cloud_vlm(
             model_name="m",
             model_id="i",
             base_url="https://vlm.test",
@@ -534,7 +534,7 @@ async def test_new_weknoracloud_vlm_requires_app_credentials() -> None:
             extra=None,
         )
     with pytest.raises(ValidationError, match="app secret is required"):
-        await new_weknoracloud_vlm(
+        await new_cloud_vlm(
             model_name="m",
             model_id="i",
             base_url="https://vlm.test",
@@ -544,7 +544,7 @@ async def test_new_weknoracloud_vlm_requires_app_credentials() -> None:
         )
 
 
-async def test_weknoracloud_predict_sends_signed_request(ssrf_whitelist: None) -> None:
+async def test_cloud_predict_sends_signed_request(ssrf_whitelist: None) -> None:
     sent_url: str = ""
     sent_headers: dict[str, str] = {}
     sent_body: str = ""
@@ -556,7 +556,7 @@ async def test_weknoracloud_predict_sends_signed_request(ssrf_whitelist: None) -
         sent_body = request.content.decode("utf-8")
         return httpx.Response(200, json={"choices": [{"message": {"content": "understood"}}]})
 
-    vlm = await new_weknoracloud_vlm(
+    vlm = await new_cloud_vlm(
         model_name="local-name",
         model_id="model-1",
         base_url="https://vlm.test",
@@ -593,7 +593,7 @@ async def test_weknoracloud_predict_sends_signed_request(ssrf_whitelist: None) -
     assert _header(sent_headers, "X-Signature") == expected["X-Signature"]
 
 
-async def test_weknoracloud_predict_uses_remote_model_name(ssrf_whitelist: None) -> None:
+async def test_cloud_predict_uses_remote_model_name(ssrf_whitelist: None) -> None:
     sent_body: str = ""
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -601,7 +601,7 @@ async def test_weknoracloud_predict_uses_remote_model_name(ssrf_whitelist: None)
         sent_body = request.content.decode("utf-8")
         return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
 
-    vlm = await new_weknoracloud_vlm(
+    vlm = await new_cloud_vlm(
         model_name="local-name",
         model_id="model-1",
         base_url="https://vlm.test",
@@ -615,11 +615,11 @@ async def test_weknoracloud_predict_uses_remote_model_name(ssrf_whitelist: None)
     assert body["model"] == "qwen-vl-plus"
 
 
-async def test_weknoracloud_predict_raises_on_non_200(ssrf_whitelist: None) -> None:
+async def test_cloud_predict_raises_on_non_200(ssrf_whitelist: None) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(401, text="unauthorized")
 
-    vlm = await new_weknoracloud_vlm(
+    vlm = await new_cloud_vlm(
         model_name="local-name",
         model_id="model-1",
         base_url="https://vlm.test",
@@ -655,13 +655,13 @@ async def test_new_vlm_routes_to_managed_cloud(ssrf_whitelist: None) -> None:
         model_name="cloud-vlm",
         model_id="m1",
         interface_type="openai",
-        provider=PROVIDER_WEKNORACLOUD,
+        provider=PROVIDER_CLOUD,
         app_id="app-1",
         app_secret="secret-1",
     )
     vlm = await new_vlm(config, None)
     assert isinstance(vlm, ConcurrencyVLM)
-    assert isinstance(vlm._inner, WeKnoraCloudVLM)
+    assert isinstance(vlm._inner, CloudVLM)
 
 
 async def test_new_vlm_routes_to_remote_api(ssrf_whitelist: None) -> None:

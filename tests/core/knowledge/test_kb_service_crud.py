@@ -65,11 +65,7 @@ def _make_repo() -> tuple[AsyncMock, dict[str, KnowledgeBase], dict[tuple[int, s
 
     async def _list_by_tenant(tenant_id: int) -> list[KnowledgeBase]:
         return sorted(
-            (
-                r
-                for r in _live().values()
-                if r.tenant_id == tenant_id and not r.is_temporary
-            ),
+            (r for r in _live().values() if r.tenant_id == tenant_id and not r.is_temporary),
             key=lambda r: r.created_at,
             reverse=True,
         )
@@ -148,7 +144,9 @@ def repo_and_state() -> tuple[AsyncMock, dict[str, KnowledgeBase], dict[tuple[in
 
 
 @pytest.fixture
-def repo(repo_and_state: tuple[AsyncMock, dict[str, KnowledgeBase], dict[tuple[int, str], int]]) -> AsyncMock:
+def repo(
+    repo_and_state: tuple[AsyncMock, dict[str, KnowledgeBase], dict[tuple[int, str], int]],
+) -> AsyncMock:
     return repo_and_state[0]
 
 
@@ -190,9 +188,7 @@ class TestCreateKnowledgeBase(ServiceTest):
         assert info.indexing_strategy == _DEFAULT_STRATEGY
         assert info.faq_config is None
 
-    async def test_trims_the_name(
-        self, service: KBService, rows: dict[str, KnowledgeBase]
-    ) -> None:
+    async def test_trims_the_name(self, service: KBService, rows: dict[str, KnowledgeBase]) -> None:
         info = await service.create_knowledge_base(tenant_id=7, name="  docs  ")
         assert info.name == "docs"
         assert rows[info.id].name == "docs"
@@ -200,9 +196,7 @@ class TestCreateKnowledgeBase(ServiceTest):
     async def test_stamps_creator_id(
         self, service: KBService, rows: dict[str, KnowledgeBase]
     ) -> None:
-        info = await service.create_knowledge_base(
-            tenant_id=7, name="docs", creator_id="usr-1"
-        )
+        info = await service.create_knowledge_base(tenant_id=7, name="docs", creator_id="usr-1")
         assert info.creator_id == "usr-1"
 
     async def test_faq_type_gets_default_faq_config(
@@ -251,9 +245,7 @@ class TestCreateKnowledgeBase(ServiceTest):
     async def test_explicit_vector_store_id_preserved(
         self, service: KBService, rows: dict[str, KnowledgeBase]
     ) -> None:
-        info = await service.create_knowledge_base(
-            tenant_id=7, name="docs", vector_store_id="vs-1"
-        )
+        info = await service.create_knowledge_base(tenant_id=7, name="docs", vector_store_id="vs-1")
         assert info.vector_store_id == "vs-1"
 
     async def test_extract_enabled_syncs_graph_enabled(
@@ -284,9 +276,7 @@ class TestCreateKnowledgeBase(ServiceTest):
         assert excinfo.value.code == "knowledge_base.type_invalid"
 
     @pytest.mark.parametrize("tenant_id", [0, -1])
-    async def test_rejects_invalid_tenant(
-        self, service: KBService, tenant_id: int
-    ) -> None:
+    async def test_rejects_invalid_tenant(self, service: KBService, tenant_id: int) -> None:
         with pytest.raises(ValidationError) as excinfo:
             await service.create_knowledge_base(tenant_id=tenant_id, name="docs")
         assert excinfo.value.code == "knowledge_base.tenant_required"
@@ -412,9 +402,7 @@ class TestListKnowledgeBases(ServiceTest):
         infos = await service.list_knowledge_bases(tenant_id=tid)
 
         assert infos[0].knowledge_count == 3
-        repo.count_documents.assert_awaited_once_with(
-            tenant_id=tid, knowledge_base_id=stored.id
-        )
+        repo.count_documents.assert_awaited_once_with(tenant_id=tid, knowledge_base_id=stored.id)
 
     async def test_faq_rows_get_chunk_count(
         self,
@@ -430,9 +418,7 @@ class TestListKnowledgeBases(ServiceTest):
         infos = await service.list_knowledge_bases(tenant_id=tid)
 
         assert infos[0].chunk_count == 5
-        repo.count_chunks.assert_awaited_once_with(
-            tenant_id=tid, knowledge_base_id=stored.id
-        )
+        repo.count_chunks.assert_awaited_once_with(tenant_id=tid, knowledge_base_id=stored.id)
         repo.count_documents.assert_not_awaited()
 
     async def test_count_failure_leaves_zero_default(

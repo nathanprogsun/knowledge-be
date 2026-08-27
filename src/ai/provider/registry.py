@@ -35,7 +35,7 @@ class ModelType(StrEnum):
 
 ProviderName: TypeAlias = Literal[
     "generic",
-    "weknoracloud",
+    "cloud",
     "aliyun",
     "zhipu",
     "volcengine",
@@ -65,7 +65,7 @@ ProviderName: TypeAlias = Literal[
 # ── Provider identifiers ──────────────────────────────────────────────
 
 PROVIDER_GENERIC: ProviderName = "generic"
-PROVIDER_WEKNORACLOUD: ProviderName = "weknoracloud"
+PROVIDER_CLOUD: ProviderName = "cloud"
 PROVIDER_ALIYUN: ProviderName = "aliyun"
 PROVIDER_ZHIPU: ProviderName = "zhipu"
 PROVIDER_VOLCENGINE: ProviderName = "volcengine"
@@ -95,7 +95,7 @@ PROVIDER_AZURE_OPENAI: ProviderName = "azure_openai"
 # tuple so the factories and the metadata list iterate deterministically.
 ALL_PROVIDERS: tuple[ProviderName, ...] = (
     PROVIDER_GENERIC,
-    PROVIDER_WEKNORACLOUD,
+    PROVIDER_CLOUD,
     PROVIDER_ALIYUN,
     PROVIDER_ZHIPU,
     PROVIDER_VOLCENGINE,
@@ -197,6 +197,7 @@ __all__ = [
     "PROVIDER_ALIYUN",
     "PROVIDER_ANTHROPIC",
     "PROVIDER_AZURE_OPENAI",
+    "PROVIDER_CLOUD",
     "PROVIDER_DEEPSEEK",
     "PROVIDER_GEMINI",
     "PROVIDER_GENERIC",
@@ -218,7 +219,6 @@ __all__ = [
     "PROVIDER_REQUESTY",
     "PROVIDER_SILICONFLOW",
     "PROVIDER_VOLCENGINE",
-    "PROVIDER_WEKNORACLOUD",
     "PROVIDER_ZHIPU",
     "ModelType",
     "ProviderConfig",

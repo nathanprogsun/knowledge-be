@@ -1,6 +1,6 @@
 """Unit tests for FAQ domain types and content validation."""
 
-# ruff: noqa: RUF001  # Chinese test data uses fullwidth punctuation.
+# Chinese test data uses fullwidth punctuation.
 
 from __future__ import annotations
 

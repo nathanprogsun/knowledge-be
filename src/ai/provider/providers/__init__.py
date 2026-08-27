@@ -13,6 +13,7 @@ from src.ai.provider.providers import (
     aliyun,
     anthropic,
     azure_openai,
+    cloud,
     deepseek,
     gemini,
     generic,
@@ -34,7 +35,6 @@ from src.ai.provider.providers import (
     requesty,
     siliconflow,
     volcengine,
-    weknoracloud,
     zhipu,
 )
 from src.ai.provider.registry import (
@@ -50,7 +50,7 @@ from src.ai.provider.registry import (
 PROVIDERS: dict[str, ProviderInfo] = {}
 for _builder in (
     generic.info,
-    weknoracloud.info,
+    cloud.info,
     aliyun.info,
     zhipu.info,
     volcengine.info,

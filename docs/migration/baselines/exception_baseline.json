@@ -1,0 +1,26 @@
+{
+  "files": {
+    "ai/retrieval/composite.py": 2,
+    "ai/retrieval/kb_engine_resolver.py": 1,
+    "core/agents/tools/data_analysis.py": 4,
+    "core/agents/tools/web_fetch.py": 9,
+    "core/agents/tools/wiki_route.py": 4,
+    "core/channels/im/adapters/_common.py": 3,
+    "core/channels/im/commands/registry.py": 2,
+    "core/chat/bus.py": 4,
+    "core/chat/factory.py": 2,
+    "core/chat/messages/suggestion_service.py": 4,
+    "core/chat/sessions/agent_qa.py": 4,
+    "core/chat/sessions/knowledge_qa.py": 1,
+    "core/chat/sessions/search_knowledge.py": 1,
+    "core/chat/sessions/title_gen.py": 1,
+    "core/chat/stream/manager.py": 1,
+    "core/evaluation/service/evaluation_service.py": 1,
+    "core/knowledge/documents/create_passage.py": 1,
+    "core/knowledge/documents/image_multimodal.py": 5,
+    "core/knowledge/faq/service/faq_service.py": 1,
+    "core/knowledge/graph/builder.py": 2,
+    "core/knowledge/knowledge_bases/hybrid_search.py": 1
+  },
+  "total": 54
+}

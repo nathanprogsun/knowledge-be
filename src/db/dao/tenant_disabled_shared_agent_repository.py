@@ -32,8 +32,7 @@ class TenantDisabledSharedAgentRepository(GenericRepository[TenantDisabledShared
     async def list_by_tenant(self, tenant_id: int) -> list[TenantDisabledSharedAgent]:
         """Every hide row of one tenant, oldest first."""
         stmt = text(
-            f"select * from {_TABLE} "
-            "where tenant_id = :tenant_id order by created_at asc"
+            f"select * from {_TABLE} where tenant_id = :tenant_id order by created_at asc"
         ).bindparams(tenant_id=tenant_id)
         result = await self._session.execute(stmt)
         return [self._hydrate(m) for m in result.mappings().all()]

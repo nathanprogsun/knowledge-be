@@ -63,7 +63,7 @@ VECTOR_NAME = "embedding"
 # ── Collection resolution ─────────────────────────────────────────────
 
 ENV_WEAVIATE_COLLECTION = "WEAVIATE_COLLECTION"
-DEFAULT_COLLECTION_NAME = "weknora_embeddings"
+DEFAULT_COLLECTION_NAME = "kb_embeddings"
 
 # ── Storage estimate constants (mirrors the upstream storage formula) ──
 
@@ -108,7 +108,7 @@ def _resolve_collection_name(index_config: IndexConfig | None) -> str:
     """Resolve the collection base name (upstream ``ResolveCollectionName``).
 
     Priority: ``collection_prefix`` > ``collection_name`` > env var
-    ``WEAVIATE_COLLECTION`` > default ``weknora_embeddings``.
+    ``WEAVIATE_COLLECTION`` > default ``kb_embeddings``.
     """
     if index_config is not None:
         if index_config.collection_prefix:
@@ -433,27 +433,19 @@ class WeaviateRetrieveEngineRepository:
         ]
         if params.knowledge_base_ids:
             operands.append(
-                Filter.by_property(FIELD_KNOWLEDGE_BASE_ID).contains_any(
-                    params.knowledge_base_ids
-                )
+                Filter.by_property(FIELD_KNOWLEDGE_BASE_ID).contains_any(params.knowledge_base_ids)
             )
         if params.knowledge_ids:
             operands.append(
-                Filter.by_property(FIELD_KNOWLEDGE_ID).contains_any(
-                    params.knowledge_ids
-                )
+                Filter.by_property(FIELD_KNOWLEDGE_ID).contains_any(params.knowledge_ids)
             )
         if params.tag_ids:
-            operands.append(
-                Filter.by_property(FIELD_TAG_ID).contains_any(params.tag_ids)
-            )
+            operands.append(Filter.by_property(FIELD_TAG_ID).contains_any(params.tag_ids))
         if params.exclude_knowledge_ids:
             operands.append(
                 Filter.all_of(
                     [
-                        Filter.by_property(FIELD_KNOWLEDGE_ID).not_equal(
-                            value
-                        )
+                        Filter.by_property(FIELD_KNOWLEDGE_ID).not_equal(value)
                         for value in params.exclude_knowledge_ids
                     ]
                 )
@@ -473,9 +465,7 @@ class WeaviateRetrieveEngineRepository:
 
     # ── Save ──────────────────────────────────────────────────────────
 
-    async def save(
-        self, ctx: Context, index_info: IndexInfo, params: IndexSaveParams
-    ) -> None:
+    async def save(self, ctx: Context, index_info: IndexInfo, params: IndexSaveParams) -> None:
         """Store a single object in Weaviate."""
         embedding = _to_embedding(index_info, params)
         if not embedding:
@@ -533,9 +523,7 @@ class WeaviateRetrieveEngineRepository:
 
     # ── Retrieve ─────────────────────────────────────────────────────
 
-    async def retrieve(
-        self, ctx: Context, params: RetrieveParams
-    ) -> list[RetrieveResult]:
+    async def retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
         """Dispatch retrieval based on ``params.retriever_type``."""
         if params.retriever_type == RetrieverType.VECTOR:
             return await self._vector_retrieve(ctx, params)
@@ -546,9 +534,7 @@ class WeaviateRetrieveEngineRepository:
             message=f"invalid retriever type: {params.retriever_type}",
         )
 
-    async def _vector_retrieve(
-        self, ctx: Context, params: RetrieveParams
-    ) -> list[RetrieveResult]:
+    async def _vector_retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
         """Perform cosine near-vector similarity search."""
         del ctx
         dimension = len(params.embedding)
@@ -759,9 +745,7 @@ class WeaviateRetrieveEngineRepository:
         while True:
             response = await collection.query.fetch_objects(
                 limit=_COPY_BATCH_SIZE,
-                filters=Filter.by_property(FIELD_KNOWLEDGE_BASE_ID).equal(
-                    source_knowledge_base_id
-                ),
+                filters=Filter.by_property(FIELD_KNOWLEDGE_BASE_ID).equal(source_knowledge_base_id),
                 include_vector=[VECTOR_NAME],
                 after=offset,
                 return_metadata=MetadataQuery(),
@@ -785,9 +769,7 @@ class WeaviateRetrieveEngineRepository:
                     original_source_id, source_chunk_id, target_chunk_id
                 )
                 vector = obj.vector
-                embedding = (
-                    vector.get(VECTOR_NAME) if isinstance(vector, Mapping) else vector
-                )
+                embedding = vector.get(VECTOR_NAME) if isinstance(vector, Mapping) else vector
                 if embedding is None:
                     continue
                 new_properties = _build_properties(

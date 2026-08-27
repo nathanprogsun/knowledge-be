@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,7 +31,6 @@ from src.ai.storage.factory import new_file_service_from_storage_config
 from src.common.exception import NotFoundError, PermissionDeniedError, ValidationError
 from src.core.infra.storage_backends.factory import build_storage_backend_service
 from src.core.infra.storage_backends.types import StorageBackendConfigInfo
-from src.core.knowledge.knowledge_bases.service.kb_service import KBService
 from src.web.deps import AuthDep, RoleViewerDep
 from src.web.deps.knowledge_bases import KBServiceDep
 from src.web.deps.session import SessionDep

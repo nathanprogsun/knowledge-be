@@ -50,9 +50,7 @@ _PASSTHROUGH_ENGINES: tuple[RetrieverEngineType, ...] = (
 def test_keyword_scores_pass_through_unchanged(score: float) -> None:
     normalizer = _normalizer()
     for engine in _PASSTHROUGH_ENGINES:
-        got = normalizer.normalize(
-            _CTX, score, RetrieverType.KEYWORDS, engine
-        )
+        got = normalizer.normalize(_CTX, score, RetrieverType.KEYWORDS, engine)
         assert got == score
 
 
@@ -81,12 +79,8 @@ def test_opensearch_keyword_passes_through_unbounded() -> None:
         (1.5, 1.0),
     ],
 )
-def test_milvus_raw_cosine_rescaled_to_unit_interval(
-    score: float, expected: float
-) -> None:
-    got = _normalizer().normalize(
-        _CTX, score, RetrieverType.VECTOR, RetrieverEngineType.MILVUS
-    )
+def test_milvus_raw_cosine_rescaled_to_unit_interval(score: float, expected: float) -> None:
+    got = _normalizer().normalize(_CTX, score, RetrieverType.VECTOR, RetrieverEngineType.MILVUS)
     assert got == pytest.approx(expected)
 
 
@@ -108,9 +102,7 @@ def test_milvus_raw_cosine_rescaled_to_unit_interval(
 def test_unit_interval_engines_pass_through(
     engine: RetrieverEngineType, score: float, expected: float
 ) -> None:
-    got = _normalizer().normalize(
-        _CTX, score, RetrieverType.VECTOR, engine
-    )
+    got = _normalizer().normalize(_CTX, score, RetrieverType.VECTOR, engine)
     assert got == pytest.approx(expected)
 
 
@@ -164,9 +156,7 @@ def test_elasticsearch_cosine_passes_through(score: float, expected: float) -> N
 def test_opensearch_cosine_passes_through(score: float, expected: float) -> None:
     # OpenSearch k-NN cosinesimil scores arrive pre-mapped to [0, 1] by the
     # plugin's score translation; the normalizer only guards engine drift.
-    got = _normalizer().normalize(
-        _CTX, score, RetrieverType.VECTOR, RetrieverEngineType.OPENSEARCH
-    )
+    got = _normalizer().normalize(_CTX, score, RetrieverType.VECTOR, RetrieverEngineType.OPENSEARCH)
     assert got == pytest.approx(expected)
 
 
@@ -177,18 +167,12 @@ def test_non_milvus_engines_clamp_to_unit_interval() -> None:
     # Every engine that is not Milvus takes the default clamp branch — a
     # hypothetical future engine cannot leak past the [0, 1] envelope.
     normalizer = _normalizer()
-    assert (
-        normalizer.normalize(
-            _CTX, 0.42, RetrieverType.VECTOR, RetrieverEngineType.POSTGRES
-        )
-        == pytest.approx(0.42)
-    )
-    assert (
-        normalizer.normalize(
-            _CTX, 5.0, RetrieverType.VECTOR, RetrieverEngineType.POSTGRES
-        )
-        == pytest.approx(1.0)
-    )
+    assert normalizer.normalize(
+        _CTX, 0.42, RetrieverType.VECTOR, RetrieverEngineType.POSTGRES
+    ) == pytest.approx(0.42)
+    assert normalizer.normalize(
+        _CTX, 5.0, RetrieverType.VECTOR, RetrieverEngineType.POSTGRES
+    ) == pytest.approx(1.0)
 
 
 # ── clamp01 envelope ─────────────────────────────────────────────────
@@ -216,28 +200,20 @@ def test_nan_and_inf_handled_across_formulas() -> None:
     # NaN -> 0 so a strict-weak-ordering comparator downstream never sees a
     # value that compares neither greater nor less than anything.
     assert (
-        normalizer.normalize(
-            _CTX, math.nan, RetrieverType.VECTOR, RetrieverEngineType.POSTGRES
-        )
+        normalizer.normalize(_CTX, math.nan, RetrieverType.VECTOR, RetrieverEngineType.POSTGRES)
         == 0.0
     )
     assert (
-        normalizer.normalize(
-            _CTX, math.inf, RetrieverType.VECTOR, RetrieverEngineType.POSTGRES
-        )
+        normalizer.normalize(_CTX, math.inf, RetrieverType.VECTOR, RetrieverEngineType.POSTGRES)
         == 1.0
     )
     assert (
-        normalizer.normalize(
-            _CTX, -math.inf, RetrieverType.VECTOR, RetrieverEngineType.POSTGRES
-        )
+        normalizer.normalize(_CTX, -math.inf, RetrieverType.VECTOR, RetrieverEngineType.POSTGRES)
         == 0.0
     )
     # NaN through the Milvus cosine formula too.
     assert (
-        normalizer.normalize(
-            _CTX, math.nan, RetrieverType.VECTOR, RetrieverEngineType.MILVUS
-        )
+        normalizer.normalize(_CTX, math.nan, RetrieverType.VECTOR, RetrieverEngineType.MILVUS)
         == 0.0
     )
 

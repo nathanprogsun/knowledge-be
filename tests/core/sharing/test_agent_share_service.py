@@ -427,9 +427,7 @@ async def test_list_shares_by_agent_returns_live_rows() -> None:
 
 async def test_update_share_permission_forces_viewer() -> None:
     service, state = _make_service()
-    share = _share(agent_id="agent-1", org_id="org-1").model_copy(
-        update={"permission": "editor"}
-    )
+    share = _share(agent_id="agent-1", org_id="org-1").model_copy(update={"permission": "editor"})
     state.shares[share.id] = share
 
     await service.update_share_permission(

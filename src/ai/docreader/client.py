@@ -228,8 +228,7 @@ class DocReaderClient:
             raise ExternalServiceError(
                 code="docreader.rpc_error",
                 message=(
-                    "docreader read returned unexpected response type "
-                    f"{type(response).__name__}"
+                    f"docreader read returned unexpected response type {type(response).__name__}"
                 ),
             )
         return response

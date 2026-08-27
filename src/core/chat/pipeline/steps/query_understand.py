@@ -143,7 +143,10 @@ class QueryUnderstandPlugin:
             pipeline_error(
                 "QueryUnderstand",
                 "get_model",
-                {"session_id": pipeline_ctx.session_id, "chat_model_id": pipeline_ctx.chat_model_id},
+                {
+                    "session_id": pipeline_ctx.session_id,
+                    "chat_model_id": pipeline_ctx.chat_model_id,
+                },
             )
             return await next()
 
@@ -151,7 +154,9 @@ class QueryUnderstandPlugin:
         messages = [Message(role="system", content=system_content)]
         user_message = Message(role="user", content=user_content)
         if use_images:
-            user_message = Message(role="user", content=user_content, images=list(pipeline_ctx.images))
+            user_message = Message(
+                role="user", content=user_content, images=list(pipeline_ctx.images)
+            )
         messages.append(user_message)
 
         max_tokens = _MAX_IMAGE_TOKENS if use_images else _MAX_TEXT_TOKENS
@@ -241,7 +246,9 @@ class QueryUnderstandPlugin:
         if has_images:
             if pipeline_ctx.chat_model_supports_vision:
                 try:
-                    model = await self._model_service.get_chat_model(ctx, pipeline_ctx.chat_model_id)
+                    model = await self._model_service.get_chat_model(
+                        ctx, pipeline_ctx.chat_model_id
+                    )
                     return model, True
                 except Exception as exc:
                     pipeline_warn(
@@ -263,7 +270,9 @@ class QueryUnderstandPlugin:
                             "error": str(exc),
                         },
                     )
-            pipeline_warn("QueryUnderstand", "no_vision_model", {"session_id": pipeline_ctx.session_id})
+            pipeline_warn(
+                "QueryUnderstand", "no_vision_model", {"session_id": pipeline_ctx.session_id}
+            )
 
         text_model_id = pipeline_ctx.chat_model_id
         if pipeline_ctx.query_understand_model_id:
@@ -273,12 +282,17 @@ class QueryUnderstandPlugin:
             return model, False
         except Exception as exc:
             if not (
-                pipeline_ctx.query_understand_model_id and text_model_id != pipeline_ctx.chat_model_id
+                pipeline_ctx.query_understand_model_id
+                and text_model_id != pipeline_ctx.chat_model_id
             ):
                 pipeline_error(
                     "QueryUnderstand",
                     "get_model",
-                    {"session_id": pipeline_ctx.session_id, "chat_model_id": text_model_id, "error": str(exc)},
+                    {
+                        "session_id": pipeline_ctx.session_id,
+                        "chat_model_id": text_model_id,
+                        "error": str(exc),
+                    },
                 )
                 return None, False
             pipeline_warn(
@@ -297,7 +311,11 @@ class QueryUnderstandPlugin:
                 pipeline_error(
                     "QueryUnderstand",
                     "get_model",
-                    {"session_id": pipeline_ctx.session_id, "chat_model_id": pipeline_ctx.chat_model_id, "error": str(fb_exc)},
+                    {
+                        "session_id": pipeline_ctx.session_id,
+                        "chat_model_id": pipeline_ctx.chat_model_id,
+                        "error": str(fb_exc),
+                    },
                 )
                 return None, False
 
@@ -479,7 +497,9 @@ def _parse_structured_query_output_json(content: str) -> _StructuredQueryOutput 
         return None
     if not isinstance(obj, dict):
         return None
-    rewrite_query = _first_string_field(obj, "rewrite_query", "rewritten_query", "query", "question")
+    rewrite_query = _first_string_field(
+        obj, "rewrite_query", "rewritten_query", "query", "question"
+    )
     intent = _first_string_field(obj, "intent")
     description = _first_string_field(
         obj,

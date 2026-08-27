@@ -52,9 +52,7 @@ def is_lkeap_deepseek_r1_model(model_name: str) -> bool:
 
 def is_lkeap_thinking_model(model_name: str) -> bool:
     """True for any LKEAP model that supports a reasoning chain."""
-    return is_lkeap_deepseek_r1_model(model_name) or is_lkeap_deepseek_v3_model(
-        model_name
-    )
+    return is_lkeap_deepseek_r1_model(model_name) or is_lkeap_deepseek_v3_model(model_name)
 
 
 def is_moonshot_fixed_temp_model(model_name: str) -> bool:
@@ -84,9 +82,7 @@ def is_openai_reasoning_or_gpt5_model(model_name: str) -> bool:
         return False
     if name.startswith("gpt-5"):
         return True
-    return any(
-        name == prefix or name.startswith(prefix + "-") for prefix in ("o1", "o3", "o4")
-    )
+    return any(name == prefix or name.startswith(prefix + "-") for prefix in ("o1", "o3", "o4"))
 
 
 __all__ = [

@@ -676,12 +676,14 @@ def _restore_registry() -> Iterator[None]:
     future test that re-registers under the same name would silently
     overwrite it. The fixture is defensive — a no-op today.
     """
+    import src.workers.tasks  # noqa: F401 — pre-warm so the snapshot captures registered handlers.
     from src.workers import registry as registry_module
 
-    snapshot = dict(registry_module.all_tasks())
+    baseline = dict(registry_module.all_tasks())
     yield
     current = registry_module.all_tasks()
-    for name in current.keys() - snapshot.keys():
-        current.pop(name, None)
-    for name, handler in snapshot.items():
+    for name in list(current.keys()):
+        if name not in baseline:
+            current.pop(name, None)
+    for name, handler in baseline.items():
         current[name] = handler

@@ -79,7 +79,9 @@ def new_chat(config: ChatConfig, ollama_service: OllamaService | None = None) ->
         )
     if source == MODEL_SOURCE_REMOTE:
         return wrap_chat_concurrency(new_remote_chat(config), config.max_concurrency)
-    raise ValidationError(code="chat.unsupported_source", message=f"unsupported chat model source: {config.source}")
+    raise ValidationError(
+        code="chat.unsupported_source", message=f"unsupported chat model source: {config.source}"
+    )
 
 
 __all__ = [

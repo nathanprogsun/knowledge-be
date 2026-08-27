@@ -1325,7 +1325,7 @@
     "knowledge_references": "list[JsonObject] | None",
     "response_type": "str"
   },
-  "SaveWeKnoraCloudCredentialsRequest": {
+  "SaveCloudCredentialsRequest": {
     "app_id": "str",
     "app_secret": "str"
   },
@@ -1843,7 +1843,7 @@
     "index_fields": "list[VectorStoreConnectionField] | None",
     "type": "str"
   },
-  "WeKnoraCloudStatusResponse": {
+  "CloudStatusResponse": {
     "has_models": "bool",
     "needs_reinit": "bool",
     "reason": "str | None"

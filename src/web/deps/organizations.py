@@ -40,17 +40,11 @@ def get_agent_share_service(session: SessionDep) -> AgentShareServiceImpl:
     return build_agent_share_service(session)
 
 
-OrganizationServiceDep = Annotated[
-    OrganizationService, Depends(get_organization_service)
-]
+OrganizationServiceDep = Annotated[OrganizationService, Depends(get_organization_service)]
 
-SharedResourceServiceDep = Annotated[
-    SharedResourceService, Depends(get_shared_resource_service)
-]
+SharedResourceServiceDep = Annotated[SharedResourceService, Depends(get_shared_resource_service)]
 
-AgentShareServiceDep = Annotated[
-    AgentShareServiceImpl, Depends(get_agent_share_service)
-]
+AgentShareServiceDep = Annotated[AgentShareServiceImpl, Depends(get_agent_share_service)]
 
 
 __all__ = [

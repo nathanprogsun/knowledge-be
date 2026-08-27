@@ -1,6 +1,6 @@
 """Unit tests for FAQ entry mapping helpers."""
 
-# ruff: noqa: RUF001  # Chinese test data uses fullwidth punctuation.
+# Chinese test data uses fullwidth punctuation.
 
 from __future__ import annotations
 
@@ -148,7 +148,9 @@ def test_duplicate_error_for_standard_collision() -> None:
 
 def test_duplicate_error_for_similar_collision() -> None:
     error = duplicate_error_for(
-        FAQContent(standard_question="如何开户？", similar_questions=["怎么充值"], answers=["答案"]),
+        FAQContent(
+            standard_question="如何开户？", similar_questions=["怎么充值"], answers=["答案"]
+        ),
         _row(),
     )
     assert error is not None
@@ -158,7 +160,9 @@ def test_duplicate_error_for_similar_collision() -> None:
 
 def test_duplicate_error_for_returns_none_when_no_collision() -> None:
     error = duplicate_error_for(
-        FAQContent(standard_question="如何开户？", similar_questions=["怎么开户"], answers=["答案"]),
+        FAQContent(
+            standard_question="如何开户？", similar_questions=["怎么开户"], answers=["答案"]
+        ),
         _row(),
     )
     assert error is None
@@ -166,7 +170,9 @@ def test_duplicate_error_for_returns_none_when_no_collision() -> None:
 
 def test_duplicate_error_for_reports_standard_before_similar() -> None:
     error = duplicate_error_for(
-        FAQContent(standard_question="如何充值？", similar_questions=["怎么充值"], answers=["答案"]),
+        FAQContent(
+            standard_question="如何充值？", similar_questions=["怎么充值"], answers=["答案"]
+        ),
         _row(),
     )
     assert error is not None

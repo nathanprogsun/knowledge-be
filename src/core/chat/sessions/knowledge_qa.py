@@ -87,14 +87,10 @@ def build_pipeline_stages(
         builder.add(EventType.QUERY_UNDERSTAND)
         builder.add(EventType.CHUNK_SEARCH_PARALLEL)
         builder.add(EventType.CHUNK_RERANK)
-        builder.add_if(
-            pipeline_ctx.web_search_enabled, EventType.WEB_FETCH
-        )
+        builder.add_if(pipeline_ctx.web_search_enabled, EventType.WEB_FETCH)
         builder.add(EventType.CHUNK_MERGE)
         builder.add(EventType.FILTER_TOP_K)
-        builder.add_if(
-            pipeline_ctx.data_analysis_enabled, EventType.DATA_ANALYSIS
-        )
+        builder.add_if(pipeline_ctx.data_analysis_enabled, EventType.DATA_ANALYSIS)
         builder.add(EventType.INTO_CHAT_MESSAGE)
         builder.add(EventType.CHAT_COMPLETION_STREAM)
     return builder.build()
@@ -108,10 +104,7 @@ def build_pure_chat_user_content(pipeline_ctx: PipelineContext) -> str:
     handles these in the ``INTO_CHAT_MESSAGE`` stage instead.
     """
     parts: list[str] = [pipeline_ctx.query]
-    if (
-        pipeline_ctx.image_description
-        and not pipeline_ctx.chat_model_supports_vision
-    ):
+    if pipeline_ctx.image_description and not pipeline_ctx.chat_model_supports_vision:
         parts.append("\n\n[用户上传图片内容]\n" + pipeline_ctx.image_description)
     if pipeline_ctx.quoted_context:
         parts.append("\n\n" + pipeline_ctx.quoted_context)
@@ -195,8 +188,7 @@ class FallbackHandler:
         """
         if not pipeline_ctx.fallback_prompt:
             logger.warning(
-                "Fallback strategy is 'model' but fallback_prompt is "
-                "empty, using fixed response"
+                "Fallback strategy is 'model' but fallback_prompt is empty, using fixed response"
             )
             await self._handle_fixed(pipeline_ctx, event_bus)
             return
@@ -282,8 +274,7 @@ async def execute_knowledge_qa(
             if error.err is not None:
                 raise error.err
             logger.warning(
-                "Pipeline stage %s reported error without "
-                "exception: %s",
+                "Pipeline stage %s reported error without exception: %s",
                 stage,
                 error.description,
             )

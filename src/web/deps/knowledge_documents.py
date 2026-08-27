@@ -71,9 +71,7 @@ class _BackendFileServiceResolver:
         tenant_id: int,
     ) -> FileService | None:
         """Return the file service for the knowledge base, or ``None``."""
-        kb = await self._kb_service.get_knowledge_base_by_id(
-            knowledge_base_id=knowledge_base_id
-        )
+        kb = await self._kb_service.get_knowledge_base_by_id(knowledge_base_id=knowledge_base_id)
         backend_id = (kb.storage_backend_id or "").strip()
         info = await self._storage_backend_service.resolve_backend(
             tenant_id=tenant_id,

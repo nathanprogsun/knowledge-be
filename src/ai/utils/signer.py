@@ -86,10 +86,7 @@ def sign_request(
         "body": body_md5,
     }
 
-    parts = [
-        f"{_rfc3986_encode(key)}={_rfc3986_encode(params[key])}"
-        for key in sorted(params)
-    ]
+    parts = [f"{_rfc3986_encode(key)}={_rfc3986_encode(params[key])}" for key in sorted(params)]
     signature = _md5_hex("&".join(parts))
 
     return {

@@ -344,17 +344,13 @@ class TestCreate:
     async def test_create_rejects_missing_chat_model(self) -> None:
         service = _build_service(models=[_Model("emb-1", "Embedding")])
         with pytest.raises(ValidationError) as exc:
-            await service.create(
-                EvaluationCreateQuery(dataset_id="default")
-            )
+            await service.create(EvaluationCreateQuery(dataset_id="default"))
         assert exc.value.code == "evaluation.no_chat_model"
 
     async def test_create_returns_default_rerank_when_absent(self) -> None:
         models = [_Model("emb-1", "Embedding"), _Model("qa-1", "KnowledgeQA")]
         service = _build_service(models=models)
-        response = await service.create(
-            EvaluationCreateQuery(dataset_id="default")
-        )
+        response = await service.create(EvaluationCreateQuery(dataset_id="default"))
         assert response.params.chat_model_id == "qa-1"
         assert response.params.rerank_model_id == ""
 
@@ -644,15 +640,9 @@ class TestDatasetService:
         (tmp_path / "corpus.csv").write_text(
             "id,text\n10,passage ten\n20,passage twenty\n", encoding="utf-8"
         )
-        (tmp_path / "answers.csv").write_text(
-            "id,text\n100,an answer\n", encoding="utf-8"
-        )
-        (tmp_path / "qrels.csv").write_text(
-            "qid,pid\n1,10\n1,20\n2,10\n", encoding="utf-8"
-        )
-        (tmp_path / "qas.csv").write_text(
-            "qid,aid\n1,100\n", encoding="utf-8"
-        )
+        (tmp_path / "answers.csv").write_text("id,text\n100,an answer\n", encoding="utf-8")
+        (tmp_path / "qrels.csv").write_text("qid,pid\n1,10\n1,20\n2,10\n", encoding="utf-8")
+        (tmp_path / "qas.csv").write_text("qid,aid\n1,100\n", encoding="utf-8")
         from src.core.evaluation.dataset import DatasetService
 
         pairs = DatasetService().load_csv(
@@ -680,9 +670,7 @@ class TestDatasetService:
             await DatasetService().get_dataset_by_id("missing")
         assert exc.value.code == "evaluation.dataset_not_found"
 
-    async def test_default_dataset_falls_back_when_samples_absent(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_default_dataset_falls_back_when_samples_absent(self, tmp_path: Path) -> None:
         from src.core.evaluation.dataset import DatasetService
 
         service = DatasetService(dataset_dir=tmp_path / "does-not-exist")

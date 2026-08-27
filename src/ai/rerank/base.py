@@ -23,21 +23,21 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.ai.provider import (
     PROVIDER_ALIYUN,
+    PROVIDER_CLOUD,
     PROVIDER_JINA,
     PROVIDER_LKEAP,
     PROVIDER_NVIDIA,
     PROVIDER_VOLCENGINE,
-    PROVIDER_WEKNORACLOUD,
     PROVIDER_ZHIPU,
     detect_provider,
 )
 from src.ai.rerank.aliyun import new_aliyun_reranker
+from src.ai.rerank.cloud import new_cloud_reranker
 from src.ai.rerank.jina import new_jina_reranker
 from src.ai.rerank.lkeap import new_lkeap_reranker
 from src.ai.rerank.nvidia import new_nvidia_reranker
 from src.ai.rerank.remote_api import RankResult, new_openai_reranker
 from src.ai.rerank.volcengine import new_volcengine_reranker
-from src.ai.rerank.weknoracloud import new_weknoracloud_reranker
 from src.ai.rerank.zhipu import new_zhipu_reranker
 from src.common.json import JsonObject, JsonValue
 
@@ -167,8 +167,8 @@ async def new_reranker(
         reranker = await new_jina_reranker(config, client=client)
     elif provider_name == PROVIDER_NVIDIA:
         reranker = await new_nvidia_reranker(config, client=client)
-    elif provider_name == PROVIDER_WEKNORACLOUD:
-        reranker = await new_weknoracloud_reranker(config, client=client)
+    elif provider_name == PROVIDER_CLOUD:
+        reranker = await new_cloud_reranker(config, client=client)
     elif provider_name == PROVIDER_LKEAP:
         reranker = await new_lkeap_reranker(config)
     elif provider_name == PROVIDER_VOLCENGINE:

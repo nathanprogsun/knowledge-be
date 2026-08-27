@@ -99,14 +99,10 @@ class TestRetrievalMetrics:
         assert _compute_recall(_input([1, 3])) == pytest.approx(0.5)
 
     def test_ndcg_at_3(self) -> None:
-        assert _compute_ndcg(_input([1, 3]), 3) == pytest.approx(
-            1.0 / (1.0 + 1.0 / math.log2(3))
-        )
+        assert _compute_ndcg(_input([1, 3]), 3) == pytest.approx(1.0 / (1.0 + 1.0 / math.log2(3)))
 
     def test_ndcg_at_10_equals_ndcg_at_3_for_short_lists(self) -> None:
-        assert _compute_ndcg(_input([1, 3]), 10) == pytest.approx(
-            _compute_ndcg(_input([1, 3]), 3)
-        )
+        assert _compute_ndcg(_input([1, 3]), 10) == pytest.approx(_compute_ndcg(_input([1, 3]), 3))
 
     def test_mrr_is_reciprocal_of_first_hit_rank(self) -> None:
         assert _compute_mrr(_input([3, 1])) == pytest.approx(0.5)
@@ -164,7 +160,9 @@ class TestGenerationMetrics:
     def test_rouge1_f(self) -> None:
         pair = _pair(pids=[1], passages=["x"], answer="a b d")
         result = _run_hook(pair, chat=_Chat("a b c"))
-        assert result.generation.rouge1 == pytest.approx(2.0 * (2.0 / 3.0) * (2.0 / 3.0) / (4.0 / 3.0 + 1e-8))
+        assert result.generation.rouge1 == pytest.approx(
+            2.0 * (2.0 / 3.0) * (2.0 / 3.0) / (4.0 / 3.0 + 1e-8)
+        )
 
     def test_rouge2_exact(self) -> None:
         pair = _pair(pids=[1], passages=["x"], answer="a b c")
@@ -174,7 +172,9 @@ class TestGenerationMetrics:
     def test_rougel_f(self) -> None:
         pair = _pair(pids=[1], passages=["x"], answer="a b d")
         result = _run_hook(pair, chat=_Chat("a b c"))
-        assert result.generation.rougel == pytest.approx(2.0 * (2.0 / 3.0) * (2.0 / 3.0) / (4.0 / 3.0 + 1e-8))
+        assert result.generation.rougel == pytest.approx(
+            2.0 * (2.0 / 3.0) * (2.0 / 3.0) / (4.0 / 3.0 + 1e-8)
+        )
 
 
 # ── Aggregation ───────────────────────────────────────────────────────

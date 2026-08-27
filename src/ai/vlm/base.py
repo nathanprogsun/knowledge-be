@@ -12,11 +12,11 @@ from dataclasses import dataclass
 from typing import Protocol, cast
 
 from src.ai.provider.detect import detect_provider
-from src.ai.provider.registry import ALL_PROVIDERS, PROVIDER_WEKNORACLOUD
+from src.ai.provider.registry import ALL_PROVIDERS, PROVIDER_CLOUD
+from src.ai.vlm.cloud import new_cloud_vlm
 from src.ai.vlm.concurrency import wrap_vlm_concurrency
 from src.ai.vlm.ollama import OllamaChatService, new_ollama_vlm
 from src.ai.vlm.remote_api import new_remote_api_vlm
-from src.ai.vlm.weknoracloud import new_weknoracloud_vlm
 from src.common.json import JsonObject
 
 MODEL_SOURCE_LOCAL: str = "local"
@@ -138,8 +138,8 @@ async def new_vlm(config: Config, ollama_service: OllamaChatService | None) -> V
         )
     else:
         provider_name = _resolve_provider(config)
-        if provider_name == PROVIDER_WEKNORACLOUD:
-            vlm = await new_weknoracloud_vlm(
+        if provider_name == PROVIDER_CLOUD:
+            vlm = await new_cloud_vlm(
                 model_name=config.model_name,
                 model_id=config.model_id,
                 base_url=config.base_url,

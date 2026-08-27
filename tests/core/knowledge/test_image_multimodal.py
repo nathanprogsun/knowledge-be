@@ -15,7 +15,7 @@ counter) instead of ``make_test_tenant_id``'s BIGINT range.
 
 from __future__ import annotations
 
-# ruff: noqa: RUF001  # Chinese test data uses fullwidth punctuation.
+# Chinese test data uses fullwidth punctuation.
 import itertools
 import json
 import uuid
@@ -358,9 +358,7 @@ class _FakeKBService:
         self.missing = False
         self.requests: list[str] = []
 
-    async def get_knowledge_base_by_id_only(
-        self, *, knowledge_base_id: str
-    ) -> KnowledgeBaseInfo:
+    async def get_knowledge_base_by_id_only(self, *, knowledge_base_id: str) -> KnowledgeBaseInfo:
         self.requests.append(knowledge_base_id)
         if self.missing or self.kb is None or self.kb.id != knowledge_base_id:
             raise NotFoundError(
@@ -455,9 +453,7 @@ class _FakeEngineService:
     def support(self) -> list[RetrieverType]:
         return list(self._support)
 
-    async def retrieve(
-        self, _ctx: Context, params: RetrieveParams
-    ) -> list[RetrieveResult]:
+    async def retrieve(self, _ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
         return []
 
     async def index(
@@ -553,9 +549,7 @@ class _FakeRegistry:
     def register(self, service: _FakeEngineService) -> None:
         pass
 
-    def get_retrieve_engine_service(
-        self, engine_type: RetrieverEngineType
-    ) -> _FakeEngineService:
+    def get_retrieve_engine_service(self, engine_type: RetrieverEngineType) -> _FakeEngineService:
         return self._service
 
     def register_with_store_id(self, store_id: str, svc: _FakeEngineService) -> None:
@@ -603,9 +597,7 @@ class _FakeFinalizer:
     def __init__(self) -> None:
         self.calls: list[tuple[int, str, str]] = []
 
-    async def finalize(
-        self, *, tenant_id: int, knowledge_id: str, knowledge_base_id: str
-    ) -> None:
+    async def finalize(self, *, tenant_id: int, knowledge_id: str, knowledge_base_id: str) -> None:
         self.calls.append((tenant_id, knowledge_id, knowledge_base_id))
 
 
@@ -665,9 +657,7 @@ def _run(
 ) -> ImageMultimodalOutcome:
     import asyncio
 
-    return asyncio.run(
-        service.process_image(ctx=ctx or _ctx(), payload=payload or _payload())
-    )
+    return asyncio.run(service.process_image(ctx=ctx or _ctx(), payload=payload or _payload()))
 
 
 # ── OCR sanitizer ─────────────────────────────────────────────────────
@@ -685,11 +675,7 @@ def test_sanitize_ocr_text_drops_html_skeleton() -> None:
 
 def test_sanitize_ocr_text_passes_markdown_through() -> None:
     source = (
-        "# 标题\n\n"
-        "这是一段正文，包含一些内容。\n\n"
-        "| 列1 | 列2 |\n"
-        "| --- | --- |\n"
-        "| 数据1 | 数据2 |"
+        "# 标题\n\n这是一段正文，包含一些内容。\n\n| 列1 | 列2 |\n| --- | --- |\n| 数据1 | 数据2 |"
     )
     assert sanitize_ocr_text(source) == source
 
@@ -749,7 +735,10 @@ def test_sanitize_ocr_text_collapses_blank_lines() -> None:
 
 def test_strip_markdown_code_block() -> None:
     assert strip_markdown_code_block("just normal text") == "just normal text"
-    assert strip_markdown_code_block("```markdown\n# Title\nContent here\n```") == "# Title\nContent here"
+    assert (
+        strip_markdown_code_block("```markdown\n# Title\nContent here\n```")
+        == "# Title\nContent here"
+    )
     assert strip_markdown_code_block("```html\n<p>hello</p>\n```") == "<p>hello</p>"
     assert strip_markdown_code_block("```\nsome text\n```") == "some text"
 
@@ -761,8 +750,7 @@ def test_looks_like_html() -> None:
     assert looks_like_html("# Title\n\nSome paragraph text") is False
     assert looks_like_html("This is mostly text with a <b>bold</b> word.") is False
     assert (
-        looks_like_html("<div><p><span>x</span></p></div><div><p><span>y</span></p></div>")
-        is True
+        looks_like_html("<div><p><span>x</span></p></div><div><p><span>y</span></p></div>") is True
     )
 
 
@@ -942,9 +930,10 @@ def test_build_multimodal_chunks_skips_empty_sections() -> None:
     from src.core.knowledge.documents.image_update import ImageInfo
 
     only_caption = ImageInfo(url="u", original_url="u", caption="desc")
-    assert [c.chunk_type for c in build_multimodal_chunks(payload=_payload(), image_info=only_caption, now=_NOW)] == [
-        CHUNK_TYPE_IMAGE_CAPTION
-    ]
+    assert [
+        c.chunk_type
+        for c in build_multimodal_chunks(payload=_payload(), image_info=only_caption, now=_NOW)
+    ] == [CHUNK_TYPE_IMAGE_CAPTION]
     empty = ImageInfo(url="u", original_url="u")
     assert build_multimodal_chunks(payload=_payload(), image_info=empty, now=_NOW) == []
 
@@ -1191,7 +1180,9 @@ def test_process_image_indexes_via_composite() -> None:
     assert outcome.chunks_created == 2
     assert outcome.indexed is True
     assert len(engine_service.indexed) == 2
-    assert {info.source_id for info in engine_service.indexed} == {c.id for c in chunk_service.created}
+    assert {info.source_id for info in engine_service.indexed} == {
+        c.id for c in chunk_service.created
+    }
     assert {c.status for c in chunk_service.rows.values()} == {CHUNK_STATUS_INDEXED}
 
 

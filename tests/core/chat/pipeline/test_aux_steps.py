@@ -271,7 +271,9 @@ def test_enrich_content_with_image_info_for_chat_inline_caption() -> None:
     assert "**Image caption:** A chart" in enriched
     # The image itself stays Markdown for chat context.
     assert "![alt](https://img.example/a.png)" in enriched
-    assert enriched.index("**Image caption:** A chart") > enriched.index("https://img.example/a.png")
+    assert enriched.index("**Image caption:** A chart") > enriched.index(
+        "https://img.example/a.png"
+    )
 
 
 def test_enrich_content_with_image_info_for_chat_unmatched_image_unchanged() -> None:
@@ -702,9 +704,7 @@ async def test_load_history_truncates_to_max_rounds() -> None:
     stored: list[_StoredMessage] = []
     for index in range(6):
         stored.append(_StoredMessage(request_id=f"r{index}", role="user", content=f"q{index}"))
-        stored.append(
-            _StoredMessage(request_id=f"r{index}", role="assistant", content=f"a{index}")
-        )
+        stored.append(_StoredMessage(request_id=f"r{index}", role="assistant", content=f"a{index}"))
     service = _FakeMessageService(stored)
     plugin = LoadHistoryPlugin(service)
     pipeline_ctx = PipelineContext(session_id="sess-1", max_rounds=2)

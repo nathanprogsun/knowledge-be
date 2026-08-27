@@ -3,7 +3,7 @@
 Feishu and Lark are the same product deployed on two isolated clouds
 (``open.feishu.cn`` / ``open.larksuite.com``) sharing one API surface, so
 a single implementation serves both. The ``platform`` constructor
-argument selects the cloud and the platform identifier reported on
+argument selects the kb and the platform identifier reported on
 parsed messages.
 
 Callback flow:
@@ -56,7 +56,7 @@ from src.db.models.im_channel import IMChannel
 
 logger = logging.getLogger("src.core.channels.im.adapters.feishu")
 
-#: Open Platform API origin for each cloud (no trailing slash).
+#: Open Platform API origin for each kb (no trailing slash).
 _FEISHU_BASE_URL: Final[str] = "https://open.feishu.cn"
 _LARK_BASE_URL: Final[str] = "https://open.larksuite.com"
 _DEFAULT_BASE_URLS: Final[dict[str, str]] = {
@@ -330,7 +330,9 @@ class FeishuAdapter(IMAdapter):
                 "[Feishu] incoming message has no message_id; replying via send-message api"
             )
 
-        fallback_url = f"{self._api_base_url}/open-apis/im/v1/messages?receive_id_type={receive_id_type}"
+        fallback_url = (
+            f"{self._api_base_url}/open-apis/im/v1/messages?receive_id_type={receive_id_type}"
+        )
         try:
             code, api_msg = self._post_feishu_message(token, fallback_url, fallback_payload)
         except httpx.HTTPError as exc:

@@ -78,9 +78,7 @@ def _apply_tenant_role_cap(permission: str, caller_tenant_role: str) -> str:
     shared resource, regardless of the org-level grant. Higher roles
     pass through unchanged.
     """
-    if caller_tenant_role == TenantRole.VIEWER and has_org_permission(
-        permission, ORG_ROLE_EDITOR
-    ):
+    if caller_tenant_role == TenantRole.VIEWER and has_org_permission(permission, ORG_ROLE_EDITOR):
         return ORG_ROLE_VIEWER
     return permission
 
@@ -155,9 +153,7 @@ class SharedResourceService:
                 ),
                 share_id=share.id,
                 organization_id=share.organization_id,
-                org_name=await self._org_name(
-                    share.organization_id, cache=org_names
-                ),
+                org_name=await self._org_name(share.organization_id, cache=org_names),
                 permission=effective,
                 source_tenant_id=share.source_tenant_id,
                 shared_at=share.created_at,
@@ -212,16 +208,12 @@ class SharedResourceService:
                 agent=CustomAgentInfo.from_row(agent),
                 share_id=share.id,
                 organization_id=share.organization_id,
-                org_name=await self._org_name(
-                    share.organization_id, cache=org_names
-                ),
+                org_name=await self._org_name(share.organization_id, cache=org_names),
                 permission=effective,
                 source_tenant_id=share.source_tenant_id,
                 shared_at=share.created_at,
                 shared_by_user_id=share.shared_by_user_id,
-                shared_by_username=await self._shared_by_username(
-                    share.shared_by_user_id
-                ),
+                shared_by_username=await self._shared_by_username(share.shared_by_user_id),
                 web_search_ready=await self._agent_web_search_ready(
                     agent=agent,
                     source_tenant_id=share.source_tenant_id,
@@ -266,9 +258,7 @@ class SharedResourceService:
         caller's tenant can reach. An unresolvable agent is rejected
         with 403 (mirrors the upstream "no access" guard).
         """
-        source_tenant_id = await self._resolve_source_tenant(
-            tenant_id=tenant_id, agent_id=agent_id
-        )
+        source_tenant_id = await self._resolve_source_tenant(tenant_id=tenant_id, agent_id=agent_id)
         if disabled:
             await self._disabled_repo.add(
                 tenant_id=tenant_id,
@@ -284,9 +274,7 @@ class SharedResourceService:
 
     # ── Internal helpers ───────────────────────────────────────────
 
-    async def _load_knowledge_bases(
-        self, ids: set[str]
-    ) -> dict[str, KnowledgeBaseInfo]:
+    async def _load_knowledge_bases(self, ids: set[str]) -> dict[str, KnowledgeBaseInfo]:
         """Batch-load knowledge bases by id, projected onto the DTO."""
         if not ids:
             return {}
@@ -328,9 +316,7 @@ class SharedResourceService:
     ) -> str | None:
         """Return the tenant's role in an organization, memoized per org."""
         if org_id not in cache:
-            member = await self._member_repo.get_member(
-                organization_id=org_id, tenant_id=tenant_id
-            )
+            member = await self._member_repo.get_member(organization_id=org_id, tenant_id=tenant_id)
             cache[org_id] = member.role if member is not None else None
         return cache[org_id]
 
@@ -382,16 +368,12 @@ class SharedResourceService:
                     source_tenant_id, provider_id
                 )
             else:
-                provider = await self._web_search_provider_repo.get_default(
-                    source_tenant_id
-                )
+                provider = await self._web_search_provider_repo.get_default(source_tenant_id)
             ready = provider is not None
         cache[cache_key] = ready
         return ready
 
-    async def _disabled_keys(
-        self, tenant_id: int
-    ) -> set[tuple[str, int]]:
+    async def _disabled_keys(self, tenant_id: int) -> set[tuple[str, int]]:
         """The (agent_id, source_tenant_id) tuples the tenant has hidden."""
         rows = await self._disabled_repo.list_by_tenant(tenant_id)
         return {(row.agent_id, row.source_tenant_id) for row in rows}
@@ -407,9 +389,7 @@ class SharedResourceService:
         Own agents resolve to the caller's tenant; anything else must be
         reachable through a share, otherwise the caller has no access.
         """
-        own = await self._agent_repo.get_by_id_and_tenant(
-            id=agent_id, tenant_id=tenant_id
-        )
+        own = await self._agent_repo.get_by_id_and_tenant(id=agent_id, tenant_id=tenant_id)
         if own is not None:
             return tenant_id
         share = await self._agent_share_repo.get_share_for_tenant(

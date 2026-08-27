@@ -52,7 +52,10 @@ from src.common.exception import (
     UnauthorizedError,
     ValidationError,
 )
-from src.core.channels.embed.types import EMBED_SESSION_MARKER_PREFIX
+from src.core.channels.embed.types import (
+    EMBED_SESSION_MARKER_PREFIX,
+    EmbedChannelInfo,
+)
 from src.db.dao.embed_channel_repository import EmbedChannelRepository
 from src.db.dao.session_repository import SessionRepository
 from src.db.models.embed_channel import EmbedChannel
@@ -147,6 +150,16 @@ def origin_allowed(origin: str, allowed: list[str]) -> bool:
 # ── Session handle signing ──────────────────────────────────────────
 
 
+def _origin_list_of(channel: EmbedChannel) -> list[str]:
+    """Narrow the JSONB ``allowed_origins`` column onto a concrete list."""
+    value = channel.allowed_origins
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str)]
+    if isinstance(value, str):
+        return [value]
+    return []
+
+
 def sign_embed_session_handle(channel: EmbedChannel | None, session_id: str) -> str:
     """Return the URL-safe base64 HMAC-SHA256 handle bound to ``session_id``.
 
@@ -228,9 +241,7 @@ class EmbedRateLimiter:
         if redis_client is not None:
             self._script = redis_client.register_script(self._SCRIPT)
 
-    async def check(
-        self, *, key: str, limit: int, window_seconds: int
-    ) -> None:
+    async def check(self, *, key: str, limit: int, window_seconds: int) -> None:
         if limit <= 0 or not key or self._script is None:
             return
         result = await self._script(
@@ -261,9 +272,7 @@ class InMemoryRateLimiter:
         self._reset_at: dict[str, float] = {}
         self._lock = asyncio.Lock()
 
-    async def check(
-        self, *, key: str, limit: int, window_seconds: int
-    ) -> None:
+    async def check(self, *, key: str, limit: int, window_seconds: int) -> None:
         if limit <= 0 or not key:
             return
         async with self._lock:
@@ -343,9 +352,7 @@ class EmbedSessionService:
             )
         return row
 
-    async def lookup_for_embed(
-        self, *, channel_id: str, token: str
-    ) -> EmbedChannel:
+    async def lookup_for_embed(self, *, channel_id: str, token: str) -> EmbedChannel:
         """Resolve a publish token (or session token) to its live channel.
 
         Mirrors ``LookupForEmbed`` (publish token) plus the middleware
@@ -380,11 +387,8 @@ class EmbedSessionService:
                 code="embed.channel_disabled",
                 message="embed channel is disabled",
             )
-        if (
-            not is_embed_session_token(cleaned_token)
-            and not hmac.compare_digest(
-                row.publish_token.encode(), cleaned_token.encode()
-            )
+        if not is_embed_session_token(cleaned_token) and not hmac.compare_digest(
+            row.publish_token.encode(), cleaned_token.encode()
         ):
             # Constant-time token compare: publish tokens carry an
             # embedded secret, so a timing-leak safe compare is the
@@ -397,9 +401,7 @@ class EmbedSessionService:
 
     # ── Session token mint / resolve ───────────────────────────────
 
-    async def issue_session_token(
-        self, *, channel_id: str
-    ) -> tuple[str, int]:
+    async def issue_session_token(self, *, channel_id: str) -> tuple[str, int]:
         """Mint a short-lived session token bound to ``channel_id``."""
         cleaned = channel_id.strip()
         if not cleaned:
@@ -437,9 +439,7 @@ class EmbedSessionService:
                 code="embed.token_invalid",
                 message="invalid embed session token",
             )
-        resolved = (
-            value.decode() if isinstance(value, (bytes, bytearray)) else str(value)
-        )
+        resolved = value.decode() if isinstance(value, (bytes, bytearray)) else str(value)
         resolved = resolved.strip()
         if not resolved:
             raise UnauthorizedError(
@@ -448,9 +448,7 @@ class EmbedSessionService:
             )
         return resolved
 
-    async def issue_preview_session(
-        self, *, channel_id: str
-    ) -> tuple[str, int]:
+    async def issue_preview_session(self, *, channel_id: str) -> tuple[str, int]:
         """Mint a session token for an authenticated management preview."""
         cleaned = channel_id.strip()
         if not cleaned:
@@ -484,17 +482,13 @@ class EmbedSessionService:
         session id and a signed handle the widget must echo on later
         calls (via :func:`verify_embed_session_handle`).
         """
-        channel = await self.lookup_for_embed(
-            channel_id=channel_id, token=token
-        )
+        channel = await self.lookup_for_embed(channel_id=channel_id, token=token)
         # ``allowed_origins`` is a JSONB column whose list shape is
         # guaranteed by the create/update normalizers; narrow the type
         # so the origin gate gets the concrete list it validates.
         allowed_origins = cast("list[str]", channel.allowed_origins)
         await self.assert_origin_allowed(origin, allowed_origins)
-        await self.enforce_rate_limits(
-            channel=channel, client_ip=client_ip
-        )
+        await self.enforce_rate_limits(channel=channel, client_ip=client_ip)
 
         now = _now()
         session_id = str(uuid4())
@@ -513,10 +507,47 @@ class EmbedSessionService:
 
     # ── Gating helpers (public so the views layer can reuse) ──────
 
-    @staticmethod
-    async def assert_origin_allowed(
-        origin: str, allowed_origins: list[str]
+    async def resolve_channel_for_request(
+        self,
+        *,
+        channel_id: str,
+        token: str,
+        origin: str,
+        client_ip: str,
+    ) -> EmbedChannelInfo:
+        """Authenticate + gate an embed request; return the safe projection.
+
+        Composes token lookup, origin gating, and rate limits so the web
+        layer only ever sees ``EmbedChannelInfo`` — the db row (which
+        carries the secret ``publish_token``) never crosses into web.
+        """
+        row = await self.lookup_for_embed(channel_id=channel_id, token=token)
+        await self.assert_origin_allowed(origin, _origin_list_of(row))
+        await self.enforce_rate_limits(channel=row, client_ip=client_ip)
+        return EmbedChannelInfo.map_from_db(row)
+
+    async def assert_session_handle(
+        self,
+        *,
+        channel_id: str,
+        session_id: str,
+        signature: str,
     ) -> None:
+        """Verify the HMAC session handle against the stored publish token.
+
+        Raises :class:`PermissionDeniedError` on mismatch. The db row is
+        re-fetched inside the service precisely so the secret never
+        leaves the core layer.
+        """
+        row = await self._embed_channel_repo.get_by_id(channel_id.strip())
+        if row is None or not verify_embed_session_handle(row, session_id, signature):
+            raise PermissionDeniedError(
+                code="embed.session_signature_invalid",
+                message="session signature invalid",
+            )
+
+    @staticmethod
+    async def assert_origin_allowed(origin: str, allowed_origins: list[str]) -> None:
         """Raise :class:`PermissionDeniedError` when ``origin`` is not in ``allowed_origins``."""
         if not origin_allowed(origin, allowed_origins):
             raise PermissionDeniedError(
@@ -548,9 +579,7 @@ class EmbedSessionService:
 
         if ip:
             await limiter.check(
-                key=(
-                    f"{EMBED_RATE_LIMIT_MINUTE_PREFIX}{channel.id}:{ip}"
-                ),
+                key=(f"{EMBED_RATE_LIMIT_MINUTE_PREFIX}{channel.id}:{ip}"),
                 limit=per_minute,
                 window_seconds=minute_window,
             )

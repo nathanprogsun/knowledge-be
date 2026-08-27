@@ -1,4 +1,4 @@
-""""Thinking then answer" hand-off shared by every streaming chat path.
+""" "Thinking then answer" hand-off shared by every streaming chat path.
 
 Thinking chunks are forwarded as they arrive; exactly one ``thinking``
 ``done`` marker is emitted before the first answer token — or when the stream

@@ -337,9 +337,7 @@ def merge_resolved_tag_knowledge_ids(
     outside the tag KBs are skipped.
     """
     tag_kbs = {
-        scope.knowledge_base_id
-        for scope in tag_scopes
-        if scope.knowledge_base_id and scope.tag_ids
+        scope.knowledge_base_id for scope in tag_scopes if scope.knowledge_base_id and scope.tag_ids
     }
     if not tag_kbs:
         return unique_non_empty(existing)
@@ -522,19 +520,12 @@ async def resolve_chat_model_id(
     override = (req.summary_model_id or "").strip()
     if override:
         override_info = await model_service.get_model_by_id(ctx, override)
-        if (
-            override_info is not None
-            and override_info.type == MODEL_TYPE_KNOWLEDGE_QA
-        ):
+        if override_info is not None and override_info.type == MODEL_TYPE_KNOWLEDGE_QA:
             logger.info("Using request's summary model override: %s", override)
             return override
-        logger.warning(
-            "Request provided invalid summary model ID %s, falling back", override
-        )
+        logger.warning("Request provided invalid summary model ID %s, falling back", override)
 
-    logger.info(
-        "Using custom agent's model_id: %s", agent_model_id
-    )
+    logger.info("Using custom agent's model_id: %s", agent_model_id)
     return agent_model_id
 
 
@@ -635,8 +626,7 @@ def build_agent_config(
         knowledge_ids=merged_knowledge_ids,
         system_prompt=system_prompt,
         use_custom_system_prompt=use_custom_system_prompt,
-        web_search_enabled=_config_bool(config_blob, "web_search_enabled")
-        and web_search_enabled,
+        web_search_enabled=_config_bool(config_blob, "web_search_enabled") and web_search_enabled,
         web_search_max_results=web_search_max_results,
         web_search_provider_id=web_search_provider_id,
         multi_turn_enabled=_config_bool(config_blob, "multi_turn_enabled"),
@@ -753,15 +743,9 @@ async def run_agent_qa(
 
     # ── KB scope ────────────────────────────────────────────────────
     kb_ids = (
-        list(knowledge_base_ids)
-        if knowledge_base_ids is not None
-        else list(req.knowledge_base_ids)
+        list(knowledge_base_ids) if knowledge_base_ids is not None else list(req.knowledge_base_ids)
     )
-    doc_ids = (
-        list(knowledge_ids)
-        if knowledge_ids is not None
-        else list(req.knowledge_ids)
-    )
+    doc_ids = list(knowledge_ids) if knowledge_ids is not None else list(req.knowledge_ids)
 
     # ── config assembly ────────────────────────────────────────────
     config = build_agent_config(
@@ -816,9 +800,7 @@ async def run_agent_qa(
         if history_turns <= 0:
             history_turns = DEFAULT_HISTORY_TURNS
         try:
-            llm_context = await history_loader.load(
-                ctx, req.session_id, history_turns
-            )
+            llm_context = await history_loader.load(ctx, req.session_id, history_turns)
         except Exception as exc:
             logger.warning(
                 "Failed to load agent history from DB: %s, continuing without history",
@@ -846,9 +828,7 @@ async def run_agent_qa(
 
     # ── vision routing ──────────────────────────────────────────────
     model_info = await model_service.get_model_by_id(ctx, effective_model_id)
-    model_supports_vision = bool(
-        model_info is not None and model_info.supports_vision
-    )
+    model_supports_vision = bool(model_info is not None and model_info.supports_vision)
     agent_query, agent_image_urls = build_agent_query(
         query=req.query,
         image_urls=req.image_urls,

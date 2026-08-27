@@ -117,9 +117,7 @@ def _suggestion_set(
         config_hash="hash",
         locale="en",
         status=status,
-        questions=[
-            {"id": "q-1", "text": "follow up?", "category": "clarify"}
-        ],
+        questions=[{"id": "q-1", "text": "follow up?", "category": "clarify"}],
         created_at=_NOW,
         updated_at=_NOW,
     )
@@ -157,17 +155,13 @@ def _build_app(**service_overrides: object) -> FastAPI:
     app.dependency_overrides[require_auth] = _noop_auth
     _noop_role_gates(app)
     if "session_service" in service_overrides:
-        app.dependency_overrides[get_session_service] = lambda: service_overrides[
-            "session_service"
-        ]
+        app.dependency_overrides[get_session_service] = lambda: service_overrides["session_service"]
     if "message_service" in service_overrides:
-        app.dependency_overrides[get_message_service] = lambda: service_overrides[
-            "message_service"
-        ]
+        app.dependency_overrides[get_message_service] = lambda: service_overrides["message_service"]
     if "suggestion_service" in service_overrides:
-        app.dependency_overrides[get_message_suggestion_service] = (
-            lambda: service_overrides["suggestion_service"]
-        )
+        app.dependency_overrides[get_message_suggestion_service] = lambda: service_overrides[
+            "suggestion_service"
+        ]
     return app
 
 
@@ -223,9 +217,7 @@ def test_get_session_returns_envelope() -> None:
 
 def test_get_session_maps_not_found_to_404() -> None:
     fake = AsyncMock()
-    fake.get = AsyncMock(
-        side_effect=NotFoundError(code="session.not_found", message="gone")
-    )
+    fake.get = AsyncMock(side_effect=NotFoundError(code="session.not_found", message="gone"))
     app = _build_app(session_service=fake)
 
     with _client(app) as client:
@@ -277,9 +269,7 @@ def test_list_sessions_returns_paged_envelope() -> None:
 def test_update_session_returns_stored_row() -> None:
     fake = AsyncMock()
     fake.tenant_id = 7
-    fake.update = AsyncMock(
-        return_value=_session_row(session_id="sess-1", title="renamed")
-    )
+    fake.update = AsyncMock(return_value=_session_row(session_id="sess-1", title="renamed"))
     app = _build_app(session_service=fake)
 
     with _client(app) as client:
@@ -361,9 +351,7 @@ def test_batch_delete_rejects_empty_ids() -> None:
     app = _build_app(session_service=fake)
 
     with _client(app) as client:
-        response = client.request(
-            "DELETE", "/api/v1/sessions/batch", json={"ids": []}
-        )
+        response = client.request("DELETE", "/api/v1/sessions/batch", json={"ids": []})
 
     assert response.status_code == 422
 
@@ -405,9 +393,7 @@ def test_clear_session_messages() -> None:
         response = client.delete("/api/v1/sessions/sess-1/messages")
 
     assert response.status_code == 200
-    assert (
-        response.json()["message"] == "Session messages cleared successfully"
-    )
+    assert response.json()["message"] == "Session messages cleared successfully"
     assert fake.clear_session_messages.await_args.args[1] == "sess-1"
 
 
@@ -416,9 +402,7 @@ def test_clear_session_messages() -> None:
 
 def test_load_messages_returns_recent_by_default() -> None:
     fake = AsyncMock()
-    fake.get_recent_messages_by_session = AsyncMock(
-        return_value=[_message_row()]
-    )
+    fake.get_recent_messages_by_session = AsyncMock(return_value=[_message_row()])
     app = _build_app(message_service=fake)
 
     with _client(app) as client:
@@ -449,16 +433,12 @@ def test_load_messages_respects_limit_query() -> None:
 
 def test_load_messages_with_before_time() -> None:
     fake = AsyncMock()
-    fake.list_messages_by_session_before_time = AsyncMock(
-        return_value=[_message_row()]
-    )
+    fake.list_messages_by_session_before_time = AsyncMock(return_value=[_message_row()])
     app = _build_app(message_service=fake)
 
     cursor = (datetime.now(UTC) - timedelta(days=1)).isoformat()
     with _client(app) as client:
-        response = client.get(
-            f"/api/v1/messages/sess-1/load?before_time={quote(cursor)}"
-        )
+        response = client.get(f"/api/v1/messages/sess-1/load?before_time={quote(cursor)}")
 
     assert response.status_code == 200
     args = fake.list_messages_by_session_before_time.await_args.args
@@ -471,9 +451,7 @@ def test_load_messages_rejects_bad_before_time() -> None:
     app = _build_app(message_service=fake)
 
     with _client(app) as client:
-        response = client.get(
-            "/api/v1/messages/sess-1/load?before_time=not-a-time"
-        )
+        response = client.get("/api/v1/messages/sess-1/load?before_time=not-a-time")
 
     assert response.status_code == 422
 
@@ -569,9 +547,7 @@ def test_get_suggestions_returns_null_when_absent() -> None:
     app = _build_app(suggestion_service=fake)
 
     with _client(app) as client:
-        response = client.get(
-            "/api/v1/sessions/sess-1/messages/msg-1/suggestions"
-        )
+        response = client.get("/api/v1/sessions/sess-1/messages/msg-1/suggestions")
 
     assert response.status_code == 200
     body = response.json()
@@ -585,9 +561,7 @@ def test_get_suggestions_returns_set() -> None:
     app = _build_app(suggestion_service=fake)
 
     with _client(app) as client:
-        response = client.get(
-            "/api/v1/sessions/sess-1/messages/msg-1/suggestions"
-        )
+        response = client.get("/api/v1/sessions/sess-1/messages/msg-1/suggestions")
 
     assert response.status_code == 200
     body = response.json()
@@ -621,9 +595,7 @@ def test_ensure_suggestions_returns_202_for_generating() -> None:
     app = _build_app(suggestion_service=fake)
 
     with _client(app) as client:
-        response = client.post(
-            "/api/v1/sessions/sess-1/messages/msg-1/suggestions"
-        )
+        response = client.post("/api/v1/sessions/sess-1/messages/msg-1/suggestions")
 
     assert response.status_code == 202
 

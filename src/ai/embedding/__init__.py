@@ -31,6 +31,10 @@ from src.ai.embedding.azure_openai import (
     new_azure_openai_embedder,
 )
 from src.ai.embedding.batch import BatchEmbedder, new_batch_embedder
+from src.ai.embedding.cloud import (
+    CloudEmbedder,
+    new_cloud_embedder,
+)
 from src.ai.embedding.concurrency import (
     ConcurrencyEmbedder,
     ConcurrencyLimiter,
@@ -58,16 +62,13 @@ from src.ai.embedding.transport import (
     validate_embedding_base_url,
 )
 from src.ai.embedding.volcengine import VolcengineEmbedder, new_volcengine_embedder
-from src.ai.embedding.weknoracloud import (
-    WeKnoraCloudEmbedder,
-    new_weknoracloud_embedder,
-)
 from src.ai.embedding.zhipu import ZhipuEmbedder, new_zhipu_embedder
 
 __all__ = [
     "AliyunEmbedder",
     "AzureOpenAIEmbedder",
     "BatchEmbedder",
+    "CloudEmbedder",
     "ConcurrencyEmbedder",
     "ConcurrencyLimiter",
     "Config",
@@ -87,7 +88,6 @@ __all__ = [
     "SupportsDimensionOverride",
     "TaskContext",
     "VolcengineEmbedder",
-    "WeKnoraCloudEmbedder",
     "ZhipuEmbedder",
     "apply_custom_headers",
     "config_from_model",
@@ -96,6 +96,7 @@ __all__ = [
     "new_aliyun_embedder",
     "new_azure_openai_embedder",
     "new_batch_embedder",
+    "new_cloud_embedder",
     "new_embedder",
     "new_embedding_http_client",
     "new_gemini_embedder",
@@ -104,7 +105,6 @@ __all__ = [
     "new_ollama_embedder",
     "new_openai_embedder",
     "new_volcengine_embedder",
-    "new_weknoracloud_embedder",
     "new_zhipu_embedder",
     "set_global_limit",
     "set_governor",

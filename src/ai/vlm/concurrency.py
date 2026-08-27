@@ -66,9 +66,7 @@ class ConcurrencyVLM:
     async def predict(self, img_bytes: list[bytes], prompt: str) -> str:
         if self._limit <= 0:
             return await self._inner.predict(img_bytes, prompt)
-        semaphore = await self._gate.semaphore_for(
-            self._inner.get_model_id(), self._limit
-        )
+        semaphore = await self._gate.semaphore_for(self._inner.get_model_id(), self._limit)
         async with semaphore:
             return await self._inner.predict(img_bytes, prompt)
 

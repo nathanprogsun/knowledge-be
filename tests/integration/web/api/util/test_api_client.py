@@ -35,20 +35,20 @@ def _build_app() -> FastAPI:
 
     @app.get("/echo", response_model=Echo, name="echo")
     def echo(
-        x_knowledge_user_id: str = Header(...),
-        x_knowledge_tenant_id: str = Header(...),
+        x_user_id: str = Header(...),
+        x_tenant_id: str = Header(...),
     ) -> Echo:
-        return Echo(user_id=x_knowledge_user_id, tenant_id=x_knowledge_tenant_id)
+        return Echo(user_id=x_user_id, tenant_id=x_tenant_id)
 
     @app.post("/echo", response_model=Echo, name="echo_post")
     def echo_post(
         body: EchoBody,
-        x_knowledge_user_id: str = Header(...),
-        x_knowledge_tenant_id: str = Header(...),
+        x_user_id: str = Header(...),
+        x_tenant_id: str = Header(...),
     ) -> Echo:
         return Echo(
-            user_id=x_knowledge_user_id,
-            tenant_id=x_knowledge_tenant_id,
+            user_id=x_user_id,
+            tenant_id=x_tenant_id,
             note=body.note,
         )
 
@@ -56,12 +56,12 @@ def _build_app() -> FastAPI:
     def update_item(
         item_id: int,
         body: EchoBody,
-        x_knowledge_user_id: str = Header(...),
-        x_knowledge_tenant_id: str = Header(...),
+        x_user_id: str = Header(...),
+        x_tenant_id: str = Header(...),
     ) -> Echo:
         return Echo(
-            user_id=x_knowledge_user_id,
-            tenant_id=x_knowledge_tenant_id,
+            user_id=x_user_id,
+            tenant_id=x_tenant_id,
             note=f"{body.note}:{item_id}",
         )
 
@@ -69,30 +69,30 @@ def _build_app() -> FastAPI:
     def patch_item(
         item_id: int,
         body: EchoBody,
-        x_knowledge_user_id: str = Header(...),
-        x_knowledge_tenant_id: str = Header(...),
+        x_user_id: str = Header(...),
+        x_tenant_id: str = Header(...),
     ) -> Echo:
         return Echo(
-            user_id=x_knowledge_user_id,
-            tenant_id=x_knowledge_tenant_id,
+            user_id=x_user_id,
+            tenant_id=x_tenant_id,
             note=f"{body.note}:{item_id}",
         )
 
     @app.delete("/items/{item_id}", name="delete_item")
     def delete_item(
         item_id: int,
-        x_knowledge_user_id: str = Header(...),
-        x_knowledge_tenant_id: str = Header(...),
+        x_user_id: str = Header(...),
+        x_tenant_id: str = Header(...),
     ) -> dict[str, Any]:
-        return {"deleted": item_id, "user_id": x_knowledge_user_id}
+        return {"deleted": item_id, "user_id": x_user_id}
 
     @app.get("/search", name="search")
     def search(
         q: str,
-        x_knowledge_user_id: str = Header(...),
-        x_knowledge_tenant_id: str = Header(...),
+        x_user_id: str = Header(...),
+        x_tenant_id: str = Header(...),
     ) -> dict[str, Any]:
-        return {"q": q, "user_id": x_knowledge_user_id}
+        return {"q": q, "user_id": x_user_id}
 
     @app.get("/fail", name="fail", status_code=400)
     def fail() -> dict[str, str]:

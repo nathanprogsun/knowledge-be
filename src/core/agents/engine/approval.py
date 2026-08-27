@@ -44,7 +44,7 @@ DEFAULT_APPROVAL_TIMEOUT_SECONDS: float = 600.0
 
 #: Environment variable that opts into fail-open: a checker error skips the
 #: gate instead of requiring approval. Unset defaults to fail-close.
-FAIL_OPEN_ENV = "WEKNORA_AGENT_TOOL_APPROVAL_FAIL_OPEN"
+FAIL_OPEN_ENV = "KB_AGENT_TOOL_APPROVAL_FAIL_OPEN"
 
 #: Reason text attached to a timed-out wait.
 TIMEOUT_REASON = "approval timeout"
@@ -106,9 +106,7 @@ class _Waiter:
     __slots__ = ("_delivered", "ch", "tenant_id", "user_id")
 
     def __init__(self, tenant_id: int, user_id: str) -> None:
-        self.ch: asyncio.Queue[ApprovalDecision] = asyncio.Queue[ApprovalDecision](
-            maxsize=1
-        )
+        self.ch: asyncio.Queue[ApprovalDecision] = asyncio.Queue[ApprovalDecision](maxsize=1)
         self.tenant_id = tenant_id
         # Empty user_id means "skip the user check" on resolve.
         self.user_id = user_id
@@ -145,9 +143,7 @@ class ApprovalGate:
         fail_open: bool | None = None,
     ) -> None:
         self._checker = checker
-        self._timeout = (
-            timeout_seconds if timeout_seconds > 0 else DEFAULT_APPROVAL_TIMEOUT_SECONDS
-        )
+        self._timeout = timeout_seconds if timeout_seconds > 0 else DEFAULT_APPROVAL_TIMEOUT_SECONDS
         if fail_open is None:
             fail_open = os.environ.get(FAIL_OPEN_ENV, "").strip().lower() == "true"
         self._fail_close = not fail_open
@@ -246,9 +242,7 @@ class ApprovalGate:
 
     # ── internals ──────────────────────────────────────────────────
 
-    async def _wait_for_decision(
-        self, waiter: _Waiter, timeout: float
-    ) -> ApprovalDecision:
+    async def _wait_for_decision(self, waiter: _Waiter, timeout: float) -> ApprovalDecision:
         """Block until a decision arrives, the window elapses, or cancel."""
         try:
             return await asyncio.wait_for(waiter.ch.get(), timeout=timeout)
@@ -264,9 +258,7 @@ class ApprovalGate:
             # Best-effort: mark the wait as cancelled so a concurrent resolve
             # cannot deliver after the caller is gone.
             waiter.deliver(
-                ApprovalDecision(
-                    approved=False, reason=CANCELED_REASON, context_canceled=True
-                )
+                ApprovalDecision(approved=False, reason=CANCELED_REASON, context_canceled=True)
             )
             raise
 

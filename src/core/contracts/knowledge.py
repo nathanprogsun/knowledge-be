@@ -161,7 +161,7 @@ class KnowledgeBase(BaseModel):
 
 
 class CreateKnowledgeBaseRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     name: str
     description: str | None = Field(default=None)
@@ -182,9 +182,16 @@ class CreateKnowledgeBaseRequest(BaseModel):
 
 
 class UpdateKnowledgeBaseRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    """Partial-update body: every field optional so callers can PATCH a subset.
 
-    name: str
+    The service layer skips a field when its value is ``None`` and
+    inherits the existing row's value, so the same request shape works
+    for both PUT (full body) and PATCH (subset).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    name: str | None = Field(default=None)
     description: str | None = Field(default=None)
     config: JsonObject | None = Field(default=None)
 

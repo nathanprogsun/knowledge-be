@@ -415,35 +415,34 @@ class KBService:
         self,
         *,
         knowledge_base_id: str,
-        name: str,
+        name: str | None = None,
         description: str | None = None,
         config: JsonObject | None = None,
     ) -> KnowledgeBaseInfo:
-        """Update the mutable fields of an existing knowledge base.
+        """Partial-update the mutable fields of an existing knowledge base.
 
-        The vector-store binding is immutable by contract and is never
-        part of an update. The supplied ``config`` is merged per the
-        upstream ``KnowledgeBaseConfig`` semantics.
+        Every parameter is optional — ``None`` means "leave the existing
+        value alone". This lets the same request shape serve PUT (full
+        body) and PATCH (subset). The vector-store binding is immutable
+        by contract and is never part of an update. The supplied
+        ``config`` is merged per the upstream ``KnowledgeBaseConfig``
+        semantics.
         """
         _require_knowledge_base_id(knowledge_base_id)
-        clean_name = _require_name(name)
         existing = await self._kb_repo.get_by_id_or_none(knowledge_base_id)
         if existing is None:
             raise NotFoundError(
                 code=_NOT_FOUND_CODE,
                 message=f"knowledge base {knowledge_base_id} not found",
             )
-        fields = _apply_update_config(existing, config)
-        row = _ensure_defaults(
-            existing.model_copy(
-                update={
-                    "name": clean_name,
-                    "description": description,
-                    **fields,
-                    "updated_at": _now(),
-                }
-            )
-        )
+        # Build the patch dict: skip keys whose caller did not supply.
+        patch: dict[str, object] = {"updated_at": _now()}
+        if name is not None:
+            patch["name"] = _require_name(name)
+        if description is not None:
+            patch["description"] = description
+        patch.update(_apply_update_config(existing, config))
+        row = _ensure_defaults(existing.model_copy(update=patch))
         persisted = await self._kb_repo.update(row)
         return KnowledgeBaseInfo.map_from_db(persisted)
 

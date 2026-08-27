@@ -101,17 +101,11 @@ def to_create_request(body: EmbedChannelRequest) -> EmbedChannelCreateRequest:
         page_title=body.page_title,
         header_title_mode=body.header_title_mode,
         show_suggested_questions=(
-            body.show_suggested_questions
-            if body.show_suggested_questions is not None
-            else True
+            body.show_suggested_questions if body.show_suggested_questions is not None else True
         ),
         widget_position=body.widget_position,
-        allow_web_search=(
-            body.allow_web_search if body.allow_web_search is not None else False
-        ),
-        allow_file_upload=(
-            body.allow_file_upload if body.allow_file_upload is not None else False
-        ),
+        allow_web_search=(body.allow_web_search if body.allow_web_search is not None else False),
+        allow_file_upload=(body.allow_file_upload if body.allow_file_upload is not None else False),
         default_locale=body.default_locale or "",
     )
 
@@ -121,11 +115,7 @@ def to_update_request(body: EmbedChannelRequest) -> EmbedChannelUpdateRequest:
     return EmbedChannelUpdateRequest(
         name=body.name,
         enabled=body.enabled,
-        allowed_origins=(
-            list(body.allowed_origins)
-            if body.allowed_origins is not None
-            else None
-        ),
+        allowed_origins=(list(body.allowed_origins) if body.allowed_origins is not None else None),
         welcome_message=body.welcome_message,
         rate_limit_per_minute=body.rate_limit_per_minute,
         rate_limit_per_day=body.rate_limit_per_day,

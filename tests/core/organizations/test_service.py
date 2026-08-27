@@ -14,7 +14,6 @@ from __future__ import annotations
 import re
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -84,9 +83,7 @@ def _make_org_repo() -> tuple[AsyncMock, dict[str, Organization]]:
         existing = rows.get(id)
         if existing is None or existing.deleted_at is not None:
             return False
-        rows[id] = existing.model_copy(
-            update={"deleted_at": now, "updated_at": now}
-        )
+        rows[id] = existing.model_copy(update={"deleted_at": now, "updated_at": now})
         return True
 
     async def _update_invite_code(
@@ -123,9 +120,7 @@ def _make_org_repo() -> tuple[AsyncMock, dict[str, Organization]]:
         joined: list[Organization] = []
         for r in _live().values():
             # The mock joins members lazily to mirror the SQL path.
-            members = [
-                m for m in member_rows.values() if m.organization_id == r.id
-            ]
+            members = [m for m in member_rows.values() if m.organization_id == r.id]
             if any(m.tenant_id == tenant_id for m in members):
                 joined.append(r)
         return sorted(joined, key=lambda r: (r.created_at, r.id), reverse=True)
@@ -190,9 +185,7 @@ def _make_member_repo() -> AsyncMock:
     ) -> bool:
         for key, m in member_rows.items():
             if m.organization_id == organization_id and m.tenant_id == tenant_id:
-                member_rows[key] = m.model_copy(
-                    update={"role": role, "updated_at": _NOW}
-                )
+                member_rows[key] = m.model_copy(update={"role": role, "updated_at": _NOW})
                 return True
         return False
 
@@ -207,9 +200,7 @@ def _make_member_repo() -> AsyncMock:
         return None
 
     async def _list_members(org_id: str) -> list[OrganizationTenantMember]:
-        return sorted(
-            _live_members(org_id), key=lambda m: (m.created_at, m.id)
-        )
+        return sorted(_live_members(org_id), key=lambda m: (m.created_at, m.id))
 
     async def _count_members(org_id: str) -> int:
         return len(_live_members(org_id))
@@ -292,9 +283,7 @@ def _make_join_request_repo() -> AsyncMock:
         rows = [r for r in _live_for(org_id) if status is None or r.status == status]
         return sorted(rows, key=lambda r: (r.created_at, r.id), reverse=True)
 
-    async def _count_join_requests(
-        org_id: str, *, status: str | None = None
-    ) -> int:
+    async def _count_join_requests(org_id: str, *, status: str | None = None) -> int:
         return sum(1 for r in _live_for(org_id) if status is None or r.status == status)
 
     repo.create_join_request.side_effect = _create_join_request
@@ -308,7 +297,9 @@ def _make_join_request_repo() -> AsyncMock:
 
 
 def _make_repos() -> tuple[
-    AsyncMock, AsyncMock, AsyncMock,
+    AsyncMock,
+    AsyncMock,
+    AsyncMock,
     dict[str, Organization],
 ]:
     """Build all three repository mocks with fresh closure-captured state."""
@@ -324,9 +315,7 @@ def _make_repos() -> tuple[
 
 
 @pytest.fixture
-def state() -> tuple[
-    AsyncMock, AsyncMock, AsyncMock, dict[str, Organization]
-]:
+def state() -> tuple[AsyncMock, AsyncMock, AsyncMock, dict[str, Organization]]:
     return _make_repos()
 
 
@@ -543,9 +532,7 @@ class TestCreateOrganization(ServiceTest):
             )
         assert excinfo.value.code == "organization.invite_validity_invalid"
 
-    async def test_rejects_negative_member_limit(
-        self, service: OrganizationService
-    ) -> None:
+    async def test_rejects_negative_member_limit(self, service: OrganizationService) -> None:
         with pytest.raises(ValidationError) as excinfo:
             await service.create_organization(
                 user_id=_USER_OWNER,
@@ -597,16 +584,12 @@ class TestReads(ServiceTest):
         assert info.id == seeded.id
         assert info.name == seeded.name
 
-    async def test_get_organization_missing_raises(
-        self, service: OrganizationService
-    ) -> None:
+    async def test_get_organization_missing_raises(self, service: OrganizationService) -> None:
         with pytest.raises(NotFoundError) as excinfo:
             await service.get_organization(id="missing")
         assert excinfo.value.code == "organization.not_found"
 
-    async def test_get_organization_rejects_blank_id(
-        self, service: OrganizationService
-    ) -> None:
+    async def test_get_organization_rejects_blank_id(self, service: OrganizationService) -> None:
         with pytest.raises(ValidationError):
             await service.get_organization(id="   ")
 
@@ -632,9 +615,7 @@ class TestReads(ServiceTest):
             await service.get_organization_by_invite_code(invite_code="abc123")
         assert excinfo.value.code == "organization.invite_code_expired"
 
-    async def test_get_by_invite_code_missing_raises(
-        self, service: OrganizationService
-    ) -> None:
+    async def test_get_by_invite_code_missing_raises(self, service: OrganizationService) -> None:
         with pytest.raises(NotFoundError) as excinfo:
             await service.get_organization_by_invite_code(invite_code="nope")
         assert excinfo.value.code == "organization.invite_code_not_found"
@@ -795,9 +776,7 @@ class TestDeleteOrganization(ServiceTest):
 
         assert org_rows[seeded.id].deleted_at is not None
 
-    async def test_missing_org_raises(
-        self, service: OrganizationService
-    ) -> None:
+    async def test_missing_org_raises(self, service: OrganizationService) -> None:
         with pytest.raises(NotFoundError):
             await service.delete_organization(
                 id="missing",
@@ -1058,9 +1037,7 @@ class TestMemberManagement(ServiceTest):
         org_rows: dict[str, Organization],
     ) -> None:
         seeded = _seed_org(org_rows)
-        first = _seed_member(
-            seeded.id, tenant_id=_TENANT_OWNER, joined_at=_NOW
-        )
+        first = _seed_member(seeded.id, tenant_id=_TENANT_OWNER, joined_at=_NOW)
         second = _seed_member(
             seeded.id,
             tenant_id=_TENANT_NEW,
@@ -1079,9 +1056,7 @@ class TestMemberManagement(ServiceTest):
         seeded = _seed_org(org_rows)
         _seed_member(seeded.id, tenant_id=_TENANT_NEW, role=ORG_ROLE_EDITOR)
 
-        info = await service.get_tenant_member(
-            org_id=seeded.id, tenant_id=_TENANT_NEW
-        )
+        info = await service.get_tenant_member(org_id=seeded.id, tenant_id=_TENANT_NEW)
 
         assert info.tenant_id == _TENANT_NEW
         assert info.role == ORG_ROLE_EDITOR
@@ -1094,9 +1069,7 @@ class TestMemberManagement(ServiceTest):
         seeded = _seed_org(org_rows)
 
         with pytest.raises(NotFoundError) as excinfo:
-            await service.get_tenant_member(
-                org_id=seeded.id, tenant_id=_TENANT_NEW
-            )
+            await service.get_tenant_member(org_id=seeded.id, tenant_id=_TENANT_NEW)
         assert excinfo.value.code == "organization.tenant_not_member"
 
     async def test_is_tenant_org_admin(
@@ -1108,24 +1081,9 @@ class TestMemberManagement(ServiceTest):
         _seed_member(seeded.id, tenant_id=_TENANT_OWNER, role=ORG_ROLE_ADMIN)
         _seed_member(seeded.id, tenant_id=_TENANT_NEW, role=ORG_ROLE_VIEWER)
 
-        assert (
-            await service.is_tenant_org_admin(
-                org_id=seeded.id, tenant_id=_TENANT_OWNER
-            )
-            is True
-        )
-        assert (
-            await service.is_tenant_org_admin(
-                org_id=seeded.id, tenant_id=_TENANT_NEW
-            )
-            is False
-        )
-        assert (
-            await service.is_tenant_org_admin(
-                org_id=seeded.id, tenant_id=999
-            )
-            is False
-        )
+        assert await service.is_tenant_org_admin(org_id=seeded.id, tenant_id=_TENANT_OWNER) is True
+        assert await service.is_tenant_org_admin(org_id=seeded.id, tenant_id=_TENANT_NEW) is False
+        assert await service.is_tenant_org_admin(org_id=seeded.id, tenant_id=999) is False
 
     async def test_get_tenant_role_in_org(
         self,
@@ -1135,9 +1093,7 @@ class TestMemberManagement(ServiceTest):
         seeded = _seed_org(org_rows)
         _seed_member(seeded.id, tenant_id=_TENANT_NEW, role=ORG_ROLE_EDITOR)
 
-        role = await service.get_tenant_role_in_org(
-            org_id=seeded.id, tenant_id=_TENANT_NEW
-        )
+        role = await service.get_tenant_role_in_org(org_id=seeded.id, tenant_id=_TENANT_NEW)
 
         assert role == ORG_ROLE_EDITOR
 
@@ -1163,8 +1119,7 @@ class TestJoinFlows(ServiceTest):
         member = next(
             m
             for m in member_rows.values()
-            if m.organization_id == seeded.id
-            and m.tenant_id == _TENANT_NEW
+            if m.organization_id == seeded.id and m.tenant_id == _TENANT_NEW
         )
         assert member.role == ORG_ROLE_VIEWER
 
@@ -1218,11 +1173,7 @@ class TestJoinFlows(ServiceTest):
         )
 
         assert info.id == seeded.id
-        request = next(
-            r
-            for r in join_request_rows.values()
-            if r.organization_id == seeded.id
-        )
+        request = next(r for r in join_request_rows.values() if r.organization_id == seeded.id)
         assert request.status == JOIN_REQUEST_STATUS_PENDING
         assert request.request_type == JOIN_REQUEST_TYPE_JOIN
         assert request.requested_role == ORG_ROLE_EDITOR
@@ -1354,9 +1305,7 @@ class TestJoinRequests(ServiceTest):
         seeded = _seed_org(org_rows)
 
         with pytest.raises(ValidationError):
-            await service.list_join_requests(
-                org_id=seeded.id, status="garbage"
-            )
+            await service.list_join_requests(org_id=seeded.id, status="garbage")
 
     async def test_count_pending_join_requests(
         self,
@@ -1422,8 +1371,7 @@ class TestReviewJoinRequest(ServiceTest):
         member = next(
             m
             for m in member_rows.values()
-            if m.organization_id == seeded.id
-            and m.tenant_id == _TENANT_NEW
+            if m.organization_id == seeded.id and m.tenant_id == _TENANT_NEW
         )
         assert member.role == ORG_ROLE_EDITOR
 
@@ -1453,8 +1401,7 @@ class TestReviewJoinRequest(ServiceTest):
         member = next(
             m
             for m in member_rows.values()
-            if m.organization_id == seeded.id
-            and m.tenant_id == _TENANT_NEW
+            if m.organization_id == seeded.id and m.tenant_id == _TENANT_NEW
         )
         assert member.role == ORG_ROLE_EDITOR
 
@@ -1505,9 +1452,7 @@ class TestReviewJoinRequest(ServiceTest):
         org_rows: dict[str, Organization],
     ) -> None:
         seeded = _seed_org(org_rows)
-        request = _seed_join_request(
-            seeded.id, status=JOIN_REQUEST_STATUS_APPROVED
-        )
+        request = _seed_join_request(seeded.id, status=JOIN_REQUEST_STATUS_APPROVED)
 
         with pytest.raises(ConflictError) as excinfo:
             await service.review_join_request(
@@ -1638,9 +1583,7 @@ class TestRoleUpgrade(ServiceTest):
             request_type=JOIN_REQUEST_TYPE_UPGRADE,
         )
 
-        info = await service.get_pending_upgrade_request(
-            org_id=seeded.id, tenant_id=_TENANT_NEW
-        )
+        info = await service.get_pending_upgrade_request(org_id=seeded.id, tenant_id=_TENANT_NEW)
 
         assert info.id == pending.id
 
@@ -1652,9 +1595,7 @@ class TestRoleUpgrade(ServiceTest):
         seeded = _seed_org(org_rows)
 
         with pytest.raises(NotFoundError) as excinfo:
-            await service.get_pending_upgrade_request(
-                org_id=seeded.id, tenant_id=_TENANT_NEW
-            )
+            await service.get_pending_upgrade_request(org_id=seeded.id, tenant_id=_TENANT_NEW)
         assert excinfo.value.code == "organization.upgrade_request_not_found"
 
 

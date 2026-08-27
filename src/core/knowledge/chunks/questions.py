@@ -65,18 +65,14 @@ class DocumentChunkMetadata(BaseModel):
 
     def with_question(self, question: GeneratedQuestion) -> DocumentChunkMetadata:
         """Return a copy with ``question`` replaced in place (new object)."""
-        questions = [
-            question if q.id == question.id else q for q in self.generated_questions
-        ]
+        questions = [question if q.id == question.id else q for q in self.generated_questions]
         return self.model_copy(update={"generated_questions": questions})
 
     def without_question(self, question_id: str) -> DocumentChunkMetadata:
         """Return a copy with ``question_id`` removed (new object)."""
         return self.model_copy(
             update={
-                "generated_questions": [
-                    q for q in self.generated_questions if q.id != question_id
-                ]
+                "generated_questions": [q for q in self.generated_questions if q.id != question_id]
             }
         )
 

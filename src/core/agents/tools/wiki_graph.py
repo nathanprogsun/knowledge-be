@@ -61,7 +61,7 @@ WIKI_GRAPH_TOOL_DESCRIPTION = (
     "\n"
     "## When to Use\n"
     "✅ **Use for**:\n"
-    "- Understanding relationships between entities (e.g., \"relationship between Docker and Kubernetes\")\n"
+    '- Understanding relationships between entities (e.g., "relationship between Docker and Kubernetes")\n'
     "- Exploring knowledge networks and concept associations\n"
     "- Finding related information about specific entities\n"
     "- Understanding technical architecture and system relationships\n"
@@ -78,8 +78,8 @@ WIKI_GRAPH_TOOL_DESCRIPTION = (
     "\n"
     "## Graph Configuration\n"
     "Knowledge graph must be pre-configured in knowledge bases:\n"
-    "- **Entity types** (Nodes): e.g., \"Technology\", \"Tool\", \"Concept\"\n"
-    "- **Relationship types** (Relations): e.g., \"depends_on\", \"uses\", \"contains\"\n"
+    '- **Entity types** (Nodes): e.g., "Technology", "Tool", "Concept"\n'
+    '- **Relationship types** (Relations): e.g., "depends_on", "uses", "contains"\n'
     "\n"
     "If KB is not configured with graph, tool will return regular search results.\n"
     "\n"
@@ -340,7 +340,9 @@ class QueryKnowledgeGraphTool:
                     "knowledge_base_ids": cast("list[JsonValue]", kb_ids),
                     "query": query,
                     "results": cast("list[JsonValue]", []),
-                    "graph_configs": cast("dict[str, JsonValue]", graph_configs_to_data(graph_configs)),
+                    "graph_configs": cast(
+                        "dict[str, JsonValue]", graph_configs_to_data(graph_configs)
+                    ),
                     "graph_config": cast("JsonValue", aggregate_graph_config(graph_configs)),
                     "errors": cast("list[JsonValue]", errors),
                 },
@@ -433,14 +435,18 @@ class QueryKnowledgeGraphTool:
             else:
                 parts.append("  ⚠️ No entity types configured\n")
             if config.relations:
-                parts.append(f"  ✓ Relationship Types ({len(config.relations)}): {config.relations}\n")
+                parts.append(
+                    f"  ✓ Relationship Types ({len(config.relations)}): {config.relations}\n"
+                )
             else:
                 parts.append("  ⚠️ No relationship types configured\n")
             parts.append("\n")
 
         if not has_graph_config:
             parts.append("⚠️ None of the queried knowledge bases have graph extraction configured\n")
-            parts.append("💡 Hint: Configure entity and relationship types in knowledge base settings\n\n")
+            parts.append(
+                "💡 Hint: Configure entity and relationship types in knowledge base settings\n\n"
+            )
 
         if kb_counts:
             parts.append("=== 📚 Knowledge Base Coverage ===\n")
@@ -450,7 +456,9 @@ class QueryKnowledgeGraphTool:
 
         parts.append("=== 🔍 Query Results ===\n\n")
         if not has_graph_config:
-            parts.append("💡 Returning relevant document chunks (knowledge base has no graph configuration)\n\n")
+            parts.append(
+                "💡 Returning relevant document chunks (knowledge base has no graph configuration)\n\n"
+            )
         else:
             parts.append("💡 Content retrieval based on graph configuration\n\n")
 
@@ -487,11 +495,15 @@ class QueryKnowledgeGraphTool:
             )
 
         parts.append("=== 💡 Tips ===\n")
-        parts.append("- ✓ Results are deduplicated across knowledge bases and sorted by relevance\n")
+        parts.append(
+            "- ✓ Results are deduplicated across knowledge bases and sorted by relevance\n"
+        )
         parts.append("- ✓ Use get_chunk_detail to get full content\n")
         parts.append("- ✓ Use list_knowledge_chunks to explore context\n")
         if not has_graph_config:
-            parts.append("- ⚠️ Configure graph extraction for more precise entity-relationship results\n")
+            parts.append(
+                "- ⚠️ Configure graph extraction for more precise entity-relationship results\n"
+            )
         parts.append("- ⏳ Full graph query language (Cypher) support is under development\n")
         return "".join(parts), formatted_results
 

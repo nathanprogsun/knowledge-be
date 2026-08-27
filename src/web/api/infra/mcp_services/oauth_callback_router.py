@@ -75,7 +75,7 @@ async def mcp_oauth_callback(
             state=state,
             redirect_uri=entry.redirect_uri,
         )
-    except Exception as exc:  # noqa: BLE001 — any failure maps to the SPA error marker
+    except Exception as exc:
         logger.warning("MCP OAuth callback exchange failed: {}", exc)
         return _error_redirect("authorization_failed")
 

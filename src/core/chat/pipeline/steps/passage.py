@@ -138,9 +138,7 @@ def build_document_header(results: Sequence[SearchResult]) -> str:
         title = result.knowledge_title or result.knowledge_filename
         if title == "":
             continue
-        documents.append(
-            (title, result.knowledge_description, result.knowledge_custom_metadata)
-        )
+        documents.append((title, result.knowledge_description, result.knowledge_custom_metadata))
     if not documents:
         return ""
 

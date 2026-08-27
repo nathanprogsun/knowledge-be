@@ -109,9 +109,7 @@ class ChatCompletionStreamStep:
                 "eventbus_missing",
                 {"session_id": pipeline_ctx.session_id},
             )
-            return ERR_MODEL_CALL.with_error(
-                RuntimeError("EventBus is required for streaming")
-            )
+            return ERR_MODEL_CALL.with_error(RuntimeError("EventBus is required for streaming"))
 
         pipeline_info(
             "Stream",
@@ -119,9 +117,7 @@ class ChatCompletionStreamStep:
             {"chat_model": pipeline_ctx.chat_model_id},
         )
         try:
-            with with_prompt_cache_metadata(
-                chat_messages, options, KNOWLEDGE_QA_PURPOSE
-            ):
+            with with_prompt_cache_metadata(chat_messages, options, KNOWLEDGE_QA_PURPOSE):
                 stream = chat_model.chat_stream(chat_messages, options)
         except Exception as exc:
             pipeline_error(
@@ -142,9 +138,7 @@ class ChatCompletionStreamStep:
                     "error": "nil_channel",
                 },
             )
-            return ERR_MODEL_CALL.with_error(
-                RuntimeError("chat stream returned nil channel")
-            )
+            return ERR_MODEL_CALL.with_error(RuntimeError("chat stream returned nil channel"))
 
         pipeline_info(
             "Stream",

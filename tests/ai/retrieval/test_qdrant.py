@@ -60,9 +60,7 @@ _CTX = TaskContext()
 # ── Mock helpers ──────────────────────────────────────────────────────
 
 
-def _scored_point(
-    point_id: str, score: float, payload: dict[str, object]
-) -> ScoredPoint:
+def _scored_point(point_id: str, score: float, payload: dict[str, object]) -> ScoredPoint:
     """Build a ScoredPoint with just the fields the repo reads."""
     return ScoredPoint(id=point_id, score=score, payload=payload, version=0)
 
@@ -98,7 +96,7 @@ class _FakeClient:
 
 
 def _repo(
-    base: str = "weknora_embeddings",
+    base: str = "kb_embeddings",
     shard: int = 0,
     replication: int = 0,
     client: _FakeClient | None = None,
@@ -169,7 +167,7 @@ def test_resolve_collection_name_uses_default_when_nothing_set(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("QDRANT_COLLECTION", raising=False)
-    assert _resolve_collection_name(None) == "weknora_embeddings"
+    assert _resolve_collection_name(None) == "kb_embeddings"
 
 
 def test_resolve_collection_name_config_overrides_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -179,7 +177,7 @@ def test_resolve_collection_name_config_overrides_env(monkeypatch: pytest.Monkey
 
 
 def test_collection_name_combines_base_and_dimension() -> None:
-    assert _collection_name("weknora_embeddings", 768) == "weknora_embeddings_768"
+    assert _collection_name("kb_embeddings", 768) == "kb_embeddings_768"
 
 
 def test_tokenize_query_returns_empty_for_blank() -> None:
@@ -213,7 +211,9 @@ def test_to_embedding_data_returns_empty_when_source_id_missing() -> None:
 
 
 def test_calculate_storage_size_includes_vector_and_id_tracker() -> None:
-    info = _index_info(content="abcde", source_id="s", chunk_id="c", knowledge_id="k", knowledge_base_id="kb")
+    info = _index_info(
+        content="abcde", source_id="s", chunk_id="c", knowledge_id="k", knowledge_base_id="kb"
+    )
     data = _to_embedding_data(info, {})
     # No embedding => vector_size = 0, hnsw_index = 0.
     size_no_vec = _calculate_storage_size(data)
@@ -253,7 +253,7 @@ async def test_save_creates_collection_with_expected_schema() -> None:
     client.create_collection.assert_awaited_once()
     kwargs = client.create_collection.await_args
     assert kwargs is not None
-    assert kwargs.kwargs["collection_name"] == "weknora_embeddings_4"
+    assert kwargs.kwargs["collection_name"] == "kb_embeddings_4"
     vc = kwargs.kwargs["vectors_config"]
     assert isinstance(vc, VectorParams)
     assert vc.size == 4
@@ -267,9 +267,7 @@ async def test_save_creates_payload_indexes_after_collection() -> None:
     info = _index_info(source_id="s-1")
     await r.save(_CTX, info, _save_params("s-1", [0.1] * 4))
     indexes = client.create_payload_index.await_args_list
-    schema_by_field = {
-        c.kwargs["field_name"]: c.kwargs["field_schema"] for c in indexes
-    }
+    schema_by_field = {c.kwargs["field_name"]: c.kwargs["field_schema"] for c in indexes}
     for keyword_field in (
         FIELD_CHUNK_ID,
         FIELD_KNOWLEDGE_ID,
@@ -310,7 +308,7 @@ async def test_save_passes_point_with_payload_and_vector() -> None:
     await r.save(_CTX, info, _save_params("s-1", [0.1, 0.2, 0.3, 0.4]))
     upsert_call = client.upsert.await_args
     assert upsert_call is not None
-    assert upsert_call.kwargs["collection_name"] == "weknora_embeddings_4"
+    assert upsert_call.kwargs["collection_name"] == "kb_embeddings_4"
     points = upsert_call.kwargs["points"]
     assert len(points) == 1
     point = points[0]
@@ -342,7 +340,7 @@ async def test_batch_save_groups_points_by_dimension() -> None:
     await r.batch_save(_CTX, infos, params)
     upsert_calls = client.upsert.await_args_list
     collections = {c.kwargs["collection_name"] for c in upsert_calls}
-    assert collections == {"weknora_embeddings_4", "weknora_embeddings_8"}
+    assert collections == {"kb_embeddings_4", "kb_embeddings_8"}
 
 
 async def test_batch_save_skips_empty_embeddings() -> None:
@@ -401,7 +399,7 @@ async def test_vector_retrieve_queries_with_filter_and_threshold() -> None:
     await r.retrieve(_CTX, params)
     qp = client.query_points.await_args
     assert qp is not None
-    assert qp.kwargs["collection_name"] == "weknora_embeddings_4"
+    assert qp.kwargs["collection_name"] == "kb_embeddings_4"
     assert qp.kwargs["limit"] == 7
     assert qp.kwargs["score_threshold"] == 0.5
     assert qp.kwargs["with_payload"] is True
@@ -472,8 +470,8 @@ async def test_keywords_retrieve_filters_collections_by_base_name() -> None:
     client = _FakeClient()
     client.get_collections.return_value = CollectionsResponse(
         collections=[
-            CollectionDescription(name="weknora_embeddings_4"),
-            CollectionDescription(name="weknora_embeddings_8"),
+            CollectionDescription(name="kb_embeddings_4"),
+            CollectionDescription(name="kb_embeddings_8"),
             CollectionDescription(name="other_collection"),
         ]
     )
@@ -483,13 +481,13 @@ async def test_keywords_retrieve_filters_collections_by_base_name() -> None:
     await r.retrieve(_CTX, params)
     # Only the two base-name-matching collections are scrolled.
     scrolled = {c.kwargs["collection_name"] for c in client.scroll.await_args_list}
-    assert scrolled == {"weknora_embeddings_4", "weknora_embeddings_8"}
+    assert scrolled == {"kb_embeddings_4", "kb_embeddings_8"}
 
 
 async def test_keywords_retrieve_uses_should_conditions_for_tokens() -> None:
     client = _FakeClient()
     client.get_collections.return_value = CollectionsResponse(
-        collections=[CollectionDescription(name="weknora_embeddings_4")]
+        collections=[CollectionDescription(name="kb_embeddings_4")]
     )
     client.scroll.return_value = ([], None)
     r = _repo(client=client)
@@ -512,7 +510,7 @@ async def test_keywords_retrieve_uses_should_conditions_for_tokens() -> None:
 async def test_keywords_retrieve_falls_back_to_must_match_for_empty_tokens() -> None:
     client = _FakeClient()
     client.get_collections.return_value = CollectionsResponse(
-        collections=[CollectionDescription(name="weknora_embeddings_4")]
+        collections=[CollectionDescription(name="kb_embeddings_4")]
     )
     client.scroll.return_value = ([], None)
     r = _repo(client=client)
@@ -530,7 +528,7 @@ async def test_keywords_retrieve_falls_back_to_must_match_for_empty_tokens() -> 
 async def test_keywords_retrieve_caps_results_to_top_k() -> None:
     client = _FakeClient()
     client.get_collections.return_value = CollectionsResponse(
-        collections=[CollectionDescription(name="weknora_embeddings_4")]
+        collections=[CollectionDescription(name="kb_embeddings_4")]
     )
     payload: dict[str, object] = {FIELD_CONTENT: "x", FIELD_CHUNK_ID: "c"}
     records = [_record(f"p-{i}", payload) for i in range(5)]
@@ -551,7 +549,7 @@ async def test_delete_by_chunk_id_list_emits_filter_selector() -> None:
     await r.delete_by_chunk_id_list(_CTX, ["c-1", "c-2"], 4, "")
     delete_call = client.delete.await_args
     assert delete_call is not None
-    assert delete_call.kwargs["collection_name"] == "weknora_embeddings_4"
+    assert delete_call.kwargs["collection_name"] == "kb_embeddings_4"
     selector = delete_call.kwargs["points_selector"]
     assert isinstance(selector, Filter)
 
@@ -590,18 +588,16 @@ async def test_batch_update_chunk_enabled_status_updates_all_collections() -> No
     client = _FakeClient()
     client.get_collections.return_value = CollectionsResponse(
         collections=[
-            CollectionDescription(name="weknora_embeddings_4"),
-            CollectionDescription(name="weknora_embeddings_8"),
+            CollectionDescription(name="kb_embeddings_4"),
+            CollectionDescription(name="kb_embeddings_8"),
             CollectionDescription(name="unrelated"),
         ]
     )
     r = _repo(client=client)
-    await r.batch_update_chunk_enabled_status(
-        _CTX, {"c-1": True, "c-2": False}
-    )
+    await r.batch_update_chunk_enabled_status(_CTX, {"c-1": True, "c-2": False})
     set_payload_calls = client.set_payload.await_args_list
     targeted = {c.kwargs["collection_name"] for c in set_payload_calls}
-    assert targeted == {"weknora_embeddings_4", "weknora_embeddings_8"}
+    assert targeted == {"kb_embeddings_4", "kb_embeddings_8"}
     # Two payload writes per collection (enabled + disabled).
     assert len(set_payload_calls) == 4
 
@@ -616,12 +612,10 @@ async def test_batch_update_chunk_enabled_status_skips_empty_map() -> None:
 async def test_batch_update_chunk_tag_id_groups_by_tag() -> None:
     client = _FakeClient()
     client.get_collections.return_value = CollectionsResponse(
-        collections=[CollectionDescription(name="weknora_embeddings_4")]
+        collections=[CollectionDescription(name="kb_embeddings_4")]
     )
     r = _repo(client=client)
-    await r.batch_update_chunk_tag_id(
-        _CTX, {"c-1": "tag-a", "c-2": "tag-a", "c-3": "tag-b"}
-    )
+    await r.batch_update_chunk_tag_id(_CTX, {"c-1": "tag-a", "c-2": "tag-a", "c-3": "tag-b"})
     payloads = [c.kwargs["payload"][FIELD_TAG_ID] for c in client.set_payload.await_args_list]
     assert payloads == ["tag-a", "tag-b"]
 
@@ -654,8 +648,10 @@ async def test_copy_indices_paginates_and_remaps_ids() -> None:
     }
     # First call returns 2 records; second call returns empty.
     client.scroll.side_effect = [
-        ([_record("p-a", src_payload_a, [0.1] * 4),
-          _record("p-b", src_payload_b, [0.2] * 4)], "p-b"),
+        (
+            [_record("p-a", src_payload_a, [0.1] * 4), _record("p-b", src_payload_b, [0.2] * 4)],
+            "p-b",
+        ),
         ([], None),
     ]
     r = _repo(client=client)
@@ -751,7 +747,7 @@ async def test_new_qdrant_retrieve_engine_repository_constructs_client() -> None
     assert kwargs["prefer_grpc"] is True
     assert kwargs["api_key"] == "key-1"
     assert kwargs["https"] is True
-    assert repo._collection_base_name == "weknora_embeddings"
+    assert repo._collection_base_name == "kb_embeddings"
     assert repo._shard_number == 2
 
 

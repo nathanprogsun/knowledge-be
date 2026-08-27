@@ -157,15 +157,13 @@ class SystemInfoService:
                 sqlalchemy.text("SELECT version_num FROM alembic_version")
             )
             revision = version_row.scalar_one_or_none() or ""
-        except Exception as exc:  # noqa: BLE001 — captured as info-row error
+        except Exception as exc:
             return ("unknown", f"alembic_version lookup failed: {exc}")
 
         try:
-            server_row = await self._session.execute(
-                sqlalchemy.text("SELECT version()")
-            )
+            server_row = await self._session.execute(sqlalchemy.text("SELECT version()"))
             server_version = server_row.scalar_one_or_none() or ""
-        except Exception as exc:  # noqa: BLE001 — captured as info-row error
+        except Exception as exc:
             return (revision or "unknown", f"server version lookup failed: {exc}")
 
         # Compose a compact label: revision + server version. The

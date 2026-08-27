@@ -58,9 +58,7 @@ class CompositeRetrieveEngine:
 
     def support_retriever(self, retriever_type: RetrieverType) -> bool:
         """Report whether any registered engine serves ``retriever_type``."""
-        return any(
-            retriever_type in info.retriever_types for info in self._engine_infos
-        )
+        return any(retriever_type in info.retriever_types for info in self._engine_infos)
 
     async def retrieve(
         self, ctx: Context, retrieve_params: list[RetrieveParams]
@@ -79,15 +77,10 @@ class CompositeRetrieveEngine:
             if isinstance(result, BaseException):
                 raise result
         return [
-            item
-            for result in results
-            if not isinstance(result, BaseException)
-            for item in result
+            item for result in results if not isinstance(result, BaseException) for item in result
         ]
 
-    async def _retrieve_one(
-        self, ctx: Context, params: RetrieveParams
-    ) -> list[RetrieveResult]:
+    async def _retrieve_one(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
         for engine_info in self._engine_infos:
             if params.retriever_type in engine_info.retriever_types:
                 return await engine_info.retrieve_engine.retrieve(ctx, params)
@@ -98,13 +91,9 @@ class CompositeRetrieveEngine:
 
     # ── write fan-out (every engine) ─────────────────────────────────
 
-    async def index(
-        self, ctx: Context, embedder: Embedder, index_info: IndexInfo
-    ) -> None:
+    async def index(self, ctx: Context, embedder: Embedder, index_info: IndexInfo) -> None:
         async def _op(_ctx: Context, info: EngineInfo) -> None:
-            await info.retrieve_engine.index(
-                _ctx, embedder, index_info, list(info.retriever_types)
-            )
+            await info.retrieve_engine.index(_ctx, embedder, index_info, list(info.retriever_types))
 
         await self._concurrent_exec(ctx, _op)
 
@@ -191,9 +180,7 @@ class CompositeRetrieveEngine:
         self, ctx: Context, chunk_status_map: Mapping[str, bool]
     ) -> None:
         async def _op(_ctx: Context, info: EngineInfo) -> None:
-            await info.retrieve_engine.batch_update_chunk_enabled_status(
-                _ctx, chunk_status_map
-            )
+            await info.retrieve_engine.batch_update_chunk_enabled_status(_ctx, chunk_status_map)
 
         await self._concurrent_exec(ctx, _op)
 
@@ -245,9 +232,7 @@ def new_composite_retrieve_engine(
     (propagated from the registry) or when it does not support a requested
     retriever type.
     """
-    by_engine: dict[
-        RetrieverEngineType, tuple[RetrieveEngineService, list[RetrieverType]]
-    ] = {}
+    by_engine: dict[RetrieverEngineType, tuple[RetrieveEngineService, list[RetrieverType]]] = {}
     for engine_param in engine_params:
         svc = registry.get_retrieve_engine_service(engine_param.retriever_engine_type)
         if engine_param.retriever_type not in svc.support():

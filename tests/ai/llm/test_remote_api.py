@@ -28,6 +28,7 @@ from src.ai.llm.prompt_cache import (
 from src.ai.llm.providers import (
     AzureProvider,
     AzureReasoningProvider,
+    CloudProvider,
     DeepseekProvider,
     GeminiProvider,
     GenericProvider,
@@ -38,7 +39,6 @@ from src.ai.llm.providers import (
     ProviderAdapter,
     QwenThinkingProvider,
     VolcengineProvider,
-    WeKnoraCloudProvider,
     resolve_provider,
 )
 from src.ai.llm.remote_api import (
@@ -65,7 +65,7 @@ from src.ai.llm.types import (
     Tool,
     ToolCall,
 )
-from src.common.exception import ValidationError, AIProviderError
+from src.common.exception import AIProviderError, ValidationError
 from src.common.json import JsonObject
 
 BASE_URL = "http://llm.test/v1"
@@ -102,22 +102,18 @@ def test_constructor_rejects_restricted_base_url(monkeypatch: pytest.MonkeyPatch
 
 def test_constructor_requires_managed_cloud_credentials() -> None:
     with pytest.raises(ValidationError, match="AppID"):
-        RemoteAPIChat(_config(provider="weknoracloud", app_id="", app_secret=""))
+        RemoteAPIChat(_config(provider="cloud", app_id="", app_secret=""))
     with pytest.raises(ValidationError, match="AppSecret"):
-        RemoteAPIChat(_config(provider="weknoracloud", app_id="app", app_secret=""))
+        RemoteAPIChat(_config(provider="cloud", app_id="app", app_secret=""))
 
 
 def test_constructor_remote_model_name_override() -> None:
-    chat = RemoteAPIChat(
-        _config(extra_config={"remote_model_name": "  renamed-model "})
-    )
+    chat = RemoteAPIChat(_config(extra_config={"remote_model_name": "  renamed-model "}))
     assert chat.get_model_name() == "renamed-model"
 
 
 def test_constructor_getters() -> None:
-    chat = RemoteAPIChat(
-        _config(model_id="m-1", api_key="sk-x", custom_headers={"X-Trace": "t"})
-    )
+    chat = RemoteAPIChat(_config(model_id="m-1", api_key="sk-x", custom_headers={"X-Trace": "t"}))
     assert chat.get_model_name() == "deepseek-chat"
     assert chat.get_model_id() == "m-1"
     assert chat.get_provider() == "deepseek"
@@ -147,8 +143,7 @@ def test_constructor_azure_api_version_kept() -> None:
     assert chat._api_version == "2024-06-01"
     endpoint = chat._resolve_default_endpoint()
     assert endpoint == (
-        "https://llm.test/openai/deployments/deepseek-chat"
-        "/chat/completions?api-version=2024-06-01"
+        "https://llm.test/openai/deployments/deepseek-chat/chat/completions?api-version=2024-06-01"
     )
 
 
@@ -156,7 +151,7 @@ def test_constructor_azure_api_version_kept() -> None:
 
 
 def test_resolve_provider_routing() -> None:
-    assert isinstance(resolve_provider("weknoracloud", "m"), WeKnoraCloudProvider)
+    assert isinstance(resolve_provider("cloud", "m"), CloudProvider)
     assert isinstance(resolve_provider("aliyun", "qwen3-8b"), QwenThinkingProvider)
     assert isinstance(resolve_provider("aliyun", "qwen-max"), QwenThinkingProvider)
     assert isinstance(resolve_provider("lkeap", "deepseek-v3.2"), LkeapProvider)
@@ -280,9 +275,7 @@ def test_convert_messages_tool_calls_and_tool_role() -> None:
 
 def test_build_chat_completion_request_basics() -> None:
     chat = RemoteAPIChat(_config())
-    req = chat.build_chat_completion_request(
-        [Message(role="user", content="hi")], None, True
-    )
+    req = chat.build_chat_completion_request([Message(role="user", content="hi")], None, True)
     assert req["model"] == "deepseek-chat"
     assert req["stream"] is True
     assert req["stream_options"] == {"include_usage": True}
@@ -387,7 +380,7 @@ def test_build_outbound_thinking_override_wins() -> None:
 def test_build_outbound_managed_cloud_endpoint_and_signing() -> None:
     chat = RemoteAPIChat(
         _config(
-            provider="weknoracloud",
+            provider="cloud",
             model_name="m",
             app_id="app",
             app_secret="secret",
@@ -658,7 +651,7 @@ async def test_sse_reader_events() -> None:
         _async_lines(
             [
                 "event: message",
-                "data: {\"a\":1}",
+                'data: {"a":1}',
                 "",
                 "data: [DONE]",
                 "data: ignored",
@@ -686,8 +679,12 @@ def test_remove_thinking_content() -> None:
 
 def test_token_usage_from_openai_details() -> None:
     usage = token_usage_from_openai(
-        {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15,
-         "prompt_tokens_details": {"cached_tokens": 4}},
+        {
+            "prompt_tokens": 10,
+            "completion_tokens": 5,
+            "total_tokens": 15,
+            "prompt_tokens_details": {"cached_tokens": 4},
+        },
         "deepseek",
     )
     assert usage.cache_read_tokens == 4
@@ -719,9 +716,7 @@ def test_apply_raw_prompt_cache_usage() -> None:
 def test_fingerprint_prompt_prefix_stable() -> None:
     fp = prompt_prefix_fingerprint(
         [Message(role="system", content="sys"), Message(role="user", content="hi")],
-        ChatOptions(
-            tools=[Tool(type="function", function=FunctionDef(name="t", description=""))]
-        ),
+        ChatOptions(tools=[Tool(type="function", function=FunctionDef(name="t", description=""))]),
     )
     assert len(fp) == 16
     assert fingerprint_prompt_prefix("a", "b") == fingerprint_prompt_prefix("a", "b")

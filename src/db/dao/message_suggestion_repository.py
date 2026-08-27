@@ -141,9 +141,7 @@ class MessageSuggestionRepository(GenericRepository[MessageSuggestionSet]):
         questions, token / latency bookkeeping, error code) under the
         row's primary key.
         """
-        updates = {
-            k: v for k, v in row.model_dump().items() if k not in _IMMUTABLE_UPDATE_COLUMNS
-        }
+        updates = {k: v for k, v in row.model_dump().items() if k not in _IMMUTABLE_UPDATE_COLUMNS}
         persisted = await self.update_by_primary_key({"id": row.id}, updates)
         if persisted is None:
             raise DataError(
@@ -176,8 +174,7 @@ class MessageSuggestionRepository(GenericRepository[MessageSuggestionSet]):
     ) -> int:
         """Hard-delete every suggestion set of a session. Returns count."""
         stmt = text(
-            f"delete from {_TABLE_NAME} "
-            "where tenant_id = :tenant_id and session_id = :session_id"
+            f"delete from {_TABLE_NAME} where tenant_id = :tenant_id and session_id = :session_id"
         ).bindparams(tenant_id=tenant_id, session_id=session_id)
         result = await self._session.execute(stmt)
         return cast("CursorResult[SqlValue]", result).rowcount or 0
@@ -244,8 +241,7 @@ class MessageSuggestionRepository(GenericRepository[MessageSuggestionSet]):
             params["ready"] = SUGGESTION_STATUS_READY
         else:
             where = (
-                "id = :id and (status <> :generating "
-                "or lease_until is null or lease_until < :now)"
+                "id = :id and (status <> :generating or lease_until is null or lease_until < :now)"
             )
         stmt = text(
             f"update {_TABLE_NAME} set "

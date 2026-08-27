@@ -235,8 +235,12 @@ def merge_citations_into_items(
     Items whose slug is not in ``citations`` keep their description /
     details fallback. Returns ``(entities, concepts, uncited_count)``.
     """
-    entities = [replace(item, source_chunks=tuple(citations.get(item.slug, []))) for item in entities]
-    concepts = [replace(item, source_chunks=tuple(citations.get(item.slug, []))) for item in concepts]
+    entities = [
+        replace(item, source_chunks=tuple(citations.get(item.slug, []))) for item in entities
+    ]
+    concepts = [
+        replace(item, source_chunks=tuple(citations.get(item.slug, []))) for item in concepts
+    ]
     uncited = sum(1 for item in entities if not item.source_chunks) + sum(
         1 for item in concepts if not item.source_chunks
     )

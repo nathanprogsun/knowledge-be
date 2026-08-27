@@ -81,14 +81,14 @@ ENGLISH_CHAPTER_PATTERN: Final = re.compile(
 # Matches CJK chapter / section markers like 第一章, 第3节, 第 1 章
 # (whitespace between 第 / numeral / unit is tolerated).
 CHINESE_CHAPTER_PATTERN: Final = re.compile(
-    r"^[ \t]*第[ \t]*[一二三四五六七八九十百千零〇0-9]+[ \t]*(?:章|节|節|部分|篇)[ \t]?.{0,200}$",  # noqa: RUF001
+    r"^[ \t]*第[ \t]*[一二三四五六七八九十百千零〇0-9]+[ \t]*(?:章|节|節|部分|篇)[ \t]?.{0,200}$",
     re.MULTILINE,
 )
 
 # Sentence-level separators tuned per language. Used for fine-grained
 # sub-splitting when a section is still too large.
 _LANG_SEPARATORS: Final = {
-    LangChinese: ("。", "！", "？", "；", "\n"),  # noqa: RUF001
+    LangChinese: ("。", "！", "？", "；", "\n"),
     LangGerman: (". ", "! ", "? ", "; ", "\n"),
     LangEnglish: (". ", "! ", "? ", "; ", "\n"),
 }
@@ -98,7 +98,7 @@ def sentence_separators(lang: str) -> list[str]:
     """Return sentence-level separators tuned for the given language."""
     if lang in _LANG_SEPARATORS:
         return list(_LANG_SEPARATORS[lang])
-    return ["。", "！", "？", "；", ". ", "! ", "? ", "; ", "\n"]  # noqa: RUF001
+    return ["。", "！", "？", "；", ". ", "! ", "? ", "; ", "\n"]
 
 
 def chapter_patterns_for_langs(langs: list[str]) -> list[re.Pattern[str]]:

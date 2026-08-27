@@ -27,9 +27,7 @@ _CTX = TaskContext()
 class _FakeRepo:
     """Store repository returning a fixed store (or raising)."""
 
-    def __init__(
-        self, store: VectorStoreLike | None, error: Exception | None = None
-    ) -> None:
+    def __init__(self, store: VectorStoreLike | None, error: Exception | None = None) -> None:
         self._store = store
         self._error = error
         self.calls: list[tuple[int, str]] = []
@@ -52,9 +50,7 @@ def _store(store_id: str = "store-1") -> VectorStore:
     )
 
 
-def _repo(
-    store: VectorStoreLike | None, error: Exception | None = None
-) -> _FakeRepo:
+def _repo(store: VectorStoreLike | None, error: Exception | None = None) -> _FakeRepo:
     return _FakeRepo(store, error)
 
 

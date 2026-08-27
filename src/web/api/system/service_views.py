@@ -48,7 +48,7 @@ from src.core.system.storage_allowlist import (
     build_storage_provider_statuses,
     supported_providers,
 )
-from src.web.deps import AuthDep, RoleAdminDep, RoleViewerDep, SystemAdminDep
+from src.web.deps import AuthDep, RoleAdminDep, RoleViewerDep
 
 router = APIRouter(prefix="/system", tags=["system"])
 
@@ -63,8 +63,7 @@ def _minio_enabled() -> bool:
     config is resolved by the storage backend domain).
     """
     return bool(
-        os.getenv("MINIO_ENDPOINT", "").strip()
-        and os.getenv("MINIO_ACCESS_KEY_ID", "").strip()
+        os.getenv("MINIO_ENDPOINT", "").strip() and os.getenv("MINIO_ACCESS_KEY_ID", "").strip()
     )
 
 

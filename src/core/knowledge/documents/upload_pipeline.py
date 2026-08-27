@@ -39,17 +39,35 @@ UNKNOWN_FILE_TYPE = "unknown"
 # the worker's post-download re-check share one source of truth).
 SUPPORTED_IMPORT_EXTENSIONS: frozenset[str] = frozenset(
     {
-        "pdf", "txt", "docx", "doc", "epub",
-        "html", "htm", "mhtml", "md", "markdown",
-        "png", "jpg", "jpeg", "gif",
-        "csv", "xlsx", "xls", "pptx", "ppt", "json",
-        "mp3", "wav", "m4a", "flac", "ogg",
+        "pdf",
+        "txt",
+        "docx",
+        "doc",
+        "epub",
+        "html",
+        "htm",
+        "mhtml",
+        "md",
+        "markdown",
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "csv",
+        "xlsx",
+        "xls",
+        "pptx",
+        "ppt",
+        "json",
+        "mp3",
+        "wav",
+        "m4a",
+        "flac",
+        "ogg",
     }
 )
 
-VIDEO_EXTENSIONS: frozenset[str] = frozenset(
-    {"mp4", "mov", "avi", "mkv", "webm", "wmv", "flv"}
-)
+VIDEO_EXTENSIONS: frozenset[str] = frozenset({"mp4", "mov", "avi", "mkv", "webm", "wmv", "flv"})
 
 IMAGE_EXTENSIONS: frozenset[str] = frozenset(
     {"jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "tiff"}
@@ -311,13 +329,11 @@ async def check_file_knowledge_exists(
         columns["file_hash"] = file_hash
     rows = await repo.find_all_by_column_values(columns)
     if file_hash:
-        candidates = [
-            row for row in rows
-            if row.parse_status != "failed"
-        ]
+        candidates = [row for row in rows if row.parse_status != "failed"]
     else:
         candidates = [
-            row for row in rows
+            row
+            for row in rows
             if row.parse_status != "failed"
             and row.file_name == file_name
             and row.file_size == file_size
@@ -327,10 +343,7 @@ async def check_file_knowledge_exists(
     if file_hash:
         target_type = normalize_file_extension(file_type)
         for row in candidates:
-            if (
-                row.file_type is None
-                or normalize_file_extension(row.file_type) == target_type
-            ):
+            if row.file_type is None or normalize_file_extension(row.file_type) == target_type:
                 return row
         return None
     return candidates[0]

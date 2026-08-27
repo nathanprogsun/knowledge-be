@@ -262,6 +262,7 @@ def test_translate_source_id_other_returns_uuid() -> None:
 
 def test_dedupe_rows_by_id_last_wins() -> None:
     from src.ai.retrieval.doris import DorisVectorEmbedding
+
     rows = [
         DorisVectorEmbedding(id="a", content="first"),
         DorisVectorEmbedding(id="b", content="middle"),
@@ -302,9 +303,15 @@ def test_build_create_table_ddl_includes_dimension() -> None:
 
 def test_to_doris_vector_embedding_extracts_embedding() -> None:
     info = IndexInfo(
-        id="row-1", content="hello", source_id="src-1", source_type=SourceType.CHUNK,
-        chunk_id="chunk-1", knowledge_id="kid-1", knowledge_base_id="kb-1",
-        tag_id="t-1", is_enabled=True,
+        id="row-1",
+        content="hello",
+        source_id="src-1",
+        source_type=SourceType.CHUNK,
+        chunk_id="chunk-1",
+        knowledge_id="kid-1",
+        knowledge_base_id="kb-1",
+        tag_id="t-1",
+        is_enabled=True,
     )
     params: IndexSaveParams = {"embedding": {"src-1": [1.0, 2.0, 3.0]}}
     emb = _to_doris_vector_embedding(info, params, "inner_product_duplicate")
@@ -323,6 +330,7 @@ def test_to_doris_vector_embedding_no_embedding_returns_empty() -> None:
 
 def test_calculate_storage_size_includes_vec_and_payload() -> None:
     from src.ai.retrieval.doris import DorisVectorEmbedding
+
     with_vec = DorisVectorEmbedding(content="hello", embedding=[1.0, 2.0, 3.0])
     without_vec = DorisVectorEmbedding(content="hello", embedding=[])
     assert _calculate_storage_size(with_vec) > _calculate_storage_size(without_vec)
@@ -372,9 +380,11 @@ async def test_batch_save_with_empty_list_is_noop() -> None:
 async def test_batch_save_writes_to_dimension_table() -> None:
     # ensureTable → SHOW COUNT(1) returns 1 (table exists)
     # insertRows → multi-row INSERT
-    repo, db = _new_repo(script=[
-        ("SELECT COUNT", (1,)),  # table exists for dim=4
-    ])
+    repo, db = _new_repo(
+        script=[
+            ("SELECT COUNT", (1,)),  # table exists for dim=4
+        ]
+    )
     info = IndexInfo(source_id="src-1", chunk_id="c1", content="hello")
     await repo.batch_save(_CTX, [info], {"embedding": {"src-1": [1.0, 2.0, 3.0, 4.0]}})
     executed = db._cursor.executed
@@ -383,7 +393,7 @@ async def test_batch_save_writes_to_dimension_table() -> None:
     # Second statement was the INSERT
     inserts = [s for s, _ in executed if s.strip().upper().startswith("INSERT INTO")]
     assert len(inserts) == 1
-    assert "weknora_embeddings_4" in inserts[0]
+    assert "kb_embeddings_4" in inserts[0]
 
 
 async def test_batch_save_skips_empty_embedding() -> None:
@@ -438,12 +448,28 @@ async def test_vector_retrieve_returns_empty_when_table_missing() -> None:
 
 
 async def test_vector_retrieve_runs_inner_product_query() -> None:
-    repo, _db = _new_repo(script=[
-        ("SELECT COUNT", (1,)),  # table exists
-        ("SELECT", [(  # retrieve rows
-            "row-1", "hello", "src-1", 0, "c-1", "k-1", "kb-1", "t-1", True, 0.95,
-        )]),
-    ])
+    repo, _db = _new_repo(
+        script=[
+            ("SELECT COUNT", (1,)),  # table exists
+            (
+                "SELECT",
+                [
+                    (  # retrieve rows
+                        "row-1",
+                        "hello",
+                        "src-1",
+                        0,
+                        "c-1",
+                        "k-1",
+                        "kb-1",
+                        "t-1",
+                        True,
+                        0.95,
+                    )
+                ],
+            ),
+        ]
+    )
     params = RetrieveParams(
         embedding=[1.0, 2.0, 3.0, 4.0],
         retriever_type=RetrieverType.VECTOR,
@@ -465,15 +491,33 @@ async def test_keywords_retrieve_empty_query_returns_empty() -> None:
 
 
 async def test_keywords_retrieve_merges_across_tables() -> None:
-    repo, _db = _new_repo(script=[
-        ("SELECT TABLE_NAME", [("weknora_embeddings_4",), ("weknora_embeddings_768",)]),
-        ("SELECT", [(  # table 4 results
-            "row-1", "hello", "src-1", 0, "c-1", "k-1", "kb-1", "t-1", True,
-        )]),
-        ("SELECT", [  # table 768 results
-            ("row-2", "world", "src-2", 0, "c-2", "k-2", "kb-2", "t-2", False),
-        ]),
-    ])
+    repo, _db = _new_repo(
+        script=[
+            ("SELECT TABLE_NAME", [("kb_embeddings_4",), ("kb_embeddings_768",)]),
+            (
+                "SELECT",
+                [
+                    (  # table 4 results
+                        "row-1",
+                        "hello",
+                        "src-1",
+                        0,
+                        "c-1",
+                        "k-1",
+                        "kb-1",
+                        "t-1",
+                        True,
+                    )
+                ],
+            ),
+            (
+                "SELECT",
+                [  # table 768 results
+                    ("row-2", "world", "src-2", 0, "c-2", "k-2", "kb-2", "t-2", False),
+                ],
+            ),
+        ]
+    )
     params = RetrieveParams(query="hello world", top_k=10, retriever_type=RetrieverType.KEYWORDS)
     results = await repo._keywords_retrieve(_CTX, params)
     assert len(results) == 1
@@ -513,20 +557,33 @@ async def test_delete_with_empty_ids_is_noop() -> None:
 
 async def test_copy_indices_empty_mapping_is_noop() -> None:
     repo, db = _new_repo()
-    await repo.copy_indices(
-        _CTX, "src-kb", {}, {}, "tgt-kb", dimension=4, knowledge_type=""
-    )
+    await repo.copy_indices(_CTX, "src-kb", {}, {}, "tgt-kb", dimension=4, knowledge_type="")
     assert db._cursor.executed == []
 
 
 async def test_copy_indices_copies_with_translated_ids() -> None:
-    repo, db = _new_repo(script=[
-        ("SELECT COUNT", (1,)),  # ensureTable
-        ("SELECT", [(  # page 1: source rows
-            "row-1", "content", "src-1", 0, "src-c-1", "src-k-1",
-            "src-kb-1", "tag-1", True, b"[1.0,2.0,3.0,4.0]",
-        )]),
-    ])
+    repo, db = _new_repo(
+        script=[
+            ("SELECT COUNT", (1,)),  # ensureTable
+            (
+                "SELECT",
+                [
+                    (  # page 1: source rows
+                        "row-1",
+                        "content",
+                        "src-1",
+                        0,
+                        "src-c-1",
+                        "src-k-1",
+                        "src-kb-1",
+                        "tag-1",
+                        True,
+                        b"[1.0,2.0,3.0,4.0]",
+                    )
+                ],
+            ),
+        ]
+    )
     await repo.copy_indices(
         _CTX,
         "src-kb",
@@ -544,32 +601,62 @@ async def test_copy_indices_copies_with_translated_ids() -> None:
 
 
 async def test_batch_update_chunk_enabled_status_rewrite() -> None:
-    repo, db = _new_repo(script=[
-        ("SELECT TABLE_NAME", [("weknora_embeddings_4",)]),
-        ("SELECT", [(  # load rows
-            "row-1", "content", "src-1", 0, "c-1", "k-1", "kb-1", "tag-1", False,
-            b"[1.0,2.0]",
-        )]),
-        ("SELECT COUNT", (1,)),
-        ("DELETE", (1,)),  # delete by id
-        ("INSERT", (1,)),  # insert
-    ])
+    repo, db = _new_repo(
+        script=[
+            ("SELECT TABLE_NAME", [("kb_embeddings_4",)]),
+            (
+                "SELECT",
+                [
+                    (  # load rows
+                        "row-1",
+                        "content",
+                        "src-1",
+                        0,
+                        "c-1",
+                        "k-1",
+                        "kb-1",
+                        "tag-1",
+                        False,
+                        b"[1.0,2.0]",
+                    )
+                ],
+            ),
+            ("SELECT COUNT", (1,)),
+            ("DELETE", (1,)),  # delete by id
+            ("INSERT", (1,)),  # insert
+        ]
+    )
     await repo.batch_update_chunk_enabled_status(_CTX, {"c-1": True})
     executed = db._cursor.executed
     assert any("SELECT" in s.upper() for s, _ in executed)
 
 
 async def test_batch_update_chunk_tag_id_rewrite() -> None:
-    repo, db = _new_repo(script=[
-        ("SELECT TABLE_NAME", [("weknora_embeddings_4",)]),
-        ("SELECT", [(
-            "row-1", "content", "src-1", 0, "c-1", "k-1", "kb-1", "old-tag", True,
-            b"[1.0,2.0]",
-        )]),
-        ("SELECT COUNT", (1,)),
-        ("DELETE", (1,)),
-        ("INSERT", (1,)),
-    ])
+    repo, db = _new_repo(
+        script=[
+            ("SELECT TABLE_NAME", [("kb_embeddings_4",)]),
+            (
+                "SELECT",
+                [
+                    (
+                        "row-1",
+                        "content",
+                        "src-1",
+                        0,
+                        "c-1",
+                        "k-1",
+                        "kb-1",
+                        "old-tag",
+                        True,
+                        b"[1.0,2.0]",
+                    )
+                ],
+            ),
+            ("SELECT COUNT", (1,)),
+            ("DELETE", (1,)),
+            ("INSERT", (1,)),
+        ]
+    )
     await repo.batch_update_chunk_tag_id(_CTX, {"c-1": "new-tag"})
     assert any("SELECT" in s.upper() for s, _ in db._cursor.executed)
 
@@ -584,7 +671,7 @@ async def test_batch_update_chunk_enabled_status_legacy_uses_stream_load(
     repo._compat_mode_resolved = "legacy"
     # lookupChunkRowKeys: listEmbeddingTables + SELECT per table
     db._cursor._script = [
-        ("SELECT TABLE_NAME", [("weknora_embeddings_4",)]),
+        ("SELECT TABLE_NAME", [("kb_embeddings_4",)]),
         ("SELECT", [("row-1", "c-1")]),  # lookup
     ]
     partial_update = AsyncMock(return_value=None)
@@ -634,13 +721,15 @@ def test_build_base_filter_includes_is_enabled() -> None:
 
 
 def test_build_base_filter_includes_optional_filters() -> None:
-    wb = _build_base_filter(RetrieveParams(
-        knowledge_base_ids=["kb-1", "kb-2"],
-        knowledge_ids=["k-1"],
-        tag_ids=["t-1"],
-        exclude_knowledge_ids=["k-ex"],
-        exclude_chunk_ids=["c-ex"],
-    ))
+    wb = _build_base_filter(
+        RetrieveParams(
+            knowledge_base_ids=["kb-1", "kb-2"],
+            knowledge_ids=["k-1"],
+            tag_ids=["t-1"],
+            exclude_knowledge_ids=["k-ex"],
+            exclude_chunk_ids=["c-ex"],
+        )
+    )
     where, args = wb.build()
     assert "knowledge_base_id" in where
     assert "tag_id" in where

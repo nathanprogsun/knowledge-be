@@ -493,7 +493,13 @@ async def test_list_all_orders_by_type_then_title(session: AsyncSession) -> None
     kb = _kb()
     await _insert_page(
         repo,
-        _sample_page(tenant_id=tid, knowledge_base_id=kb, slug="concept/rag", title="RAG", page_type="concept"),
+        _sample_page(
+            tenant_id=tid,
+            knowledge_base_id=kb,
+            slug="concept/rag",
+            title="RAG",
+            page_type="concept",
+        ),
     )
     await _insert_page(
         repo,
@@ -651,7 +657,10 @@ async def test_count_by_type_and_count_orphans(session: AsyncSession) -> None:
     tid = make_test_tenant_id()
     kb = _kb()
     await _insert_page(repo, _sample_page(tenant_id=tid, knowledge_base_id=kb, slug="entity/a"))
-    await _insert_page(repo, _sample_page(tenant_id=tid, knowledge_base_id=kb, slug="concept/b", page_type="concept"))
+    await _insert_page(
+        repo,
+        _sample_page(tenant_id=tid, knowledge_base_id=kb, slug="concept/b", page_type="concept"),
+    )
     await _insert_page(
         repo,
         _sample_page(

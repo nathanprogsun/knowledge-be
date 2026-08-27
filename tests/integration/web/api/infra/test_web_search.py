@@ -64,15 +64,11 @@ class _FakeWebSearchProviderService:
 
     async def list_providers(self, tenant_id: int) -> list[WebSearchProviderInfo]:
         self._record("list_providers", tenant_id=tenant_id)
-        out = [
-            r for r in self.rows.values() if r.tenant_id == tenant_id and r.deleted_at is None
-        ]
+        out = [r for r in self.rows.values() if r.tenant_id == tenant_id and r.deleted_at is None]
         out.sort(key=lambda r: r.created_at)
         return [WebSearchProviderInfo.map_from_db(r) for r in out]
 
-    async def get_provider(
-        self, tenant_id: int, provider_id: str
-    ) -> WebSearchProviderInfo:
+    async def get_provider(self, tenant_id: int, provider_id: str) -> WebSearchProviderInfo:
         self._record("get_provider", tenant_id=tenant_id, provider_id=provider_id)
         for r in self.rows.values():
             if r.id == provider_id and r.tenant_id == tenant_id and r.deleted_at is None:
@@ -170,9 +166,7 @@ class _FakeWebSearchProviderService:
                 code="web_search_provider.not_found",
                 message=f"web search provider {provider_id} not found",
             )
-        self.rows[provider_id] = existing.model_copy(
-            update={"deleted_at": datetime.now(UTC)}
-        )
+        self.rows[provider_id] = existing.model_copy(update={"deleted_at": datetime.now(UTC)})
 
     async def test_provider_by_id(
         self,

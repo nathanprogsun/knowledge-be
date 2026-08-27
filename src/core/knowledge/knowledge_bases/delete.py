@@ -89,8 +89,7 @@ class KBIndexCleanup(Protocol):
         knowledge_base_id: str,
         knowledge: Sequence[Document],
         vector_store_id: str | None,
-    ) -> None:
-        ...
+    ) -> None: ...
 
 
 @dataclass(frozen=True)

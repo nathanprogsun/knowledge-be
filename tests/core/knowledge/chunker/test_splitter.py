@@ -47,7 +47,7 @@ class TestSplitText:
 
     def test_chinese_offsets_are_rune_based(self) -> None:
         # Arrange
-        text = "这是一段中文文本，用于测试分块。" * 8  # noqa: RUF001
+        text = "这是一段中文文本，用于测试分块。" * 8
         cfg = SplitterConfig(chunk_size=20, chunk_overlap=5, separators=["\n\n", "\n", "。"])
         chunks = split_text(text, cfg)
 
@@ -113,8 +113,8 @@ class TestSemanticOverlapBoundary:
             ("第一段。\r\n\r\n第二段", "第二段"),
             ("第一句。第一行\n第二行", "第二行"),
             ("第一句。第一行\r\n第二行", "第二行"),
-            ("第一句？第二句", "第二句"),  # noqa: RUF001
-            ("第一句！第二句", "第二句"),  # noqa: RUF001
+            ("第一句？第二句", "第二句"),
+            ("第一句！第二句", "第二句"),
             ("First sentence. Second sentence", "Second sentence"),
             ("Question? Answer", "Answer"),
             ("Warning! Continue", "Continue"),
@@ -132,7 +132,7 @@ class TestSemanticOverlapBoundary:
         "text",
         [
             "没有任何语义分隔符的连续文本",
-            "只有，逗号；分号：冒号",  # noqa: RUF001
+            "只有，逗号；分号：冒号",
             "version1.2 remains one unit",
             "address 192.168.1.1 remains one unit",
             "see https://ex.com?q=1&foo=bar",

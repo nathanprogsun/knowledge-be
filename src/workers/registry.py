@@ -19,9 +19,7 @@ from arq.worker import Function
 from src.workers.base import WorkerContext
 
 # A JSON-serializable value carried in a task payload.
-JsonValue: TypeAlias = (
-    str | int | float | bool | list["JsonValue"] | dict[str, "JsonValue"] | None
-)
+JsonValue: TypeAlias = str | int | float | bool | list["JsonValue"] | dict[str, "JsonValue"] | None
 
 
 class TaskHandler(Protocol):

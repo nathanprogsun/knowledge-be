@@ -63,7 +63,8 @@ class FaqRepository(GenericRepository[Faq]):
             "created_at",
         }
         update_cols = tuple(
-            c for c in self.model_class.insert_sql_column_list()
+            c
+            for c in self.model_class.insert_sql_column_list()
             if c not in self._pk_columns and c not in immutable
         )
         set_clause = ", ".join(f'"{c}" = :u_{c}' for c in update_cols)
@@ -134,8 +135,7 @@ class FaqRepository(GenericRepository[Faq]):
         params: BindParams = {f"id{i}": value for i, value in enumerate(ids)}
         params["tenant_id"] = tenant_id
         stmt = text(
-            f"delete from {self._table} where tenant_id = :tenant_id "
-            f"and id in ({placeholders})"
+            f"delete from {self._table} where tenant_id = :tenant_id and id in ({placeholders})"
         ).bindparams(**params)
         result = cast(
             "CursorResult[SqlValue]",
@@ -188,14 +188,11 @@ class FaqRepository(GenericRepository[Faq]):
             params["keyword"] = f"%{keyword}%"
         where = " and ".join(where_parts)
 
-        count_stmt = text(
-            f"select count(*) from {self._table} where {where}"
-        ).bindparams(**params)
+        count_stmt = text(f"select count(*) from {self._table} where {where}").bindparams(**params)
         total = int((await self._session.execute(count_stmt)).scalar_one())
 
         stmt = text(
-            f"select * from {self._table} where {where} "
-            "order by id limit :limit offset :offset"
+            f"select * from {self._table} where {where} order by id limit :limit offset :offset"
         ).bindparams(**params, limit=limit, offset=offset)
         result = await self._session.execute(stmt)
         rows = [self._hydrate(m) for m in result.mappings().all()]

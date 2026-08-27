@@ -42,7 +42,11 @@ def test_search_returns_hits_and_builds_request() -> None:
                             "snippet": "Summary 1",
                             "dateLastCrawled": "2024-05-01T12:00:00Z",
                         },
-                        {"name": "Result 2", "url": "https://example.com/2", "snippet": "Summary 2"},
+                        {
+                            "name": "Result 2",
+                            "url": "https://example.com/2",
+                            "snippet": "Summary 2",
+                        },
                     ]
                 }
             },

@@ -6,7 +6,7 @@ explicitly. The ``faq`` table is created by the alembic migration chain;
 these tests run once the full chain is applied to the test database.
 """
 
-# ruff: noqa: RUF001  # Chinese test data uses fullwidth punctuation.
+# Chinese test data uses fullwidth punctuation.
 
 from __future__ import annotations
 
@@ -162,8 +162,12 @@ async def test_list_by_knowledge_base_filters_keyword(session: AsyncSession) -> 
     repo = FaqRepository(session)
     tid = make_test_tenant_id()
     kb = "kb-faq-keyword"
-    await repo.create(_sample_row(tenant_id=tid, knowledge_base_id=kb, standard_question="如何退款？"))
-    await repo.create(_sample_row(tenant_id=tid, knowledge_base_id=kb, standard_question="如何充值？"))
+    await repo.create(
+        _sample_row(tenant_id=tid, knowledge_base_id=kb, standard_question="如何退款？")
+    )
+    await repo.create(
+        _sample_row(tenant_id=tid, knowledge_base_id=kb, standard_question="如何充值？")
+    )
 
     rows, total = await repo.list_by_knowledge_base(
         tenant_id=tid,
@@ -206,9 +210,7 @@ async def test_update_overwrites_mutable_columns(session: AsyncSession) -> None:
 
 async def test_update_raises_not_found_for_unknown(session: AsyncSession) -> None:
     repo = FaqRepository(session)
-    row = _sample_row(tenant_id=make_test_tenant_id()).model_copy(
-        update={"id": 999_999}
-    )
+    row = _sample_row(tenant_id=make_test_tenant_id()).model_copy(update={"id": 999_999})
     with pytest.raises(NotFoundError):
         await repo.update(row)
 

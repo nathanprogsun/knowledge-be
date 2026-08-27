@@ -357,9 +357,7 @@ async def reparse_knowledge(
         knowledge_id=existing.id,
     )
 
-    enable_multimodel, qg_enabled, question_count = _effective_flags(
-        process_overrides, kb
-    )
+    enable_multimodel, qg_enabled, question_count = _effective_flags(process_overrides, kb)
     payload = _build_payload(
         row=existing,
         enable_multimodel=enable_multimodel,

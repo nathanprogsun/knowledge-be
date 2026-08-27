@@ -50,9 +50,7 @@ _DEFAULT_INDEX_NAME: str = "xwrag_default"
 _COPY_BATCH_SIZE: int = 500
 
 
-def new_elasticsearch_v7_client(
-    addr: str, username: str, password: str
-) -> Elasticsearch:
+def new_elasticsearch_v7_client(addr: str, username: str, password: str) -> Elasticsearch:
     """Build an ``elasticsearch7`` sync client from connection params."""
     return Elasticsearch(hosts=[addr] if addr else None, username=username, password=password)
 
@@ -131,9 +129,7 @@ class ElasticsearchV7Repository(RetrieveEngineRepository):
 
     # ── protocol: save / batch_save ───────────────────────────────────
 
-    async def save(
-        self, ctx: Context, index_info: IndexInfo, params: IndexSaveParams
-    ) -> None:
+    async def save(self, ctx: Context, index_info: IndexInfo, params: IndexSaveParams) -> None:
         del ctx
         doc = to_db_vector_embedding(index_info, params)
         if not doc.get("embedding"):
@@ -144,7 +140,9 @@ class ElasticsearchV7Repository(RetrieveEngineRepository):
         doc_id = str(uuid.uuid4())
         await asyncio.to_thread(
             cast(Callable[..., Any], self._client.create),
-            index=self._index, id=doc_id, body=doc,
+            index=self._index,
+            id=doc_id,
+            body=doc,
         )
 
     async def batch_save(
@@ -188,15 +186,11 @@ class ElasticsearchV7Repository(RetrieveEngineRepository):
         if not value_list:
             return
         body = {"query": {"terms": {field: value_list}}}
-        await asyncio.to_thread(
-            self._client.delete_by_query, index=self._index, body=body
-        )
+        await asyncio.to_thread(self._client.delete_by_query, index=self._index, body=body)
 
     # ── protocol: retrieve ───────────────────────────────────────────
 
-    async def retrieve(
-        self, ctx: Context, params: RetrieveParams
-    ) -> list[RetrieveResult]:
+    async def retrieve(self, ctx: Context, params: RetrieveParams) -> list[RetrieveResult]:
         del ctx
         if params.retriever_type == RetrieverType.KEYWORDS:
             return await self._keywords_retrieve(params)
@@ -216,15 +210,15 @@ class ElasticsearchV7Repository(RetrieveEngineRepository):
             },
             "size": params.top_k,
         }
-        response = await asyncio.to_thread(
-            self._client.search, index=self._index, body=body
-        )
+        response = await asyncio.to_thread(self._client.search, index=self._index, body=body)
         results = parse_search_hits(response, MatchType.KEYWORDS)
-        return [RetrieveResult(
-            results=results,
-            retriever_engine_type=RetrieverEngineType.ELASTICSEARCH,
-            retriever_type=RetrieverType.KEYWORDS,
-        )]
+        return [
+            RetrieveResult(
+                results=results,
+                retriever_engine_type=RetrieverEngineType.ELASTICSEARCH,
+                retriever_type=RetrieverType.KEYWORDS,
+            )
+        ]
 
     async def _vector_retrieve(self, params: RetrieveParams) -> list[RetrieveResult]:
         """Script-score vector retrieval (ported for completeness).
@@ -246,15 +240,15 @@ class ElasticsearchV7Repository(RetrieveEngineRepository):
             },
             "size": params.top_k,
         }
-        response = await asyncio.to_thread(
-            self._client.search, index=self._index, body=body
-        )
+        response = await asyncio.to_thread(self._client.search, index=self._index, body=body)
         results = parse_search_hits(response, MatchType.EMBEDDING)
-        return [RetrieveResult(
-            results=results,
-            retriever_engine_type=RetrieverEngineType.ELASTICSEARCH,
-            retriever_type=RetrieverType.VECTOR,
-        )]
+        return [
+            RetrieveResult(
+                results=results,
+                retriever_engine_type=RetrieverEngineType.ELASTICSEARCH,
+                retriever_type=RetrieverType.VECTOR,
+            )
+        ]
 
     # ── protocol: copy_indices ───────────────────────────────────────
 
@@ -278,7 +272,9 @@ class ElasticsearchV7Repository(RetrieveEngineRepository):
             if not hits:
                 break
             index_info_list, embedding_map = _process_source_batch(
-                hits, source_to_target_kb_id_map, source_to_target_chunk_id_map,
+                hits,
+                source_to_target_kb_id_map,
+                source_to_target_chunk_id_map,
                 target_knowledge_base_id,
             )
             if index_info_list:
@@ -294,10 +290,15 @@ class ElasticsearchV7Repository(RetrieveEngineRepository):
         self, retrieve_params: RetrieveParams, from_val: int, batch_size: int
     ) -> list[dict[str, Any]]:
         filter_clauses = build_base_conds(retrieve_params, self._id_field)
-        body = {"query": filter_clauses[0] if filter_clauses else {}, "from": from_val, "size": batch_size}
+        body = {
+            "query": filter_clauses[0] if filter_clauses else {},
+            "from": from_val,
+            "size": batch_size,
+        }
         response = await asyncio.to_thread(
             cast(Callable[..., Any], self._client.search),
-            index=self._index, body=body,
+            index=self._index,
+            body=body,
         )
         hits_obj = cast(dict[str, Any], response).get("hits", {})
         return cast(list[dict[str, Any]], hits_obj.get("hits", []))
@@ -314,12 +315,14 @@ class ElasticsearchV7Repository(RetrieveEngineRepository):
         disabled_ids = [k for k, v in chunk_status_map.items() if not v]
         if enabled_ids:
             await self._update_by_query(
-                self._id_field("chunk_id"), enabled_ids,
+                self._id_field("chunk_id"),
+                enabled_ids,
                 "ctx._source.is_enabled = true",
             )
         if disabled_ids:
             await self._update_by_query(
-                self._id_field("chunk_id"), disabled_ids,
+                self._id_field("chunk_id"),
+                disabled_ids,
                 "ctx._source.is_enabled = false",
             )
 
@@ -334,7 +337,8 @@ class ElasticsearchV7Repository(RetrieveEngineRepository):
             tag_groups.setdefault(tag_id, []).append(chunk_id)
         for tag_id, chunk_ids in tag_groups.items():
             await self._update_by_query(
-                self._id_field("chunk_id"), chunk_ids,
+                self._id_field("chunk_id"),
+                chunk_ids,
                 "ctx._source.tag_id = params.tag_id",
                 {"tag_id": tag_id},
             )
@@ -352,9 +356,7 @@ class ElasticsearchV7Repository(RetrieveEngineRepository):
         }
         if params:
             body["script"]["params"] = params
-        await asyncio.to_thread(
-            self._client.update_by_query, index=self._index, body=body
-        )
+        await asyncio.to_thread(self._client.update_by_query, index=self._index, body=body)
 
 
 def _process_source_batch(
@@ -384,29 +386,29 @@ def _process_source_batch(
         emb = source.get("embedding")
         if emb:
             embedding_map[target_source_id] = list(emb)
-        index_info_list.append(IndexInfo(
-            content=source.get("content", ""),
-            source_id=target_source_id,
-            source_type=SourceType(source.get("source_type", 0)),
-            chunk_id=target_chunk_id,
-            knowledge_id=target_knowledge_id,
-            knowledge_base_id=target_knowledge_base_id,
-            tag_id=source.get("tag_id", ""),
-            is_enabled=source.get("is_enabled", True),
-            is_recommended=source.get("is_recommended", False),
-        ))
+        index_info_list.append(
+            IndexInfo(
+                content=source.get("content", ""),
+                source_id=target_source_id,
+                source_type=SourceType(source.get("source_type", 0)),
+                chunk_id=target_chunk_id,
+                knowledge_id=target_knowledge_id,
+                knowledge_base_id=target_knowledge_base_id,
+                tag_id=source.get("tag_id", ""),
+                is_enabled=source.get("is_enabled", True),
+                is_recommended=source.get("is_recommended", False),
+            )
+        )
     return index_info_list, embedding_map
 
 
-def _transform_source_id(
-    source_id: str, chunk_id: str, target_chunk_id: str
-) -> str:
+def _transform_source_id(source_id: str, chunk_id: str, target_chunk_id: str) -> str:
     """Remap source_id: regular chunk -> target; question -> target-q; else uuid."""
     if source_id == chunk_id:
         return target_chunk_id
     prefix = f"{chunk_id}-"
     if source_id.startswith(prefix):
-        return f"{target_chunk_id}-{source_id[len(prefix):]}"
+        return f"{target_chunk_id}-{source_id[len(prefix) :]}"
     return str(uuid.uuid4())
 
 

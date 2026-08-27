@@ -458,7 +458,9 @@ class TestFeishuSend(ServiceTest):
     def test_direct_reply_uses_reply_api(self) -> None:
         adapter = _feishu_adapter()
         incoming = IncomingMessage(
-            platform="feishu", user_id="ou_user_1", chat_type=CHAT_TYPE_DIRECT,
+            platform="feishu",
+            user_id="ou_user_1",
+            chat_type=CHAT_TYPE_DIRECT,
             message_id="om_message_1",
         )
         with respx.mock(base_url=_FEISHU_BASE) as router:
@@ -474,7 +476,9 @@ class TestFeishuSend(ServiceTest):
     def test_falls_back_when_reply_api_rejects(self) -> None:
         adapter = _feishu_adapter()
         incoming = IncomingMessage(
-            platform="feishu", user_id="ou_user_1", chat_type=CHAT_TYPE_DIRECT,
+            platform="feishu",
+            user_id="ou_user_1",
+            chat_type=CHAT_TYPE_DIRECT,
             message_id="om_message_1",
         )
         with respx.mock(base_url=_FEISHU_BASE) as router:
@@ -490,7 +494,9 @@ class TestFeishuSend(ServiceTest):
     def test_falls_back_on_transport_error(self) -> None:
         adapter = _feishu_adapter()
         incoming = IncomingMessage(
-            platform="feishu", user_id="ou_user_1", chat_type=CHAT_TYPE_DIRECT,
+            platform="feishu",
+            user_id="ou_user_1",
+            chat_type=CHAT_TYPE_DIRECT,
             message_id="om_message_1",
         )
         with respx.mock(base_url=_FEISHU_BASE) as router:
@@ -505,8 +511,11 @@ class TestFeishuSend(ServiceTest):
     def test_group_fallback_uses_chat_id(self) -> None:
         adapter = _feishu_adapter()
         incoming = IncomingMessage(
-            platform="feishu", user_id="ou_user_1", chat_id="oc_group_1",
-            chat_type=CHAT_TYPE_GROUP, message_id="om_message_1",
+            platform="feishu",
+            user_id="ou_user_1",
+            chat_id="oc_group_1",
+            chat_type=CHAT_TYPE_GROUP,
+            message_id="om_message_1",
         )
         with respx.mock(base_url=_FEISHU_BASE) as router:
             router.post(_FEISHU_TOKEN_URL).respond(200, json=_feishu_token_response())
@@ -536,7 +545,9 @@ class TestFeishuSend(ServiceTest):
     def test_unsafe_message_id_raises(self) -> None:
         adapter = _feishu_adapter()
         incoming = IncomingMessage(
-            platform="feishu", user_id="u", chat_type=CHAT_TYPE_DIRECT,
+            platform="feishu",
+            user_id="u",
+            chat_type=CHAT_TYPE_DIRECT,
             message_id="../../etc/passwd",
         )
         with respx.mock(base_url=_FEISHU_BASE) as router:
@@ -726,7 +737,10 @@ class TestWecomParse(ServiceTest):
     def test_parses_image_with_pic_url(self) -> None:
         adapter = _wecom_adapter()
         xml = _wecom_xml_message(
-            msg_type="image", pic_url="https://example.com/a.png", media_id="media_1", msg_id="msg_2"
+            msg_type="image",
+            pic_url="https://example.com/a.png",
+            media_id="media_1",
+            msg_id="msg_2",
         )
         msg = adapter.parse_callback(_wecom_callback_request(xml))
         assert msg is not None
@@ -758,7 +772,9 @@ class TestWecomSend(ServiceTest):
         )
         with respx.mock(base_url=_WECOM_BASE) as router:
             router.get(_WECOM_TOKEN_URL).respond(200, json=_wecom_token_response())
-            send_route = router.post(_WECOM_MESSAGE_URL).respond(200, json={"errcode": 0, "errmsg": "ok"})
+            send_route = router.post(_WECOM_MESSAGE_URL).respond(
+                200, json={"errcode": 0, "errmsg": "ok"}
+            )
 
             adapter.send_reply(EventContext(), incoming, ReplyMessage(content="你好"))
 
@@ -771,13 +787,20 @@ class TestWecomSend(ServiceTest):
     def test_group_reply_uses_appchat_api(self) -> None:
         adapter = _wecom_adapter()
         incoming = IncomingMessage(
-            platform="wecom", user_id="user_1", chat_id="wr_group_1",
-            chat_type=CHAT_TYPE_GROUP, message_id="msg_1",
+            platform="wecom",
+            user_id="user_1",
+            chat_id="wr_group_1",
+            chat_type=CHAT_TYPE_GROUP,
+            message_id="msg_1",
         )
         with respx.mock(base_url=_WECOM_BASE, assert_all_called=False) as router:
             router.get(_WECOM_TOKEN_URL).respond(200, json=_wecom_token_response())
-            appchat_route = router.post(_WECOM_APPCHAT_URL).respond(200, json={"errcode": 0, "errmsg": "ok"})
-            message_route = router.post(_WECOM_MESSAGE_URL).respond(200, json={"errcode": 0, "errmsg": "ok"})
+            appchat_route = router.post(_WECOM_APPCHAT_URL).respond(
+                200, json={"errcode": 0, "errmsg": "ok"}
+            )
+            message_route = router.post(_WECOM_MESSAGE_URL).respond(
+                200, json={"errcode": 0, "errmsg": "ok"}
+            )
 
             adapter.send_reply(EventContext(), incoming, ReplyMessage(content="hi"))
 
@@ -789,15 +812,20 @@ class TestWecomSend(ServiceTest):
     def test_group_reply_falls_back_to_user(self) -> None:
         adapter = _wecom_adapter()
         incoming = IncomingMessage(
-            platform="wecom", user_id="user_1", chat_id="wr_group_1",
-            chat_type=CHAT_TYPE_GROUP, message_id="msg_1",
+            platform="wecom",
+            user_id="user_1",
+            chat_id="wr_group_1",
+            chat_type=CHAT_TYPE_GROUP,
+            message_id="msg_1",
         )
         with respx.mock(base_url=_WECOM_BASE) as router:
             router.get(_WECOM_TOKEN_URL).respond(200, json=_wecom_token_response())
             appchat_route = router.post(_WECOM_APPCHAT_URL).respond(
                 200, json={"errcode": 61012, "errmsg": "not found"}
             )
-            message_route = router.post(_WECOM_MESSAGE_URL).respond(200, json={"errcode": 0, "errmsg": "ok"})
+            message_route = router.post(_WECOM_MESSAGE_URL).respond(
+                200, json={"errcode": 0, "errmsg": "ok"}
+            )
 
             adapter.send_reply(EventContext(), incoming, ReplyMessage(content="hi"))
 
@@ -813,7 +841,9 @@ class TestWecomSend(ServiceTest):
         )
         with respx.mock(base_url=_WECOM_BASE) as router:
             router.get(_WECOM_TOKEN_URL).respond(200, json=_wecom_token_response())
-            router.post(_WECOM_MESSAGE_URL).respond(200, json={"errcode": 40001, "errmsg": "invalid token"})
+            router.post(_WECOM_MESSAGE_URL).respond(
+                200, json={"errcode": 40001, "errmsg": "invalid token"}
+            )
             with pytest.raises(ExternalServiceError) as excinfo:
                 adapter.send_reply(EventContext(), incoming, ReplyMessage(content="hi"))
         assert excinfo.value.code == "im.wecom_send_failed"
@@ -838,7 +868,9 @@ class TestWecomSend(ServiceTest):
             platform="wecom", user_id="user_1", chat_type=CHAT_TYPE_DIRECT, message_id="msg_1"
         )
         with respx.mock(base_url=_WECOM_BASE) as router:
-            router.get(_WECOM_TOKEN_URL).respond(200, json={"errcode": 40013, "errmsg": "invalid corpid"})
+            router.get(_WECOM_TOKEN_URL).respond(
+                200, json={"errcode": 40013, "errmsg": "invalid corpid"}
+            )
             with pytest.raises(ExternalServiceError) as excinfo:
                 adapter.send_reply(EventContext(), incoming, ReplyMessage(content="hi"))
         assert excinfo.value.code == "im.wecom_token_failed"
@@ -851,7 +883,11 @@ class TestAdapterFactories(ServiceTest):
     def test_feishu_factory_reads_credentials(self) -> None:
         channel = _make_channel(
             platform="feishu",
-            credentials={"app_id": "cli_x", "app_secret": "s", "verification_token": _VERIFICATION_TOKEN},
+            credentials={
+                "app_id": "cli_x",
+                "app_secret": "s",
+                "verification_token": _VERIFICATION_TOKEN,
+            },
         )
         adapter = build_feishu_adapter(channel)
         assert isinstance(adapter, FeishuAdapter)
@@ -902,7 +938,12 @@ class TestAdapterFactories(ServiceTest):
         signature = _wecom_signature(timestamp, nonce, echostr)
         adapter.verify_callback(
             CallbackRequest(
-                query={"timestamp": timestamp, "nonce": nonce, "msg_signature": signature, "echostr": echostr}
+                query={
+                    "timestamp": timestamp,
+                    "nonce": nonce,
+                    "msg_signature": signature,
+                    "echostr": echostr,
+                }
             )
         )
 

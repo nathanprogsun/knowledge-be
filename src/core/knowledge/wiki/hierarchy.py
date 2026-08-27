@@ -53,9 +53,7 @@ def normalize_wiki_hierarchy(page: WikiPage) -> WikiPage:
     )
 
 
-def normalize_wiki_index_entry_hierarchy(
-    entry: WikiIndexEntry, page_type: str
-) -> WikiIndexEntry:
+def normalize_wiki_index_entry_hierarchy(entry: WikiIndexEntry, page_type: str) -> WikiIndexEntry:
     """Recompute a directory entry's cached projection for one page type."""
     clean_path = clean_category_path(entry.category_path)
     display = entry.title.strip()
@@ -80,9 +78,7 @@ def wiki_folder_segments(path: str) -> list[str]:
     return clean_category_path(path.split("/"))
 
 
-async def apply_folder_to_page(
-    page: WikiPage, *, folder_repo: WikiFolderRepository
-) -> WikiPage:
+async def apply_folder_to_page(page: WikiPage, *, folder_repo: WikiFolderRepository) -> WikiPage:
     """Refresh a page's derived ``category_path`` from its authoritative folder id.
 
     Root (``""``) clears the path. A folder id that does not resolve is

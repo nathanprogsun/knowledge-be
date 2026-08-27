@@ -42,7 +42,6 @@ Query-parameter ``description`` strings are intentionally Chinese
 full-width punctuation; suppressed file-wide for the same reason as
 ``src/web/api/system/router.py``.
 """
-# ruff: noqa: RUF001
 
 from __future__ import annotations
 
@@ -152,9 +151,7 @@ async def get_placeholders(
     Backs the editor's placeholder insertion UI; the payload is a static
     catalog shared across the workspace.
     """
-    return placeholders_envelope(
-        {**prompt_placeholder_group(), "all": all_placeholders()}
-    )
+    return placeholders_envelope({**prompt_placeholder_group(), "all": all_placeholders()})
 
 
 @router.get("/type-presets", response_model=TypePresetsEnvelope)
@@ -248,18 +245,21 @@ async def update_agent(
     service: CustomAgentServiceDep,
     tenant_id: _PrincipalTenant,
 ) -> AgentEnvelope:
-    """Overwrite an agent's mutable fields.
+    """Partial-update an agent's mutable fields.
 
-    The name is required and the config is re-defaulted by the service;
-    built-in rows reject basic-info edits. The tenant-ownership pre-check
-    makes a cross-workspace id read as not-found.
+    Every body field is optional (per ``UpdateAgentRequest``); the
+    service treats a missing field as "leave the existing value alone",
+    so the same request shape works for PUT (full body) and PATCH
+    (subset). Built-in rows reject basic-info edits. The
+    tenant-ownership pre-check makes a cross-workspace id read as
+    not-found.
     """
     tenant_id = _require_tenant(tenant_id)
     info = await service.update_agent(
         tenant_id=tenant_id,
         agent_id=id,
-        name=body.name or "",
-        config=_config_to_json(body.config) or {},
+        name=body.name,
+        config=_config_to_json(body.config) if body.config is not None else None,
         description=body.description,
         avatar=body.avatar,
     )
@@ -319,9 +319,7 @@ async def get_suggested_questions(
     knowledge_base_ids: str = Query(
         default="", description="知识库ID列表（逗号分隔），覆盖智能体默认配置"
     ),
-    knowledge_ids: str = Query(
-        default="", description="知识ID列表（逗号分隔），限定到具体文档"
-    ),
+    knowledge_ids: str = Query(default="", description="知识ID列表（逗号分隔），限定到具体文档"),
     tag_scopes: str = Query(default="", description="带知识库归属的标签范围（JSON）"),
     limit: int = Query(
         default=0, description="返回数量上限（未传时使用智能体配置的开场问题数量，最大30）"

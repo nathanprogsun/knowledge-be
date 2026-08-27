@@ -99,9 +99,7 @@ async def list_favorites(
     user has not starred anything of the requested type.
     """
     uid, tid = _require_principal(user_id, tenant_id)
-    rows = await service.list_favorites(
-        user_id=uid, tenant_id=tid, resource_type=type
-    )
+    rows = await service.list_favorites(user_id=uid, tenant_id=tid, resource_type=type)
     return favorites_list_response(rows)
 
 

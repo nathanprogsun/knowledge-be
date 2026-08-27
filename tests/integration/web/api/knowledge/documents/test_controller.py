@@ -214,7 +214,9 @@ def test_every_endpoint_declares_the_expected_role_gate() -> None:
                         roles.add(cell.cell_contents)
             for method in methods:
                 expected = EXPECTED_ROLES[(method, path)]
-                assert expected in roles, f"{method} {path} expected role gate {expected}, got {roles}"
+                assert expected in roles, (
+                    f"{method} {path} expected role gate {expected}, got {roles}"
+                )
 
 
 def test_role_gate_helper_is_the_shared_rbac_dependency() -> None:

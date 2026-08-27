@@ -132,6 +132,7 @@ def _happy_path_org_service() -> AsyncMock:
     svc.get_organization.return_value = org
     svc.list_tenant_organizations.return_value = [org]
     svc.list_tenant_members.return_value = [member]
+
     # ``get_tenant_member`` returns the canned membership only when the
     # caller matches the test principal; other workspaces (e.g. an
     # invite target) read as non-members, which is what the invite and
@@ -639,6 +640,7 @@ def test_preview_path_does_not_capture_id(client: TestClient) -> None:
 
 def test_missing_tenant_context_returns_401(client: TestClient) -> None:
     """A request with no tenant id in the principal fails closed."""
+
     async def _no_tenant_auth(request: Request) -> None:
         request.state.tenant_id = "0"
         request.state.tenant_role = "admin"

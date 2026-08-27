@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.app_context.request_context import get_tenant_id, get_user_id
 from src.common.exception import ValidationError
 from src.common.json import JsonObject
+from src.core.auth.types import UserPreferences
 from src.core.contracts.tenants import (
     APIPrincipalConfig,
     CreateAPIKeyRequest,
@@ -19,7 +18,6 @@ from src.core.contracts.tenants import (
     UpdateTenantRequest,
 )
 from src.core.tenants.types import TenantAPIKeyInfo
-from src.db.dao.users_repository import UserRepository
 from src.web.api.tenants.views import (
     DeleteTenantResponse,
     TenantEnvelope,
@@ -29,13 +27,13 @@ from src.web.api.tenants.views import (
 )
 from src.web.deps import (
     AuthDep,
+    AuthServiceDep,
     CrossTenantDep,
     CurrentUserContextDep,
     PathTenantMatchDep,
     RoleAdminDep,
     RoleOwnerDep,
     RoleViewerDep,
-    SessionDep,
     TenantAPIKeyServiceDep,
     TenantKVServiceDep,
     TenantMemberServiceDep,
@@ -81,7 +79,7 @@ async def create_tenant(
     body: CreateTenantRequest,
     tenant_service: TenantServiceDep,
     member_service: TenantMemberServiceDep,
-    session: SessionDep,
+    auth_service: AuthServiceDep,
 ) -> TenantEnvelope:
     """Create a workspace; the status is assigned server-side.
 
@@ -110,17 +108,11 @@ async def create_tenant(
         # carrying the new workspace as the active tenant. The
         # auth-middleware fallback covers existing users whose
         # preference was never set; this forward-write keeps new
-        # creators from having to rely on it.
-        user_repo = UserRepository(session)
-        existing = await user_repo.find_by_id(user_id)
-        merged_prefs: JsonObject = dict(existing.preferences or {})
-        merged_prefs["last_active_tenant_id"] = info.id
-        await user_repo.update_by_primary_key(
-            {"id": user_id},
-            {
-                "preferences": merged_prefs,
-                "updated_at": datetime.now(UTC),
-            },
+        # creators from having to rely on it. The PATCH-merge lives in
+        # the auth service — web never touches UserRepository.
+        await auth_service.update_my_preferences(
+            user_id=user_id,
+            patch=UserPreferences(last_active_tenant_id=info.id),
         )
     return tenant_envelope(info)
 

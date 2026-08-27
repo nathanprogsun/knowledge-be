@@ -168,9 +168,7 @@ class FAQService:
                 "tag_id": payload.tag_id,
                 "tag_name": payload.tag_name,
                 "is_enabled": (
-                    payload.is_enabled
-                    if payload.is_enabled is not None
-                    else existing.is_enabled
+                    payload.is_enabled if payload.is_enabled is not None else existing.is_enabled
                 ),
                 "is_recommended": (
                     payload.is_recommended

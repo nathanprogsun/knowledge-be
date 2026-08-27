@@ -314,9 +314,7 @@ class SpanTracker:
         try:
             await self._store.upsert(row)
         except Exception:
-            logger.warning(
-                "[SpanTracker] open_attempt failed kid={}:", knowledge_id, exc_info=True
-            )
+            logger.warning("[SpanTracker] open_attempt failed kid={}:", knowledge_id, exc_info=True)
             return None, attempt
         self._record_start(root_id, now)
         await self._touch_knowledge_heartbeat(knowledge_id, SPAN_KIND_ROOT)
@@ -707,9 +705,7 @@ class SpanTracker:
         try:
             await self._store.upsert(row)
         except Exception:
-            logger.warning(
-                "[SpanTracker] end_span failed span={}:", span.span_id, exc_info=True
-            )
+            logger.warning("[SpanTracker] end_span failed span={}:", span.span_id, exc_info=True)
         await self._touch_knowledge_heartbeat(span.knowledge_id, span.kind)
 
     async def fail_span(
@@ -748,9 +744,7 @@ class SpanTracker:
         try:
             await self._store.upsert(row)
         except Exception:
-            logger.warning(
-                "[SpanTracker] fail_span failed span={}:", span.span_id, exc_info=True
-            )
+            logger.warning("[SpanTracker] fail_span failed span={}:", span.span_id, exc_info=True)
         # Cascade: anything downstream of this span gets cancelled. The
         # reason string is what the UI surfaces under each cancelled
         # child's tooltip — keep it short and human.
@@ -812,9 +806,7 @@ class SpanTracker:
         try:
             await self._store.upsert(row)
         except Exception:
-            logger.warning(
-                "[SpanTracker] skip_span failed span={}:", span.span_id, exc_info=True
-            )
+            logger.warning("[SpanTracker] skip_span failed span={}:", span.span_id, exc_info=True)
         await self._touch_knowledge_heartbeat(span.knowledge_id, span.kind)
 
     # ── Lookups / progress query ────────────────────────────────────
@@ -992,9 +984,7 @@ class SpanTracker:
             try:
                 await self._store.upsert(updated)
             except Exception:
-                logger.warning(
-                    "[SpanTracker] cascade dependent stage {}:", row.name, exc_info=True
-                )
+                logger.warning("[SpanTracker] cascade dependent stage {}:", row.name, exc_info=True)
                 continue
             try:
                 await self._store.cancel_descendants(
@@ -1029,9 +1019,7 @@ class SpanTracker:
         try:
             await self._heartbeat.touch(knowledge_id=knowledge_id)
         except Exception:
-            logger.warning(
-                "[SpanTracker] heartbeat failed kid={}:", knowledge_id, exc_info=True
-            )
+            logger.warning("[SpanTracker] heartbeat failed kid={}:", knowledge_id, exc_info=True)
 
     def _record_start(self, span_id: str, at: datetime) -> None:
         with self._starts_lock:

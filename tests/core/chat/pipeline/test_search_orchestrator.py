@@ -916,7 +916,7 @@ def test_extract_keywords_filters_stopwords_and_single_runes() -> None:
 
 
 def test_split_by_delimiters_splits_cjk_and_latin() -> None:
-    assert split_by_delimiters("a，b; c。d") == ["a", "b", "c", "d"]  # noqa: RUF001
+    assert split_by_delimiters("a，b; c。d") == ["a", "b", "c", "d"]
 
 
 def test_extract_phrases_handles_ascii_and_cjk_quotes() -> None:

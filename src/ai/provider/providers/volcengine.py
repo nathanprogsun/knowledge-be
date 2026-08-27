@@ -12,9 +12,7 @@ from src.common.exception import ValidationError
 
 # Volcengine Ark API base URLs (chat, multimodal embedding, rerank).
 VOLCENGINE_CHAT_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
-VOLCENGINE_EMBEDDING_BASE_URL = (
-    "https://ark.cn-beijing.volces.com/api/v3/embeddings/multimodal"
-)
+VOLCENGINE_EMBEDDING_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3/embeddings/multimodal"
 VOLCENGINE_RERANK_BASE_URL = "https://api-knowledgebase.mlp.cn-beijing.volces.com"
 
 
@@ -24,8 +22,7 @@ def info() -> ProviderInfo:
         name=PROVIDER_VOLCENGINE,
         display_name="火山引擎 Volcengine",
         description=(
-            "doubao-1-5-pro-32k-250115, doubao-embedding-vision-250615, "
-            "doubao-seed-rerank, etc."
+            "doubao-1-5-pro-32k-250115, doubao-embedding-vision-250615, doubao-seed-rerank, etc."
         ),
         default_urls={
             ModelType.KNOWLEDGE_QA: VOLCENGINE_CHAT_BASE_URL,

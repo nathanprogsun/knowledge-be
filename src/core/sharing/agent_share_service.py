@@ -316,9 +316,12 @@ class AgentShareServiceImpl:
         """
         if share.shared_by_user_id == user_id:
             return
-        if tenant_id != 0 and tenant_id == share.source_tenant_id:
-            if tenant_role == TenantRole.ADMIN:
-                return
+        if (
+            tenant_id != 0
+            and tenant_id == share.source_tenant_id
+            and tenant_role == TenantRole.ADMIN
+        ):
+            return
         member = await self._member_repo.get_member(
             organization_id=share.organization_id,
             tenant_id=tenant_id,

@@ -119,9 +119,7 @@ class _FakeVectorStoreService:
                 code="vector_store.not_found",
                 message=f"vector store {store_id} not found",
             )
-        updated = existing.model_copy(
-            update={"name": body.name, "updated_at": datetime.now(UTC)}
-        )
+        updated = existing.model_copy(update={"name": body.name, "updated_at": datetime.now(UTC)})
         self.rows[store_id] = updated
         return VectorStoreInfo.map_from_db(updated)
 
@@ -130,14 +128,10 @@ class _FakeVectorStoreService:
         existing = self.rows.get(store_id)
         if existing is None or existing.tenant_id != tenant_id:
             return False
-        self.rows[store_id] = existing.model_copy(
-            update={"deleted_at": datetime.now(UTC)}
-        )
+        self.rows[store_id] = existing.model_copy(update={"deleted_at": datetime.now(UTC)})
         return True
 
-    async def test_by_id(
-        self, tenant_id: int, store_id: str
-    ) -> _TestResponse:
+    async def test_by_id(self, tenant_id: int, store_id: str) -> _TestResponse:
         self._record("test_by_id", tenant_id=tenant_id, store_id=store_id)
         for r in self.rows.values():
             if r.id == store_id and r.tenant_id == tenant_id and r.deleted_at is None:
@@ -147,9 +141,7 @@ class _FakeVectorStoreService:
             message=f"vector store {store_id} not found",
         )
 
-    async def test_raw(
-        self, engine_type: str, connection_config: dict[str, Any]
-    ) -> _TestResponse:
+    async def test_raw(self, engine_type: str, connection_config: dict[str, Any]) -> _TestResponse:
         self._record(
             "test_raw",
             engine_type=engine_type,

@@ -268,7 +268,9 @@ class FakeGate:
 
 class TestMCPToolMetadata:
     def test_name_composes_service_and_tool(self) -> None:
-        tool = MCPTool(service=_service(name="acme"), spec=_spec(name="search"), manager=FakeMCPManager())
+        tool = MCPTool(
+            service=_service(name="acme"), spec=_spec(name="search"), manager=FakeMCPManager()
+        )
         assert tool.name() == "mcp_acme_search"
 
     def test_name_sanitizes_human_readable_service_and_tool(self) -> None:
@@ -281,18 +283,26 @@ class TestMCPToolMetadata:
 
     def test_name_truncates_service_to_fit_64_char_limit(self) -> None:
         long_name = "x" * 60
-        tool = MCPTool(service=_service(name=long_name), spec=_spec(name="tool"), manager=FakeMCPManager())
+        tool = MCPTool(
+            service=_service(name=long_name), spec=_spec(name="tool"), manager=FakeMCPManager()
+        )
         name = tool.name()
         assert len(name) <= 64
         assert name.startswith("mcp_")
         assert name.endswith("_tool")
 
     def test_description_prefixes_external_source(self) -> None:
-        tool = MCPTool(service=_service(name="acme"), spec=_spec(description="Does things"), manager=FakeMCPManager())
+        tool = MCPTool(
+            service=_service(name="acme"),
+            spec=_spec(description="Does things"),
+            manager=FakeMCPManager(),
+        )
         assert tool.description() == "[MCP Service: acme (external)] Does things"
 
     def test_description_falls_back_to_tool_name(self) -> None:
-        tool = MCPTool(service=_service(name="acme"), spec=_spec(description=""), manager=FakeMCPManager())
+        tool = MCPTool(
+            service=_service(name="acme"), spec=_spec(description=""), manager=FakeMCPManager()
+        )
         assert tool.description() == "[MCP Service: acme (external)] my_tool"
 
     def test_parameters_default_schema_when_none(self) -> None:
@@ -301,7 +311,9 @@ class TestMCPToolMetadata:
 
     def test_parameters_return_input_schema(self) -> None:
         schema = {"type": "object", "properties": {"q": {"type": "string"}}}
-        tool = MCPTool(service=_service(), spec=_spec(input_schema=schema), manager=FakeMCPManager())
+        tool = MCPTool(
+            service=_service(), spec=_spec(input_schema=schema), manager=FakeMCPManager()
+        )
         assert json.loads(tool.parameters()) == schema
 
     def test_sanitize_name_strips_non_ascii_and_punctuation(self) -> None:
@@ -338,7 +350,9 @@ class TestMCPToolExecute:
     async def test_execute_connect_failure_returns_oauth_hint_for_oauth_service(self) -> None:
         service = _service(auth_config={"auth_type": "oauth"})
         manager = FakeMCPManager(
-            connect_error=OAuthRequiredError(metadata_url="https://mcp.example.com/.well-known/oauth")
+            connect_error=OAuthRequiredError(
+                metadata_url="https://mcp.example.com/.well-known/oauth"
+            )
         )
         tool = MCPTool(service=service, spec=_spec(), manager=manager)
         result = await tool.execute({}, "{}")
@@ -366,7 +380,9 @@ class TestMCPToolExecute:
 
     async def test_execute_surfaces_jsonrpc_error(self) -> None:
         manager = FakeMCPManager(
-            call_result=JSONRPCResponse(id="1", error=JSONRPCError(code=-1, message="server exploded"))
+            call_result=JSONRPCResponse(
+                id="1", error=JSONRPCError(code=-1, message="server exploded")
+            )
         )
         tool = MCPTool(service=_service(), spec=_spec(), manager=manager)
         result = await tool.execute({}, "{}")
@@ -402,7 +418,9 @@ class TestMCPToolExecute:
 
 class TestMCPToolApproval:
     async def test_approval_gate_rejects_tool_call(self) -> None:
-        gate = FakeGate(needs=True, decision=ApprovalDecision(approved=False, reason="user said no"))
+        gate = FakeGate(
+            needs=True, decision=ApprovalDecision(approved=False, reason="user said no")
+        )
         tool = MCPTool(service=_service(), spec=_spec(), manager=FakeMCPManager(), gate=gate)
         result = await tool.execute({}, json.dumps({"q": "hi"}))
         assert result.success is False
@@ -472,7 +490,9 @@ class TestMCPToolRegistration:
         first = _service(service_id="s1", name="same")
         second = _service(service_id="s2", name="same")
         count_first = await register_mcp_tools(registry=registry, services=[first], manager=manager)
-        count_second = await register_mcp_tools(registry=registry, services=[second], manager=manager)
+        count_second = await register_mcp_tools(
+            registry=registry, services=[second], manager=manager
+        )
         assert count_first == 1
         assert count_second == 1  # the attempted registration still counts
         assert registry.list_tools() == ["mcp_same_shared"]
@@ -495,7 +515,9 @@ class TestMCPToolRegistration:
                 ]
             )
         )
-        await register_mcp_tools(registry=registry, services=[_service(service_id="s1", name="one")], manager=manager)
+        await register_mcp_tools(
+            registry=registry, services=[_service(service_id="s1", name="one")], manager=manager
+        )
         grouped = mcp_tool_names_by_service_id(registry)
         assert grouped == {"s1": ["mcp_one_alpha", "mcp_one_zeta"]}
 
@@ -682,7 +704,9 @@ class FakeSkillManager:
         execute_error: Exception | None = None,
     ) -> None:
         self._enabled = enabled
-        self._skill = skill or Skill(name="forms", description="Form handling", instructions="Fill forms")
+        self._skill = skill or Skill(
+            name="forms", description="Form handling", instructions="Fill forms"
+        )
         self._file_content = file_content
         self._files = files if files is not None else [SKILL_FILE_NAME]
         self._execute_result = execute_result or ExecuteResult(exit_code=0)
@@ -749,7 +773,9 @@ class TestReadSkillTool:
 
     async def test_reads_specific_file(self) -> None:
         tool = ReadSkillTool(skill_manager=FakeSkillManager(file_content="file body"))
-        result = await tool.execute({}, json.dumps({"skill_name": "forms", "file_path": "FORMS.md"}))
+        result = await tool.execute(
+            {}, json.dumps({"skill_name": "forms", "file_path": "FORMS.md"})
+        )
         assert result.success is True
         assert "=== Skill File: forms/FORMS.md ===" in result.output
         assert "file body" in result.output
@@ -801,7 +827,9 @@ class TestExecuteSkillScriptTool:
 
     async def test_disabled_manager_fails_fast(self) -> None:
         tool = ExecuteSkillScriptTool(skill_manager=FakeSkillManager(enabled=False))
-        result = await tool.execute({}, json.dumps({"skill_name": "forms", "script_path": "run.py"}))
+        result = await tool.execute(
+            {}, json.dumps({"skill_name": "forms", "script_path": "run.py"})
+        )
         assert result.error == "Skills are not enabled"
 
     async def test_successful_execution_formats_output(self) -> None:
@@ -811,7 +839,14 @@ class TestExecuteSkillScriptTool:
         tool = ExecuteSkillScriptTool(skill_manager=manager)
         result = await tool.execute(
             {},
-            json.dumps({"skill_name": "forms", "script_path": "scripts/parse.py", "args": ["-v"], "input": "data"}),
+            json.dumps(
+                {
+                    "skill_name": "forms",
+                    "script_path": "scripts/parse.py",
+                    "args": ["-v"],
+                    "input": "data",
+                }
+            ),
         )
         assert result.success is True
         assert "=== Script Execution: forms/scripts/parse.py ===" in result.output
@@ -825,11 +860,11 @@ class TestExecuteSkillScriptTool:
         assert manager.last_stdin == "data"
 
     async def test_nonzero_exit_code_marks_failure(self) -> None:
-        manager = FakeSkillManager(
-            execute_result=ExecuteResult(exit_code=2, stderr="bad line")
-        )
+        manager = FakeSkillManager(execute_result=ExecuteResult(exit_code=2, stderr="bad line"))
         tool = ExecuteSkillScriptTool(skill_manager=manager)
-        result = await tool.execute({}, json.dumps({"skill_name": "forms", "script_path": "run.py"}))
+        result = await tool.execute(
+            {}, json.dumps({"skill_name": "forms", "script_path": "run.py"})
+        )
         assert result.success is False
         assert result.error == "Script exited with code 2"
         assert "## Standard Error" in result.output
@@ -840,15 +875,15 @@ class TestExecuteSkillScriptTool:
             execute_result=ExecuteResult(exit_code=0, killed=True, error="timeout")
         )
         tool = ExecuteSkillScriptTool(skill_manager=manager)
-        result = await tool.execute({}, json.dumps({"skill_name": "forms", "script_path": "run.py"}))
+        result = await tool.execute(
+            {}, json.dumps({"skill_name": "forms", "script_path": "run.py"})
+        )
         assert result.success is False
         assert result.error == "timeout"
         assert "Script was terminated (timeout or killed)" in result.output
 
     async def test_accepts_args_as_space_separated_string(self) -> None:
-        manager = FakeSkillManager(
-            execute_result=ExecuteResult(exit_code=0, stdout="ok")
-        )
+        manager = FakeSkillManager(execute_result=ExecuteResult(exit_code=0, stdout="ok"))
         tool = ExecuteSkillScriptTool(skill_manager=manager)
         result = await tool.execute(
             {},
@@ -869,7 +904,9 @@ class TestExecuteSkillScriptTool:
     async def test_execute_error_surfaces(self) -> None:
         manager = FakeSkillManager(execute_error=RuntimeError("sandbox down"))
         tool = ExecuteSkillScriptTool(skill_manager=manager)
-        result = await tool.execute({}, json.dumps({"skill_name": "forms", "script_path": "run.py"}))
+        result = await tool.execute(
+            {}, json.dumps({"skill_name": "forms", "script_path": "run.py"})
+        )
         assert result.success is False
         assert result.error == "Script execution failed: sandbox down"
 
@@ -932,11 +969,25 @@ class TestSequentialThinkingTool:
         tool = SequentialThinkingTool()
         await tool.execute(
             {},
-            json.dumps({"thought": "a", "next_thought_needed": True, "thought_number": 1, "total_thoughts": 2}),
+            json.dumps(
+                {
+                    "thought": "a",
+                    "next_thought_needed": True,
+                    "thought_number": 1,
+                    "total_thoughts": 2,
+                }
+            ),
         )
         result = await tool.execute(
             {},
-            json.dumps({"thought": "b", "next_thought_needed": False, "thought_number": 2, "total_thoughts": 2}),
+            json.dumps(
+                {
+                    "thought": "b",
+                    "next_thought_needed": False,
+                    "thought_number": 2,
+                    "total_thoughts": 2,
+                }
+            ),
         )
         assert result.data["thought_history_length"] == 2
 
@@ -944,7 +995,14 @@ class TestSequentialThinkingTool:
         tool = SequentialThinkingTool()
         result = await tool.execute(
             {},
-            json.dumps({"thought": "x", "next_thought_needed": True, "thought_number": 5, "total_thoughts": 3}),
+            json.dumps(
+                {
+                    "thought": "x",
+                    "next_thought_needed": True,
+                    "thought_number": 5,
+                    "total_thoughts": 3,
+                }
+            ),
         )
         assert result.data["total_thoughts"] == 5
 
@@ -969,7 +1027,14 @@ class TestSequentialThinkingTool:
         tool = SequentialThinkingTool()
         result = await tool.execute(
             {},
-            json.dumps({"thought": "", "next_thought_needed": False, "thought_number": 1, "total_thoughts": 1}),
+            json.dumps(
+                {
+                    "thought": "",
+                    "next_thought_needed": False,
+                    "thought_number": 1,
+                    "total_thoughts": 1,
+                }
+            ),
         )
         assert result.success is False
         assert result.error == "invalid thought: must be a non-empty string"
@@ -978,7 +1043,14 @@ class TestSequentialThinkingTool:
         tool = SequentialThinkingTool()
         result = await tool.execute(
             {},
-            json.dumps({"thought": "x", "next_thought_needed": False, "thought_number": 0, "total_thoughts": 1}),
+            json.dumps(
+                {
+                    "thought": "x",
+                    "next_thought_needed": False,
+                    "thought_number": 0,
+                    "total_thoughts": 1,
+                }
+            ),
         )
         assert result.error == "invalid thoughtNumber: must be >= 1"
 
@@ -986,7 +1058,14 @@ class TestSequentialThinkingTool:
         tool = SequentialThinkingTool()
         result = await tool.execute(
             {},
-            json.dumps({"thought": "x", "next_thought_needed": False, "thought_number": 1, "total_thoughts": 0}),
+            json.dumps(
+                {
+                    "thought": "x",
+                    "next_thought_needed": False,
+                    "thought_number": 1,
+                    "total_thoughts": 0,
+                }
+            ),
         )
         assert result.error == "invalid totalThoughts: must be >= 1"
 
@@ -1143,7 +1222,14 @@ class TestRegistryInterop:
         thinking = await registry.execute_tool(
             {},
             "thinking",
-            json.dumps({"thought": "plan", "next_thought_needed": False, "thought_number": 1, "total_thoughts": 1}),
+            json.dumps(
+                {
+                    "thought": "plan",
+                    "next_thought_needed": False,
+                    "thought_number": 1,
+                    "total_thoughts": 1,
+                }
+            ),
         )
         assert thinking.success is True
 

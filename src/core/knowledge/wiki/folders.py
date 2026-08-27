@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 # A folder name may not carry a directory separator: a folder name is a
 # single tree level (including fullwidth and pipe variants).
-_FOLDER_NAME_SEPARATORS = "/｜|／"  # noqa: RUF001
+_FOLDER_NAME_SEPARATORS = "/｜|／"
 
 
 def validate_folder_name(name: str) -> str:
@@ -60,9 +60,7 @@ def validate_folder_name(name: str) -> str:
     return clean
 
 
-def recursive_folder_counts(
-    folders: list[WikiFolder], direct: dict[str, int]
-) -> dict[str, int]:
+def recursive_folder_counts(folders: list[WikiFolder], direct: dict[str, int]) -> dict[str, int]:
     """Map each folder id to the sum of ``direct`` counts over its whole subtree.
 
     Uses the materialized path so a single pass over the (navigation-sized)
@@ -137,8 +135,7 @@ class WikiFolderService:
             if folder.parent_id != parent_id or not _relevant(folder.id):
                 continue
             has_children = any(
-                other.parent_id == folder.id and _relevant(other.id)
-                for other in all_folders
+                other.parent_id == folder.id and _relevant(other.id) for other in all_folders
             )
             nodes.append(
                 WikiFolderNode(
@@ -333,10 +330,10 @@ class WikiFolderService:
             elif candidate.path.startswith(old_path + "/"):
                 next_row = candidate.model_copy(
                     update={
-                        "path": new_path + candidate.path[len(old_path):],
-                        "depth": len(wiki_folder_segments(
-                            new_path + candidate.path[len(old_path):]
-                        )),
+                        "path": new_path + candidate.path[len(old_path) :],
+                        "depth": len(
+                            wiki_folder_segments(new_path + candidate.path[len(old_path) :])
+                        ),
                         "updated_at": now,
                     }
                 )
@@ -425,9 +422,7 @@ class WikiFolderService:
 
     async def _require_folder(self, knowledge_base_id: str, id: str) -> WikiFolder:
         """Return one live folder or raise ``wiki.folder_not_found``."""
-        row = await self._folder_repo.get_by_id_or_none(
-            knowledge_base_id=knowledge_base_id, id=id
-        )
+        row = await self._folder_repo.get_by_id_or_none(knowledge_base_id=knowledge_base_id, id=id)
         if row is None:
             raise NotFoundError(
                 code="wiki.folder_not_found",
@@ -455,9 +450,7 @@ class WikiFolderService:
             try:
                 await self._page_repo.update_meta(row=row, now=now)
             except NotFoundError:
-                logger.warning(
-                    "wiki: recompute folder path: page %s gone mid-recompute", page.slug
-                )
+                logger.warning("wiki: recompute folder path: page %s gone mid-recompute", page.slug)
 
 
 __all__ = ["WikiFolderService", "recursive_folder_counts", "validate_folder_name"]

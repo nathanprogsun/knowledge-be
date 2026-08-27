@@ -499,9 +499,7 @@ class SessionService:
             ),
             user_id=self._user_id,
         )
-        logger.info(
-            "session %s title generated (len=%d)", session.id, len(title)
-        )
+        logger.info("session %s title generated (len=%d)", session.id, len(title))
         return updated.title or title
 
 

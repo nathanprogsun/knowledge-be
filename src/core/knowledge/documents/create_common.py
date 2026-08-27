@@ -57,11 +57,31 @@ ENABLE_STATUS_ENABLED = "enabled"
 # the accepted surface identical across paths.
 _SUPPORTED_IMPORT_EXTENSIONS: frozenset[str] = frozenset(
     {
-        "pdf", "txt", "docx", "doc", "epub",
-        "html", "htm", "mhtml", "md", "markdown",
-        "png", "jpg", "jpeg", "gif",
-        "csv", "xlsx", "xls", "pptx", "ppt", "json",
-        "mp3", "wav", "m4a", "flac", "ogg",
+        "pdf",
+        "txt",
+        "docx",
+        "doc",
+        "epub",
+        "html",
+        "htm",
+        "mhtml",
+        "md",
+        "markdown",
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "csv",
+        "xlsx",
+        "xls",
+        "pptx",
+        "ppt",
+        "json",
+        "mp3",
+        "wav",
+        "m4a",
+        "flac",
+        "ogg",
     }
 )
 

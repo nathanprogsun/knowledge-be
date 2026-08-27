@@ -455,46 +455,34 @@ def test_default_allowed_tools_contains_kb_tools() -> None:
 
 
 def test_cast_params_boolean_string_to_bool() -> None:
-    schema = json.dumps(
-        {"type": "object", "properties": {"flag": {"type": "boolean"}}}
-    )
+    schema = json.dumps({"type": "object", "properties": {"flag": {"type": "boolean"}}})
     assert cast_params('{"flag": "true"}', schema) == '{"flag": true}'
 
 
 def test_cast_params_integer_string_to_int() -> None:
-    schema = json.dumps(
-        {"type": "object", "properties": {"limit": {"type": "integer"}}}
-    )
+    schema = json.dumps({"type": "object", "properties": {"limit": {"type": "integer"}}})
     assert cast_params('{"limit": "7"}', schema) == '{"limit": 7}'
 
 
 def test_cast_params_number_string_to_float() -> None:
-    schema = json.dumps(
-        {"type": "object", "properties": {"threshold": {"type": "number"}}}
-    )
+    schema = json.dumps({"type": "object", "properties": {"threshold": {"type": "number"}}})
     assert cast_params('{"threshold": "0.6"}', schema) == '{"threshold": 0.6}'
 
 
 def test_cast_params_string_from_bool_and_number() -> None:
-    schema = json.dumps(
-        {"type": "object", "properties": {"name": {"type": "string"}}}
-    )
+    schema = json.dumps({"type": "object", "properties": {"name": {"type": "string"}}})
     assert cast_params('{"name": true}', schema) == '{"name": "true"}'
     assert cast_params('{"name": 3}', schema) == '{"name": "3"}'
 
 
 def test_cast_params_array_from_json_string() -> None:
-    schema = json.dumps(
-        {"type": "object", "properties": {"queries": {"type": "array"}}}
-    )
+    schema = json.dumps({"type": "object", "properties": {"queries": {"type": "array"}}})
     args = json.dumps({"queries": '["a", "b"]'})
     assert cast_params(args, schema) == '{"queries": ["a", "b"]}'
 
 
 def test_cast_params_no_change_returns_original() -> None:
-    schema = json.dumps(
-        {"type": "object", "properties": {"n": {"type": "integer"}}}
-    )
+    schema = json.dumps({"type": "object", "properties": {"n": {"type": "integer"}}})
     args = '{"n": 3, "other": "x"}'
     assert cast_params(args, schema) == args
 
@@ -513,9 +501,7 @@ def test_validate_params_required_missing() -> None:
 
 
 def test_validate_params_type_mismatch() -> None:
-    schema = json.dumps(
-        {"type": "object", "properties": {"q": {"type": "string"}}}
-    )
+    schema = json.dumps({"type": "object", "properties": {"q": {"type": "string"}}})
     errors = validate_params('{"q": 3}', schema)
     assert len(errors) == 1
     assert "should be type 'string'" in errors[0].message
@@ -602,9 +588,7 @@ def test_derive_kb_filter_from_tools_empty_for_no_requirements() -> None:
 def test_kb_satisfies_tool_requirements() -> None:
     caps = KBCapabilities(vector=True, keyword=False)
     assert kb_satisfies_tool_requirements(caps, [TOOL_KNOWLEDGE_SEARCH])
-    assert not kb_satisfies_tool_requirements(
-        KBCapabilities(wiki=True), [TOOL_KNOWLEDGE_SEARCH]
-    )
+    assert not kb_satisfies_tool_requirements(KBCapabilities(wiki=True), [TOOL_KNOWLEDGE_SEARCH])
     assert kb_satisfies_tool_requirements(KBCapabilities(), ["thinking"])
 
 
@@ -659,12 +643,9 @@ class _FakeTagFetcher:
     def __init__(self, tags: dict[str, list[TagInfo]]) -> None:
         self._tags = tags
 
-    async def get_knowledge_tags(
-        self, knowledge_ids: list[str]
-    ) -> dict[str, list[TagInfo]]:
+    async def get_knowledge_tags(self, knowledge_ids: list[str]) -> dict[str, list[TagInfo]]:
         return {
-            knowledge_id: list(self._tags.get(knowledge_id, []))
-            for knowledge_id in knowledge_ids
+            knowledge_id: list(self._tags.get(knowledge_id, [])) for knowledge_id in knowledge_ids
         }
 
 
@@ -771,9 +752,7 @@ async def test_authorize_chunk_allows_whole_kb() -> None:
 
 async def test_validate_knowledge_base_ids_in_search_targets_rejects_foreign() -> None:
     with pytest.raises(PermissionDeniedError):
-        validate_knowledge_base_ids_in_search_targets(
-            _targets(_kb_target()), ["kb-1", "kb-9"]
-        )
+        validate_knowledge_base_ids_in_search_targets(_targets(_kb_target()), ["kb-1", "kb-9"])
 
 
 async def test_filter_search_results_in_search_targets_whole_kb_passthrough() -> None:
@@ -848,9 +827,7 @@ def test_search_target_scope_intersection_semantics() -> None:
 class _StubTool:
     """Minimal tool implementing the ``Tool`` protocol."""
 
-    def __init__(
-        self, name: str, schema: str = "{}", result: ToolResult | None = None
-    ) -> None:
+    def __init__(self, name: str, schema: str = "{}", result: ToolResult | None = None) -> None:
         self._name = name
         self._schema = schema
         self._result = result or ToolResult(success=True, output="ok")
@@ -903,9 +880,7 @@ async def test_registry_execute_validation_failure_short_circuits() -> None:
 async def test_registry_execute_truncates_oversized_output() -> None:
     registry = ToolRegistry()
     registry.set_max_tool_output_size(500)
-    registry.register_tool(
-        _StubTool("t", result=ToolResult(output="x" * 1000))
-    )
+    registry.register_tool(_StubTool("t", result=ToolResult(output="x" * 1000)))
     result = await registry.execute_tool(_Context(), "t", "{}")
     assert "[output truncated:" in result.output
 
@@ -938,7 +913,7 @@ async def test_kb_tool_basic_execute_output_and_data() -> None:
     result = await tool.execute(_Context(), '{"queries": ["alpha"]}')
     assert result.success
     assert '<search_results count="1">' in result.output
-    assert '<query>alpha</query>' in result.output
+    assert "<query>alpha</query>" in result.output
     assert 'chunk_id="c1"' in result.output
     assert result.data["count"] == 1
     assert result.data["display_type"] == "search_results"
@@ -1112,7 +1087,10 @@ async def test_kb_tool_apply_mmr_reduces_to_top_k() -> None:
 async def test_kb_tool_non_searchable_kb_filtered() -> None:
     wiki_kb = _kb(id="kb-wiki", type="wiki", embedding_model_id="")
     wiki_kb = KnowledgeBaseInfo(
-        **{**wiki_kb.model_dump(), "indexing_strategy": {"vector_enabled": False, "keyword_enabled": False}}
+        **{
+            **wiki_kb.model_dump(),
+            "indexing_strategy": {"vector_enabled": False, "keyword_enabled": False},
+        }
     )
     targets = _targets(_kb_target(knowledge_base_id="kb-wiki", tenant_id=7))
     runner = _FakeRunner([_result(id="c1", knowledge_base_id="kb-wiki")])
@@ -1124,9 +1102,7 @@ async def test_kb_tool_non_searchable_kb_filtered() -> None:
 
 
 def test_kb_tool_input_parsing() -> None:
-    input_ = KnowledgeSearchInput.from_json(
-        {"queries": ["a", "b"], "knowledge_base_ids": ["kb-1"]}
-    )
+    input_ = KnowledgeSearchInput.from_json({"queries": ["a", "b"], "knowledge_base_ids": ["kb-1"]})
     assert input_.queries == ("a", "b")
     assert input_.knowledge_base_ids == ("kb-1",)
     assert KnowledgeSearchInput.from_json({}).queries == ()
@@ -1214,7 +1190,7 @@ async def test_grep_tool_basic_execute() -> None:
     result = await tool.execute(_Context(), '{"query": "engine|stardust"}')
     assert result.success
     assert '<grep_results chunk_count="1">' in result.output
-    assert '<query>engine|stardust</query>' in result.output
+    assert "<query>engine|stardust</query>" in result.output
     assert 'chunk_id="c1"' in result.output
     assert "<match_snippet>" in result.output
     assert result.data["display_type"] == "grep_results"
@@ -1485,7 +1461,10 @@ async def test_integration_list_chunks_tool_pages_real_rows(session: AsyncSessio
     assert result.success
     assert result.data["fetched_chunks"] == 2
     assert result.data["total_chunks"] == 2
-    assert {chunk["content"] for chunk in _list_json(result, "chunks")} == {"chunk body 0", "chunk body 1"}
+    assert {chunk["content"] for chunk in _list_json(result, "chunks")} == {
+        "chunk body 0",
+        "chunk body 1",
+    }
     assert result.data["knowledge_title"] == "Q3 budget"
 
 

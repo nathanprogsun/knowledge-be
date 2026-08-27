@@ -44,9 +44,7 @@ class FakeSearchClient:
         results: list[dict[str, str]] | None = None,
     ) -> None:
         self.provider_type = provider_type
-        self._results = (
-            results if results is not None else [{"url": "https://example.com"}]
-        )
+        self._results = results if results is not None else [{"url": "https://example.com"}]
         self.calls: list[tuple[str, int, bool]] = []
 
     def search(
@@ -98,9 +96,7 @@ def _make_repo() -> tuple[AsyncMock, dict[tuple[int, str], WebSearchProvider]]:
         rows[_key(row.tenant_id, row.id)] = row
         return row
 
-    async def _get_by_id(
-        tenant_id: int, provider_id: str
-    ) -> WebSearchProvider | None:
+    async def _get_by_id(tenant_id: int, provider_id: str) -> WebSearchProvider | None:
         row = rows.get(_key(tenant_id, provider_id))
         if row is None or row.deleted_at is not None:
             return None
@@ -133,9 +129,7 @@ def _make_repo() -> tuple[AsyncMock, dict[tuple[int, str], WebSearchProvider]]:
         return row
 
     async def _list_for_tenant(tenant_id: int) -> list[WebSearchProvider]:
-        return [
-            r for r in rows.values() if r.tenant_id == tenant_id and r.deleted_at is None
-        ]
+        return [r for r in rows.values() if r.tenant_id == tenant_id and r.deleted_at is None]
 
     async def _update_by_primary_key(
         primary_key_to_value: dict[str, object],

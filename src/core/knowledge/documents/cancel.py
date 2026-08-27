@@ -129,12 +129,12 @@ async def cancel_knowledge_parse(
     if existing.parse_status in (PARSE_STATUS_COMPLETED, PARSE_STATUS_FAILED):
         raise ValidationError(
             code="knowledge.parse_not_cancellable",
-            message="解析已结束，无法取消",  # noqa: RUF001
+            message="解析已结束，无法取消",
         )
     if existing.parse_status == PARSE_STATUS_DELETING:
         raise ValidationError(
             code="knowledge.parse_deleting",
-            message="知识正在删除中，无法取消解析",  # noqa: RUF001
+            message="知识正在删除中，无法取消解析",
         )
 
     now = datetime.now(UTC)

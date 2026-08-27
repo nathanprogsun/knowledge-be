@@ -61,16 +61,13 @@ class _FakeSandbox:
         self.cleaned_up = True
 
 
-def _write_skill(
-    base: Path, name: str, *, description: str = "A test skill"
-) -> Path:
+def _write_skill(base: Path, name: str, *, description: str = "A test skill") -> Path:
     """Write a valid ``SKILL.md`` for ``name`` under ``base``."""
     skill_dir = base / name
     skill_dir.mkdir(parents=True, exist_ok=True)
     skill_file = skill_dir / SKILL_FILE_NAME
     skill_file.write_text(
-        f"---\nname: {name}\ndescription: {description}\n---\n"
-        f"# {name}\n\nBody.\n",
+        f"---\nname: {name}\ndescription: {description}\n---\n# {name}\n\nBody.\n",
         encoding="utf-8",
     )
     return skill_dir

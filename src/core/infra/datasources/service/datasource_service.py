@@ -248,7 +248,11 @@ class DataSourceService(ConnectivityMixin, ResourceListingMixin, SyncMixin):
                 existing=existing.config,
                 connector_type=existing.type,
             )
-            config_changed = merged_config != existing.config
+            # Compare semantically (parsed configs), never on the
+            # encrypted dump: re-encrypting identical plaintext yields
+            # fresh ciphertext, so a dump-level != would report every
+            # update as changed and force a spurious revalidation.
+            config_changed = parse_config(merged_config) != parse_config(existing.config)
 
         if config_changed:
             await self._validate_config_if_credentialed(merged_config, existing.type)
@@ -458,9 +462,20 @@ class DataSourceService(ConnectivityMixin, ResourceListingMixin, SyncMixin):
                 "credentials": existing_cfg.credentials if existing_cfg is not None else {},
             }
         )
-        return encrypt_config_credentials(
-            merged.strip_non_secret_credentials(connector_type).model_dump()
-        )
+        dumped = merged.strip_non_secret_credentials(connector_type).model_dump()
+        # The update path never accepts new credentials (contract: writes
+        # go through /credentials), so the credential map always originates
+        # from the stored row. Restore it verbatim instead of re-encrypting:
+        # re-encryption is non-deterministic and would both rewrite legacy
+        # plaintext rows and flip the semantic equality check above.
+        if (
+            existing is not None
+            and isinstance(existing.get("credentials"), dict)
+            and existing["credentials"]
+        ):
+            dumped["credentials"] = existing["credentials"]
+            return dumped
+        return encrypt_config_credentials(dumped)
 
     async def _audit(
         self,

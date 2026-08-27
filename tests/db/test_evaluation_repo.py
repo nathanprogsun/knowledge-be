@@ -306,7 +306,11 @@ async def test_evaluation_list_by_tenant_orders_newest_first() -> None:
 
 async def test_evaluation_list_by_tenant_with_status_filter() -> None:
     session = _FakeSession(
-        {"select * from evaluations where tenant_id = :tenant_id and deleted_at is null and status = :status": [_evaluation_row()]}
+        {
+            "select * from evaluations where tenant_id = :tenant_id and deleted_at is null and status = :status": [
+                _evaluation_row()
+            ]
+        }
     )
     repo = _evaluation_repo(session)
 

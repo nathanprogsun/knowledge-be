@@ -303,7 +303,7 @@ async def test_create_milvus_engine_wraps_repo(monkeypatch: pytest.MonkeyPatch) 
 async def test_create_doris_engine_requires_addr_and_database() -> None:
     with pytest.raises(ValidationError, match="requires addr"):
         await factory_module._create_doris_engine(
-            _store(RetrieverEngineType.DORIS, cc=ConnectionConfig(database="weknora"))
+            _store(RetrieverEngineType.DORIS, cc=ConnectionConfig(database="kb"))
         )
     with pytest.raises(ValidationError, match="requires database"):
         await factory_module._create_doris_engine(
@@ -317,7 +317,12 @@ async def test_create_doris_engine_computes_http_base(
     captured: dict[str, object] = {}
 
     async def _fake_repo_ctor(
-        addr: str, http_base: str, username: str, password: str, database: str, index_config: IndexConfig
+        addr: str,
+        http_base: str,
+        username: str,
+        password: str,
+        database: str,
+        index_config: IndexConfig,
     ) -> RetrieveEngineRepository:
         captured["addr"] = addr
         captured["http_base"] = http_base
@@ -326,7 +331,7 @@ async def test_create_doris_engine_computes_http_base(
     monkeypatch.setattr(factory_module, "_new_doris_retrieve_engine_repository", _fake_repo_ctor)
     store = _store(
         RetrieverEngineType.DORIS,
-        cc=ConnectionConfig(addr="doris-fe:9030", database="weknora", username="root"),
+        cc=ConnectionConfig(addr="doris-fe:9030", database="kb", username="root"),
     )
     engine = await factory_module._create_doris_engine(store)
     assert captured["addr"] == "doris-fe:9030"

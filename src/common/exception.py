@@ -98,6 +98,21 @@ class DataError(ApplicationError):
     message = "Data error"
 
 
+class NotImplementedFeatureError(ApplicationError):
+    """Wire-level marker for a feature whose backing seam is not wired.
+
+    Mirrors the upstream convention of surfacing "not implemented" as a
+    distinct status (HTTP 501) rather than collapsing it into the generic
+    ``internal_server_error`` envelope — the frontend branches on
+    ``error.code == "feature.not_implemented"`` to render a placeholder
+    card instead of a hard error toast, and the chat pipeline uses the
+    SSE error frame's ``error_code`` field for the same switch.
+    """
+
+    code = "feature.not_implemented"
+    message = "Feature not implemented"
+
+
 __all__ = [
     "AIProviderError",
     "ApplicationError",
@@ -106,6 +121,7 @@ __all__ = [
     "ExternalServiceError",
     "GoneError",
     "NotFoundError",
+    "NotImplementedFeatureError",
     "PermissionDeniedError",
     "StorageBackendError",
     "UnauthorizedError",

@@ -275,7 +275,9 @@ class DuckDbAnalysisEngine:
         )
 
     async def list_excel_sheets(self, path: str) -> list[str]:
-        meta_sql = f"SELECT UNNEST(layers).name FROM st_read_meta('{sql_single_quote_escape(path)}')"
+        meta_sql = (
+            f"SELECT UNNEST(layers).name FROM st_read_meta('{sql_single_quote_escape(path)}')"
+        )
         _columns, rows = self._query(meta_sql, "failed to query sheet metadata")
         names: list[str] = []
         for row in rows:
@@ -483,7 +485,7 @@ def build_excel_create_table_sql(table_name: str, filename: str, sheet_names: li
     if len(sheet_names) == 1:
         escaped_sheet = sql_single_quote_escape(sheet_names[0])
         return (
-            f'CREATE TABLE "{table_name}" AS SELECT *, \'{escaped_sheet}\' AS '
+            f"CREATE TABLE \"{table_name}\" AS SELECT *, '{escaped_sheet}' AS "
             f"{EXCEL_SHEET_NAME_COLUMN} FROM read_xlsx('{escaped_file}', sheet = "
             f"'{escaped_sheet}', header=true, all_varchar=true)"
         )

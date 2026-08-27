@@ -98,7 +98,7 @@ class TestLLMToolCallContract:
 
 EXPECTED_PROVIDER_VALUES = (
     "generic",
-    "weknoracloud",
+    "cloud",
     "aliyun",
     "zhipu",
     "volcengine",

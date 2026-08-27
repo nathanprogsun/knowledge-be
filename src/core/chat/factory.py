@@ -22,7 +22,7 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.common.exception import NotFoundError, ValidationError
+from src.common.exception import NotFoundError, NotImplementedFeatureError
 from src.core.agents.service.custom_agent_service import CustomAgentService
 from src.core.agents.service.factory import build_custom_agent_service
 from src.core.agents.types import CustomAgentInfo
@@ -110,7 +110,7 @@ class _NotWiredSearcher(KnowledgeSearcher):
         knowledge_ids: list[str],
         tag_scopes: list[TagScope],
     ) -> list[SearchResult]:
-        raise ValidationError(
+        raise NotImplementedFeatureError(
             code=_SEARCH_NOT_WIRED,
             message=(
                 "Knowledge search execution is not yet wired; "
@@ -135,7 +135,7 @@ class _NotWiredRunner(QARunner):
         agent: CustomAgentInfo | None,
         event_bus: EventBus,
     ) -> None:
-        raise ValidationError(
+        raise NotImplementedFeatureError(
             code=self._code,
             message=(
                 f"{self._stage} pipeline execution is not yet wired; "

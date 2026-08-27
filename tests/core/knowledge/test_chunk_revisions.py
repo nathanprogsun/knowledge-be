@@ -142,9 +142,7 @@ def _make_repo(rows: list[ChunkRevision]) -> AsyncMock:
             (
                 r
                 for r in rows
-                if r.tenant_id == tenant_id
-                and r.chunk_id == chunk_id
-                and r.revision == revision
+                if r.tenant_id == tenant_id and r.chunk_id == chunk_id and r.revision == revision
             ),
             None,
         )
@@ -789,9 +787,7 @@ async def test_delete_drops_question_index_row() -> None:
         syncer=syncer,
     )
 
-    assert syncer.delete_calls == [
-        (TENANT_ID, generated_question_source_id(CHUNK_ID, "q-1"))
-    ]
+    assert syncer.delete_calls == [(TENANT_ID, generated_question_source_id(CHUNK_ID, "q-1"))]
     chunk_service.update_chunk.assert_awaited_once()
 
 
@@ -932,9 +928,7 @@ async def test_integration_question_bind_unbind_round_trip(
 ) -> None:
     tid = _tenant_id()
     chunk_service = ChunkService(chunk_repo=ChunkRepository(db_session))
-    created = await chunk_service.create_chunks(
-        chunks=[_chunk(tenant_id=tid, content_revision=2)]
-    )
+    created = await chunk_service.create_chunks(chunks=[_chunk(tenant_id=tid, content_revision=2)])
     cid = created[0].id
 
     bound = await upsert_generated_question(

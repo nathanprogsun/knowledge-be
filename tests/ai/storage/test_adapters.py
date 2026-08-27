@@ -79,15 +79,11 @@ class RecordingFileService:
     async def check_connectivity(self) -> None:
         return None
 
-    async def save_file(
-        self, *, file: FileUpload, tenant_id: int, knowledge_id: str
-    ) -> str:
+    async def save_file(self, *, file: FileUpload, tenant_id: int, knowledge_id: str) -> str:
         self.saved_files.append((file.filename, file.size))
         return f"local://{tenant_id}/{knowledge_id}/photo.png"
 
-    async def save_bytes(
-        self, *, data: bytes, tenant_id: int, file_name: str, temp: bool
-    ) -> str:
+    async def save_bytes(self, *, data: bytes, tenant_id: int, file_name: str, temp: bool) -> str:
         self.saved_bytes.append((data, file_name, temp))
         return f"local://{tenant_id}/exports/out.txt"
 
@@ -211,9 +207,7 @@ async def test_local_save_bytes_lands_in_exports(tmp_path: Path) -> None:
 async def test_local_save_bytes_rejects_traversal(tmp_path: Path) -> None:
     adapter = LocalStorageAdapter(base_dir=str(tmp_path))
     with pytest.raises(ValidationError):
-        await adapter.save_bytes(
-            data=b"x", tenant_id=_TENANT, file_name="a/../..", temp=False
-        )
+        await adapter.save_bytes(data=b"x", tenant_id=_TENANT, file_name="a/../..", temp=False)
     with pytest.raises(ValidationError):
         await adapter.save_bytes(data=b"x", tenant_id=_TENANT, file_name="..", temp=False)
 
@@ -271,14 +265,14 @@ async def test_s3_save_get_delete_copy_roundtrip() -> None:
         bucket_name="documents",
         use_ssl=True,
         force_path_style=False,
-        path_prefix="weknora/",
+        path_prefix="kb/",
     )
     with respx.mock(base_url="https://documents.s3.example.com") as router:
-        put_route = router.put(path__regex=_key_regex("weknora/", _KB))
+        put_route = router.put(path__regex=_key_regex("kb/", _KB))
         put_route.respond(200)
-        get_route = router.get(path__regex=_key_regex("weknora/", _KB))
+        get_route = router.get(path__regex=_key_regex("kb/", _KB))
         get_route.respond(200, content=b"hello")
-        delete_route = router.delete(path__regex=_key_regex("weknora/", _KB))
+        delete_route = router.delete(path__regex=_key_regex("kb/", _KB))
         delete_route.respond(204)
 
         path = await adapter.save_file(
@@ -286,7 +280,7 @@ async def test_s3_save_get_delete_copy_roundtrip() -> None:
             tenant_id=_TENANT,
             knowledge_id=_KB,
         )
-        assert path.startswith(f"s3://documents/weknora/{_TENANT}/{_KB}/")
+        assert path.startswith(f"s3://documents/kb/{_TENANT}/{_KB}/")
         assert path.endswith(".png")
         assert put_route.calls.last.request.content == b"hello"
 
@@ -313,17 +307,17 @@ async def test_s3_copy_copies_into_knowledge_layout() -> None:
         secret_access_key="secret",
         bucket_name="documents",
         use_ssl=True,
-        path_prefix="weknora/",
+        path_prefix="kb/",
     )
-    src = f"s3://documents/weknora/{_TENANT}/kb-old/abc.png"
+    src = f"s3://documents/kb/{_TENANT}/kb-old/abc.png"
     with respx.mock(base_url="https://documents.s3.example.com") as router:
-        copy_route = router.put(path__regex=_key_regex("weknora/", _KB))
+        copy_route = router.put(path__regex=_key_regex("kb/", _KB))
         copy_route.respond(200)
         copied = await adapter.copy_file(src, tenant_id=_TENANT, knowledge_id=_KB)
-    assert copied.startswith(f"s3://documents/weknora/{_TENANT}/{_KB}/")
+    assert copied.startswith(f"s3://documents/kb/{_TENANT}/{_KB}/")
     assert (
         copy_route.calls.last.request.headers["x-amz-copy-source"]
-        == f"documents/weknora/{_TENANT}/kb-old/abc.png"
+        == f"documents/kb/{_TENANT}/kb-old/abc.png"
     )
 
 
@@ -337,7 +331,9 @@ async def test_s3_copy_cross_backend_refused() -> None:
         use_ssl=True,
     )
     with pytest.raises(CrossBackendCopyError):
-        await adapter.copy_file("minio://documents/7/kb1/a.png", tenant_id=_TENANT, knowledge_id=_KB)
+        await adapter.copy_file(
+            "minio://documents/7/kb1/a.png", tenant_id=_TENANT, knowledge_id=_KB
+        )
 
 
 async def test_s3_probe_ok_and_missing_bucket() -> None:
@@ -414,15 +410,15 @@ async def test_tos_temp_bucket_save_bytes() -> None:
         access_key="AK",
         secret_key="SK",
         bucket_name="tos-main",
-        path_prefix="weknora",
+        path_prefix="kb",
         temp_bucket_name="tos-temp",
     )
     with respx.mock(base_url="https://tos-main.tos.example.com") as router:
-        router.put(path__regex=_key_regex("weknora/", "exports", r"\.json$")).respond(200)
+        router.put(path__regex=_key_regex("kb/", "exports", r"\.json$")).respond(200)
         path = await svc.save_bytes(
             data=b"data", tenant_id=_TENANT, file_name="out.json", temp=False
         )
-        assert path.startswith(f"tos://tos-main/weknora/{_TENANT}/exports/")
+        assert path.startswith(f"tos://tos-main/kb/{_TENANT}/exports/")
     with respx.mock(base_url="https://tos-temp.tos.example.com") as router:
         router.put(path__regex=rf"/exports/{_TENANT}/{_UUID}\.json$").respond(200)
         temp_path = await svc.save_bytes(
@@ -453,15 +449,15 @@ async def test_oss_temp_bucket_routes_reads_by_bucket() -> None:
         access_key="AK",
         secret_key="SK",
         bucket_name="oss-main",
-        path_prefix="weknora/",
+        path_prefix="kb/",
         temp_bucket_name="oss-temp",
     )
     with respx.mock(base_url="https://oss-main.oss.example.com") as router:
-        router.put(path__regex=_key_regex("weknora/", _KB)).respond(200)
+        router.put(path__regex=_key_regex("kb/", _KB)).respond(200)
         path = await svc.save_file(
             file=FakeUpload("a.png", b"img"), tenant_id=_TENANT, knowledge_id=_KB
         )
-        assert path.startswith(f"oss://oss-main/weknora/{_TENANT}/{_KB}/")
+        assert path.startswith(f"oss://oss-main/kb/{_TENANT}/{_KB}/")
 
     temp_path = f"oss://oss-temp/exports/{_TENANT}/x.json"
     with respx.mock(base_url="https://oss-temp.oss.example.com") as router:
@@ -483,20 +479,20 @@ async def test_ks3_save_and_copy() -> None:
         access_key="AK",
         secret_key="SK",
         bucket_name="ks3-main",
-        path_prefix="weknora",
+        path_prefix="kb",
     )
     with respx.mock(base_url="https://ks3-main.ks3.example.com") as router:
-        router.put(path__regex=_key_regex("weknora/", _KB)).respond(200)
+        router.put(path__regex=_key_regex("kb/", _KB)).respond(200)
         path = await svc.save_file(
             file=FakeUpload("a.png", b"img"), tenant_id=_TENANT, knowledge_id=_KB
         )
-        assert path.startswith(f"ks3://ks3-main/weknora/{_TENANT}/{_KB}/")
+        assert path.startswith(f"ks3://ks3-main/kb/{_TENANT}/{_KB}/")
 
-        router.put(path__regex=_key_regex("weknora/", _KB)).respond(200)
+        router.put(path__regex=_key_regex("kb/", _KB)).respond(200)
         copied = await svc.copy_file(
-            f"ks3://ks3-main/weknora/{_TENANT}/old/a.png", tenant_id=_TENANT, knowledge_id=_KB
+            f"ks3://ks3-main/kb/{_TENANT}/old/a.png", tenant_id=_TENANT, knowledge_id=_KB
         )
-        assert copied.startswith(f"ks3://ks3-main/weknora/{_TENANT}/{_KB}/")
+        assert copied.startswith(f"ks3://ks3-main/kb/{_TENANT}/{_KB}/")
 
 
 # ── COS backend ────────────────────────────────────────────────────────
@@ -508,14 +504,14 @@ async def test_cos_save_path_contains_bucket_and_region() -> None:
         access_key_id="AK",
         secret_access_key="SK",
         bucket_name="cos-bucket",
-        path_prefix="weknora",
+        path_prefix="kb",
     )
     with respx.mock(base_url="https://cos-bucket.cos.ap-guangzhou.myqcloud.com") as router:
-        router.put(path__regex=_key_regex("weknora/", _KB)).respond(200)
+        router.put(path__regex=_key_regex("kb/", _KB)).respond(200)
         path = await adapter.save_file(
             file=FakeUpload("a.png", b"img"), tenant_id=_TENANT, knowledge_id=_KB
         )
-    assert path.startswith(f"cos://cos-bucket/ap-guangzhou/weknora/{_TENANT}/{_KB}/")
+    assert path.startswith(f"cos://cos-bucket/ap-guangzhou/kb/{_TENANT}/{_KB}/")
 
 
 async def test_cos_temp_bucket_returns_legacy_url() -> None:
@@ -524,7 +520,7 @@ async def test_cos_temp_bucket_returns_legacy_url() -> None:
         access_key_id="AK",
         secret_access_key="SK",
         bucket_name="cos-bucket",
-        path_prefix="weknora",
+        path_prefix="kb",
         temp_bucket_name="cos-temp",
         temp_region="ap-shanghai",
     )
@@ -562,18 +558,16 @@ async def test_obs_path_style_and_proxy_domain() -> None:
         access_key_id="AK",
         secret_access_key="SK",
         bucket_name="obs-bucket",
-        path_prefix="weknora",
+        path_prefix="kb",
     )
     with respx.mock(base_url="https://obs.cn-north-4.example.com") as router:
-        router.put(
-            path__regex=rf"/obs-bucket/weknora/{_TENANT}/{_KB}/{_UUID}\.png$"
-        ).respond(200)
+        router.put(path__regex=rf"/obs-bucket/kb/{_TENANT}/{_KB}/{_UUID}\.png$").respond(200)
         path = await adapter.save_file(
             file=FakeUpload("a.png", b"img"), tenant_id=_TENANT, knowledge_id=_KB
         )
-        assert path.startswith(f"obs://obs-bucket/weknora/{_TENANT}/{_KB}/")
+        assert path.startswith(f"obs://obs-bucket/kb/{_TENANT}/{_KB}/")
         url = await adapter.get_file_url(path)
-        assert url.startswith("https://obs.cn-north-4.example.com/obs-bucket/weknora/")
+        assert url.startswith("https://obs.cn-north-4.example.com/obs-bucket/kb/")
 
 
 async def test_obs_proxy_domain_path_format() -> None:
@@ -583,24 +577,20 @@ async def test_obs_proxy_domain_path_format() -> None:
         access_key_id="AK",
         secret_access_key="SK",
         bucket_name="obs-bucket",
-        path_prefix="weknora",
+        path_prefix="kb",
         proxy_domain="https://files.example.com",
     )
     with respx.mock(base_url="https://obs.cn-north-4.example.com") as router:
-        router.put(
-            path__regex=rf"/obs-bucket/weknora/{_TENANT}/{_KB}/{_UUID}\.png$"
-        ).respond(200)
+        router.put(path__regex=rf"/obs-bucket/kb/{_TENANT}/{_KB}/{_UUID}\.png$").respond(200)
         path = await adapter.save_file(
             file=FakeUpload("a.png", b"img"), tenant_id=_TENANT, knowledge_id=_KB
         )
-        assert path.startswith("https://files.example.com/weknora/")
+        assert path.startswith("https://files.example.com/kb/")
         url = await adapter.get_file_url(path)
-        assert url.startswith("https://files.example.com/weknora/")
+        assert url.startswith("https://files.example.com/kb/")
 
     with respx.mock(base_url="https://obs.cn-north-4.example.com") as router:
-        router.delete(
-            path__regex=rf"/obs-bucket/weknora/{_TENANT}/{_KB}/{_UUID}\.png$"
-        ).respond(204)
+        router.delete(path__regex=rf"/obs-bucket/kb/{_TENANT}/{_KB}/{_UUID}\.png$").respond(204)
         await adapter.delete_file(path)
 
 
@@ -612,9 +602,7 @@ async def test_dummy_service_semantics() -> None:
     await svc.check_connectivity()
     path = await svc.save_file(file=FakeUpload("a.png", b"x"), tenant_id=_TENANT, knowledge_id=_KB)
     assert path.startswith(f"dummy://{_TENANT}/")
-    bytes_path = await svc.save_bytes(
-        data=b"x", tenant_id=_TENANT, file_name="a.txt", temp=False
-    )
+    bytes_path = await svc.save_bytes(data=b"x", tenant_id=_TENANT, file_name="a.txt", temp=False)
     assert bytes_path.startswith(f"dummy://{_TENANT}/")
     assert await svc.get_file_url(path) == path
     await svc.delete_file(path)
@@ -758,9 +746,7 @@ async def test_resource_catalog_save_bytes_registers_content_hash() -> None:
     catalog = FakeCatalog()
     svc = ResourceCatalogFileService(inner=inner, catalog=catalog)
 
-    ref = await svc.save_bytes(
-        data=b"payload", tenant_id=_TENANT, file_name="out.txt", temp=True
-    )
+    ref = await svc.save_bytes(data=b"payload", tenant_id=_TENANT, file_name="out.txt", temp=True)
     assert ref.startswith("resource://")
     meta = catalog.registered[0][2]
     assert meta.temporary is True
@@ -785,9 +771,7 @@ async def test_resource_catalog_register_failure_deletes_physical() -> None:
     inner = RecordingFileService()
     svc = ResourceCatalogFileService(inner=inner, catalog=FailingCatalog())
     with pytest.raises(StorageBackendError):
-        await svc.save_file(
-            file=FakeUpload("a.png", b"x"), tenant_id=_TENANT, knowledge_id=_KB
-        )
+        await svc.save_file(file=FakeUpload("a.png", b"x"), tenant_id=_TENANT, knowledge_id=_KB)
     assert inner.deleted == [f"local://{_TENANT}/{_KB}/photo.png"]
 
 
@@ -806,9 +790,7 @@ async def test_storage_backend_path_helpers() -> None:
     assert parse_storage_backend_path(wrapped) == ("backend-a", "cos://b/r/k")
     assert parse_storage_backend_path("local://7/kb/x.png") is None
     assert parse_tenant_id_from_storage_path("local://7/kb/x.png") == 7
-    assert (
-        parse_tenant_id_from_storage_path("storage://backend-a/s3://documents/7/kb/x.png") == 7
-    )
+    assert parse_tenant_id_from_storage_path("storage://backend-a/s3://documents/7/kb/x.png") == 7
     assert parse_tenant_id_from_storage_path("s3://documents/kb/x.png") == 0
 
 

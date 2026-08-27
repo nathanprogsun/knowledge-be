@@ -29,7 +29,6 @@ Error messages surfaced to callers are intentionally Chinese: they match
 the upstream strings the frontend already renders. RUF001 (ambiguous
 full-width punctuation) is suppressed file-wide for that reason.
 """
-# ruff: noqa: RUF001
 
 from __future__ import annotations
 

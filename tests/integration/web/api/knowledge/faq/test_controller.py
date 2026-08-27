@@ -468,7 +468,9 @@ async def test_create_returns_created_entry(
     fake_faq_service: _FakeFAQService,
 ) -> None:
     """A valid body creates the entry under the resolved FAQ container."""
-    resp = client.post(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entry", json=default_create_faq_request)
+    resp = client.post(
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entry", json=default_create_faq_request
+    )
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -496,7 +498,9 @@ async def test_create_without_faq_container_returns_422(
 ) -> None:
     """A knowledge base with no FAQ document cannot take a write."""
     fake_knowledge_service.has_container = False
-    resp = client.post(f"/api/v1/knowledge-bases/{_KB_ID}/faq/entry", json=default_create_faq_request)
+    resp = client.post(
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entry", json=default_create_faq_request
+    )
     assert resp.status_code == 422
     assert resp.json()["error"]["code"] == "faq.knowledge_container_missing"
 
@@ -544,7 +548,9 @@ async def test_delete_returns_ack(
 ) -> None:
     """A successful batch delete returns the success ack."""
     fake_faq_service.seed(_entry(1, "问题一"), _entry(2, "问题二"))
-    resp = client.request("DELETE", f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries", json={"ids": [1, 2]})
+    resp = client.request(
+        "DELETE", f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries", json={"ids": [1, 2]}
+    )
     assert resp.status_code == 200
     assert resp.json() == {"success": True}
     assert 1 not in fake_faq_service.rows
@@ -553,7 +559,9 @@ async def test_delete_returns_ack(
 
 async def test_delete_with_unknown_id_returns_404(client: TestClient) -> None:
     """A batch containing a foreign or unknown id fails the whole batch."""
-    resp = client.request("DELETE", f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries", json={"ids": [1, 2]})
+    resp = client.request(
+        "DELETE", f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries", json={"ids": [1, 2]}
+    )
     assert resp.status_code == 404
     assert resp.json()["error"]["code"] == "faq.not_found"
 

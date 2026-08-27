@@ -75,8 +75,6 @@ class RetrieveGraphRepository(Protocol):
         """Delete the graphs under every given namespace."""
         ...
 
-    async def search_node(
-        self, namespace: NameSpace, nodes: list[str]
-    ) -> GraphData | None:
+    async def search_node(self, namespace: NameSpace, nodes: list[str]) -> GraphData | None:
         """Return the subgraph matching any of ``nodes``, or ``None`` when disabled."""
         ...

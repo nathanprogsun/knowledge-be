@@ -50,9 +50,8 @@ def test_html_search_returns_hits_and_builds_request() -> None:
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        body = (
-            _hit_html("Title 1", "https://example.com/1", "Snippet 1")
-            + _hit_html("Title 2", "https://example.com/2", "Snippet 2")
+        body = _hit_html("Title 1", "https://example.com/1", "Snippet 1") + _hit_html(
+            "Title 2", "https://example.com/2", "Snippet 2"
         )
         return httpx.Response(200, text=body)
 
@@ -64,8 +63,18 @@ def test_html_search_returns_hits_and_builds_request() -> None:
     assert dict(request.url.params) == {"q": "hello", "kl": "cn-zh"}
     assert request.headers["User-Agent"].startswith("Mozilla/5.0")
     assert results == [
-        {"title": "Title 1", "url": "https://example.com/1", "snippet": "Snippet 1", "source": "duckduckgo"},
-        {"title": "Title 2", "url": "https://example.com/2", "snippet": "Snippet 2", "source": "duckduckgo"},
+        {
+            "title": "Title 1",
+            "url": "https://example.com/1",
+            "snippet": "Snippet 1",
+            "source": "duckduckgo",
+        },
+        {
+            "title": "Title 2",
+            "url": "https://example.com/2",
+            "snippet": "Snippet 2",
+            "source": "duckduckgo",
+        },
     ]
 
 
@@ -102,7 +111,9 @@ def test_html_search_returns_empty_when_no_results() -> None:
         if str(request.url).startswith(_HTML_URL):
             return httpx.Response(200, text="<html></html>")
         api_calls.append(request)
-        return httpx.Response(200, json={"AbstractText": "", "AbstractURL": "", "RelatedTopics": []})
+        return httpx.Response(
+            200, json={"AbstractText": "", "AbstractURL": "", "RelatedTopics": []}
+        )
 
     provider = _duckduckgo(handler_with_api)
     results = provider.search("hello", 3, False)
@@ -112,9 +123,7 @@ def test_html_search_returns_empty_when_no_results() -> None:
 
 def test_html_search_respects_max_results_cap() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        body = "".join(
-            _hit_html(f"T{i}", f"https://e/{i}", f"s{i}") for i in range(10)
-        )
+        body = "".join(_hit_html(f"T{i}", f"https://e/{i}", f"s{i}") for i in range(10))
         return httpx.Response(200, text=body)
 
     results = _duckduckgo(handler).search("hello", 3, False)
@@ -163,24 +172,28 @@ def test_api_fallback_used_when_html_returns_no_hits() -> None:
 
 def test_api_search_includes_related_topics_and_results() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            text="<html></html>",
-            request=request,
-        ) if str(request.url).startswith(_HTML_URL) else httpx.Response(
-            200,
-            json={
-                "AbstractText": "",
-                "AbstractURL": "",
-                "RelatedTopics": [
-                    {"Text": "R-Title-1\nrest", "FirstURL": "https://e/r/1"},
-                    {"Text": "", "FirstURL": "https://e/skip"},
-                    {"Text": "only-text"},
-                ],
-                "Results": [
-                    {"Text": "Result-Text-1", "FirstURL": "https://e/res/1"},
-                ],
-            },
+        return (
+            httpx.Response(
+                200,
+                text="<html></html>",
+                request=request,
+            )
+            if str(request.url).startswith(_HTML_URL)
+            else httpx.Response(
+                200,
+                json={
+                    "AbstractText": "",
+                    "AbstractURL": "",
+                    "RelatedTopics": [
+                        {"Text": "R-Title-1\nrest", "FirstURL": "https://e/r/1"},
+                        {"Text": "", "FirstURL": "https://e/skip"},
+                        {"Text": "only-text"},
+                    ],
+                    "Results": [
+                        {"Text": "Result-Text-1", "FirstURL": "https://e/res/1"},
+                    ],
+                },
+            )
         )
 
     results = _duckduckgo(handler).search("hello", 10, False)

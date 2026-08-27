@@ -239,10 +239,7 @@ def regex_matches_any(text: str, compiled: list[Pattern[str]]) -> bool:
     """Whether ``text`` matches at least one of the compiled patterns."""
     if not text or not compiled:
         return False
-    return any(
-        pattern is not None and pattern.search(text) is not None
-        for pattern in compiled
-    )
+    return any(pattern is not None and pattern.search(text) is not None for pattern in compiled)
 
 
 def count_regex_hits(

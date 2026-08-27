@@ -35,6 +35,7 @@ from src.core.channels.embed.service.embed_channel_service import (
 from src.core.channels.embed.session import (
     CreatedEmbedSession,
     sign_embed_session_handle,
+    verify_embed_session_handle,
 )
 from src.core.channels.embed.types import EmbedChannelInfo
 from src.core.chat.bus import Event
@@ -210,7 +211,9 @@ class _FakeEmbedService:
             message=f"embed channel {channel_id} not found",
         )
 
-    async def list_channels_by_agent(self, *, tenant_id: int, agent_id: str) -> list[EmbedChannelInfo]:
+    async def list_channels_by_agent(
+        self, *, tenant_id: int, agent_id: str
+    ) -> list[EmbedChannelInfo]:
         self._maybe_raise()
         return self.list_by_agent
 
@@ -229,7 +232,9 @@ class _FakeEmbedService:
         self.deleted.append((tenant_id, channel_id))
         self._maybe_raise()
 
-    async def rotate_token(self, *, tenant_id: int, channel_id: str) -> tuple[EmbedChannelInfo, str]:
+    async def rotate_token(
+        self, *, tenant_id: int, channel_id: str
+    ) -> tuple[EmbedChannelInfo, str]:
         self.rotated.append((tenant_id, channel_id))
         self._maybe_raise()
         return self.rotate_result
@@ -279,6 +284,23 @@ class _FakeSessionService:
         if self.raise_on_lookup is not None:
             raise self.raise_on_lookup
         return self.channel
+
+    async def resolve_channel_for_request(
+        self, *, channel_id: str, token: str, origin: str, client_ip: str
+    ) -> EmbedChannelInfo:
+        self.lookups.append((channel_id, token))
+        if self.raise_on_lookup is not None:
+            raise self.raise_on_lookup
+        return EmbedChannelInfo.map_from_db(self.channel)
+
+    async def assert_session_handle(
+        self, *, channel_id: str, session_id: str, signature: str
+    ) -> None:
+        if not verify_embed_session_handle(self.channel, session_id, signature):
+            raise PermissionDeniedError(
+                code="embed.session_signature_invalid",
+                message="session signature invalid",
+            )
 
     async def assert_origin_allowed(self, origin: str, allowed_origins: list[str]) -> None:
         return None
@@ -431,7 +453,9 @@ def _holder() -> dict[str, Any]:
 
 
 @pytest.fixture
-def admin_client(embed_service: _FakeEmbedService, session_service: _FakeSessionService) -> TestClient:
+def admin_client(
+    embed_service: _FakeEmbedService, session_service: _FakeSessionService
+) -> TestClient:
     """A minimal app with the admin embed routers and a fake service layer."""
 
     def _get_embed_service() -> _FakeEmbedService:
@@ -967,9 +991,7 @@ def test_public_mcp_oauth_and_files_unavailable(public_client: TestClient) -> No
         ).status_code
         == 502
     )
-    assert (
-        public_client.get(f"/api/v1/embed/{_CHANNEL_ID}/files").status_code == 502
-    )
+    assert public_client.get(f"/api/v1/embed/{_CHANNEL_ID}/files").status_code == 502
 
 
 # ── Public routes work without user auth ──────────────────────────────
@@ -1022,23 +1044,24 @@ def test_get_embed_channel_resolves_token_and_stashes_channel(
         )
     )
 
-    assert resolved == channel
+    assert resolved == EmbedChannelInfo.map_from_db(channel)
     assert session_service.lookups == [(_CHANNEL_ID, _PUBLISH_TOKEN)]
-    assert request.state.embed_channel == channel
+    assert request.state.embed_channel == EmbedChannelInfo.map_from_db(channel)
     assert request.state.embed_tenant_id == str(_TENANT)
 
 
 def test_require_embed_session_accepts_valid_handle() -> None:
     channel = _channel_row()
+    session_service = _FakeSessionService()
+    session_service.channel = channel
 
     async def _run() -> None:
-        request = Request(
-            {"type": "http", "method": "GET", "headers": {}, "path": "/"}
-        )
+        request = Request({"type": "http", "method": "GET", "headers": {}, "path": "/"})
         await require_embed_session(
             request=request,
             session_id=_SESSION_ID,
-            channel=channel,
+            channel=EmbedChannelInfo.map_from_db(channel),
+            session_service=session_service,
             x_embed_session=_session_handle(channel),
         )
 
@@ -1047,16 +1070,17 @@ def test_require_embed_session_accepts_valid_handle() -> None:
 
 def test_require_embed_session_rejects_invalid_handle() -> None:
     channel = _channel_row()
+    session_service = _FakeSessionService()
+    session_service.channel = channel
 
     async def _run() -> None:
-        request = Request(
-            {"type": "http", "method": "GET", "headers": {}, "path": "/"}
-        )
+        request = Request({"type": "http", "method": "GET", "headers": {}, "path": "/"})
         with pytest.raises(PermissionDeniedError) as excinfo:
             await require_embed_session(
                 request=request,
                 session_id=_SESSION_ID,
-                channel=channel,
+                channel=EmbedChannelInfo.map_from_db(channel),
+                session_service=session_service,
                 x_embed_session="forged",
             )
         assert excinfo.value.code == "embed.session_signature_invalid"

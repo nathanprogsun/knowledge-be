@@ -1,11 +1,11 @@
-"""WeKnoraCloud credential service — save + status.
+"""Cloud credential service — save + status.
 
 Two operations:
 
 - ``save_credentials`` — validate that both ``app_id`` and
   ``app_secret`` are present, probe the upstream ``/api/v1/health``
   endpoint with signed headers, then persist the pair into the
-  workspace's ``credentials`` JSONB column under ``weknoracloud``.
+  workspace's ``credentials`` JSONB column under ``cloud``.
   No model rows are created (the upstream contract: "仅保存
   APPID/APPSECRET 凭证, 不自动创建模型").
 - ``check_status`` — report whether the workspace has usable
@@ -32,11 +32,11 @@ import httpx
 
 from src.common.exception import ExternalServiceError, NotFoundError, ValidationError
 from src.common.json import JsonObject
-from src.core.contracts.infra import WeKnoraCloudStatusResponse
+from src.core.contracts.infra import CloudStatusResponse
 from src.db.dao.tenants_repository import TenantRepository
 
 # Hard-coded upstream entry point. Path segments are appended by each caller.
-WEKNORA_CLOUD_BASE_URL: Final = "https://weknora.weixin.qq.com"
+KB_CLOUD_BASE_URL: Final = "https://kb.weixin.qq.com"
 
 # The credential probe path on the upstream service.
 _HEALTH_PATH: Final = "/api/v1/health"
@@ -49,7 +49,7 @@ ENC_PREFIX: Final = "enc:v1:"
 
 # Key of the provider object inside the ``credentials`` JSONB column
 # (the public wire tag for this provider slot).
-_CREDENTIALS_KEY: Final = "weknoracloud"
+_CREDENTIALS_KEY: Final = "cloud"
 
 # Nonce alphabet + length used by the upstream signing scheme.
 _NONCE_CHARS: Final = string.ascii_lowercase + string.ascii_uppercase + string.digits
@@ -64,7 +64,7 @@ _RFC3986_SAFE: Final = "-_.~"
 # Reason string surfaced when the stored secret could not be decrypted.
 # The fullwidth punctuation is part of the user-facing copy.
 _REINIT_REASON: Final = (
-    "WeKnoraCloud 凭证解密失败（服务重启后加密密钥已变更），请重新填写 APPID 和 APPSECRET"  # noqa: RUF001
+    "Cloud 凭证解密失败（服务重启后加密密钥已变更），请重新填写 APPID 和 APPSECRET"
 )
 
 
@@ -94,7 +94,7 @@ def sign_request_headers(
     request_id: str,
     body_json: str = "",
 ) -> dict[str, str]:
-    """Build the signed WeKnoraCloud request headers.
+    """Build the signed Cloud request headers.
 
     Sorts the six signing params by key, joins as
     ``rfc3986(k)=rfc3986(v)`` with ``&``, then MD5s the result.
@@ -124,18 +124,18 @@ def sign_request_headers(
     }
 
 
-def is_weknora_cloud_doc_reader_addr(addr: str) -> bool:
-    """True when ``addr`` is the WeKnoraCloud docreader endpoint.
+def is_kb_cloud_doc_reader_addr(addr: str) -> bool:
+    """True when ``addr`` is the Cloud docreader endpoint.
 
     Trailing slashes are ignored on both sides of the comparison.
     """
     normalized = addr.strip().rstrip("/")
-    expected = WEKNORA_CLOUD_BASE_URL.rstrip("/") + "/api/v1/doc/reader"
+    expected = KB_CLOUD_BASE_URL.rstrip("/") + "/api/v1/doc/reader"
     return normalized == expected
 
 
-class WeKnoraCloudService:
-    """WeKnoraCloud credential persistence + status, constructed per request."""
+class CloudService:
+    """Cloud credential persistence + status, constructed per request."""
 
     def __init__(
         self,
@@ -161,7 +161,7 @@ class WeKnoraCloudService:
         app_id: str,
         app_secret: str,
     ) -> None:
-        """Verify then persist the workspace's WeKnoraCloud credentials.
+        """Verify then persist the workspace's Cloud credentials.
 
         Raises ``ValidationError`` when either field is blank,
         ``ExternalServiceError`` when verification fails, and
@@ -169,12 +169,12 @@ class WeKnoraCloudService:
         """
         if not app_id:
             raise ValidationError(
-                code="weknoracloud.app_id_required",
+                code="cloud.app_id_required",
                 message="app_id is required",
             )
         if not app_secret:
             raise ValidationError(
-                code="weknoracloud.app_secret_required",
+                code="cloud.app_secret_required",
                 message="app_secret is required",
             )
 
@@ -193,7 +193,7 @@ class WeKnoraCloudService:
         is unreachable. All three raise ``ExternalServiceError`` with a
         ``credential verification failed: ...`` message.
         """
-        health_url = WEKNORA_CLOUD_BASE_URL.rstrip("/") + _HEALTH_PATH
+        health_url = KB_CLOUD_BASE_URL.rstrip("/") + _HEALTH_PATH
         request_id = f"verify-{time.time_ns()}"
         headers = sign_request_headers(
             app_id=app_id,
@@ -205,13 +205,13 @@ class WeKnoraCloudService:
             response = await self._get(health_url, headers=headers)
         except httpx.HTTPError as exc:
             raise ExternalServiceError(
-                code="weknoracloud.service_unreachable",
+                code="cloud.service_unreachable",
                 message=f"credential verification failed: service unreachable: {exc}",
             ) from exc
 
         if response.status_code in (401, 403):
             raise ExternalServiceError(
-                code="weknoracloud.invalid_credentials",
+                code="cloud.invalid_credentials",
                 message=(
                     "credential verification failed: invalid APPID or APPSECRET "
                     f"(HTTP {response.status_code})"
@@ -219,7 +219,7 @@ class WeKnoraCloudService:
             )
         if response.status_code != 200:
             raise ExternalServiceError(
-                code="weknoracloud.verification_failed",
+                code="cloud.verification_failed",
                 message=(
                     "credential verification failed: invalid response status code: "
                     f"{response.status_code}"
@@ -243,7 +243,7 @@ class WeKnoraCloudService:
         """Merge the provider object into the workspace ``credentials`` column.
 
         Other providers already present in the JSONB object are
-        preserved — only the WeKnoraCloud provider slot is replaced.
+        preserved — only the Cloud provider slot is replaced.
         """
         tenant = await self._tenants_repo.find_by_id(tenant_id)
         credentials: JsonObject = dict(tenant.credentials or {})
@@ -260,7 +260,7 @@ class WeKnoraCloudService:
 
     # ── Status ──────────────────────────────────────────────────────
 
-    async def check_status(self, *, tenant_id: int) -> WeKnoraCloudStatusResponse:
+    async def check_status(self, *, tenant_id: int) -> CloudStatusResponse:
         """Report whether the workspace's credentials are usable.
 
         A missing workspace and a missing credential block both
@@ -270,21 +270,21 @@ class WeKnoraCloudService:
         try:
             tenant = await self._tenants_repo.find_by_id(tenant_id)
         except NotFoundError:
-            return WeKnoraCloudStatusResponse(has_models=False, needs_reinit=False)
+            return CloudStatusResponse(has_models=False, needs_reinit=False)
 
         credentials = _read_credentials(tenant.credentials)
         if credentials is None:
-            return WeKnoraCloudStatusResponse(has_models=False, needs_reinit=False)
+            return CloudStatusResponse(has_models=False, needs_reinit=False)
 
         # A stored secret still carrying the enc:v1: prefix means the row
         # loaded but decryption did not happen (rotated / missing key).
         if credentials[1].startswith(ENC_PREFIX):
-            return WeKnoraCloudStatusResponse(
+            return CloudStatusResponse(
                 has_models=True,
                 needs_reinit=True,
                 reason=_REINIT_REASON,
             )
-        return WeKnoraCloudStatusResponse(has_models=True, needs_reinit=False)
+        return CloudStatusResponse(has_models=True, needs_reinit=False)
 
 
 def _read_credentials(raw: JsonObject | None) -> tuple[str, str] | None:
@@ -309,8 +309,8 @@ def _read_credentials(raw: JsonObject | None) -> tuple[str, str] | None:
 
 __all__ = [
     "ENC_PREFIX",
-    "WEKNORA_CLOUD_BASE_URL",
-    "WeKnoraCloudService",
-    "is_weknora_cloud_doc_reader_addr",
+    "KB_CLOUD_BASE_URL",
+    "CloudService",
+    "is_kb_cloud_doc_reader_addr",
     "sign_request_headers",
 ]

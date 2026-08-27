@@ -14,6 +14,7 @@ factory for every test, so each request resolves a freshly-issued
 
 from __future__ import annotations
 
+import os
 import secrets
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -72,7 +73,15 @@ def faker_seed() -> None:
 
 @pytest.fixture(scope="session")
 def _integration_settings() -> None:
-    """Reset the settings cache so DATABASE_URL_OVERRIDE (or defaults) apply."""
+    """Reset the settings cache so DATABASE_URL_OVERRIDE (or defaults) apply.
+
+    RBAC enforcement is disabled for the integration suite: these tests
+    exercise endpoint shapes and persistence against a real DB, not the
+    role matrix (covered separately by unit tests). The header-auth
+    principal carries no membership rows, so with enforcement on every
+    tenant-scoped call would 403.
+    """
+    os.environ["RBAC_ENFORCED"] = "false"
     reset_settings_cache()
 
 

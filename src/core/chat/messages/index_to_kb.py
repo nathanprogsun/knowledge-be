@@ -172,7 +172,7 @@ class DefaultMessageIndexer:
         """
         if not knowledge_id:
             return
-        return None
+        return
 
     async def delete_session_knowledge(
         self,
@@ -186,7 +186,7 @@ class DefaultMessageIndexer:
         """
         if not knowledge_ids:
             return
-        return None
+        return
 
     async def _update_knowledge_link(
         self,
