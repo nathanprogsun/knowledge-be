@@ -26512,6 +26512,26 @@
               }
             ]
           },
+          "wiki_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WikiConfig"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "indexing_strategy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IndexingStrategy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "vector_store_id": {
             "anyOf": [
               {
@@ -41264,6 +41284,17 @@
               }
             ],
             "title": "Content Instructions"
+          },
+          "extraction_instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Extraction Instructions"
           }
         },
         "type": "object",

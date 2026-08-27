@@ -23,6 +23,7 @@ class WikiConfig(BaseModel):
     max_pages_per_ingest: int | None = Field(default=0)
     extraction_granularity: str | None = Field(default=None)
     content_instructions: str | None = Field(default=None)
+    extraction_instructions: str | None = Field(default=None)
 
 
 class IndexingStrategy(BaseModel):
@@ -178,6 +179,8 @@ class CreateKnowledgeBaseRequest(BaseModel):
     extract_config: ExtractConfig | None = Field(default=None)
     faq_config: FAQConfig | None = Field(default=None)
     question_generation_config: QuestionGenerationConfig | None = Field(default=None)
+    wiki_config: WikiConfig | None = Field(default=None)
+    indexing_strategy: IndexingStrategy | None = Field(default=None)
     vector_store_id: str | None = Field(default=None)
 
 

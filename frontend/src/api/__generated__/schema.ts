@@ -6655,6 +6655,8 @@ export interface components {
             extract_config?: components["schemas"]["ExtractConfig"] | null;
             faq_config?: components["schemas"]["FAQConfig"] | null;
             question_generation_config?: components["schemas"]["QuestionGenerationConfig"] | null;
+            wiki_config?: components["schemas"]["WikiConfig"] | null;
+            indexing_strategy?: components["schemas"]["IndexingStrategy"] | null;
             /** Vector Store Id */
             vector_store_id?: string | null;
         };
@@ -12666,6 +12668,8 @@ export interface components {
             extraction_granularity?: string | null;
             /** Content Instructions */
             content_instructions?: string | null;
+            /** Extraction Instructions */
+            extraction_instructions?: string | null;
         };
         /** WikiEnvelope[WikiAutoFixData] */
         WikiEnvelope_WikiAutoFixData_: {

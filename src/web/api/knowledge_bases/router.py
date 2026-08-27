@@ -212,6 +212,8 @@ async def create_knowledge_base(
         extract_config=_config_to_json(body.extract_config),
         faq_config=_config_to_json(body.faq_config),
         question_generation_config=_config_to_json(body.question_generation_config),
+        wiki_config=_config_to_json(body.wiki_config),
+        indexing_strategy=_config_to_json(body.indexing_strategy),
         vector_store_id=body.vector_store_id,
     )
     return knowledge_base_envelope(info)
