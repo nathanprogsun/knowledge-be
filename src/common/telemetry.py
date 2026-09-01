@@ -26,9 +26,9 @@ Exporter selection (``otel_exporter`` setting):
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable, Sequence
 
 from fastapi import FastAPI
 from opentelemetry import trace
@@ -44,8 +44,11 @@ from opentelemetry.sdk.trace.export import (
     SpanExporter,
     SpanExportResult,
 )
+from opentelemetry.trace.span import INVALID_SPAN_CONTEXT
+from opentelemetry.util.types import AttributeValue
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from src.common.json import JsonValue
 from src.settings import Settings, get_settings
 
 
@@ -74,7 +77,23 @@ class JsonlFileSpanExporter(SpanExporter):
         return None
 
 
-def _serialise_span(span: ReadableSpan) -> dict[str, str | int | float | bool | list | dict | None]:
+def _json_attrs(attrs: Mapping[str, AttributeValue] | None) -> dict[str, JsonValue]:
+    """Coerce an OTel attribute map to a plain ``JsonValue`` dict.
+
+    OTel types attribute values as ``Sequence`` for arrays; the wire
+    shape needs concrete lists, and the recursive ``JsonValue`` type
+    does not cover the SDK's ``AttributeValue`` union.
+    """
+    out: dict[str, JsonValue] = {}
+    for key, value in (attrs or {}).items():
+        if isinstance(value, (str, bool, int, float)):
+            out[key] = value
+        else:
+            out[key] = list(value)
+    return out
+
+
+def _serialise_span(span: ReadableSpan) -> dict[str, JsonValue]:
     """Render a span as a JSON-serialisable dict.
 
     Mirrors the OTel ``Span.to_json`` shape with a couple of project-
@@ -83,7 +102,7 @@ def _serialise_span(span: ReadableSpan) -> dict[str, str | int | float | bool | 
     from the SDK; we keep the field names lowercase to match OTel
     spec output that downstream tools expect.
     """
-    ctx = span.get_span_context()
+    ctx = span.get_span_context() or INVALID_SPAN_CONTEXT
     parent = span.parent
     start_ns = span.start_time or 0
     end_ns = span.end_time or start_ns
@@ -92,30 +111,28 @@ def _serialise_span(span: ReadableSpan) -> dict[str, str | int | float | bool | 
         "name": span.name,
         "trace_id": f"{ctx.trace_id:032x}",
         "span_id": f"{ctx.span_id:016x}",
-        "parent_span_id": (
-            f"{parent.span_id:016x}" if parent is not None else ""
-        ),
+        "parent_span_id": (f"{parent.span_id:016x}" if parent is not None else ""),
         "kind": span.kind.name if span.kind is not None else "INTERNAL",
-        "timestamp": datetime.fromtimestamp(start_ns / 1e9, tz=timezone.utc).isoformat(),
+        "timestamp": datetime.fromtimestamp(start_ns / 1e9, tz=UTC).isoformat(),
         "duration_ms": duration_ms,
         "status": {
             "status_code": span.status.status_code.name,
             "description": span.status.description or "",
         },
-        "attributes": dict(span.attributes or {}),
+        "attributes": _json_attrs(span.attributes),
         "events": [
             {
                 "name": e.name,
                 "timestamp": e.timestamp,
-                "attributes": dict(e.attributes or {}),
+                "attributes": _json_attrs(e.attributes),
             }
             for e in span.events
         ],
-        "resource": dict(span.resource.attributes.items()),
+        "resource": _json_attrs(span.resource.attributes),
     }
 
 
-def _build_exporter(settings: "Settings") -> SpanExporter:
+def _build_exporter(settings: Settings) -> SpanExporter:
     """Pick an exporter based on ``settings.otel_exporter``.
 
     ``file`` is preferred over ``otlp`` when explicitly selected
@@ -125,7 +142,9 @@ def _build_exporter(settings: "Settings") -> SpanExporter:
     """
     mode = getattr(settings, "otel_exporter", "console").lower()
     if mode == "file":
-        return JsonlFileSpanExporter(Path(getattr(settings, "otel_file_dir", "traces")) / "traces.jsonl")
+        return JsonlFileSpanExporter(
+            Path(getattr(settings, "otel_file_dir", "traces")) / "traces.jsonl"
+        )
     if mode == "otlp":
         endpoint = getattr(settings, "otel_exporter_otlp_endpoint", None)
         if endpoint:
