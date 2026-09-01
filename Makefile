@@ -35,9 +35,12 @@ typecheck:
 	uv run mypy
 
 # Ratchet gate: mypy may only improve vs the recorded baseline. CI runs
-# this instead of raw mypy until the backlog is burned down.
+# this instead of raw mypy until the backlog is burned down. Runs via uv so
+# the mypy that produces the numbers is the project venv's, not whatever a
+# global python happens to resolve (a mismatched mypy reports phantom
+# import-not-found regressions and fails the gate incorrectly).
 check-mypy-baseline:
-	python scripts/check_mypy_baseline.py
+	uv run python scripts/check_mypy_baseline.py
 
 test:
 	uv run pytest
