@@ -301,9 +301,7 @@ class _FakeMessageRepo(MessageRepository):
         ids = set(request_ids)
         session_bound = set(session_ids)
         return [
-            r
-            for r in self.rows.values()
-            if r.request_id in ids and r.session_id in session_bound
+            r for r in self.rows.values() if r.request_id in ids and r.session_id in session_bound
         ]
 
     async def list_knowledge_ids_by_session(

@@ -1209,6 +1209,15 @@
               "type": "string",
               "title": "Redirect Uri"
             }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "State"
+            }
           }
         ],
         "responses": {
@@ -1263,7 +1272,7 @@
           "auth"
         ],
         "summary": "Auto Setup",
-        "description": "Lite-mode transparent bootstrap: create the default user/workspace\non first boot, then just sign them in on every subsequent boot.\n\nMirrors Go's ``AutoSetup``: idempotent — the default account is\ncreated once, and later calls reuse it and mint a fresh token pair.",
+        "description": "Lite-mode transparent bootstrap: create the default user/workspace\non first boot, then just sign them in on every subsequent boot.\n\nMirrors Go's ``AutoSetup``: idempotent — the default account is\ncreated once, and later calls reuse it and mint a fresh token pair.\n\nThe endpoint is unauthenticated by design and therefore gated by\n``Settings.auto_setup_enabled``; when disabled it reads as 404 so a\npublic deployment does not advertise a bootstrap surface.",
         "operationId": "auto_setup_api_v1_auth_auto_setup_post",
         "responses": {
           "200": {
@@ -9006,7 +9015,7 @@
           "files"
         ],
         "summary": "Serve Kb File",
-        "description": "Serve a knowledge-base-scoped stored object.\n\nThe owner tenant of the knowledge base is authoritative: the object\npath must belong to that tenant, and the file is fetched through the\nowner tenant's storage config. This keeps shared-KB images reachable\nby any tenant the KB is shared with.",
+        "description": "Serve a knowledge-base-scoped stored object.\n\nThe caller must either own the knowledge base or hold a share grant\non it; sharing a KB makes its stored objects (e.g. embedded images)\nreachable to the receiving tenants. The owner tenant stays\nauthoritative for the storage lookup: the object path must belong to\nthat tenant, and the file is fetched through its storage config.",
         "operationId": "serve_kb_file_api_v1_knowledge_bases__kb_id__files_get",
         "parameters": [
           {
@@ -26472,6 +26481,17 @@
               }
             ]
           },
+          "storage_backend_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storage Backend Id"
+          },
           "storage_config": {
             "anyOf": [
               {
@@ -37051,25 +37071,11 @@
             "title": "Success"
           },
           "data": {
-            "$ref": "#/components/schemas/SessionListResponse"
-          }
-        },
-        "type": "object",
-        "required": [
-          "success",
-          "data"
-        ],
-        "title": "SessionListEnvelope",
-        "description": "``{\"success\": true, \"data\": {\"items\": [...], ...}}`` - paged list."
-      },
-      "SessionListResponse": {
-        "properties": {
-          "items": {
             "items": {
               "$ref": "#/components/schemas/Session"
             },
             "type": "array",
-            "title": "Items"
+            "title": "Data"
           },
           "total": {
             "type": "integer",
@@ -37086,12 +37092,14 @@
         },
         "type": "object",
         "required": [
-          "items",
+          "success",
+          "data",
           "total",
           "page",
           "page_size"
         ],
-        "title": "SessionListResponse"
+        "title": "SessionListEnvelope",
+        "description": "``{\"success\": true, \"data\": [...], \"total\": n, \"page\": n, \"page_size\": n}``.\n\nThe list payload is a flat array at ``data`` with the paging\ncounters as envelope siblings, matching the upstream contract."
       },
       "SetMCPToolApprovalRequest": {
         "properties": {

@@ -64,19 +64,11 @@ class _FakeKBShareRepo(KBShareRepository):
                 return share
         return None
 
-    async def list_by_knowledge_base(
-        self, knowledge_base_id: str
-    ) -> list[KnowledgeBaseShare]:
-        return [
-            s for s in self._shares.values() if s.knowledge_base_id == knowledge_base_id
-        ]
+    async def list_by_knowledge_base(self, knowledge_base_id: str) -> list[KnowledgeBaseShare]:
+        return [s for s in self._shares.values() if s.knowledge_base_id == knowledge_base_id]
 
-    async def list_by_organization(
-        self, organization_id: str
-    ) -> list[KnowledgeBaseShare]:
-        return [
-            s for s in self._shares.values() if s.organization_id == organization_id
-        ]
+    async def list_by_organization(self, organization_id: str) -> list[KnowledgeBaseShare]:
+        return [s for s in self._shares.values() if s.organization_id == organization_id]
 
     async def list_shared_for_tenant(self, tenant_id: int) -> list[KnowledgeBaseShare]:
         return list(self._shared_for_tenant.get(tenant_id, []))

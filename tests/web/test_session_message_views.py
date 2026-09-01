@@ -257,10 +257,10 @@ def test_list_sessions_returns_paged_envelope() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["success"] is True
-    assert body["data"]["total"] == 1
-    assert body["data"]["page"] == 2
-    assert body["data"]["page_size"] == 10
-    assert body["data"]["items"][0]["is_pinned"] is True
+    assert body["total"] == 1
+    assert body["page"] == 2
+    assert body["page_size"] == 10
+    assert body["data"][0]["is_pinned"] is True
     query = fake.list_with_filters.await_args.args[0]
     assert query.keyword == "AI"
     assert query.page == 2

@@ -11,10 +11,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
-from src.core.contracts.sessions import (
-    Session,
-    SessionListResponse,
-)
+from src.core.contracts.sessions import Session
 from src.db.models.session import Session as SessionRow
 
 
@@ -28,12 +25,19 @@ class SessionEnvelope(BaseModel):
 
 
 class SessionListEnvelope(BaseModel):
-    """``{"success": true, "data": {"items": [...], ...}}`` - paged list."""
+    """``{"success": true, "data": [...], "total": n, "page": n, "page_size": n}``.
+
+    The list payload is a flat array at ``data`` with the paging
+    counters as envelope siblings, matching the upstream contract.
+    """
 
     model_config = ConfigDict(frozen=True)
 
     success: bool
-    data: SessionListResponse
+    data: list[Session]
+    total: int
+    page: int
+    page_size: int
 
 
 class DeleteSessionResponse(BaseModel):
@@ -87,15 +91,13 @@ def session_list_envelope(
     page: int,
     page_size: int,
 ) -> SessionListEnvelope:
-    """Wrap a paged session list in the success envelope."""
+    """Wrap a paged session list in the flat success envelope."""
     return SessionListEnvelope(
         success=True,
-        data=SessionListResponse(
-            items=[session_to_contract(row) for row in rows],
-            total=total,
-            page=page,
-            page_size=page_size,
-        ),
+        data=[session_to_contract(row) for row in rows],
+        total=total,
+        page=page,
+        page_size=page_size,
     )
 
 
