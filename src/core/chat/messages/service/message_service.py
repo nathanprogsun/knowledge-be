@@ -681,7 +681,9 @@ class MessageServiceImpl:
         """
         _require_query(params.query)
         limit = params.limit if params.limit > 0 else _DEFAULT_SEARCH_LIMIT
-        session_ids = list(params.session_ids)
+        session_ids = await self._resolve_search_scope(ctx, params.session_ids)
+        if not session_ids:
+            return MessageSearchResult(items=(), total=0)
 
         keyword_items: list[MessageSearchResultItem] = []
         vector_items: list[MessageSearchResultItem] = []
@@ -707,7 +709,7 @@ class MessageServiceImpl:
         else:
             merged = _rrf_merge(keyword_items, vector_items)
 
-        merged = await self._fetch_partner_messages(merged)
+        merged = await self._fetch_partner_messages(merged, session_ids=session_ids)
 
         grouped = _group_by_request_id(merged)
         if len(grouped) > limit:
@@ -716,6 +718,29 @@ class MessageServiceImpl:
             items=tuple(grouped),
             total=len(grouped),
         )
+
+    async def _resolve_search_scope(
+        self,
+        ctx: Context,
+        requested: tuple[str, ...],
+    ) -> list[str]:
+        """Narrow the caller's session filter to tenant-owned sessions.
+
+        The messages table carries no tenant column, so every search
+        must run against caller-visible session ids: supplied ids are
+        verified one by one against the sessions table; when the caller
+        supplies none, the tenant's live sessions are enumerated up
+        front. Both paths then flow through the repository's mandatory
+        ``session_id in (…)`` filter.
+        """
+        if self._session_repo is None:
+            return list(requested)
+        tenant_id = getattr(ctx, "tenant_id", 0)
+        if requested:
+            for session_id in requested:
+                await self._require_session(ctx, session_id)
+            return list(requested)
+        return await self._session_repo.list_ids_by_tenant(tenant_id=tenant_id)
 
     async def _keyword_search(
         self,
@@ -732,7 +757,7 @@ class MessageServiceImpl:
         """
         rows = await self._message_repo.search_by_keyword(
             keyword=query,
-            session_ids=session_ids or None,
+            session_ids=session_ids,
             limit=limit * 3,
         )
         items: list[MessageSearchResultItem] = []
@@ -782,6 +807,8 @@ class MessageServiceImpl:
     async def _fetch_partner_messages(
         self,
         items: list[MessageSearchResultItem],
+        *,
+        session_ids: list[str],
     ) -> list[MessageSearchResultItem]:
         """Fill in the partner message of any Q&A pair matched on one side.
 
@@ -822,7 +849,10 @@ class MessageServiceImpl:
             return items
 
         try:
-            partners = await self._message_repo.list_by_request_ids(incomplete)
+            partners = await self._message_repo.list_by_request_ids(
+                incomplete,
+                session_ids=session_ids,
+            )
         except Exception:
             return items
 

@@ -266,20 +266,21 @@ class _FakeMessageRepo(MessageRepository):
         self,
         *,
         keyword: str,
-        session_ids: list[str] | None = None,
+        session_ids: list[str],
         limit: int = 20,
     ) -> list[Message]:
         self.keyword_calls.append(
             {
                 "keyword": keyword,
-                "session_ids": list(session_ids or []),
+                "session_ids": list(session_ids),
                 "limit": limit,
             }
         )
+        if not session_ids:
+            return []
         rows = [r for r in self.rows.values() if keyword in r.content]
-        if session_ids:
-            ids = set(session_ids)
-            rows = [r for r in rows if r.session_id in ids]
+        ids = set(session_ids)
+        rows = [r for r in rows if r.session_id in ids]
         return rows[:limit]
 
     async def list_by_knowledge_ids(
@@ -293,10 +294,17 @@ class _FakeMessageRepo(MessageRepository):
     async def list_by_request_ids(
         self,
         request_ids: list[str],
+        *,
+        session_ids: list[str],
     ) -> list[Message]:
         self.by_request_calls.append(list(request_ids))
         ids = set(request_ids)
-        return [r for r in self.rows.values() if r.request_id in ids]
+        session_bound = set(session_ids)
+        return [
+            r
+            for r in self.rows.values()
+            if r.request_id in ids and r.session_id in session_bound
+        ]
 
     async def list_knowledge_ids_by_session(
         self,
@@ -333,6 +341,10 @@ class _FakeSessionRepo(SessionRepository):
     ) -> object | None:
         self.calls.append((tenant_id, id))
         return object() if id in self.existing else None
+
+    async def list_ids_by_tenant(self, *, tenant_id: int) -> list[str]:
+        """Enumerate the allowed ids — the tenant-scope seam for search."""
+        return sorted(self.existing)
 
 
 class _FakeConfig(ChatHistoryConfigProvider):
@@ -730,11 +742,55 @@ async def test_search_messages_rejects_empty_query() -> None:
     assert exc.value.code == "message.search_query_required"
 
 
+async def test_search_messages_rejects_session_ids_outside_caller_scope() -> None:
+    # Arrange — the caller passes a session id the tenant does not own.
+    repo = _FakeMessageRepo()
+    repo.seed(_message(id="msg-1", session_id="foreign-sess", content="secret"))
+    service, _, sessions = _service(message_repo=repo)
+    assert sessions is not None
+
+    # Act / Assert — scope resolution rejects the foreign id before search.
+    with pytest.raises(NotFoundError) as exc:
+        await service.search_messages(
+            _Ctx(),
+            MessageSearchParams(
+                query="secret",
+                mode=MessageSearchMode.KEYWORD,
+                session_ids=("foreign-sess",),
+            ),
+        )
+    assert exc.value.code == "message.session_not_found"
+    assert repo.keyword_calls == []
+
+
+async def test_search_messages_without_session_filter_scans_only_tenant_sessions() -> None:
+    # Arrange — a message lives in a session the caller cannot see.
+    repo = _FakeMessageRepo()
+    repo.seed(_message(id="msg-1", session_id="foreign-sess", content="hello"))
+    repo.seed(_message(id="msg-2", session_id="sess-1", content="hello"))
+    service, _, sessions = _service(message_repo=repo)
+    assert sessions is not None
+    sessions.allow("sess-1")
+
+    # Act
+    result = await service.search_messages(
+        _Ctx(),
+        MessageSearchParams(query="hello", mode=MessageSearchMode.KEYWORD),
+    )
+
+    # Assert — only the in-scope hit surfaces.
+    assert repo.keyword_calls[0]["session_ids"] == ["sess-1"]
+    assert result.total == 1
+    assert result.items[0].query_content == "hello"
+
+
 async def test_search_messages_keyword_mode_runs_keyword_only() -> None:
     # Arrange
     repo = _FakeMessageRepo()
     repo.seed(_message(id="msg-1", session_id="sess-1", content="hello world"))
-    service, _, _ = _service(message_repo=repo)
+    service, _, sessions = _service(message_repo=repo)
+    assert sessions is not None
+    sessions.allow("sess-1")
 
     # Act
     result = await service.search_messages(
@@ -760,7 +816,9 @@ async def test_search_messages_vector_mode_runs_vector_seam() -> None:
     )
     searcher = _FakeVectorSearcher(results=[vector_hit])
     config = _FakeConfig(enabled=True, kb_id="kb-history")
-    service, _, _ = _service(message_repo=repo, vector_searcher=searcher, config=config)
+    service, _, sessions = _service(message_repo=repo, vector_searcher=searcher, config=config)
+    assert sessions is not None
+    sessions.allow("sess-1")
 
     # Act
     result = await service.search_messages(
@@ -816,7 +874,9 @@ async def test_search_messages_hybrid_mode_fuses_keyword_and_vector() -> None:
     )
     searcher = _FakeVectorSearcher(results=[vector_hit])
     config = _FakeConfig(enabled=True, kb_id="kb-history")
-    service, _, _ = _service(message_repo=repo, vector_searcher=searcher, config=config)
+    service, _, sessions = _service(message_repo=repo, vector_searcher=searcher, config=config)
+    assert sessions is not None
+    sessions.allow("sess-1")
 
     # Act
     result = await service.search_messages(
@@ -837,7 +897,9 @@ async def test_search_messages_falls_back_to_keyword_when_vector_seam_absent() -
     # Arrange
     repo = _FakeMessageRepo()
     repo.seed(_message(id="msg-1", session_id="sess-1", content="keyword only"))
-    service, _, _ = _service(message_repo=repo)
+    service, _, sessions = _service(message_repo=repo)
+    assert sessions is not None
+    sessions.allow("sess-1")
 
     # Act
     result = await service.search_messages(
@@ -890,7 +952,9 @@ async def test_search_messages_groups_partner_message_for_qa_pair() -> None:
     )
     searcher = _FakeVectorSearcher(results=[user_hit])
     config = _FakeConfig(enabled=True, kb_id="kb-history")
-    service, _, _ = _service(message_repo=repo, vector_searcher=searcher, config=config)
+    service, _, sessions = _service(message_repo=repo, vector_searcher=searcher, config=config)
+    assert sessions is not None
+    sessions.allow("sess-1")
 
     # Act
     result = await service.search_messages(

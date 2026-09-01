@@ -109,6 +109,12 @@ filterwarnings = [
     # The test suite uses TestClient (sync portal loop) deliberately, so
     # the import-time deprecation notice is suppressed.
     "ignore::starlette.exceptions.StarletteDeprecationWarning",
+    # jieba (segmenter used by the retrieval engines) ships unescaped
+    # regex literals that raise SyntaxWarning at import; under
+    # filterwarnings=error that becomes a collection-time SyntaxError.
+    # The package is vendored upstream and not ours to fix, so its
+    # warnings are scoped out while every other warning still errors.
+    "ignore::SyntaxWarning:jieba",
 ]
 
 [tool.coverage.run]

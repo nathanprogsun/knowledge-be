@@ -34,6 +34,7 @@ from src.core.infra.storage_backends.types import StorageBackendConfigInfo
 from src.web.deps import AuthDep, RoleViewerDep
 from src.web.deps.knowledge_bases import KBServiceDep
 from src.web.deps.session import SessionDep
+from src.web.deps.sharing import KBShareServiceDep
 
 bare_files_router = APIRouter(prefix="/files", tags=["files"])
 
@@ -156,6 +157,7 @@ async def serve_kb_file(
     _auth: AuthDep,
     _role: RoleViewerDep,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     request: Request,
     session: SessionDep,
     kb_id: str,
@@ -163,15 +165,26 @@ async def serve_kb_file(
 ) -> StreamingResponse:
     """Serve a knowledge-base-scoped stored object.
 
-    The owner tenant of the knowledge base is authoritative: the object
-    path must belong to that tenant, and the file is fetched through the
-    owner tenant's storage config. This keeps shared-KB images reachable
-    by any tenant the KB is shared with.
+    The caller must either own the knowledge base or hold a share grant
+    on it; sharing a KB makes its stored objects (e.g. embedded images)
+    reachable to the receiving tenants. The owner tenant stays
+    authoritative for the storage lookup: the object path must belong to
+    that tenant, and the file is fetched through its storage config.
     """
     path = _validate_file_path(file_path)
-    _require_tenant_id(request)
+    caller_tenant_id = _require_tenant_id(request)
     kb = await kb_service.get_knowledge_base_by_id(knowledge_base_id=kb_id)
     owner_tenant_id = kb.tenant_id
+    allowed = await kb_share_service.can_access_knowledge_base(
+        tenant_id=caller_tenant_id,
+        owner_tenant_id=owner_tenant_id,
+        knowledge_base_id=kb_id,
+    )
+    if not allowed:
+        raise PermissionDeniedError(
+            code="files.forbidden",
+            message="forbidden: knowledge base not accessible",
+        )
     path_tenant_id = parse_tenant_id_from_storage_path(path)
     if path_tenant_id and path_tenant_id != owner_tenant_id:
         raise PermissionDeniedError(

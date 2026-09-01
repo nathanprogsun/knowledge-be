@@ -159,6 +159,21 @@ class SessionRepository(GenericRepository[Session]):
         result = await self._session.execute(stmt)
         return self._hydrate_opt(result.mappings().first())
 
+    async def list_ids_by_tenant(self, *, tenant_id: int) -> list[str]:
+        """Ids of the tenant's live sessions, newest first.
+
+        Id-only scan for callers that narrow another tenant-less table
+        (e.g. message search) to this tenant's session set — hydrating
+        full rows would only discard them again.
+        """
+        stmt = text(
+            f"select id from {_TABLE_NAME} "
+            f"where tenant_id = :tenant_id and {_LIVE} "
+            f"order by {_SESSION_ORDER}"
+        ).bindparams(tenant_id=tenant_id)
+        result = await self._session.execute(stmt)
+        return [str(value) for value in result.scalars().all()]
+
     async def list_by_tenant(self, *, tenant_id: int, user_id: str = "") -> list[Session]:
         """Every live session of the workspace, newest activity first."""
         where = f"tenant_id = :tenant_id and {_LIVE}"

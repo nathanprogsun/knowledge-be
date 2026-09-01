@@ -265,22 +265,19 @@ class MessageRepository(GenericRepository[Message]):
         self,
         *,
         keyword: str,
-        session_ids: list[str] | None = None,
+        session_ids: list[str],
         limit: int = 20,
     ) -> list[Message]:
-        """ILIKE search across the caller's live messages.
+        """ILIKE search restricted to an explicit session-id set.
 
-        When ``session_ids`` is supplied, the search is restricted to those
-        sessions; otherwise it scans every live row of the workspace.
-        Sessions whose ``session_id`` is empty are always ignored by the
-        SQL filter — the live-row guard already covers them.
-
-        The match runs against ``content``; an empty ``keyword`` short-
-        circuits to an empty list to keep the SQL ``like`` predicate
-        well-formed regardless of the caller.
+        The messages table carries no tenant column, so tenant isolation
+        is the caller's duty: ``session_ids`` must be the caller-visible
+        sessions resolved from the sessions table, never an open-ended
+        scan. An empty ``session_ids`` short-circuits to an empty list —
+        there is no legitimate "search everything" path.
         """
         term = (keyword or "").strip()
-        if not term:
+        if not term or not session_ids:
             return []
         # ``session_id`` / ``id`` / ``created_at`` are literal column
         # names declared in this module — not user input. The ``like``
@@ -289,19 +286,16 @@ class MessageRepository(GenericRepository[Message]):
         self._assert_safe_identifier("id", kind="column")
         self._assert_safe_identifier("created_at", kind="column")
         self._assert_safe_identifier("content", kind="column")
-        ids_clause = ""
-        if session_ids:
-            ids_clause = " and session_id in :session_ids"
         stmt = text(
             f"select * from {_TABLE_NAME} "
             "where content ilike :pattern "
             f"and {_LIVE} "
-            f"{ids_clause} "
+            "and session_id in :session_ids "
             f"order by {_RECENT_ORDER} limit :limit"
         ).bindparams(
             pattern=f"%{term}%",
             limit=limit,
-            **({"session_ids": tuple(session_ids)} if session_ids else {}),
+            session_ids=tuple(session_ids),
         )
         result = await self._session.execute(stmt)
         return [self._hydrate(m) for m in result.mappings().all()]
@@ -330,21 +324,31 @@ class MessageRepository(GenericRepository[Message]):
     async def list_by_request_ids(
         self,
         request_ids: list[str],
+        *,
+        session_ids: list[str],
     ) -> list[Message]:
-        """Bulk lookup of live messages by their ``request_id`` column.
+        """Bulk lookup of live messages by ``request_id`` within sessions.
 
         The search path uses this to fetch the partner of a Q&A pair
-        that matched on only one role. Returns an empty list when
-        ``request_ids`` is empty so the SQL ``in`` clause is well-formed.
+        that matched on only one role. ``session_ids`` is mandatory for
+        the same tenant-isolation reason as ``search_by_keyword``:
+        request ids are caller-supplied, so without the session filter a
+        request id planted by another tenant could attach foreign rows.
+        Returns an empty list when either list is empty so the SQL
+        ``in`` clauses stay well-formed.
         """
-        if not request_ids:
+        if not request_ids or not session_ids:
             return []
         self._assert_safe_identifier("request_id", kind="column")
         stmt = text(
             f"select * from {_TABLE_NAME} "
             "where request_id in :request_ids "
+            "and session_id in :session_ids "
             f"and {_LIVE} order by {_RECENT_ORDER}"
-        ).bindparams(request_ids=tuple(request_ids))
+        ).bindparams(
+            request_ids=tuple(request_ids),
+            session_ids=tuple(session_ids),
+        )
         result = await self._session.execute(stmt)
         return [self._hydrate(m) for m in result.mappings().all()]
 
