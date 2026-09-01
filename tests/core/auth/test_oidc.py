@@ -36,6 +36,16 @@ from src.settings import reset_settings_cache
 from src.util.security import decode_token, hash_password, reset_secret_cache
 from tests.util.service_test import ServiceTest
 
+
+def _state_kwargs(redirect_uri: str = "https://app.example.com/cb") -> dict[str, str]:
+    """Sign a fresh state and return the (state, expected_nonce) kwargs."""
+    nonce = "nonce-test"
+    state = _sign_state(
+        OIDCStatePayload(nonce=nonce, redirect_uri=redirect_uri, iat=int(time.time()))
+    )
+    return {"state": state, "expected_nonce": nonce}
+
+
 # ── Protocol doubles (non-repository collaborators) ──────────────────
 
 
@@ -226,7 +236,9 @@ class TestLoginWithOidc(ServiceTest):
         )
         service = _make_service(users_repo, tokens_repo, client)
 
-        result = await service.login_with_oidc(code="c", redirect_uri="https://app.example.com/cb")
+        result = await service.login_with_oidc(
+            code="c", redirect_uri="https://app.example.com/cb", **_state_kwargs()
+        )
 
         assert result.success is True
         assert result.message == "登录成功"
@@ -254,7 +266,9 @@ class TestLoginWithOidc(ServiceTest):
         service = _make_service(users_repo, tokens_repo, client)
 
         with pytest.raises(ExternalServiceError) as exc_info:
-            await service.login_with_oidc(code="c", redirect_uri="https://app.example.com/cb")
+            await service.login_with_oidc(
+                code="c", redirect_uri="https://app.example.com/cb", **_state_kwargs()
+            )
         assert exc_info.value.code == "oidc.provisioning_unavailable"
         assert inserted == []
 
@@ -268,7 +282,9 @@ class TestLoginWithOidc(ServiceTest):
         service = _make_service(users_repo, tokens_repo, client)
 
         with pytest.raises(ValidationError) as exc_info:
-            await service.login_with_oidc(code="c", redirect_uri="https://app.example.com/cb")
+            await service.login_with_oidc(
+                code="c", redirect_uri="https://app.example.com/cb", **_state_kwargs()
+            )
         assert exc_info.value.code == "oidc.missing_email"
         assert inserted == []
 
@@ -282,7 +298,9 @@ class TestLoginWithOidc(ServiceTest):
         )
         service = _make_service(users_repo, tokens_repo, client)
 
-        result = await service.login_with_oidc(code="c", redirect_uri="https://app.example.com/cb")
+        result = await service.login_with_oidc(
+            code="c", redirect_uri="https://app.example.com/cb", **_state_kwargs()
+        )
 
         assert result.success is False
         assert result.message == "Account is disabled"
@@ -303,7 +321,9 @@ class TestLoginWithOidc(ServiceTest):
             ),
         )
         with pytest.raises(ValidationError, match="code is required"):
-            await service.login_with_oidc(code="   ", redirect_uri="https://app.example.com/cb")
+            await service.login_with_oidc(
+                code="   ", redirect_uri="https://app.example.com/cb", **_state_kwargs()
+            )
 
     async def test_disabled_when_oidc_off(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("OIDC_ENABLE", "false")
@@ -319,7 +339,9 @@ class TestLoginWithOidc(ServiceTest):
             ),
         )
         with pytest.raises(PermissionDeniedError) as exc_info:
-            await service.login_with_oidc(code="c", redirect_uri="https://app.example.com/cb")
+            await service.login_with_oidc(
+                code="c", redirect_uri="https://app.example.com/cb", **_state_kwargs()
+            )
         assert exc_info.value.code == "oidc.disabled"
 
 
@@ -362,3 +384,60 @@ def test_state_expired_rejected() -> None:
 def test_state_malformed_rejected() -> None:
     with pytest.raises(UnauthorizedError):
         _verify_state("not-a-valid-state")
+
+
+# ── Callback state enforcement ───────────────────────────────────────
+
+
+class TestLoginStateGuards(ServiceTest):
+    async def test_missing_nonce_cookie_rejected(self) -> None:
+        users_repo = _make_users_repo(user=_seed_user(email="alice@example.com"))
+        tokens_repo, _ = _make_tokens_repo()
+        client = _FakeOidcClient(
+            token=OIDCTokenResponse(access_token="at", id_token="", token_type="Bearer"),
+            userinfo=_userinfo("alice@example.com"),
+        )
+        service = _make_service(users_repo, tokens_repo, client)
+        kwargs = _state_kwargs()
+        kwargs["expected_nonce"] = ""
+        with pytest.raises(UnauthorizedError) as exc_info:
+            await service.login_with_oidc(
+                code="c",
+                redirect_uri="https://app.example.com/cb",
+                **kwargs,
+            )
+        assert exc_info.value.code == "oidc.invalid_state"
+
+    async def test_nonce_mismatch_rejected(self) -> None:
+        users_repo = _make_users_repo(user=_seed_user(email="alice@example.com"))
+        tokens_repo, _ = _make_tokens_repo()
+        client = _FakeOidcClient(
+            token=OIDCTokenResponse(access_token="at", id_token="", token_type="Bearer"),
+            userinfo=_userinfo("alice@example.com"),
+        )
+        service = _make_service(users_repo, tokens_repo, client)
+        kwargs = _state_kwargs()
+        kwargs["expected_nonce"] = "attacker-nonce"
+        with pytest.raises(UnauthorizedError) as exc_info:
+            await service.login_with_oidc(
+                code="c",
+                redirect_uri="https://app.example.com/cb",
+                **kwargs,
+            )
+        assert exc_info.value.code == "oidc.invalid_state"
+
+    async def test_redirect_uri_swapped_at_callback_rejected(self) -> None:
+        users_repo = _make_users_repo(user=_seed_user(email="alice@example.com"))
+        tokens_repo, _ = _make_tokens_repo()
+        client = _FakeOidcClient(
+            token=OIDCTokenResponse(access_token="at", id_token="", token_type="Bearer"),
+            userinfo=_userinfo("alice@example.com"),
+        )
+        service = _make_service(users_repo, tokens_repo, client)
+        with pytest.raises(UnauthorizedError) as exc_info:
+            await service.login_with_oidc(
+                code="c",
+                redirect_uri="https://evil.example.com/cb",
+                **_state_kwargs(),
+            )
+        assert exc_info.value.code == "oidc.invalid_state"

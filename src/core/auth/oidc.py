@@ -14,7 +14,7 @@ import json
 import secrets
 import time
 from dataclasses import dataclass
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 from src.common.exception import (
     ExternalServiceError,
@@ -200,6 +200,7 @@ class OidcService:
         redirect_uri = redirect_uri.strip()
         if not redirect_uri:
             raise ValidationError("redirect_uri is required", code="oidc.invalid_request")
+        self._check_redirect_uri(redirect_uri)
         cfg = await self._load_oidc_config()
         nonce = secrets.token_urlsafe(18)
         state = _sign_state(
@@ -231,14 +232,31 @@ class OidcService:
         *,
         code: str,
         redirect_uri: str,
+        state: str,
+        expected_nonce: str,
     ) -> OIDCCallbackResult:
-        """Exchange ``code`` for provider tokens, bind to an existing local user."""
+        """Exchange ``code`` for provider tokens, bind to an existing local user.
+
+        The ``state`` (echoed back by the provider) is verified against
+        its HMAC, freshness, and embedded ``redirect_uri``; its nonce
+        must match the ``expected_nonce`` the caller's browser carries
+        in the state cookie set when the authorize URL was issued. Both
+        checks close login-CSRF: an attacker's own code/state pair never
+        matches the victim's cookie.
+        """
         code = code.strip()
         redirect_uri = redirect_uri.strip()
         if not code:
             raise ValidationError("code is required", code="oidc.invalid_request")
         if not redirect_uri:
             raise ValidationError("redirect_uri is required", code="oidc.invalid_request")
+        if not expected_nonce.strip():
+            raise UnauthorizedError("OIDC state cookie missing", code="oidc.invalid_state")
+        payload = _verify_state(state)
+        if not hmac.compare_digest(payload.nonce, expected_nonce.strip()):
+            raise UnauthorizedError("OIDC state nonce mismatch", code="oidc.invalid_state")
+        if payload.redirect_uri != redirect_uri:
+            raise UnauthorizedError("OIDC state redirect_uri mismatch", code="oidc.invalid_state")
         cfg = await self._load_oidc_config()
         token_resp = await self._oidc_client.exchange_code(
             token_endpoint=cfg.token_endpoint,
@@ -284,6 +302,24 @@ class OidcService:
         )
 
     # ── Internal helpers ────────────────────────────────────────────
+
+    @staticmethod
+    def _check_redirect_uri(redirect_uri: str) -> None:
+        """Enforce the optional redirect-host whitelist.
+
+        When ``oidc_redirect_allowed_hosts`` is configured, the callback
+        redirect host must be listed; an empty list keeps the historical
+        behavior (the provider's own registered-URI enforcement applies).
+        """
+        allowed = get_settings().oidc_redirect_allowed_hosts
+        if not allowed:
+            return
+        host = (urlparse(redirect_uri).hostname or "").lower()
+        if host not in {entry.lower() for entry in allowed}:
+            raise ValidationError(
+                "redirect_uri host is not allowed",
+                code="oidc.redirect_host_forbidden",
+            )
 
     async def _load_oidc_config(self) -> _OIDCConfig:
         """Load + validate OIDC settings, discovering endpoints if needed."""

@@ -99,6 +99,9 @@ class Settings(BaseSettings):
     oidc_token_endpoint: str = ""
     oidc_user_info_endpoint: str = ""
     oidc_scopes: list[str] = ["openid", "profile", "email"]
+    # Optional host whitelist for the OIDC callback redirect URI; empty
+    # defers to the provider's registered-URI enforcement.
+    oidc_redirect_allowed_hosts: list[str] = []
     # Claim keys to read username/email from the userinfo / id_token.
     oidc_user_info_mapping_username: str = "name"
     oidc_user_info_mapping_email: str = "email"
@@ -109,6 +112,16 @@ class Settings(BaseSettings):
     # calls that authenticate via headers rather than bearer tokens).
     # Defaults mirror the upstream contract (``X-Tenant-ID``,
     # ``X-User-Id``, ``X-Roles``).
+    #
+    # ``header_auth_enabled`` is the deploy-time kill switch for that
+    # channel: the headers assert identity and roles verbatim, so the
+    # channel must stay off unless a trusted gateway strips/overwrites
+    # them for all inbound traffic.
+    header_auth_enabled: bool = False
+    # ``auto_setup_enabled`` gates the unauthenticated /auth/auto-setup
+    # bootstrap that mints a token pair for the default account; off by
+    # default so a public deployment cannot be anonymously signed in.
+    auto_setup_enabled: bool = False
     auth_header_user_id: str = "X-User-Id"
     auth_header_tenant_id: str = "X-Tenant-ID"
     auth_header_roles: str = "X-Roles"
