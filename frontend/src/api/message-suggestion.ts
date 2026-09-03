@@ -1,14 +1,14 @@
 import { get, post } from '@/utils/request'
+import type { components } from '@/api/__generated__/schema'
 
-export interface MessageSuggestionItem {
-  id: string
-  text: string
-  category?: 'clarify' | 'deepen' | 'action'
+type Schema = components['schemas']
+
+export type MessageSuggestionItem = Schema['SuggestionQuestion'] & {
   source: 'model' | 'faq' | 'document' | 'wiki' | string
   knowledge_base_ids?: string[]
 }
 
-export interface MessageSuggestionSet {
+export type MessageSuggestionSet = Partial<Omit<Schema['SuggestionSet'], 'questions'>> & {
   id: string
   session_id: string
   assistant_message_id: string
@@ -20,14 +20,14 @@ export interface MessageSuggestionSet {
 }
 
 export function ensureMessageSuggestions(sessionId: string, messageId: string, regenerate = false) {
-  return post<{ data: MessageSuggestionSet }>(
+  return post<Schema['SuggestionEnvelope']>(
     `/api/v1/sessions/${sessionId}/messages/${messageId}/suggestions`,
     { regenerate },
   )
 }
 
 export function getMessageSuggestions(sessionId: string, messageId: string) {
-  return get<{ data: MessageSuggestionSet }>(
+  return get<Schema['SuggestionEnvelope']>(
     `/api/v1/sessions/${sessionId}/messages/${messageId}/suggestions`,
   )
 }
@@ -38,8 +38,13 @@ export function recordMessageSuggestionEvent(
   eventType: 'impression' | 'click' | 'dismiss',
   questionId = '',
 ) {
+  const body: Schema['SuggestionEventRequest'] = {
+    suggestion_set_id: suggestionSetId,
+    question_id: questionId,
+    event_type: eventType,
+  }
   return post(
     `/api/v1/sessions/${sessionId}/suggestion-events`,
-    { suggestion_set_id: suggestionSetId, question_id: questionId, event_type: eventType },
+    body,
   )
 }

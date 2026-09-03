@@ -7,6 +7,12 @@ const t = (key: string) => i18n.global.t(key)
 // 空间信息接口（从 OpenAPI schema 别名，避免手写字段名漂移）
 export type TenantInfo = components['schemas']['Tenant']
 export type TenantAPIKeyInfo = components['schemas']['TenantAPIKey']
+export type TenantAPIKey = Omit<TenantAPIKeyInfo, 'last_used_at' | 'expires_at' | 'capabilities'> & {
+  api_key: string
+  last_used_at?: string
+  expires_at?: string
+  capabilities?: TenantAPIKeyCapability[]
+}
 export type CreatedTenantAPIKey = components['schemas']['TenantAPIKeyWithToken']
 
 export type APIPrincipalMode = 'tenant' | 'direct_header' | 'signed_token'
