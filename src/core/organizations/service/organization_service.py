@@ -345,7 +345,7 @@ class OrganizationService:
         if existing is None:
             raise self._not_found(id)
 
-        updates: dict[str, object] = {}
+        updates: dict[str, str | bool | int | datetime] = {}
         if name is not None:
             updates["name"] = _require_name(name)
         if description is not None:

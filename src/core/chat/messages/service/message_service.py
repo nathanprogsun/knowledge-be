@@ -40,7 +40,7 @@ from typing import Protocol, runtime_checkable
 
 from src.common.exception import NotFoundError, ValidationError
 from src.common.json import JsonValue
-from src.core.chat.messages.types import MessageSearchMode
+from src.core.chat.messages.types import MessageInfo, MessageSearchMode
 from src.core.chat.pipeline.types import Context
 from src.db.dao.message_repository import MessageRepository
 from src.db.dao.session_repository import SessionRepository
@@ -248,14 +248,14 @@ class MessageService(Protocol):
         self,
         ctx: Context,
         message: Message,
-    ) -> Message: ...
+    ) -> MessageInfo: ...
 
     async def get_message(
         self,
         ctx: Context,
         session_id: str,
         message_id: str,
-    ) -> Message: ...
+    ) -> MessageInfo: ...
 
     async def list_messages_by_session(
         self,
@@ -263,14 +263,14 @@ class MessageService(Protocol):
         session_id: str,
         page: int,
         page_size: int,
-    ) -> list[Message]: ...
+    ) -> list[MessageInfo]: ...
 
     async def get_recent_messages_by_session(
         self,
         ctx: Context,
         session_id: str,
         limit: int,
-    ) -> list[Message]: ...
+    ) -> list[MessageInfo]: ...
 
     async def list_messages_by_session_before_time(
         self,
@@ -278,13 +278,13 @@ class MessageService(Protocol):
         session_id: str,
         before_time: datetime,
         limit: int,
-    ) -> list[Message]: ...
+    ) -> list[MessageInfo]: ...
 
     async def update_message(
         self,
         ctx: Context,
         message: Message,
-    ) -> Message: ...
+    ) -> MessageInfo: ...
 
     async def update_message_images(
         self,
@@ -292,7 +292,7 @@ class MessageService(Protocol):
         session_id: str,
         message_id: str,
         images: JsonValue,
-    ) -> Message: ...
+    ) -> MessageInfo: ...
 
     async def update_message_rendered_content(
         self,
@@ -300,7 +300,7 @@ class MessageService(Protocol):
         session_id: str,
         message_id: str,
         rendered_content: str,
-    ) -> Message: ...
+    ) -> MessageInfo: ...
 
     async def delete_message(
         self,
@@ -419,7 +419,7 @@ class MessageServiceImpl:
         self,
         ctx: Context,
         message: Message,
-    ) -> Message:
+    ) -> MessageInfo:
         """Persist a new message after verifying its session.
 
         ``message`` carries the caller-supplied ``id`` (UUID), the
@@ -428,14 +428,15 @@ class MessageServiceImpl:
         database-assigned timestamps.
         """
         await self._require_session(ctx, message.session_id)
-        return await self._message_repo.create(message)
+        row = await self._message_repo.create(message)
+        return MessageInfo.map_from_db(row)
 
     async def get_message(
         self,
         ctx: Context,
         session_id: str,
         message_id: str,
-    ) -> Message:
+    ) -> MessageInfo:
         """Return one live message by ``(session_id, message_id)``.
 
         Raises ``NotFoundError`` when the row is missing or soft-deleted,
@@ -451,7 +452,7 @@ class MessageServiceImpl:
                 code="message.not_found",
                 message=f"message {message_id} not found in session {session_id}",
             )
-        return row
+        return MessageInfo.map_from_db(row)
 
     async def list_messages_by_session(
         self,
@@ -459,7 +460,7 @@ class MessageServiceImpl:
         session_id: str,
         page: int,
         page_size: int,
-    ) -> list[Message]:
+    ) -> list[MessageInfo]:
         """Paginated session feed, oldest first.
 
         Defaults ``page_size`` to 20 when zero / negative so a sloppy
@@ -470,18 +471,19 @@ class MessageServiceImpl:
             page = 1
         if page_size <= 0:
             page_size = _DEFAULT_PAGE_SIZE
-        return await self._message_repo.list_by_session(
+        rows = await self._message_repo.list_by_session(
             session_id,
             page=page,
             page_size=page_size,
         )
+        return [MessageInfo.map_from_db(row) for row in rows]
 
     async def get_recent_messages_by_session(
         self,
         ctx: Context,
         session_id: str,
         limit: int,
-    ) -> list[Message]:
+    ) -> list[MessageInfo]:
         """Return the most recent messages of a session, chronological.
 
         The persistence layer fetches the newest ``limit`` rows newest-
@@ -489,10 +491,11 @@ class MessageServiceImpl:
         window with user turns first on equal timestamps.
         """
         await self._require_session(ctx, session_id)
-        return await self._message_repo.list_recent_by_session(
+        rows = await self._message_repo.list_recent_by_session(
             session_id,
             limit=limit,
         )
+        return [MessageInfo.map_from_db(row) for row in rows]
 
     async def list_messages_by_session_before_time(
         self,
@@ -500,7 +503,7 @@ class MessageServiceImpl:
         session_id: str,
         before_time: datetime,
         limit: int,
-    ) -> list[Message]:
+    ) -> list[MessageInfo]:
         """Messages of a session created strictly before ``before_time``.
 
         Used by the chat pipeline to assemble history for a turn that
@@ -508,17 +511,18 @@ class MessageServiceImpl:
         is the cutoff.
         """
         await self._require_session(ctx, session_id)
-        return await self._message_repo.list_by_session_before_time(
+        rows = await self._message_repo.list_by_session_before_time(
             session_id,
             before_time=before_time,
             limit=limit,
         )
+        return [MessageInfo.map_from_db(row) for row in rows]
 
     async def update_message(
         self,
         ctx: Context,
         message: Message,
-    ) -> Message:
+    ) -> MessageInfo:
         """Persist the mutable columns of ``message`` back to storage.
 
         Mirrors the upstream ``UpdateMessage``: the identity columns
@@ -541,7 +545,7 @@ class MessageServiceImpl:
                 code="message.not_found",
                 message=f"message {message.id} not found in session {message.session_id}",
             )
-        return updated
+        return MessageInfo.map_from_db(updated)
 
     @staticmethod
     def _mutable_columns(message: Message) -> dict[str, JsonValue]:
@@ -574,7 +578,7 @@ class MessageServiceImpl:
         session_id: str,
         message_id: str,
         images: JsonValue,
-    ) -> Message:
+    ) -> MessageInfo:
         """Overwrite the ``images`` JSONB column of a message."""
         await self._require_session(ctx, session_id)
         updated = await self._message_repo.update_images(
@@ -587,7 +591,7 @@ class MessageServiceImpl:
                 code="message.not_found",
                 message=f"message {message_id} not found in session {session_id}",
             )
-        return updated
+        return MessageInfo.map_from_db(updated)
 
     async def update_message_rendered_content(
         self,
@@ -595,7 +599,7 @@ class MessageServiceImpl:
         session_id: str,
         message_id: str,
         rendered_content: str,
-    ) -> Message:
+    ) -> MessageInfo:
         """Overwrite the ``rendered_content`` column of a user message."""
         await self._require_session(ctx, session_id)
         updated = await self._message_repo.update_rendered_content(
@@ -608,7 +612,7 @@ class MessageServiceImpl:
                 code="message.not_found",
                 message=f"message {message_id} not found in session {session_id}",
             )
-        return updated
+        return MessageInfo.map_from_db(updated)
 
     async def delete_message(
         self,

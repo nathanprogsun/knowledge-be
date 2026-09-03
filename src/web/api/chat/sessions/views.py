@@ -1,18 +1,18 @@
 """Wire-shape conversion for the session endpoints.
 
-Projects the session-domain row (``db.models.session.Session``) onto
-the frozen contract shapes in ``src/core/contracts/sessions.py`` and
-wraps them in the success envelope. The IM-origin fields on the
-contract are joined at read time upstream; this build has no channel
-mapper, so they stay ``None`` (the contract types them nullable).
+Wraps the service-side ``SessionInfo`` projection into the frozen
+contract shapes in ``src/core/contracts/sessions.py`` plus the success
+envelope. The IM-origin fields on the contract are joined at read time
+upstream; this build has no channel mapper, so they stay ``None`` (the
+contract types them nullable).
 """
 
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict
 
+from src.core.chat.sessions.types import SessionInfo
 from src.core.contracts.sessions import Session
-from src.db.models.session import Session as SessionRow
 
 
 class SessionEnvelope(BaseModel):
@@ -58,34 +58,34 @@ class PinSessionEnvelope(BaseModel):
     is_pinned: bool
 
 
-def session_to_contract(row: SessionRow) -> Session:
-    """Project a session row onto the frozen wire contract.
+def session_to_contract(info: SessionInfo) -> Session:
+    """Project the service-side session DTO onto the frozen wire contract.
 
     The IM-origin fields (``im_platform`` etc.) are filled by a
     channel mapper at read time in the upstream; without a channel
     mapping this build emits them as ``None``.
     """
     return Session(
-        id=row.id,
-        title=row.title,
-        description=row.description,
-        tenant_id=row.tenant_id,
-        user_id=row.user_id,
-        is_pinned=row.is_pinned,
-        pinned_at=row.pinned_at,
-        created_at=row.created_at,
-        updated_at=row.updated_at,
-        deleted_at=row.deleted_at,
+        id=info.id,
+        title=info.title,
+        description=info.description,
+        tenant_id=info.tenant_id,
+        user_id=info.user_id,
+        is_pinned=info.is_pinned,
+        pinned_at=info.pinned_at,
+        created_at=info.created_at,
+        updated_at=info.updated_at,
+        deleted_at=info.deleted_at,
     )
 
 
-def session_envelope(row: SessionRow) -> SessionEnvelope:
+def session_envelope(info: SessionInfo) -> SessionEnvelope:
     """Wrap one session in the success envelope."""
-    return SessionEnvelope(success=True, data=session_to_contract(row))
+    return SessionEnvelope(success=True, data=session_to_contract(info))
 
 
 def session_list_envelope(
-    rows: list[SessionRow],
+    rows: list[SessionInfo],
     *,
     total: int,
     page: int,

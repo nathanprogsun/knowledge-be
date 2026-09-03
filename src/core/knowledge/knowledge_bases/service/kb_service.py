@@ -436,7 +436,7 @@ class KBService:
                 message=f"knowledge base {knowledge_base_id} not found",
             )
         # Build the patch dict: skip keys whose caller did not supply.
-        patch: dict[str, object] = {"updated_at": _now()}
+        patch: dict[str, JsonObject | str | datetime | None] = {"updated_at": _now()}
         if name is not None:
             patch["name"] = _require_name(name)
         if description is not None:

@@ -16,6 +16,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict
 
+from src.common.json import JsonValue
 from src.db.models.embed_channel import EmbedChannel
 
 # Defaults applied by the service layer when a field is left empty.
@@ -79,6 +80,49 @@ class EmbedChannelInfo(BaseModel):
         return cls.model_validate(record)
 
 
+class EmbedChannelOwnedInfo(BaseModel):
+    """Service-side projection of an embed-channel row with admin secrets.
+
+    Needed for the admin single-get endpoint so it can return
+    ``publish_token`` and a ``has_webhook_secret`` flag. The raw
+    webhook secret value never crosses the web boundary.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    tenant_id: int
+    agent_id: str
+    name: str
+    enabled: bool
+    allowed_origins: JsonValue
+    welcome_message: str
+    rate_limit_per_minute: int
+    rate_limit_per_day: int
+    primary_color: str
+    page_title: str
+    header_title_mode: str
+    show_suggested_questions: bool
+    widget_position: str
+    allow_web_search: bool
+    allow_file_upload: bool
+    default_locale: str
+    webhook_url: str
+    has_webhook_secret: bool
+    publish_token: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def map_from_db(cls, db: EmbedChannel) -> Self:
+        record = db.model_dump()
+        record["has_webhook_secret"] = bool(record.get("webhook_secret") or "")
+        record["publish_token"] = record.get("publish_token") or None
+        record.pop("webhook_secret", None)
+        record.pop("deleted_at", None)
+        return cls.model_validate(record)
+
+
 __all__ = [
     "EMBED_DEFAULT_HEADER_TITLE_MODE",
     "EMBED_DEFAULT_RATE_LIMIT_PER_DAY",
@@ -88,4 +132,5 @@ __all__ = [
     "EMBED_SUPPORTED_LOCALES",
     "EMBED_WIDGET_POSITIONS",
     "EmbedChannelInfo",
+    "EmbedChannelOwnedInfo",
 ]

@@ -667,7 +667,8 @@ async def test_update_message_rendered_content_delegates_to_repo() -> None:
     updated = await service.update_message_rendered_content(_Ctx(), "sess-1", "msg-1", "rendered")
 
     # Assert
-    assert updated.rendered_content == "rendered"
+    assert updated.id == "msg-1"
+    assert updated.session_id == "sess-1"
     assert repo.rendered_updates == [("sess-1", "msg-1", "rendered")]
 
 

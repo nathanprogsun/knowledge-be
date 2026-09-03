@@ -195,9 +195,9 @@ def test_create_session_returns_201_envelope() -> None:
     assert body["data"]["tenant_id"] == 7
     assert body["data"]["user_id"] == "u-1"
     assert "created_at" in body["data"]
-    created = fake.create.await_args.args[0]
-    assert created.tenant_id == 7
-    assert created.title == "new chat"
+    created_kwargs = fake.create.await_args.kwargs
+    assert created_kwargs["title"] == "new chat"
+    assert created_kwargs["description"] == "d"
 
 
 def test_get_session_returns_envelope() -> None:
@@ -281,9 +281,10 @@ def test_update_session_returns_stored_row() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["data"]["title"] == "renamed"
-    updated = fake.update.await_args.args[0]
-    assert updated.id == "sess-1"
-    assert updated.title == "renamed"
+    updated_kwargs = fake.update.await_args.kwargs
+    assert updated_kwargs["session_id"] == "sess-1"
+    assert updated_kwargs["title"] == "renamed"
+    assert updated_kwargs["description"] == "new desc"
 
 
 def test_delete_session_returns_message() -> None:

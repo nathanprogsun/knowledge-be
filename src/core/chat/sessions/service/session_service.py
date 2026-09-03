@@ -39,6 +39,7 @@ from src.core.chat.sessions.title_gen import (
     TitleGenerator,
     TitleGeneratorLike,
 )
+from src.core.chat.sessions.types import SessionInfo
 from src.db.dao.session_repository import SessionRepository
 from src.db.models.message import Message
 from src.db.models.session import Session
@@ -176,41 +177,38 @@ class SessionService:
 
     # ── Create ──────────────────────────────────────────────────────
 
-    async def create(self, session: Session) -> Session:
-        """Insert a new session row.
+    async def create(
+        self,
+        *,
+        title: str | None = None,
+        description: str | None = None,
+        session_id: str = "",
+    ) -> SessionInfo:
+        """Insert a new session row for the caller and return its projection.
 
-        Mints a fresh UUID ``id`` when the caller did not supply one,
-        stamps ``created_at`` / ``updated_at`` to the current time, and
-        delegates to the repository. The tenant id must match the
-        caller's active tenant; cross-tenant creation is rejected.
+        Mints a fresh UUID ``id`` when the caller did not supply one and
+        stamps ``created_at`` / ``updated_at`` to the current time. The
+        tenant and owner are always the caller's — cross-tenant creation
+        is structurally impossible through this path.
         """
-        if session.tenant_id <= 0:
-            raise ValidationError(
-                code="session.invalid_tenant_id",
-                message="session.tenant_id must be positive",
-            )
-        if session.tenant_id != self._tenant_id:
-            raise ValidationError(
-                code="session.tenant_mismatch",
-                message="session.tenant_id does not match the active tenant",
-            )
         now = _now()
         new_row = Session(
-            id=session.id or _new_id(),
-            tenant_id=session.tenant_id,
-            title=session.title,
-            description=session.description,
-            user_id=session.user_id or self._user_id,
+            id=session_id.strip() or _new_id(),
+            tenant_id=self._tenant_id,
+            title=title,
+            description=description,
+            user_id=self._user_id,
             is_pinned=False,
             pinned_at=None,
             created_at=now,
             updated_at=now,
         )
-        return await self._session_repo.create(new_row)
+        created = await self._session_repo.create(new_row)
+        return SessionInfo.from_row(created)
 
     # ── Read ────────────────────────────────────────────────────────
 
-    async def get(self, session_id: str) -> Session:
+    async def get(self, session_id: str) -> SessionInfo:
         """Return a live session visible to the caller, or raise."""
         if not session_id or not session_id.strip():
             raise ValidationError(
@@ -227,9 +225,9 @@ class SessionService:
                 code="session.not_found",
                 message=f"session {session_id} not found",
             )
-        return row
+        return SessionInfo.from_row(row)
 
-    async def get_by_id(self, session_id: str) -> Session | None:
+    async def get_by_id(self, session_id: str) -> SessionInfo | None:
         """Return a live session by id, ignoring the owner scope.
 
         Tenant-scoped only — a non-admin caller should normally use
@@ -241,22 +239,24 @@ class SessionService:
                 code="session.id_required",
                 message="session id is required",
             )
-        return await self._session_repo.get_by_id(
+        row = await self._session_repo.get_by_id(
             tenant_id=self._tenant_id,
             id=session_id,
         )
+        return SessionInfo.from_row(row) if row is not None else None
 
-    async def list_all(self) -> list[Session]:
+    async def list_all(self) -> list[SessionInfo]:
         """Every live session of the caller's tenant, newest first."""
-        return await self._session_repo.list_by_tenant(
+        rows = await self._session_repo.list_by_tenant(
             tenant_id=self._tenant_id,
             user_id=self._user_id,
         )
+        return [SessionInfo.from_row(row) for row in rows]
 
     async def list_paged(
         self,
         pagination: Pagination,
-    ) -> PaginationResponse[Session]:
+    ) -> PaginationResponse[SessionInfo]:
         """One page of the tenant's sessions plus the total count."""
         rows, total = await self._session_repo.list_paged(
             tenant_id=self._tenant_id,
@@ -264,17 +264,17 @@ class SessionService:
             page=pagination.page,
             page_size=pagination.page_size,
         )
-        return PaginationResponse[Session](
+        return PaginationResponse[SessionInfo](
             total=total,
             page=pagination.page,
             page_size=pagination.page_size,
-            data=rows,
+            data=[SessionInfo.from_row(row) for row in rows],
         )
 
     async def list_with_filters(
         self,
         query: SessionListQuery,
-    ) -> PaginationResponse[Session]:
+    ) -> PaginationResponse[SessionInfo]:
         """Search the tenant's sessions by title, with pagination.
 
         The owner scope is applied unless ``source`` names a channel
@@ -290,11 +290,11 @@ class SessionService:
             page_size=query.page_size,
             keyword=query.keyword,
         )
-        return PaginationResponse[Session](
+        return PaginationResponse[SessionInfo](
             total=total,
             page=query.page,
             page_size=query.page_size,
-            data=rows,
+            data=[SessionInfo.from_row(row) for row in rows],
         )
 
     # ── Pin toggle ───────────────────────────────────────────────────
@@ -320,7 +320,13 @@ class SessionService:
 
     # ── Update ──────────────────────────────────────────────────────
 
-    async def update(self, session: Session) -> Session:
+    async def update(
+        self,
+        *,
+        session_id: str,
+        title: str | None = None,
+        description: str | None = None,
+    ) -> SessionInfo:
         """Overwrite the mutable columns of an existing session.
 
         The owner scope is enforced by the repository: a caller
@@ -328,24 +334,19 @@ class SessionService:
         is ``title`` / ``description``; ``is_pinned`` and
         ``pinned_at`` move through :meth:`set_pinned` instead.
         """
-        if not session.id or not session.id.strip():
+        if not session_id or not session_id.strip():
             raise ValidationError(
                 code="session.id_required",
                 message="session id is required",
             )
-        if session.tenant_id != self._tenant_id:
-            raise ValidationError(
-                code="session.tenant_mismatch",
-                message="session.tenant_id does not match the active tenant",
-            )
-        existing = await self.get(session.id)
+        existing = await self.get(session_id)
         now = _now()
-        return await self._session_repo.update(
+        updated = await self._session_repo.update(
             Session(
                 id=existing.id,
                 tenant_id=existing.tenant_id,
-                title=session.title,
-                description=session.description,
+                title=title,
+                description=description,
                 user_id=existing.user_id,
                 is_pinned=existing.is_pinned,
                 pinned_at=existing.pinned_at,
@@ -354,6 +355,7 @@ class SessionService:
             ),
             user_id=self._user_id,
         )
+        return SessionInfo.from_row(updated)
 
     # ── Delete ──────────────────────────────────────────────────────
 

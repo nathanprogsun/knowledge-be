@@ -24,6 +24,7 @@ from src.common.exception import (
     ValidationError,
 )
 from src.core.auth.permissions import TenantRole
+from src.core.sharing.types import AgentShareInfo
 from src.db.dao.agent_share_repository import AgentShareRepository
 from src.db.dao.custom_agent_repository import CustomAgentRepository
 from src.db.dao.organization_repository import (
@@ -57,7 +58,7 @@ class AgentShareService(Protocol):
         user_id: str,
         tenant_id: int,
         permission: str,
-    ) -> AgentShare: ...
+    ) -> AgentShareInfo: ...
 
     async def update_share_permission(
         self,
@@ -78,22 +79,22 @@ class AgentShareService(Protocol):
         tenant_role: str,
     ) -> None: ...
 
-    async def get_share(self, *, share_id: str) -> AgentShare: ...
+    async def get_share(self, *, share_id: str) -> AgentShareInfo: ...
 
     async def get_share_by_agent_and_org(
         self,
         *,
         agent_id: str,
         organization_id: str,
-    ) -> AgentShare: ...
+    ) -> AgentShareInfo: ...
 
-    async def list_shares_by_agent(self, *, agent_id: str) -> list[AgentShare]: ...
+    async def list_shares_by_agent(self, *, agent_id: str) -> list[AgentShareInfo]: ...
 
     async def list_shares_by_organization(
         self,
         *,
         organization_id: str,
-    ) -> list[AgentShare]: ...
+    ) -> list[AgentShareInfo]: ...
 
 
 class AgentShareServiceImpl:
@@ -122,7 +123,7 @@ class AgentShareServiceImpl:
         user_id: str,
         tenant_id: int,
         permission: str,
-    ) -> AgentShare:
+    ) -> AgentShareInfo:
         """Share an owned agent into an organization as a read-only grant.
 
         The agent must exist and belong to the caller's tenant, be
@@ -183,7 +184,7 @@ class AgentShareServiceImpl:
         )
         created = await self._share_repo.create_or_none(share)
         if created is not None:
-            return created
+            return AgentShareInfo.map_from_db(created)
 
         # Duplicate live share: upgrade the existing row to viewer.
         existing = await self._share_repo.get_by_agent_and_org_or_none(
@@ -198,7 +199,8 @@ class AgentShareServiceImpl:
         upgraded = existing.model_copy(
             update={"permission": SHARE_PERMISSION_VIEWER, "updated_at": now}
         )
-        return await self._share_repo.update(upgraded)
+        updated = await self._share_repo.update(upgraded)
+        return AgentShareInfo.map_from_db(updated)
 
     # ── Update ──────────────────────────────────────────────────────
 
@@ -259,7 +261,7 @@ class AgentShareServiceImpl:
 
     # ── Reads ───────────────────────────────────────────────────────
 
-    async def get_share(self, *, share_id: str) -> AgentShare:
+    async def get_share(self, *, share_id: str) -> AgentShareInfo:
         """Return one live share row, or raise ``NotFoundError``."""
         share = await self._share_repo.get_by_id_or_none(share_id)
         if share is None:
@@ -267,14 +269,14 @@ class AgentShareServiceImpl:
                 code=_SHARE_NOT_FOUND_CODE,
                 message=f"agent share {share_id} not found",
             )
-        return share
+        return AgentShareInfo.map_from_db(share)
 
     async def get_share_by_agent_and_org(
         self,
         *,
         agent_id: str,
         organization_id: str,
-    ) -> AgentShare:
+    ) -> AgentShareInfo:
         """Return the live share for the (agent, org) pair, or raise."""
         share = await self._share_repo.get_by_agent_and_org_or_none(
             agent_id=agent_id,
@@ -285,19 +287,21 @@ class AgentShareServiceImpl:
                 code=_SHARE_NOT_FOUND_CODE,
                 message=f"agent {agent_id} is not shared into {organization_id}",
             )
-        return share
+        return AgentShareInfo.map_from_db(share)
 
-    async def list_shares_by_agent(self, *, agent_id: str) -> list[AgentShare]:
+    async def list_shares_by_agent(self, *, agent_id: str) -> list[AgentShareInfo]:
         """Return every live share of one agent, newest first."""
-        return await self._share_repo.list_by_agent(agent_id)
+        rows = await self._share_repo.list_by_agent(agent_id)
+        return [AgentShareInfo.map_from_db(row) for row in rows]
 
     async def list_shares_by_organization(
         self,
         *,
         organization_id: str,
-    ) -> list[AgentShare]:
+    ) -> list[AgentShareInfo]:
         """Return every live share into one organization, newest first."""
-        return await self._share_repo.list_by_organization(organization_id)
+        rows = await self._share_repo.list_by_organization(organization_id)
+        return [AgentShareInfo.map_from_db(row) for row in rows]
 
     # ── Authorization ───────────────────────────────────────────────
 

@@ -24,6 +24,7 @@ from src.core.chat.messages import (
     MessageSearchResult,
 )
 from src.core.chat.messages.suggestion_service import MessageSuggestionSet
+from src.core.chat.messages.types import MessageInfo
 from src.core.contracts.sessions import (
     ChatHistoryStats,
     KnowledgeReference,
@@ -33,7 +34,6 @@ from src.core.contracts.sessions import (
     SuggestionQuestion,
     SuggestionSet,
 )
-from src.db.models.message import Message as MessageRow
 
 
 class MessageLoadEnvelope(BaseModel):
@@ -81,33 +81,33 @@ class SuggestionEnvelope(BaseModel):
     data: SuggestionSet | None
 
 
-def message_to_contract(row: MessageRow) -> Message:
+def message_to_contract(info: MessageInfo) -> Message:
     """Project a message row onto the frozen wire contract.
 
     The contract omits the storage-only columns (``rendered_content``,
     ``agent_id``, ``execution_context``, ...), so they are dropped here.
     """
     return Message(
-        id=row.id,
-        session_id=row.session_id,
-        request_id=row.request_id or None,
-        role=row.role,
-        content=row.content,
-        knowledge_references=_coerce_references(row.knowledge_references),
-        agent_steps=_json_objects(row.agent_steps),
-        is_completed=row.is_completed,
-        is_fallback=row.is_fallback,
-        agent_duration_ms=row.agent_duration_ms or None,
-        mentioned_items=_json_objects(row.mentioned_items),
-        images=_json_objects(row.images),
-        channel=row.channel or None,
-        created_at=row.created_at,
-        updated_at=row.updated_at,
-        deleted_at=row.deleted_at,
+        id=info.id,
+        session_id=info.session_id,
+        request_id=info.request_id or None,
+        role=info.role,
+        content=info.content,
+        knowledge_references=_coerce_references(info.knowledge_references),
+        agent_steps=_json_objects(info.agent_steps),
+        is_completed=info.is_completed,
+        is_fallback=info.is_fallback,
+        agent_duration_ms=info.agent_duration_ms or None,
+        mentioned_items=_json_objects(info.mentioned_items),
+        images=_json_objects(info.images),
+        channel=info.channel or None,
+        created_at=info.created_at,
+        updated_at=info.updated_at,
+        deleted_at=info.deleted_at,
     )
 
 
-def message_load_envelope(rows: list[MessageRow]) -> MessageLoadEnvelope:
+def message_load_envelope(rows: list[MessageInfo]) -> MessageLoadEnvelope:
     """Wrap a message page in the success envelope."""
     return MessageLoadEnvelope(
         success=True,

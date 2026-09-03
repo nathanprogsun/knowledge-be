@@ -12,7 +12,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from src.db.models.user_resource_favorite import UserResourceFavorite
+from src.core.system.types import FavoriteInfo
 
 
 class FavoriteEntry(BaseModel):
@@ -54,18 +54,18 @@ class FavoriteMutationResponse(BaseModel):
     success: bool
 
 
-def favorite_to_response(row: UserResourceFavorite) -> FavoriteEntry:
-    """Project one storage row to the wire shape."""
+def favorite_to_response(info: FavoriteInfo) -> FavoriteEntry:
+    """Project one service DTO onto the wire shape."""
     return FavoriteEntry(
-        user_id=row.user_id,
-        tenant_id=row.tenant_id,
-        resource_type=row.resource_type,
-        resource_id=row.resource_id,
-        created_at=row.created_at,
+        user_id=info.user_id,
+        tenant_id=info.tenant_id,
+        resource_type=info.resource_type,
+        resource_id=info.resource_id,
+        created_at=info.created_at,
     )
 
 
-def favorites_list_response(rows: list[UserResourceFavorite]) -> FavoritesListResponse:
+def favorites_list_response(rows: list[FavoriteInfo]) -> FavoritesListResponse:
     """Wrap a list of storage rows into the standard envelope."""
     return FavoritesListResponse(success=True, data=[favorite_to_response(r) for r in rows])
 

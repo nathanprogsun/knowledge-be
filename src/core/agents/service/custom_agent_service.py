@@ -220,7 +220,7 @@ class CustomAgentService:
                 code="agent.cannot_modify_builtin",
                 message="cannot modify built-in agent basic info",
             )
-        patch: dict[str, object] = {"updated_at": _now()}
+        patch: dict[str, JsonObject | str | datetime] = {"updated_at": _now()}
         if name is not None:
             patch["name"] = _require_name(name)
         if description is not None:
