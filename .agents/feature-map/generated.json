@@ -1,0 +1,1874 @@
+{
+  "generated_by": "scripts/build_feature_map.py",
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/api/v1/agent-chat/{session_id}",
+      "file": "src/web/api/chat/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agents",
+      "file": "src/web/api/agents/router.py",
+      "domain": "agents"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/agents",
+      "file": "src/web/api/agents/router.py",
+      "domain": "agents"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agents/placeholders",
+      "file": "src/web/api/agents/router.py",
+      "domain": "agents"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agents/type-presets",
+      "file": "src/web/api/agents/router.py",
+      "domain": "agents"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agents/{agent_id}/embed-channels",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/agents/{agent_id}/embed-channels",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/agents/{id}",
+      "file": "src/web/api/agents/router.py",
+      "domain": "agents"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agents/{id}",
+      "file": "src/web/api/agents/router.py",
+      "domain": "agents"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/agents/{id}",
+      "file": "src/web/api/agents/router.py",
+      "domain": "agents"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/agents/{id}/copy",
+      "file": "src/web/api/agents/router.py",
+      "domain": "agents"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/agents/{id}/suggested-questions",
+      "file": "src/web/api/agents/router.py",
+      "domain": "agents"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/auto-setup",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/change-password",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/config",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/invitations/lookup",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/auth/me/preferences",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oidc/callback",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oidc/config",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/oidc/url",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/refresh",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/register",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/register-by-invite",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/tenant",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/validate",
+      "file": "src/web/api/auth/router.py",
+      "domain": "auth"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/chunks/by-id/{id}",
+      "file": "src/web/api/knowledge/chunks/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/chunks/by-id/{id}/questions",
+      "file": "src/web/api/knowledge/chunks/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/chunks/by-id/{id}/questions",
+      "file": "src/web/api/knowledge/chunks/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/chunks/by-id/{id}/questions/regenerate",
+      "file": "src/web/api/knowledge/chunks/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/chunks/{knowledge_id}",
+      "file": "src/web/api/knowledge/chunks/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/chunks/{knowledge_id}",
+      "file": "src/web/api/knowledge/chunks/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/chunks/{knowledge_id}/{id}",
+      "file": "src/web/api/knowledge/chunks/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/chunks/{knowledge_id}/{id}",
+      "file": "src/web/api/knowledge/chunks/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/chunks/{knowledge_id}/{id}/revert",
+      "file": "src/web/api/knowledge/chunks/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/chunks/{knowledge_id}/{id}/revisions",
+      "file": "src/web/api/knowledge/chunks/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/cloud/credentials",
+      "file": "src/web/api/cloud/router.py",
+      "domain": "cloud"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/datasource",
+      "file": "src/web/api/infra/datasources/router.py",
+      "domain": "datasources"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/datasource",
+      "file": "src/web/api/infra/datasources/router.py",
+      "domain": "datasources"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/datasource/logs/{log_id}",
+      "file": "src/web/api/infra/datasources/router.py",
+      "domain": "datasources"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/datasource/types",
+      "file": "src/web/api/infra/datasources/router.py",
+      "domain": "datasources"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/datasource/validate-credentials",
+      "file": "src/web/api/infra/datasources/router.py",
+      "domain": "datasources"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/datasource/{id}",
+      "file": "src/web/api/infra/datasources/router.py",
+      "domain": "datasources"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/datasource/{id}",
+      "file": "src/web/api/infra/datasources/router.py",
+      "domain": "datasources"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/datasource/{id}",
+      "file": "src/web/api/infra/datasources/router.py",
+      "domain": "datasources"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/datasource/{id}/logs",
+      "file": "src/web/api/infra/datasources/router.py",
+      "domain": "datasources"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/datasource/{id}/pause",
+      "file": "src/web/api/infra/datasources/router.py",
+      "domain": "datasources"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/datasource/{id}/resource-ancestors",
+      "file": "src/web/api/infra/datasources/router.py",
+      "domain": "datasources"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/datasource/{id}/resources",
+      "file": "src/web/api/infra/datasources/router.py",
+      "domain": "datasources"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/datasource/{id}/resume",
+      "file": "src/web/api/infra/datasources/router.py",
+      "domain": "datasources"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/datasource/{id}/sync",
+      "file": "src/web/api/infra/datasources/router.py",
+      "domain": "datasources"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/datasource/{id}/validate",
+      "file": "src/web/api/infra/datasources/router.py",
+      "domain": "datasources"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/embed-channels",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/embed-channels/{channel_id}",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/embed-channels/{channel_id}",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/embed-channels/{channel_id}",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/embed-channels/{channel_id}/preview-session",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/embed-channels/{channel_id}/rotate-token",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/embed-channels/{channel_id}/stats",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/embed/{channel_id}/agent-chat/{session_id}",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/embed/{channel_id}/chunks/{chunk_id}",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/embed/{channel_id}/config",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/embed/{channel_id}/exchange",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/embed/{channel_id}/files",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/embed/{channel_id}/knowledge-chat/{session_id}",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/embed/{channel_id}/messages/{session_id}/load",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/embed/{channel_id}/sessions",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/embed/{channel_id}/sessions/{session_id}/events",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/embed/{channel_id}/sessions/{session_id}/mcp-oauth-resolutions/{pending_id}",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/embed/{channel_id}/sessions/{session_id}/mcp-oauth-resolutions/{pending_id}/cancel",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/embed/{channel_id}/sessions/{session_id}/mcp-services/{service_id}/oauth/authorize-url",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/embed/{channel_id}/sessions/{session_id}/mcp-services/{service_id}/oauth/status",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/embed/{channel_id}/sessions/{session_id}/messages/{message_id}/suggestions",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/embed/{channel_id}/sessions/{session_id}/messages/{message_id}/suggestions",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/embed/{channel_id}/sessions/{session_id}/stop",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/embed/{channel_id}/sessions/{session_id}/suggestion-events",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/embed/{channel_id}/sessions/{session_id}/tool-approvals/{pending_id}",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/embed/{channel_id}/suggested-questions",
+      "file": "src/web/api/channels/embed/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/evaluation",
+      "file": "src/web/api/evaluation/router.py",
+      "domain": "evaluation"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/evaluation",
+      "file": "src/web/api/evaluation/router.py",
+      "domain": "evaluation"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/faq/import/progress/{task_id}",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/initialization/asr/check",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/initialization/embedding/test",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/initialization/extract/fabri-tag",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/initialization/extract/fabri-text",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/initialization/extract/text-relation",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/initialization/multimodal/test",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/initialization/ollama/download/progress/{task_id}",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/initialization/ollama/download/tasks",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/initialization/ollama/models",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/initialization/ollama/models/check",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/initialization/ollama/models/download",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/initialization/ollama/status",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/initialization/remote/check",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/initialization/rerank/check",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge-bases",
+      "file": "src/web/api/knowledge_bases/router.py",
+      "domain": "knowledge_bases"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-bases",
+      "file": "src/web/api/knowledge_bases/router.py",
+      "domain": "knowledge_bases"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-bases/copy",
+      "file": "src/web/api/knowledge_bases/router.py",
+      "domain": "knowledge_bases"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/knowledge-bases/{id}",
+      "file": "src/web/api/knowledge_bases/router.py",
+      "domain": "knowledge_bases"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge-bases/{id}",
+      "file": "src/web/api/knowledge_bases/router.py",
+      "domain": "knowledge_bases"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledge-bases/{id}",
+      "file": "src/web/api/knowledge_bases/router.py",
+      "domain": "knowledge_bases"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-bases/{id}/duplicate",
+      "file": "src/web/api/knowledge_bases/router.py",
+      "domain": "knowledge_bases"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/knowledge-bases/{id}/faq/entries",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge-bases/{id}/faq/entries",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-bases/{id}/faq/entries",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge-bases/{id}/faq/entries/export",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge-bases/{id}/faq/entries/{entry_id}",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledge-bases/{id}/faq/entries/{entry_id}",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-bases/{id}/faq/entry",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge-bases/{id}/hybrid-search",
+      "file": "src/web/api/knowledge_bases/router.py",
+      "domain": "knowledge_bases"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-bases/{id}/hybrid-search",
+      "file": "src/web/api/knowledge_bases/router.py",
+      "domain": "knowledge_bases"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge-bases/{id}/knowledge",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-bases/{id}/knowledge/file",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-bases/{id}/knowledge/manual",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-bases/{id}/knowledge/passage",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-bases/{id}/knowledge/url",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge-bases/{id}/move-targets",
+      "file": "src/web/api/knowledge_bases/router.py",
+      "domain": "knowledge_bases"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge-bases/{id}/tags",
+      "file": "src/web/api/knowledge/tags/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-bases/{id}/tags",
+      "file": "src/web/api/knowledge/tags/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/knowledge-bases/{id}/tags/{tag_id}",
+      "file": "src/web/api/knowledge/tags/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledge-bases/{id}/tags/{tag_id}",
+      "file": "src/web/api/knowledge/tags/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge-bases/{kb_id}/files",
+      "file": "src/web/api/files/router.py",
+      "domain": "files"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-chat/{session_id}",
+      "file": "src/web/api/chat/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-search",
+      "file": "src/web/api/chat/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge/batch-delete",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge/batch-reparse",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge/move",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/move/progress/{task_id}",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledge/tags",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/knowledge/{id}",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/{id}",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledge/{id}",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge/{id}/cancel-parse",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge/{id}/clone",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge/{id}/reparse",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/auto-fix",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/folders",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/folders",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/folders/{folder_id}",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/folders/{folder_id}",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/graph",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/index",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/lint",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/move-page",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/pages",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/pages",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/pages/{slug:path}",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/pages/{slug:path}",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/pages/{slug:path}",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/rebuild-links",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/search",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/stats",
+      "file": "src/web/api/knowledge/wiki/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/mcp-services",
+      "file": "src/web/api/infra/mcp_services/router.py",
+      "domain": "mcp_services"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/mcp-services",
+      "file": "src/web/api/infra/mcp_services/router.py",
+      "domain": "mcp_services"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/mcp-services/{service_id}",
+      "file": "src/web/api/infra/mcp_services/router.py",
+      "domain": "mcp_services"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/mcp-services/{service_id}",
+      "file": "src/web/api/infra/mcp_services/router.py",
+      "domain": "mcp_services"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/mcp-services/{service_id}",
+      "file": "src/web/api/infra/mcp_services/router.py",
+      "domain": "mcp_services"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/mcp-services/{service_id}/oauth/authorize-url",
+      "file": "src/web/api/infra/mcp_services/router.py",
+      "domain": "mcp_services"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/mcp-services/{service_id}/oauth/status",
+      "file": "src/web/api/infra/mcp_services/router.py",
+      "domain": "mcp_services"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/mcp-services/{service_id}/oauth/token",
+      "file": "src/web/api/infra/mcp_services/router.py",
+      "domain": "mcp_services"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/mcp-services/{service_id}/resources",
+      "file": "src/web/api/infra/mcp_services/router.py",
+      "domain": "mcp_services"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/mcp-services/{service_id}/test",
+      "file": "src/web/api/infra/mcp_services/router.py",
+      "domain": "mcp_services"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/mcp-services/{service_id}/tool-approvals",
+      "file": "src/web/api/infra/mcp_services/router.py",
+      "domain": "mcp_services"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/mcp-services/{service_id}/tool-approvals/{tool_name}",
+      "file": "src/web/api/infra/mcp_services/router.py",
+      "domain": "mcp_services"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/mcp-services/{service_id}/tools",
+      "file": "src/web/api/infra/mcp_services/router.py",
+      "domain": "mcp_services"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/me/invitations/pending-count",
+      "file": "src/web/api/me/router.py",
+      "domain": "me"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/messages/chat-history-stats",
+      "file": "src/web/api/chat/messages/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/messages/search",
+      "file": "src/web/api/chat/messages/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/messages/{session_id}/load",
+      "file": "src/web/api/chat/messages/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/messages/{session_id}/{message_id}",
+      "file": "src/web/api/chat/messages/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/models",
+      "file": "src/web/api/infra/models/router.py",
+      "domain": "models"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/models",
+      "file": "src/web/api/infra/models/router.py",
+      "domain": "models"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/models/cloud/status",
+      "file": "src/web/api/infra/models/router.py",
+      "domain": "models"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/models/providers",
+      "file": "src/web/api/infra/models/router.py",
+      "domain": "models"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/models/{model_id}",
+      "file": "src/web/api/infra/models/router.py",
+      "domain": "models"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/models/{model_id}",
+      "file": "src/web/api/infra/models/router.py",
+      "domain": "models"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/models/{model_id}",
+      "file": "src/web/api/infra/models/router.py",
+      "domain": "models"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/models/{model_id}/debug",
+      "file": "src/web/api/infra/models/router.py",
+      "domain": "models"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organizations",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/organizations",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/organizations/join",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/organizations/join-by-id",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/organizations/join-request",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organizations/preview/{code}",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organizations/search",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/organizations/{id}",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organizations/{id}",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/organizations/{id}",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/organizations/{id}/invite",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/organizations/{id}/invite-code",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organizations/{id}/join-requests",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/organizations/{id}/join-requests/{request_id}/review",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/organizations/{id}/leave",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organizations/{id}/members",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/organizations/{id}/members/{tenant_id}",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/organizations/{id}/members/{tenant_id}",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/organizations/{id}/request-upgrade",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organizations/{id}/search-tenants",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organizations/{id}/search-users",
+      "file": "src/web/api/organizations/router.py",
+      "domain": "organizations"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sessions",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/sessions",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/sessions/batch",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/sessions/{session_id}",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sessions/{session_id}",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/sessions/{session_id}",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/sessions/{session_id}/messages",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sessions/{session_id}/messages/{message_id}/suggestions",
+      "file": "src/web/api/chat/messages/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/sessions/{session_id}/messages/{message_id}/suggestions",
+      "file": "src/web/api/chat/messages/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/sessions/{session_id}/pin",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/sessions/{session_id}/pin",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/sessions/{session_id}/suggestion-events",
+      "file": "src/web/api/chat/messages/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/storage-backends",
+      "file": "src/web/api/infra/storage_backends/router.py",
+      "domain": "storage_backends"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/storage-backends",
+      "file": "src/web/api/infra/storage_backends/router.py",
+      "domain": "storage_backends"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/storage-backends/test",
+      "file": "src/web/api/infra/storage_backends/router.py",
+      "domain": "storage_backends"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/storage-backends/types",
+      "file": "src/web/api/infra/storage_backends/router.py",
+      "domain": "storage_backends"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/storage-backends/{id}",
+      "file": "src/web/api/infra/storage_backends/router.py",
+      "domain": "storage_backends"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/storage-backends/{id}",
+      "file": "src/web/api/infra/storage_backends/router.py",
+      "domain": "storage_backends"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/storage-backends/{id}",
+      "file": "src/web/api/infra/storage_backends/router.py",
+      "domain": "storage_backends"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/storage-backends/{id}/default",
+      "file": "src/web/api/infra/storage_backends/router.py",
+      "domain": "storage_backends"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/storage-backends/{id}/test",
+      "file": "src/web/api/infra/storage_backends/router.py",
+      "domain": "storage_backends"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/system/admin/audit-log",
+      "file": "src/web/api/system/router.py",
+      "domain": "system"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/system/admin/settings",
+      "file": "src/web/api/system/router.py",
+      "domain": "system"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/system/admin/settings/{key}",
+      "file": "src/web/api/system/router.py",
+      "domain": "system"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/system/admin/settings/{key}",
+      "file": "src/web/api/system/router.py",
+      "domain": "system"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/system/admin/settings/{key}",
+      "file": "src/web/api/system/router.py",
+      "domain": "system"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/system/info",
+      "file": "src/web/api/system/router.py",
+      "domain": "system"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/all",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/kv/{key}",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/tenants/kv/{key}",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/search",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/tenants/{tenant_id}",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/tenants/{tenant_id}",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/api-keys",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/api-keys",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/tenants/{tenant_id}/api-keys/{key_id}",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/api-principal-config",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/tenants/{tenant_id}/api-principal-config",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/user/favorites",
+      "file": "src/web/api/favorites/router.py",
+      "domain": "favorites"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/user/favorites",
+      "file": "src/web/api/favorites/router.py",
+      "domain": "favorites"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/user/favorites/{type}/{id}",
+      "file": "src/web/api/favorites/router.py",
+      "domain": "favorites"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/vector-stores",
+      "file": "src/web/api/infra/vector_stores/router.py",
+      "domain": "vector_stores"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/vector-stores",
+      "file": "src/web/api/infra/vector_stores/router.py",
+      "domain": "vector_stores"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/vector-stores/test",
+      "file": "src/web/api/infra/vector_stores/router.py",
+      "domain": "vector_stores"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/vector-stores/types",
+      "file": "src/web/api/infra/vector_stores/router.py",
+      "domain": "vector_stores"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/vector-stores/{store_id}",
+      "file": "src/web/api/infra/vector_stores/router.py",
+      "domain": "vector_stores"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/vector-stores/{store_id}",
+      "file": "src/web/api/infra/vector_stores/router.py",
+      "domain": "vector_stores"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/vector-stores/{store_id}",
+      "file": "src/web/api/infra/vector_stores/router.py",
+      "domain": "vector_stores"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/vector-stores/{store_id}/test",
+      "file": "src/web/api/infra/vector_stores/router.py",
+      "domain": "vector_stores"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/web-search-providers",
+      "file": "src/web/api/infra/web_search/router.py",
+      "domain": "web_search"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/web-search-providers",
+      "file": "src/web/api/infra/web_search/router.py",
+      "domain": "web_search"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/web-search-providers/test",
+      "file": "src/web/api/infra/web_search/router.py",
+      "domain": "web_search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/web-search-providers/types",
+      "file": "src/web/api/infra/web_search/router.py",
+      "domain": "web_search"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/web-search-providers/{provider_id}",
+      "file": "src/web/api/infra/web_search/router.py",
+      "domain": "web_search"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/web-search-providers/{provider_id}",
+      "file": "src/web/api/infra/web_search/router.py",
+      "domain": "web_search"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/web-search-providers/{provider_id}",
+      "file": "src/web/api/infra/web_search/router.py",
+      "domain": "web_search"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/web-search-providers/{provider_id}/test",
+      "file": "src/web/api/infra/web_search/router.py",
+      "domain": "web_search"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/wechat/qrcode",
+      "file": "src/web/api/channels/im/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/wechat/qrcode/status",
+      "file": "src/web/api/channels/im/router.py",
+      "domain": "channels"
+    },
+    {
+      "method": "GET",
+      "path": "/files",
+      "file": "src/web/api/files/router.py",
+      "domain": "files"
+    }
+  ],
+  "services": [
+    {
+      "name": "build_agent_share_service",
+      "file": "src/core/organizations/factory.py",
+      "domain": "organizations"
+    },
+    {
+      "name": "build_audit_log_service",
+      "file": "src/core/system/factory.py",
+      "domain": "system+favorites"
+    },
+    {
+      "name": "build_auth_service",
+      "file": "src/core/auth/factory.py",
+      "domain": "auth"
+    },
+    {
+      "name": "build_chat_service",
+      "file": "src/core/chat/factory.py",
+      "domain": "chat"
+    },
+    {
+      "name": "build_chunk_revision_service",
+      "file": "src/core/knowledge/chunks/factory.py",
+      "domain": "knowledge"
+    },
+    {
+      "name": "build_chunk_service",
+      "file": "src/core/knowledge/chunks/factory.py",
+      "domain": "knowledge"
+    },
+    {
+      "name": "build_custom_agent_service",
+      "file": "src/core/agents/service/factory.py",
+      "domain": "agents"
+    },
+    {
+      "name": "build_datasource_service",
+      "file": "src/core/infra/datasources/factory.py",
+      "domain": "datasources"
+    },
+    {
+      "name": "build_embed_channel_service",
+      "file": "src/core/channels/embed/factory.py",
+      "domain": "channels"
+    },
+    {
+      "name": "build_embed_session_service",
+      "file": "src/core/channels/embed/factory.py",
+      "domain": "channels"
+    },
+    {
+      "name": "build_evaluation_service",
+      "file": "src/core/evaluation/factory.py",
+      "domain": "evaluation"
+    },
+    {
+      "name": "build_faq_service",
+      "file": "src/core/knowledge/faq/factory.py",
+      "domain": "knowledge"
+    },
+    {
+      "name": "build_favorite_service",
+      "file": "src/core/system/factory.py",
+      "domain": "system+favorites"
+    },
+    {
+      "name": "build_initialization_service",
+      "file": "src/core/infra/initialization/factory.py",
+      "domain": "initialization"
+    },
+    {
+      "name": "build_kb_cloud_service",
+      "file": "src/core/infra/models/factory.py",
+      "domain": "models"
+    },
+    {
+      "name": "build_kb_service",
+      "file": "src/core/knowledge/knowledge_bases/factory.py",
+      "domain": "knowledge"
+    },
+    {
+      "name": "build_kb_share_service",
+      "file": "src/core/sharing/factory.py",
+      "domain": "sharing"
+    },
+    {
+      "name": "build_knowledge_service",
+      "file": "src/core/knowledge/documents/factory.py",
+      "domain": "knowledge"
+    },
+    {
+      "name": "build_mcp_service",
+      "file": "src/core/infra/mcp_services/factory.py",
+      "domain": "mcp_services"
+    },
+    {
+      "name": "build_message_service",
+      "file": "src/core/chat/messages/factory.py",
+      "domain": "chat"
+    },
+    {
+      "name": "build_model_service",
+      "file": "src/core/infra/models/factory.py",
+      "domain": "models"
+    },
+    {
+      "name": "build_oidc_service",
+      "file": "src/core/auth/factory.py",
+      "domain": "auth"
+    },
+    {
+      "name": "build_organization_service",
+      "file": "src/core/organizations/factory.py",
+      "domain": "organizations"
+    },
+    {
+      "name": "build_rerank_service",
+      "file": "src/core/infra/models/factory.py",
+      "domain": "models"
+    },
+    {
+      "name": "build_session_service",
+      "file": "src/core/chat/sessions/factory.py",
+      "domain": "chat"
+    },
+    {
+      "name": "build_shared_resource_service",
+      "file": "src/core/organizations/factory.py",
+      "domain": "organizations"
+    },
+    {
+      "name": "build_storage_backend_service",
+      "file": "src/core/infra/storage_backends/factory.py",
+      "domain": "storage_backends"
+    },
+    {
+      "name": "build_system_admin_service",
+      "file": "src/core/system/factory.py",
+      "domain": "system+favorites"
+    },
+    {
+      "name": "build_system_setting_service",
+      "file": "src/core/system/factory.py",
+      "domain": "system+favorites"
+    },
+    {
+      "name": "build_tag_service",
+      "file": "src/core/knowledge/tags/factory.py",
+      "domain": "knowledge"
+    },
+    {
+      "name": "build_tenant_api_key_service",
+      "file": "src/core/tenants/factory.py",
+      "domain": "tenants"
+    },
+    {
+      "name": "build_tenant_invitation_service",
+      "file": "src/core/tenants/factory.py",
+      "domain": "tenants"
+    },
+    {
+      "name": "build_tenant_kv_service",
+      "file": "src/core/tenants/factory.py",
+      "domain": "tenants"
+    },
+    {
+      "name": "build_tenant_member_service",
+      "file": "src/core/tenants/factory.py",
+      "domain": "tenants"
+    },
+    {
+      "name": "build_tenant_service",
+      "file": "src/core/tenants/factory.py",
+      "domain": "tenants"
+    },
+    {
+      "name": "build_vector_store_service",
+      "file": "src/core/infra/vector_stores/factory.py",
+      "domain": "vector_stores"
+    },
+    {
+      "name": "build_web_search_provider_service",
+      "file": "src/core/infra/web_search/factory.py",
+      "domain": "web_search"
+    },
+    {
+      "name": "build_web_search_search_service",
+      "file": "src/core/infra/web_search/factory.py",
+      "domain": "web_search"
+    },
+    {
+      "name": "build_wiki_folder_service",
+      "file": "src/core/knowledge/wiki/factory.py",
+      "domain": "knowledge"
+    },
+    {
+      "name": "build_wiki_lint_service",
+      "file": "src/core/knowledge/wiki/factory.py",
+      "domain": "knowledge"
+    },
+    {
+      "name": "build_wiki_page_service",
+      "file": "src/core/knowledge/wiki/factory.py",
+      "domain": "knowledge"
+    }
+  ],
+  "tasks": [
+    {
+      "name": "chunk:extract",
+      "file": "src/workers/tasks/chunk_extract.py"
+    },
+    {
+      "name": "datasource_sync",
+      "file": "src/workers/tasks/datasource_sync.py"
+    },
+    {
+      "name": "datatable:summary",
+      "file": "src/workers/tasks/datatable_summary.py"
+    },
+    {
+      "name": "document_process",
+      "file": "src/workers/tasks/document_process.py"
+    },
+    {
+      "name": "faq:import",
+      "file": "src/workers/tasks/faq_import.py"
+    },
+    {
+      "name": "image_multimodal",
+      "file": "src/workers/tasks/image_multimodal.py"
+    },
+    {
+      "name": "index:delete",
+      "file": "src/workers/tasks/index_delete.py"
+    },
+    {
+      "name": "kb:clone",
+      "file": "src/workers/tasks/kb_clone.py"
+    },
+    {
+      "name": "kb:delete",
+      "file": "src/workers/tasks/kb_delete.py"
+    },
+    {
+      "name": "knowledge:list_delete",
+      "file": "src/workers/tasks/knowledge_list_delete.py"
+    },
+    {
+      "name": "knowledge:list_reparse",
+      "file": "src/workers/tasks/knowledge_list_reparse.py"
+    },
+    {
+      "name": "knowledge:move",
+      "file": "src/workers/tasks/knowledge_move.py"
+    },
+    {
+      "name": "knowledge:post_process",
+      "file": "src/workers/tasks/knowledge_post_process.py"
+    },
+    {
+      "name": "manual_process",
+      "file": "src/workers/tasks/manual_process.py"
+    },
+    {
+      "name": "question:generation",
+      "file": "src/workers/tasks/question_generation.py"
+    },
+    {
+      "name": "summary:generation",
+      "file": "src/workers/tasks/summary_generation.py"
+    },
+    {
+      "name": "temporary_document:process",
+      "file": "src/workers/tasks/temporary_document.py"
+    },
+    {
+      "name": "wiki:finalize",
+      "file": "src/workers/tasks/wiki_finalize.py"
+    },
+    {
+      "name": "wiki:ingest",
+      "file": "src/workers/tasks/wiki_ingest.py"
+    }
+  ]
+}
