@@ -169,6 +169,8 @@ the boundary translation. The db layer never references the wire DTO
   check-agent-notes``; also a pre-commit hook).
 - ``.agents/skills/`` holds reusable agent workflows (``SKILL.md``);
   on machines with Claude Code, ``.claude/skills`` symlinks here.
+- Feature map: ``.agents/feature-map/generated.json`` + ``ui.md``.
+  Frontend rules: ``frontend/AGENTS.md``.
 - The wording rules of §2 apply to everything under ``.agents/``.
 
 ## 13. Pre-commit / pre-push
@@ -186,15 +188,9 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 
 ## 14. CI gate follow-ups
 
-- **Coverage threshold not yet enforced.** CI runs ``pytest --cov=src``
-  for visibility only; tighten once a baseline is observed.
-- **Real-DB integration tests are not yet wired into CI.** Either add
-  Postgres/Redis ``services:`` to the CI job, or add a DB reachability
-  probe in ``tests/integration/conftest.py`` that ``pytest.skip``s the
-  integration suites when no DB is reachable.
-- **Frontend contract sweep incomplete.** Only ``api/auth`` is fully
-  migrated to generated types; the remaining ``frontend/src/api/``
-  modules still carry hand-written interfaces to be converted per §6.
+- **Coverage / real-DB CI** not yet enforced; tighten after a baseline.
+- **Frontend types.** Hand-written ``frontend/src/api/`` clients still
+  need generated schema types (§6). See ``frontend/AGENTS.md``.
 - **Layer gate is scoped.** ``make check-layer`` covers auth/tenant,
   infra, and product domains. ``ai`` and ``workers`` stay out until
   the retrieval ``Any`` backlog is cleared.

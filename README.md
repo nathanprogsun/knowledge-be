@@ -5,6 +5,8 @@ SQLAlchemy (async) + ARQ task queue.
 
 > Conventions: see `AGENTS.md` (single source of truth — layered arch,
 > DI scope, error hierarchy, async purity, agent workflow).
+> Frontend conventions: `frontend/AGENTS.md`. Product surface map:
+> `.agents/feature-map/ui.md`.
 > AI contributors: read `AGENTS.md` §12 before opening a PR.
 
 ## Features
@@ -81,11 +83,12 @@ strict. See `.pre-commit-config.yaml` for the exact hook set.
 
 ```
 knowledge-be/
-├── frontend/             ← Vue 3 + Vite + TS UI (independent package)
+├── frontend/             ← Vue 3 + Vite + TS UI (`frontend/AGENTS.md`)
 ├── docs/                 ← migration baselines + endpoint inventory
 ├── .agents/
 │   ├── notes/            ← RFC-style decision records (AGENTS.md §12)
-│   └── skills/           ← reusable agent workflows (SKILL.md)
+│   ├── skills/           ← reusable agent workflows (SKILL.md)
+│   └── feature-map/      ← generated.json + ui.md
 ├── .github/workflows/    ← ci.yml: lint, hygiene, format, typecheck, …
 ├── src/
 │   ├── main.py           ← uvicorn entry

@@ -32,8 +32,8 @@ lives under `core/system` (`system+favorites` on service entries).
 ## Consequences
 
 A new `POST /api/v1/sessions`-class route or `build_*_service` that is
-not regenerated fails `make check`. UI tab mapping is still a later
-manual file.
+not regenerated fails `make check`. UI tab mapping lives in
+`.agents/feature-map/ui.md`.
 
 ## Required verification
 
