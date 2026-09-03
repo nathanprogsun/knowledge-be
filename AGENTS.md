@@ -195,6 +195,6 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 - **Frontend contract sweep incomplete.** Only ``api/auth`` is fully
   migrated to generated types; the remaining ``frontend/src/api/``
   modules still carry hand-written interfaces to be converted per §6.
-- **Pre-existing check-layer failures.** ``src/web/deps/embed_channels.py``,
-  ``src/web/deps/rbac.py``, ``src/web/middleware/auth.py`` carry layer /
-  `Any` violations predating the full-stack change; fix separately.
+- **Layer gate is scoped.** ``make check-layer`` covers auth/tenant,
+  infra, and product domains. ``ai`` and ``workers`` stay out until
+  the retrieval ``Any`` backlog is cleared.

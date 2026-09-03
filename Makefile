@@ -54,15 +54,15 @@ clean:
 # ── Anti-drift checks ───────────────────────────────────────────────────
 
 INFRA_DOMAINS := datasources,initialization,mcp_services,models,storage_backends,vector_stores,web_search
+PRODUCT_DOMAINS := favorites,chat,organizations,channels,knowledge,knowledge_bases,agents,evaluation,sharing,me,files,cloud
 
 check: check-layer check-singleton check-endpoint check-schema check-imports check-sql check-pr-leak check-map-from-db check-agent-notes check-mypy-baseline check-exception-types
 	@echo "All anti-drift checks passed"
 
-# Layer check covers every shipped domain. Endpoint coverage can only
-# verify domains whose upstream docs/api/*.md table is fully aligned;
-# the residual gaps are tracked in the v0.2 release notes.
+# Layer check covers auth/tenant, infra, and product domains. `ai` and
+# `workers` stay out until the retrieval Any backlog is cleared.
 check-layer:
-	python scripts/check_layer_violation.py --src-root src/ --domains $(AUTH_TENANT_DOMAINS),$(INFRA_DOMAINS)
+	python scripts/check_layer_violation.py --src-root src/ --domains $(AUTH_TENANT_DOMAINS),$(INFRA_DOMAINS),$(PRODUCT_DOMAINS)
 
 check-singleton:
 	bash scripts/run_check_service_singleton.sh --src-root src/
