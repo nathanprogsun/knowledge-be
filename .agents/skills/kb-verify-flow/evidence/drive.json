@@ -1,0 +1,31 @@
+{
+  "at": "2026-09-03T17:07:54.585619+00:00",
+  "features": {
+    "knowledge-base-list": {
+      "probes": {
+        "knowledge_bases": {
+          "ok": false,
+          "reason": "KB_VERIFY_TOKEN unset; authenticated list not driven",
+          "skipped": true
+        }
+      }
+    },
+    "login": {
+      "probes": {
+        "auth_config": {
+          "error": "<urlopen error [Errno 61] Connection refused>",
+          "ok": false,
+          "status": null,
+          "url": "http://127.0.0.1:8000/api/v1/auth/config"
+        },
+        "web_login": {
+          "error": "<urlopen error [Errno 61] Connection refused>",
+          "ok": false,
+          "status": null,
+          "url": "http://127.0.0.1:5173/login"
+        }
+      }
+    }
+  },
+  "step": "drive"
+}
