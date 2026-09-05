@@ -291,6 +291,34 @@ class _StubRepo:
         self.deleted.append((tenant_id, session_id, document_id))
         return True
 
+    async def mark_ready(
+        self,
+        *,
+        tenant_id: int,
+        document_id: str,
+        content: str,
+        chunks: list[object],
+        image_refs: list[object],
+        metadata: dict[str, object],
+        token_count: int,
+        chunk_count: int,
+        ready_at: datetime,
+        now: datetime,
+    ) -> TemporaryDocument | None:
+        for row in self.created:
+            if row.id == document_id and row.tenant_id == tenant_id:
+                return row.model_copy(
+                    update={
+                        "status": TEMPORARY_DOCUMENT_STATUS_READY,
+                        "content": content,
+                        "token_count": token_count,
+                        "chunk_count": chunk_count,
+                        "ready_at": ready_at,
+                        "updated_at": now,
+                    }
+                )
+        return None
+
 
 async def test_create_records_uploaded_row() -> None:
     repo = _StubRepo()
@@ -381,6 +409,23 @@ async def test_create_reduces_file_name_to_basename() -> None:
         file_size=100,
     )
     assert row.file_name == "note.md"
+
+
+async def test_mark_ready_promotes_created_row() -> None:
+    repo = _StubRepo()
+    service = TemporaryDocumentService(repo=repo)  # type: ignore[arg-type]
+    created = await service.create(
+        tenant_id=7,
+        session_id="session-1",
+        resource_ref="stor/abc",
+        file_name="note.md",
+        mime_type="text/markdown",
+        file_size=12,
+    )
+    ready = await service.mark_ready(tenant_id=7, document_id=created.id)
+    assert ready is not None
+    assert ready.status == TEMPORARY_DOCUMENT_STATUS_READY
+    assert ready.resource_ref == "stor/abc"
 
 
 async def test_delete_soft_deletes_scoped() -> None:

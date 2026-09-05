@@ -16,6 +16,11 @@ Method          Path                                   Handler
 ``POST   ``    ``/sessions/{session_id}/pin``          pin
 ``DELETE ``    ``/sessions/{session_id}/pin``          unpin
 ``POST   ``    ``/sessions/{session_id}/stop``         stop generation
+``POST   ``    ``/sessions/{session_id}/attachments``  upload attachment
+``GET    ``    ``/sessions/{session_id}/attachments``  list attachments
+``GET    ``    ``/sessions/{id}/attachments/{id}``     get attachment
+``GET    ``    ``/sessions/{id}/attachments/{id}/preview``  preview bytes
+``DELETE ``    ``/sessions/{id}/attachments/{id}``     delete attachment
 ==============  ====================================  ====================
 
 Sessions are per-user chat state (Viewer+ surface, mirroring the
@@ -29,7 +34,10 @@ captured as a session id.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from typing import Annotated
+
+from fastapi import APIRouter, File, Form, Query, UploadFile
+from fastapi.responses import StreamingResponse
 
 from src.common.exception import NotFoundError, ValidationError
 from src.core.chat.sessions.service.session_service import SessionListQuery
@@ -39,22 +47,26 @@ from src.core.contracts.sessions import (
     StopGenerationRequest,
     UpdateSessionRequest,
 )
+from src.web.api.chat.sessions import attachments as attachment_handlers
 from src.web.api.chat.sessions.views import (
     DeleteSessionResponse,
     PinSessionEnvelope,
     SessionEnvelope,
     SessionListEnvelope,
+    TemporaryAttachmentEnvelope,
+    TemporaryAttachmentListEnvelope,
     delete_session_response,
     session_envelope,
     session_list_envelope,
 )
-from src.web.deps import AuthDep, RoleViewerDep
+from src.web.deps import AuthDep, RoleContributorDep, RoleViewerDep
 from src.web.deps.chat_sessions import (
     MessageContextDep,
     MessageServiceDep,
     SessionServiceDep,
     StopStreamServiceDep,
 )
+from src.web.deps.knowledge_documents import TemporaryDocumentServiceDep
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -263,6 +275,117 @@ async def unpin_session(
     """Unpin a session for the caller (404 when absent or not owned)."""
     await _set_pinned(session_service, session_id, False)
     return PinSessionEnvelope(success=True, is_pinned=False)
+
+
+@router.post(
+    "/{session_id}/attachments",
+    response_model=TemporaryAttachmentEnvelope,
+    status_code=201,
+)
+async def upload_session_attachment(
+    _auth: AuthDep,
+    _contributor: RoleContributorDep,
+    session_id: str,
+    session_service: SessionServiceDep,
+    temp_docs: TemporaryDocumentServiceDep,
+    storage: attachment_handlers.SessionAttachmentStorageDep,
+    file: Annotated[UploadFile, File()],
+    agent_id: Annotated[str | None, Form()] = None,
+    agent_source_tenant_id: Annotated[str | None, Form()] = None,
+    parser_engine: Annotated[str | None, Form()] = None,
+) -> TemporaryAttachmentEnvelope:
+    """Upload a session attachment and persist its bytes."""
+    del agent_id
+    return await attachment_handlers.upload_session_attachment(
+        session_id=_require_session_id(session_id),
+        file=file,
+        agent_source_tenant_id=agent_source_tenant_id,
+        parser_engine=parser_engine,
+        session_service=session_service,
+        temp_docs=temp_docs,
+        storage=storage,
+    )
+
+
+@router.get(
+    "/{session_id}/attachments",
+    response_model=TemporaryAttachmentListEnvelope,
+)
+async def list_session_attachments(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+    session_id: str,
+    session_service: SessionServiceDep,
+    temp_docs: TemporaryDocumentServiceDep,
+) -> TemporaryAttachmentListEnvelope:
+    """List live attachments of a session the caller owns."""
+    return await attachment_handlers.list_session_attachments(
+        session_id=_require_session_id(session_id),
+        session_service=session_service,
+        temp_docs=temp_docs,
+    )
+
+
+@router.get(
+    "/{session_id}/attachments/{attachment_id}",
+    response_model=TemporaryAttachmentEnvelope,
+)
+async def get_session_attachment(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+    session_id: str,
+    attachment_id: str,
+    session_service: SessionServiceDep,
+    temp_docs: TemporaryDocumentServiceDep,
+) -> TemporaryAttachmentEnvelope:
+    """Return one attachment of a session the caller owns."""
+    return await attachment_handlers.get_session_attachment(
+        session_id=_require_session_id(session_id),
+        attachment_id=attachment_id,
+        session_service=session_service,
+        temp_docs=temp_docs,
+    )
+
+
+@router.get("/{session_id}/attachments/{attachment_id}/preview")
+async def preview_session_attachment(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+    session_id: str,
+    attachment_id: str,
+    session_service: SessionServiceDep,
+    temp_docs: TemporaryDocumentServiceDep,
+    storage: attachment_handlers.SessionAttachmentStorageDep,
+) -> StreamingResponse:
+    """Stream the stored bytes for an owned session attachment."""
+    return await attachment_handlers.preview_session_attachment(
+        session_id=_require_session_id(session_id),
+        attachment_id=attachment_id,
+        session_service=session_service,
+        temp_docs=temp_docs,
+        storage=storage,
+    )
+
+
+@router.delete(
+    "/{session_id}/attachments/{attachment_id}",
+    response_model=DeleteSessionResponse,
+)
+async def delete_session_attachment(
+    _auth: AuthDep,
+    _contributor: RoleContributorDep,
+    session_id: str,
+    attachment_id: str,
+    session_service: SessionServiceDep,
+    temp_docs: TemporaryDocumentServiceDep,
+) -> DeleteSessionResponse:
+    """Soft-delete one attachment of a session the caller owns."""
+    return await attachment_handlers.delete_session_attachment(
+        session_id=_require_session_id(session_id),
+        attachment_id=attachment_id,
+        session_service=session_service,
+        temp_docs=temp_docs,
+    )
 
 
 @router.post("/{session_id}/stop", response_model=DeleteSessionResponse)

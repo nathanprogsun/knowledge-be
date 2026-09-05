@@ -27,6 +27,7 @@ from src.core.knowledge.documents.reparse import ReparseEnqueuer
 from src.core.knowledge.documents.service.knowledge_service import KnowledgeService
 from src.core.knowledge.documents.span_tracker import SpanTracker
 from src.core.knowledge.documents.summary_refresh import DocumentSummaryRefresher
+from src.core.knowledge.documents.temporary_document import TemporaryDocumentService
 from src.core.knowledge.documents.upload_pipeline import DocumentTaskDispatcher
 from src.core.knowledge.knowledge_bases.factory import build_kb_service
 from src.core.knowledge.tags.factory import build_tag_service
@@ -34,6 +35,12 @@ from src.db.dao.chunk_repository import ChunkRepository
 from src.db.dao.knowledge_repository import KnowledgeRepository
 from src.db.dao.knowledge_span_repository import KnowledgeSpanRepository
 from src.db.dao.knowledge_tag_repository import TagRepository
+from src.db.dao.temporary_document_repository import TemporaryDocumentRepository
+
+
+def build_temporary_document_service(session: AsyncSession) -> TemporaryDocumentService:
+    """Per-request ``TemporaryDocumentService`` with a fresh repository."""
+    return TemporaryDocumentService(repo=TemporaryDocumentRepository(session))
 
 
 def build_knowledge_service(session: AsyncSession) -> KnowledgeService:
@@ -122,4 +129,5 @@ __all__ = [
     "build_documents_orchestrator",
     "build_knowledge_service",
     "build_span_tracker",
+    "build_temporary_document_service",
 ]

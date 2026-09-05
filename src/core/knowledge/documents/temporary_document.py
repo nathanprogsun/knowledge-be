@@ -34,14 +34,15 @@ Deferred responsibilities (neutral comments mark each seam):
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import uuid
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from typing import TypeAlias
+from typing import Self, TypeAlias
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic import ValidationError as PydanticValidationError
 
 from src.common.exception import ValidationError
@@ -216,6 +217,8 @@ class TemporaryDocumentCreateOptions(BaseModel):
 
 # Alias for the selection helpers' return shape.
 ContentSelection: TypeAlias = tuple[str, int, int]
+# Module-level so method ``list`` does not shadow the builtin in annotations.
+_JsonObjectList: TypeAlias = list[JsonObject]
 
 
 # ── Upload-side helpers ────────────────────────────────────────────────
@@ -271,6 +274,35 @@ def _validate_file_name(file_name: str) -> str:
             message="invalid characters in file name",
         )
     return base
+
+
+def validate_upload(
+    *,
+    tenant_id: int,
+    session_id: str,
+    file_name: str,
+    file_size: int,
+) -> str:
+    """Return a safe basename, or raise a typed upload error."""
+    if tenant_id <= 0 or not session_id.strip():
+        raise ValidationError(
+            code="temporary_document.invalid_scope",
+            message="invalid attachment scope",
+        )
+    safe_name = _validate_file_name(file_name)
+    ext = os.path.splitext(safe_name)[1].lower()
+    if not supported_extension(ext):
+        raise ValidationError(
+            code="temporary_document.unsupported_file_type",
+            message=f"unsupported file type: {ext}",
+        )
+    cap = max_upload_bytes()
+    if file_size <= 0 or file_size > cap:
+        raise ValidationError(
+            code="temporary_document.invalid_file_size",
+            message=(f"file size must be between 1 byte and {cap // _BYTES_PER_MB}MB"),
+        )
+    return safe_name
 
 
 # ── Content / prompt-side helpers ─────────────────────────────────────
@@ -434,6 +466,73 @@ def select_content_with_budget(
     return "\n\n---\n\n".join(parts), len(selected), len(chunks)
 
 
+# ── Service-side projection ────────────────────────────────────────────
+
+_TEMPORARYDOCUMENTINFO_EXCLUDE_COLUMNS: frozenset[str] = frozenset(
+    {
+        "deleted_at",
+        "content",
+        "chunks",
+        "metadata",
+        "started_at",
+        "ready_at",
+    }
+)
+
+
+class TemporaryDocumentInfo(BaseModel):
+    """Service projection of a temporary-document row.
+
+    Drops parse-only columns and the soft-delete marker. ``resource_ref``
+    stays so preview can stream the stored bytes; the HTTP wire type
+    omits it.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    tenant_id: int
+    session_id: str
+    resource_ref: str
+    file_name: str
+    file_type: str
+    file_size: int
+    mime_type: str = ""
+    status: str
+    token_count: int = 0
+    chunk_count: int = 0
+    image_refs: list[TemporaryDocumentImage] = Field(default_factory=list)
+    error_message: str | None = None
+    expires_at: datetime
+    processing_options: JsonObject = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_json(cls, raw: JsonObject | str | None) -> JsonObject | None:
+        """Decode a JSON-backed column (``processing_options``)."""
+        if raw is None or raw == "":
+            return None
+        if isinstance(raw, str):
+            try:
+                decoded = json.loads(raw)
+            except json.JSONDecodeError:
+                return None
+            return decoded if isinstance(decoded, dict) else None
+        return raw
+
+    @classmethod
+    def map_from_db(cls, db: TemporaryDocument) -> Self:
+        """Project a storage row onto the service shape."""
+        record = db.model_dump(exclude=set(_TEMPORARYDOCUMENTINFO_EXCLUDE_COLUMNS))
+        record["image_refs"] = image_refs_of(db.image_refs)
+        record["processing_options"] = cls.from_json(record.get("processing_options")) or {}
+        return cls.model_validate(record)
+
+
+TemporaryDocumentInfoList: TypeAlias = list[TemporaryDocumentInfo]
+
+
 # ── Service ────────────────────────────────────────────────────────────
 
 
@@ -459,7 +558,7 @@ class TemporaryDocumentService:
         mime_type: str,
         file_size: int,
         options: TemporaryDocumentCreateOptions | None = None,
-    ) -> TemporaryDocument:
+    ) -> TemporaryDocumentInfo:
         """Validate and record an upload's metadata row (``uploaded``).
 
         Byte persistence is out of scope here: the caller supplies the
@@ -467,25 +566,13 @@ class TemporaryDocumentService:
         row triggers no parse yet — scheduling the async parse is deferred
         with the worker layer.
         """
-        if tenant_id <= 0 or not session_id.strip():
-            raise ValidationError(
-                code="temporary_document.invalid_scope",
-                message="invalid attachment scope",
-            )
-        safe_name = _validate_file_name(file_name)
+        safe_name = validate_upload(
+            tenant_id=tenant_id,
+            session_id=session_id,
+            file_name=file_name,
+            file_size=file_size,
+        )
         ext = os.path.splitext(safe_name)[1].lower()
-        if not supported_extension(ext):
-            raise ValidationError(
-                code="temporary_document.unsupported_file_type",
-                message=f"unsupported file type: {ext}",
-            )
-        cap = max_upload_bytes()
-        if file_size <= 0 or file_size > cap:
-            raise ValidationError(
-                code="temporary_document.invalid_file_size",
-                message=(f"file size must be between 1 byte and {cap // _BYTES_PER_MB}MB"),
-            )
-
         now = datetime.now(UTC)
         opts = options or TemporaryDocumentCreateOptions()
         row = TemporaryDocument(
@@ -503,7 +590,7 @@ class TemporaryDocumentService:
             created_at=now,
             updated_at=now,
         )
-        return await self._repo.create(row)
+        return TemporaryDocumentInfo.map_from_db(await self._repo.create(row))
 
     async def get(
         self,
@@ -511,25 +598,59 @@ class TemporaryDocumentService:
         tenant_id: int,
         session_id: str,
         document_id: str,
-    ) -> TemporaryDocument | None:
+    ) -> TemporaryDocumentInfo | None:
         """Return the live document scoped to the session, or ``None``."""
-        return await self._repo.get_scoped(
+        row = await self._repo.get_scoped(
             tenant_id=tenant_id,
             session_id=session_id,
             document_id=document_id,
         )
+        if row is None:
+            return None
+        return TemporaryDocumentInfo.map_from_db(row)
 
     async def list(
         self,
         *,
         tenant_id: int,
         session_id: str,
-    ) -> list[TemporaryDocument]:
+    ) -> TemporaryDocumentInfoList:
         """Return every live document of the session, oldest first."""
-        return await self._repo.list_scoped(
+        rows = await self._repo.list_scoped(
             tenant_id=tenant_id,
             session_id=session_id,
         )
+        return [TemporaryDocumentInfo.map_from_db(row) for row in rows]
+
+    async def mark_ready(
+        self,
+        *,
+        tenant_id: int,
+        document_id: str,
+        content: str = "",
+        chunks: _JsonObjectList | None = None,
+        image_refs: _JsonObjectList | None = None,
+        metadata: JsonObject | None = None,
+        token_count: int = 0,
+        chunk_count: int = 0,
+    ) -> TemporaryDocumentInfo | None:
+        """Promote a live row to ``ready`` with optional parse artifacts."""
+        now = datetime.now(UTC)
+        row = await self._repo.mark_ready(
+            tenant_id=tenant_id,
+            document_id=document_id,
+            content=content,
+            chunks=chunks if chunks is not None else [],
+            image_refs=image_refs if image_refs is not None else [],
+            metadata=metadata if metadata is not None else {},
+            token_count=token_count,
+            chunk_count=chunk_count,
+            ready_at=now,
+            now=now,
+        )
+        if row is None:
+            return None
+        return TemporaryDocumentInfo.map_from_db(row)
 
     async def delete(
         self,
@@ -593,6 +714,7 @@ __all__ = [
     "TemporaryDocumentChunk",
     "TemporaryDocumentCreateOptions",
     "TemporaryDocumentImage",
+    "TemporaryDocumentInfo",
     "TemporaryDocumentService",
     "TemporaryDocumentTaskPayload",
     "analyze_content",
@@ -606,4 +728,5 @@ __all__ = [
     "select_content_with_budget",
     "supported_extension",
     "temporary_document_ttl",
+    "validate_upload",
 ]

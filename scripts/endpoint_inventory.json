@@ -1,5 +1,5 @@
 {
-  "total_paths": 249,
+  "total_paths": 252,
   "endpoints": [
     {
       "method": "POST",
@@ -936,6 +936,26 @@
     {
       "method": "PUT",
       "path": "/api/v1/sessions/{session_id}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sessions/{session_id}/attachments"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/sessions/{session_id}/attachments"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/sessions/{session_id}/attachments/{attachment_id}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sessions/{session_id}/attachments/{attachment_id}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sessions/{session_id}/attachments/{attachment_id}/preview"
     },
     {
       "method": "DELETE",
