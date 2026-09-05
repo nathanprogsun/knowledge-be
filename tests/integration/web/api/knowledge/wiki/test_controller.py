@@ -714,6 +714,27 @@ async def test_list_pages_filters_by_status(client: TestClient, page_repo: Async
     assert [p["slug"] for p in resp.json()["data"]["pages"]] == ["concept/rag"]
 
 
+async def test_list_pages_splits_comma_page_types(client: TestClient, page_repo: AsyncMock) -> None:
+    page_repo._rows["page-1"] = _page()  # type: ignore[attr-defined]
+    page_repo._rows["page-2"] = _page(  # type: ignore[attr-defined]
+        id="page-2", slug="concept/rag", title="RAG", page_type="concept"
+    )
+    page_repo._rows["page-3"] = _page(  # type: ignore[attr-defined]
+        id="page-3", slug="home", title="Home", page_type="summary"
+    )
+
+    resp = client.get(
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/pages",
+        params={"page_type": "entity,concept,synthesis,comparison"},
+    )
+
+    assert resp.status_code == 200
+    assert [p["slug"] for p in resp.json()["data"]["pages"]] == [
+        "entity/acme-corp",
+        "concept/rag",
+    ]
+
+
 # ── POST /wiki/pages ─────────────────────────────────────────────────
 
 
@@ -738,6 +759,20 @@ async def test_create_page_returns_201(
     assert data["knowledge_base_id"] == KB_ID
     rows = page_repo._rows  # type: ignore[attr-defined]
     assert data["id"] in rows
+
+
+async def test_create_page_defaults_empty_type_to_summary(
+    client: TestClient,
+    page_repo: AsyncMock,
+) -> None:
+    resp = client.post(
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/pages",
+        json={"slug": "home"},
+    )
+
+    assert resp.status_code == 201
+    assert resp.json()["data"]["page_type"] == "summary"
+    assert resp.json()["data"]["status"] == "published"
 
 
 async def test_create_page_rejects_invalid_page_type(

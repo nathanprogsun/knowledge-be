@@ -53,6 +53,7 @@ from src.core.knowledge.wiki.types import (
     WIKI_INDEX_MAX_LIMIT,
     WIKI_PAGE_STATUS_PUBLISHED,
     WIKI_PAGE_TYPE_INDEX,
+    WIKI_PAGE_TYPE_SUMMARY,
     WikiGraphData,
     WikiGraphEdge,
     WikiGraphMeta,
@@ -64,6 +65,7 @@ from src.core.knowledge.wiki.types import (
     WikiPageListResponse,
     WikiStats,
     normalize_edit_source,
+    split_page_types,
 )
 from src.db.dao.wiki_page_repository import WikiFolderRepository, WikiPageRepository
 from src.db.dao.wiki_page_revision_repository import WikiPageRevisionRepository
@@ -132,6 +134,7 @@ class WikiPageService:
             update={
                 "id": page.id or str(uuid4()),
                 "status": page.status or WIKI_PAGE_STATUS_PUBLISHED,
+                "page_type": page.page_type or WIKI_PAGE_TYPE_SUMMARY,
                 "version": page.version or 1,
                 "last_edit_source": normalize_edit_source(edit_source),
                 "last_editor_id": editor_id,
@@ -323,7 +326,7 @@ class WikiPageService:
         """
         pages, total = await self._page_repo.list_pages(
             knowledge_base_id=filters.knowledge_base_id,
-            page_types=[filters.page_type] if filters.page_type else None,
+            page_types=split_page_types(filters.page_type),
             status=filters.status,
             query=filters.query,
             folder_id=filters.folder_id,
