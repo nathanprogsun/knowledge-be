@@ -1,8 +1,10 @@
 """Worker-side document-process composition.
 
-The worker process must not import ``db``. This module builds the engine,
-reader, and per-job pipeline inside ``core`` and exposes a runner the
-ARQ handler can call from its startup-wired context.
+The worker process must not import ``db`` or ``web``. This module builds
+the engine, reader, and per-job pipeline inside ``core`` and exposes a
+runner the ARQ handler can call from its startup-wired context. The
+pipeline factory attaches the file-service resolver so a ``file_url``
+row can persist bytes before parse.
 """
 
 from __future__ import annotations

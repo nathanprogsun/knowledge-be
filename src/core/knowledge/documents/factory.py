@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.storage.base import FileService
 from src.core.infra.models.factory import build_chat_model_service
+from src.core.infra.storage_backends.factory import build_storage_backend_service
 from src.core.knowledge.chunks.factory import build_chunk_service
+from src.core.knowledge.documents.backend_file_service import BackendFileServiceResolver
 from src.core.knowledge.documents.cancel import ParseTaskInspector
 from src.core.knowledge.documents.clone import ObjectCopier, VectorIndexReplicator
 from src.core.knowledge.documents.create_file import StorageResolver
@@ -59,12 +61,21 @@ def build_document_process_pipeline(
     *,
     reader: DocumentReader | None = None,
 ) -> DocumentProcessPipeline:
-    """Per-job ``DocumentProcessPipeline`` for the worker runtime."""
+    """Per-job ``DocumentProcessPipeline`` for the worker runtime.
+
+    Wires the same file-service resolver the upload path uses so a
+    ``file_url`` row can ``save_bytes`` before parse.
+    """
+    kb_service = build_kb_service(session)
     return DocumentProcessPipeline(
         knowledge_repo=KnowledgeRepository(session),
-        kb_service=build_kb_service(session),
+        kb_service=kb_service,
         chunk_repo=ChunkRepository(session),
         reader=reader,
+        file_service_resolver=BackendFileServiceResolver(
+            kb_service=kb_service,
+            storage_backend_service=build_storage_backend_service(session),
+        ),
     )
 
 
