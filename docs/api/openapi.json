@@ -10617,6 +10617,340 @@
         }
       }
     },
+    "/api/v1/knowledge-bases/{id}/shares": {
+      "post": {
+        "tags": [
+          "knowledge-bases"
+        ],
+        "summary": "Share Knowledge Base",
+        "description": "Share an owned knowledge base into an organization.",
+        "operationId": "share_knowledge_base_api_v1_knowledge_bases__id__shares_post",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateKnowledgeBaseShareRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeBaseShareEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "knowledge-bases"
+        ],
+        "summary": "List Knowledge Base Shares",
+        "description": "List live grants of a knowledge base owned by the caller.",
+        "operationId": "list_knowledge_base_shares_api_v1_knowledge_bases__id__shares_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeBaseShareListEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge-bases/{id}/shares/{share_id}": {
+      "put": {
+        "tags": [
+          "knowledge-bases"
+        ],
+        "summary": "Update Knowledge Base Share",
+        "description": "Update a stored knowledge-base share grant.",
+        "operationId": "update_knowledge_base_share_api_v1_knowledge_bases__id__shares__share_id__put",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Share Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateKnowledgeBaseShareRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeBaseShareEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "knowledge-bases"
+        ],
+        "summary": "Remove Knowledge Base Share",
+        "description": "Revoke a knowledge-base share grant.",
+        "operationId": "remove_knowledge_base_share_api_v1_knowledge_bases__id__shares__share_id__delete",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "share_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Share Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeBaseShareEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/knowledge-bases/{id}/knowledge/file": {
       "post": {
         "tags": [
@@ -16878,6 +17212,156 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SharedKnowledgeBaseListEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{id}/shared-knowledge-bases": {
+      "get": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "List Organization Shared Knowledge Bases",
+        "description": "List knowledge bases shared into one organization, including the caller's.",
+        "operationId": "list_organization_shared_knowledge_bases_api_v1_organizations__id__shared_knowledge_bases_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedKnowledgeBaseListEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{id}/shares": {
+      "get": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "List Organization Knowledge Base Shares",
+        "description": "List knowledge-base grants held by one organization.",
+        "operationId": "list_organization_knowledge_base_shares_api_v1_organizations__id__shares_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeBaseShareListEnvelope"
                 }
               }
             }
@@ -29592,6 +30076,24 @@
         ],
         "title": "CreateKnowledgeBaseRequest"
       },
+      "CreateKnowledgeBaseShareRequest": {
+        "properties": {
+          "organization_id": {
+            "type": "string",
+            "title": "Organization Id"
+          },
+          "permission": {
+            "type": "string",
+            "title": "Permission"
+          }
+        },
+        "type": "object",
+        "required": [
+          "organization_id",
+          "permission"
+        ],
+        "title": "CreateKnowledgeBaseShareRequest"
+      },
       "CreateKnowledgeFromURLRequest": {
         "properties": {
           "url": {
@@ -35623,6 +36125,207 @@
         ],
         "title": "KnowledgeBasePinEnvelope",
         "description": "``{\"success\": true, \"data\": {\"is_pinned\": ...}}``."
+      },
+      "KnowledgeBaseShare": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "knowledge_base_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Base Id"
+          },
+          "knowledge_base_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Base Name"
+          },
+          "knowledge_base_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Base Type"
+          },
+          "knowledge_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Count"
+          },
+          "chunk_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chunk Count"
+          },
+          "organization_id": {
+            "type": "string",
+            "title": "Organization Id"
+          },
+          "organization_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Organization Name"
+          },
+          "shared_by_user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shared By User Id"
+          },
+          "shared_by_username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shared By Username"
+          },
+          "source_tenant_id": {
+            "type": "integer",
+            "title": "Source Tenant Id"
+          },
+          "permission": {
+            "type": "string",
+            "title": "Permission"
+          },
+          "my_role_in_org": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "My Role In Org"
+          },
+          "my_permission": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "My Permission"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "organization_id",
+          "source_tenant_id",
+          "permission",
+          "created_at"
+        ],
+        "title": "KnowledgeBaseShare"
+      },
+      "KnowledgeBaseShareEnvelope": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/KnowledgeBaseShare"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "title": "KnowledgeBaseShareEnvelope",
+        "description": "``{\"success\": true, \"data\": {...}}`` - single KB-share responses."
+      },
+      "KnowledgeBaseShareListEnvelope": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/KnowledgeBaseShareListResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "title": "KnowledgeBaseShareListEnvelope",
+        "description": "``{\"success\": true, \"data\": {\"shares\": [...], \"total\": n}}``."
+      },
+      "KnowledgeBaseShareListResponse": {
+        "properties": {
+          "shares": {
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeBaseShare"
+            },
+            "type": "array",
+            "title": "Shares"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "shares",
+          "total"
+        ],
+        "title": "KnowledgeBaseShareListResponse"
       },
       "KnowledgeBatchEnvelope": {
         "properties": {
@@ -44280,6 +44983,19 @@
         "type": "object",
         "title": "UpdateKnowledgeBaseRequest",
         "description": "Partial-update body: every field optional so callers can PATCH a subset.\n\nThe service layer skips a field when its value is ``None`` and\ninherits the existing row's value, so the same request shape works\nfor both PUT (full body) and PATCH (subset)."
+      },
+      "UpdateKnowledgeBaseShareRequest": {
+        "properties": {
+          "permission": {
+            "type": "string",
+            "title": "Permission"
+          }
+        },
+        "type": "object",
+        "required": [
+          "permission"
+        ],
+        "title": "UpdateKnowledgeBaseShareRequest"
       },
       "UpdateKnowledgeRequest": {
         "properties": {

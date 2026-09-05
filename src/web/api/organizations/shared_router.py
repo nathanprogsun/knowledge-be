@@ -26,11 +26,13 @@ from src.core.organizations.service.organization_service import OrganizationServ
 from src.web.api.organizations.shared_views import (
     AgentShareEnvelope,
     AgentShareListEnvelope,
+    KnowledgeBaseShareListEnvelope,
     SharedAgentDisabledEnvelope,
     SharedAgentListEnvelope,
     SharedKnowledgeBaseListEnvelope,
     agent_share_envelope,
     agent_share_list_envelope,
+    kb_share_list_envelope,
     shared_agent_disabled_envelope,
     shared_agent_list_envelope,
     shared_knowledge_base_list_envelope,
@@ -42,6 +44,7 @@ from src.web.deps.organizations import (
     OrganizationServiceDep,
     SharedResourceServiceDep,
 )
+from src.web.deps.sharing import KBShareServiceDep
 
 router = APIRouter(prefix="", tags=["organizations"])
 
@@ -85,6 +88,54 @@ async def list_shared_knowledge_bases(
         caller_tenant_role=tenant_role,
     )
     return shared_knowledge_base_list_envelope(items)
+
+
+@router.get(
+    "/organizations/{id}/shared-knowledge-bases",
+    response_model=SharedKnowledgeBaseListEnvelope,
+    response_model_exclude_none=True,
+)
+async def list_organization_shared_knowledge_bases(
+    _auth: AuthDep,
+    _role: RoleViewerDep,
+    id: str,
+    service: SharedResourceServiceDep,
+    tenant_id: _PrincipalTenant,
+    tenant_role: _PrincipalRole,
+) -> SharedKnowledgeBaseListEnvelope:
+    """List knowledge bases shared into one organization, including the caller's."""
+    tenant_id = _require_tenant(tenant_id)
+    items = await service.list_organization_shared_knowledge_bases(
+        organization_id=id,
+        tenant_id=tenant_id,
+        caller_tenant_role=tenant_role,
+    )
+    return shared_knowledge_base_list_envelope(items, emit_is_mine=True)
+
+
+@router.get(
+    "/organizations/{id}/shares",
+    response_model=KnowledgeBaseShareListEnvelope,
+)
+async def list_organization_knowledge_base_shares(
+    _auth: AuthDep,
+    _role: RoleViewerDep,
+    id: str,
+    service: KBShareServiceDep,
+    org_service: OrganizationServiceDep,
+    tenant_id: _PrincipalTenant,
+    tenant_role: _PrincipalRole,
+) -> KnowledgeBaseShareListEnvelope:
+    """List knowledge-base grants held by one organization."""
+    tenant_id = _require_tenant(tenant_id)
+    shares = await service.list_shares_by_organization(
+        organization_id=id,
+        tenant_id=tenant_id,
+        tenant_role=tenant_role,
+    )
+    name = await _org_name(org_service, id)
+    org_names = {id: name} if name is not None else {}
+    return kb_share_list_envelope(shares, org_names=org_names)
 
 
 @router.get(

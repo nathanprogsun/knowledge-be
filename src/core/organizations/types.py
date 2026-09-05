@@ -135,6 +135,7 @@ class SharedKnowledgeBaseInfo(BaseModel):
     permission: str
     source_tenant_id: int
     shared_at: datetime
+    is_mine: bool = False
 
 
 class SharedAgentInfo(BaseModel):

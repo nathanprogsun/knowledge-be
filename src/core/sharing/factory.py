@@ -11,11 +11,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.sharing.kb_share_service import KBShareServiceImpl
 from src.db.dao.kb_share_repository import KBShareRepository
+from src.db.dao.knowledge_base_repository import KnowledgeBaseRepository
+from src.db.dao.organization_repository import (
+    OrganizationMemberRepository,
+    OrganizationRepository,
+)
 
 
 def build_kb_share_service(session: AsyncSession) -> KBShareServiceImpl:
     """Build the per-request KB share service on the shared session."""
-    return KBShareServiceImpl(kb_share_repo=KBShareRepository(session))
+    return KBShareServiceImpl(
+        kb_share_repo=KBShareRepository(session),
+        kb_repo=KnowledgeBaseRepository(session),
+        org_repo=OrganizationRepository(session),
+        member_repo=OrganizationMemberRepository(session),
+    )
 
 
 __all__ = ["build_kb_share_service"]

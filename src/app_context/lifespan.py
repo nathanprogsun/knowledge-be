@@ -111,6 +111,9 @@ from src.web.api.knowledge.faq.router import router as faq_router
 from src.web.api.knowledge.tags.router import router as knowledge_tags_router
 from src.web.api.knowledge.wiki.router import router as wiki_router
 from src.web.api.knowledge_bases.router import router as knowledge_bases_router
+from src.web.api.knowledge_bases.shares_router import (
+    router as knowledge_base_shares_router,
+)
 from src.web.api.me.router import router as me_router
 from src.web.api.organizations.router import router as organizations_router
 from src.web.api.organizations.shared_router import (
@@ -273,6 +276,7 @@ def create_app() -> FastAPI:
         initialization_router,
         kb_files_router,
         knowledge_bases_router,
+        knowledge_base_shares_router,
         kb_documents_router,
         knowledge_tags_router,
         mcp_services_router,
