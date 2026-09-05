@@ -25,6 +25,8 @@ The paperclip already posts multipart files to `/api/v1/sessions/{id}/attachment
 
 The paperclip can upload, poll to `ready`, preview bytes, and delete. Refresh has no frontend list client yet. Chat send still ignores `attachment_ids`. Missing storage is `temporary_document.storage_unavailable`, not a 500.
 
+The chip writes through the list row after unwrap. Mutating the local create object left the preview at 上传中 after a 201.
+
 `postUpload` no longer sets a fixed `Content-Type: multipart/form-data`. The axios instance default is `application/json`. A FormData body with that type (or a multipart type with no boundary) makes the API return 422 and the chip stay at 上传中. The request interceptor deletes `Content-Type` on `FormData` so the browser sets the boundary. A raw `fetch` of the same POST already returned 201.
 
 ## Required verification
