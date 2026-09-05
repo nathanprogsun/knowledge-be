@@ -1,5 +1,5 @@
 {
-  "total_paths": 243,
+  "total_paths": 249,
   "endpoints": [
     {
       "method": "POST",
@@ -1156,6 +1156,42 @@
     {
       "method": "PUT",
       "path": "/api/v1/tenants/{tenant_id}/api-principal-config"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/invitations"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/invitations"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/tenants/{tenant_id}/invitations/{inv_id}"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/invite-links"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/leave"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/members"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/members"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/tenants/{tenant_id}/members/{user_id}"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/tenants/{tenant_id}/members/{user_id}"
     },
     {
       "method": "GET",

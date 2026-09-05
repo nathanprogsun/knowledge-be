@@ -19,9 +19,26 @@ from src.core.contracts.tenants import (
 )
 from src.core.tenants.types import TenantAPIKeyInfo
 from src.web.api.tenants.views import (
+    AddMemberBody,
+    CreateInvitationBody,
+    CreateInviteLinkBody,
     DeleteTenantResponse,
+    InvitationEnvelope,
+    InvitationListEnvelope,
+    MemberEnvelope,
+    MemberListEnvelope,
     TenantEnvelope,
     TenantListEnvelope,
+    UpdateMemberRoleBody,
+    clamp_page,
+    invitation_envelope,
+    invitation_list_envelope,
+    invite_url_for_token,
+    member_envelope,
+    member_list_envelope,
+    require_caller_user_id,
+    require_tenant_invitation,
+    resolve_registered_user,
     tenant_envelope,
     tenant_list_envelope,
 )
@@ -40,6 +57,7 @@ from src.web.deps import (
     TenantServiceDep,
 )
 from src.web.deps.rbac import require_role_dep
+from src.web.deps.tenants import TenantInvitationServiceDep
 
 router = APIRouter(prefix="/tenants", tags=["tenants"])
 
@@ -395,6 +413,190 @@ async def delete_tenant(
     """Soft-delete a workspace; idempotent for unknown ids."""
     await tenant_service.delete_tenant(tenant_id)
     return DeleteTenantResponse(success=True, message="Workspace deleted successfully")
+
+
+@router.get("/{tenant_id}/members", response_model=MemberListEnvelope)
+async def list_members(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+    _match: PathTenantMatchDep,
+    tenant_id: int,
+    member_service: TenantMemberServiceDep,
+    q: str | None = Query(default=None),
+    page: int = Query(default=_DEFAULT_PAGE),
+    page_size: int = Query(default=_DEFAULT_PAGE_SIZE),
+) -> MemberListEnvelope:
+    """List workspace members. ``q`` matches email or username when joined."""
+    page, page_size = clamp_page(page, page_size)
+    query = q.strip() if q is not None and q.strip() else None
+    rows, total = await member_service.list_members_page(
+        tenant_id,
+        query=query,
+        page=page,
+        page_size=page_size,
+    )
+    return member_list_envelope(rows, total=total, page=page, page_size=page_size)
+
+
+@router.post("/{tenant_id}/members", response_model=MemberEnvelope, status_code=201)
+async def add_member(
+    _auth: AuthDep,
+    _owner: RoleOwnerDep,
+    _match: PathTenantMatchDep,
+    tenant_id: int,
+    body: AddMemberBody,
+    member_service: TenantMemberServiceDep,
+    auth_service: AuthServiceDep,
+) -> MemberEnvelope:
+    """Add a registered user by email. Unknown emails are 404, not an invite."""
+    user = await resolve_registered_user(auth_service, body.email)
+    info = await member_service.add_member(
+        user_id=user.user_id,
+        tenant_id=tenant_id,
+        role=body.role,
+        invited_by=require_caller_user_id(),
+    )
+    return member_envelope(
+        info,
+        email=user.email,
+        username=user.username,
+        avatar=user.avatar,
+    )
+
+
+@router.put("/{tenant_id}/members/{user_id}", response_model=DeleteTenantResponse)
+async def update_member_role(
+    _auth: AuthDep,
+    _owner: RoleOwnerDep,
+    _match: PathTenantMatchDep,
+    tenant_id: int,
+    user_id: str,
+    body: UpdateMemberRoleBody,
+    member_service: TenantMemberServiceDep,
+) -> DeleteTenantResponse:
+    """Change a member's role. Demoting the last owner is a conflict."""
+    await member_service.update_role(user_id=user_id, tenant_id=tenant_id, role=body.role)
+    return DeleteTenantResponse(success=True, message="Member role updated")
+
+
+@router.delete("/{tenant_id}/members/{user_id}", response_model=DeleteTenantResponse)
+async def delete_member(
+    _auth: AuthDep,
+    _owner: RoleOwnerDep,
+    _match: PathTenantMatchDep,
+    tenant_id: int,
+    user_id: str,
+    member_service: TenantMemberServiceDep,
+) -> DeleteTenantResponse:
+    """Remove a member. Removing the last owner is a conflict."""
+    await member_service.remove_member(user_id=user_id, tenant_id=tenant_id)
+    return DeleteTenantResponse(success=True, message="Member removed")
+
+
+@router.post("/{tenant_id}/leave", response_model=DeleteTenantResponse)
+async def leave_tenant(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+    _match: PathTenantMatchDep,
+    tenant_id: int,
+    member_service: TenantMemberServiceDep,
+) -> DeleteTenantResponse:
+    """Leave the workspace as the caller. Last owner is a typed conflict."""
+    await member_service.remove_member(
+        user_id=require_caller_user_id(),
+        tenant_id=tenant_id,
+    )
+    return DeleteTenantResponse(success=True, message="Left workspace")
+
+
+@router.get("/{tenant_id}/invitations", response_model=InvitationListEnvelope)
+async def list_invitations(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+    _match: PathTenantMatchDep,
+    tenant_id: int,
+    invitation_service: TenantInvitationServiceDep,
+    include_terminal: bool = Query(default=False),
+    page: int = Query(default=_DEFAULT_PAGE),
+    page_size: int = Query(default=_DEFAULT_PAGE_SIZE),
+) -> InvitationListEnvelope:
+    """List this workspace's invitations. Defaults to pending rows."""
+    page, page_size = clamp_page(page, page_size)
+    rows, total = await invitation_service.list_tenant_invitations_page(
+        tenant_id,
+        include_terminal=include_terminal,
+        page=page,
+        page_size=page_size,
+    )
+    return invitation_list_envelope(rows, total=total, page=page, page_size=page_size)
+
+
+@router.post(
+    "/{tenant_id}/invitations",
+    response_model=InvitationEnvelope,
+    status_code=201,
+)
+async def create_invitation(
+    _auth: AuthDep,
+    _owner: RoleOwnerDep,
+    _match: PathTenantMatchDep,
+    tenant_id: int,
+    body: CreateInvitationBody,
+    invitation_service: TenantInvitationServiceDep,
+    auth_service: AuthServiceDep,
+) -> InvitationEnvelope:
+    """Invite a registered user. The invitee sees the row on ``/me/invitations``."""
+    user = await resolve_registered_user(auth_service, body.email)
+    info = await invitation_service.create_invitation(
+        tenant_id=tenant_id,
+        invitee_user_id=user.user_id,
+        role=body.role,
+        invited_by=require_caller_user_id(),
+        message=body.message,
+    )
+    return invitation_envelope(info, invitee_email=user.email, invitee_name=user.username)
+
+
+@router.delete("/{tenant_id}/invitations/{inv_id}", response_model=DeleteTenantResponse)
+async def revoke_invitation(
+    _auth: AuthDep,
+    _owner: RoleOwnerDep,
+    _match: PathTenantMatchDep,
+    tenant_id: int,
+    inv_id: int,
+    invitation_service: TenantInvitationServiceDep,
+) -> DeleteTenantResponse:
+    """Revoke a pending invitation. Other workspaces' rows look missing."""
+    await require_tenant_invitation(
+        invitation_service,
+        tenant_id=tenant_id,
+        inv_id=inv_id,
+    )
+    await invitation_service.revoke(inv_id)
+    return DeleteTenantResponse(success=True, message="Invitation revoked")
+
+
+@router.post(
+    "/{tenant_id}/invite-links",
+    response_model=InvitationEnvelope,
+    status_code=201,
+)
+async def create_invite_link(
+    _auth: AuthDep,
+    _owner: RoleOwnerDep,
+    _match: PathTenantMatchDep,
+    tenant_id: int,
+    body: CreateInviteLinkBody,
+    invitation_service: TenantInvitationServiceDep,
+) -> InvitationEnvelope:
+    """Issue a reusable share link and return its copy URL."""
+    info, token = await invitation_service.create_share_link(
+        tenant_id=tenant_id,
+        role=body.role,
+        invited_by=require_caller_user_id(),
+        message=body.message,
+    )
+    return invitation_envelope(info, invite_url=invite_url_for_token(token))
 
 
 def _engines_payload(body: CreateTenantRequest) -> JsonObject | None:
