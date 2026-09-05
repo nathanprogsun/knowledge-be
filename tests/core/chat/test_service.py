@@ -8,6 +8,8 @@ All heavy seams are replaced with tiny in-memory fakes.
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 import pytest
@@ -23,7 +25,9 @@ from src.core.chat.service import (
     AgentResolver,
     AssistantMessage,
     ChatService,
+    KnowledgeQARequestLike,
     KnowledgeSearcher,
+    MentionedItemLike,
     MessageGateway,
     QARunner,
     TagScope,
@@ -32,6 +36,7 @@ from src.core.chat.service import (
     merge_knowledge_targets,
     resolve_agent_mode,
 )
+from src.core.chat.stream.manager import MemoryStreamManager, StreamManager
 from src.core.chat.types import EventType
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
@@ -158,6 +163,21 @@ class _Gateway(MessageGateway):
 class _QARequest:
     """Structural stand-in for the web request body."""
 
+    query: str
+    knowledge_base_ids: Sequence[str] | None
+    knowledge_ids: Sequence[str] | None
+    agent_id: str | None
+    agent_enabled: bool
+    web_search_enabled: bool
+    summary_model_id: str | None
+    mcp_service_ids: Sequence[str] | None
+    skill_names: Sequence[str] | None
+    tag_ids: Sequence[str] | None
+    mentioned_items: Sequence[MentionedItemLike] | None
+    disable_title: bool
+    channel: str | None
+    attachment_ids: Sequence[str] | None
+
     def __init__(
         self,
         *,
@@ -165,7 +185,7 @@ class _QARequest:
         agent_id: str | None = None,
         agent_enabled: bool = False,
         summary_model_id: str | None = None,
-        mentioned_items: list[object] | None = None,
+        mentioned_items: Sequence[MentionedItemLike] | None = None,
     ) -> None:
         self.query = query
         self.knowledge_base_ids = None
@@ -196,22 +216,50 @@ def _agent(agent_id: str = "agent-1", *, mode: str = AGENT_MODE_SMART_REASONING)
     )
 
 
+class _HangingRunner(QARunner):
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+
+    async def run(
+        self,
+        *,
+        ctx: Context,
+        session_id: str,
+        request: KnowledgeQARequestLike,
+        agent: CustomAgentInfo | None,
+        event_bus: EventBus,
+    ) -> None:
+        del ctx, request, agent
+        await event_bus.emit(
+            Event(
+                type=EventType.AGENT_THOUGHT,
+                session_id=session_id,
+                data={"content": "thought", "done": False},
+            )
+        )
+        self.started.set()
+        await asyncio.Event().wait()
+
+
 def _service(
     *,
     agents: dict[str, CustomAgentInfo] | None = None,
     searcher: _Searcher | None = None,
-    runner: _Runner | None = None,
+    runner: QARunner | None = None,
     gateway: _Gateway | None = None,
+    stream_manager: StreamManager | None = None,
 ) -> ChatService:
+    qa_runner = runner or _Runner()
     return ChatService(
         tenant_id=7,
         user_id="user-1",
         request_id="req-1",
         agent_resolver=_AgentResolver(agents or {}),
         searcher=searcher or _Searcher(),
-        knowledge_runner=runner or _Runner(),
-        agent_runner=runner or _Runner(),
+        knowledge_runner=qa_runner,
+        agent_runner=qa_runner,
         message_gateway=gateway or _Gateway(),
+        stream_manager=stream_manager,
     )
 
 
@@ -360,6 +408,34 @@ async def test_stream_agent_qa_forwards_agent_to_runner() -> None:
     async for _event in stream:
         pass
     assert runner.calls[0]["session_id"] == "s1"
+
+
+async def test_stream_qa_stops_when_wait_cancelled_fires() -> None:
+    manager = MemoryStreamManager()
+    gateway = _Gateway()
+    runner = _HangingRunner()
+    service = _service(runner=runner, gateway=gateway, stream_manager=manager)
+    stream = await service.stream_knowledge_qa(
+        session_id="s1",
+        request=_QARequest(query="hello"),
+    )
+    first = await anext(stream)
+    assert first.type == EventType.AGENT_QUERY
+    assistant_id = f"assistant-{len(gateway.assistant_messages)}"
+
+    collected: list[Event] = [first]
+
+    async def _consume() -> None:
+        async for event in stream:
+            collected.append(event)
+
+    consumer = asyncio.create_task(_consume())
+    await asyncio.wait_for(runner.started.wait(), timeout=1.0)
+    manager.cancel("s1", assistant_id)
+    await asyncio.wait_for(consumer, timeout=1.0)
+
+    assert EventType.AGENT_COMPLETE not in {event.type for event in collected}
+    assert gateway.completed == [(assistant_id, "")]
 
 
 __all__ = [

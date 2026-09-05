@@ -37,6 +37,7 @@ from fastapi import FastAPI
 
 from src.ai.mcp_transport import MCPConnectionManager
 from src.common.oidc_client import OidcClient
+from src.core.chat.stream.manager import MemoryStreamManager
 from src.core.infra.mcp_services.oauth import (
     InMemorySecretStore,
     OAuthManager,
@@ -65,6 +66,9 @@ class LifeSpanService:
     mcp_oauth_manager_factory: Callable[[MCPServiceInfo], Awaitable[OAuthManager]] | None = None
     arq_redis: ArqRedis | None = None
     arq_queue_name: str = "arq:queue"
+    # Process-local cancel flags. Stop and the in-flight QA loop must
+    # share one instance or POST /stop cannot interrupt tokens.
+    stream_manager: MemoryStreamManager | None = None
 
 
 def get_lifespan_service(app: FastAPI) -> LifeSpanService:
@@ -80,6 +84,14 @@ def get_db_engine_from_lifespan(app: FastAPI) -> DatabaseEngine:
     if service.db_engine is None:
         raise RuntimeError("DatabaseEngine is not initialized.")
     return service.db_engine
+
+
+def get_stream_manager_from_lifespan(app: FastAPI) -> MemoryStreamManager:
+    """DI factory for the shared in-process stream manager."""
+    service = get_lifespan_service(app)
+    if service.stream_manager is None:
+        raise RuntimeError("MemoryStreamManager is not initialized.")
+    return service.stream_manager
 
 
 def get_oidc_client_from_lifespan(app: FastAPI) -> OidcClient:
@@ -99,4 +111,5 @@ __all__ = [
     "get_db_engine_from_lifespan",
     "get_lifespan_service",
     "get_oidc_client_from_lifespan",
+    "get_stream_manager_from_lifespan",
 ]

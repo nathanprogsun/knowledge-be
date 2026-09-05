@@ -20,9 +20,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Request
 
 from src.app_context import request_context
+from src.app_context.registry import get_stream_manager_from_lifespan
 from src.common.exception import ValidationError
 from src.core.chat.messages.factory import (
     build_message_service,
@@ -120,9 +121,9 @@ def get_message_suggestion_service(session: SessionDep) -> MessageSuggestionServ
     )
 
 
-def get_stop_stream_service() -> StopStreamService:
+def get_stop_stream_service(request: Request) -> StopStreamService:
     """Build the per-request stream-stop facade."""
-    return build_stop_stream_service()
+    return build_stop_stream_service(get_stream_manager_from_lifespan(request.app))
 
 
 SessionServiceDep = Annotated[SessionService, Depends(get_session_service)]

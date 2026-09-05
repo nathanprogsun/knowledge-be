@@ -33,6 +33,7 @@ from typing import Annotated
 from fastapi import Depends, Header, Request
 
 from src.app_context import request_context
+from src.app_context.registry import get_stream_manager_from_lifespan
 from src.common.exception import (
     ValidationError,
 )
@@ -101,6 +102,7 @@ def get_embed_chat_service(
         tenant_id=channel.tenant_id,
         user_id=principal,
         request_id=request_context.get_request_id() or "",
+        stream_manager=get_stream_manager_from_lifespan(request.app),
     )
 
 
