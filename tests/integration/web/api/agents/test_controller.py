@@ -479,7 +479,8 @@ async def test_update_builtin_config_returns_200(
     client: TestClient,
     agent_repo: AsyncMock,
 ) -> None:
-    agent_repo._rows["builtin-quick-answer"] = _agent_row(  # type: ignore[attr-defined]
+    stored_rows: dict[str, CustomAgent] = getattr(agent_repo, "_rows")
+    stored_rows["builtin-quick-answer"] = _agent_row(
         id="builtin-quick-answer",
         name="快速问答",
         is_builtin=True,
