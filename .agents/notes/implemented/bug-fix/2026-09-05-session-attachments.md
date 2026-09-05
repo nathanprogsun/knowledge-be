@@ -19,10 +19,13 @@ The paperclip already posts multipart files to `/api/v1/sessions/{id}/attachment
 - **Reuse `BackendFileServiceResolver`** — rejected: that resolver needs a knowledge base id. Session attachments are not KB-scoped.
 - **Enqueue parse from the upload handler** — rejected: workers must not import `web` or `db`, and empty ready content is enough for this surface.
 - **Bind `attachment_ids` into `KnowledgeQARunner`** — rejected: the send body already accepts the field. Prompt bind is a later change.
+- **Keep the explicit multipart Content-Type** — rejected: without a boundary the request never completes. Let the browser set the type on `FormData`.
 
 ## Consequences
 
 The paperclip can upload, poll to `ready`, preview bytes, and delete. Refresh has no frontend list client yet. Chat send still ignores `attachment_ids`. Missing storage is `temporary_document.storage_unavailable`, not a 500.
+
+`postUpload` no longer sets a fixed `Content-Type: multipart/form-data`. The axios instance default is `application/json`. A FormData body with that type (or a multipart type with no boundary) makes the API return 422 and the chip stay at 上传中. The request interceptor deletes `Content-Type` on `FormData` so the browser sets the boundary. A raw `fetch` of the same POST already returned 201.
 
 ## Required verification
 

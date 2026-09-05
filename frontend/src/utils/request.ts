@@ -77,6 +77,15 @@ instance.interceptors.request.use(
     }
     
     config.headers["X-Request-ID"] = `${generateRandomString(12)}`;
+    // Default JSON content-type hides the multipart boundary, so uploads 422.
+    if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+      const headers = config.headers as { delete?: (name: string) => void };
+      if (typeof headers.delete === "function") {
+        headers.delete("Content-Type");
+      } else {
+        delete config.headers["Content-Type"];
+      }
+    }
     return config;
   },
   (error) => {
@@ -283,7 +292,7 @@ export function postUpload(
   return instance.post(url, data, {
     ...config,
     headers: {
-      "Content-Type": "multipart/form-data",
+      // A fixed multipart type has no boundary, so the upload never finishes.
       "X-Request-ID": `${generateRandomString(12)}`,
       ...(config.headers || {}),
     },
