@@ -12,7 +12,9 @@ export renderers (CSV and JSON), which mirror the upstream export format:
 
 The FAQ container resolver is here too: the FAQ service requires the
 caller to pass the FAQ knowledge container id for an entry write, so the
-views resolve it from the knowledge base's documents.
+views resolve it from the knowledge base's documents. A first write on a
+new FAQ knowledge base creates that container; otherwise the manager's
+create and import buttons only toast.
 """
 # Chinese user-facing messages use fullwidth punctuation.
 
@@ -40,7 +42,10 @@ from src.core.contracts.knowledge import (
 )
 from src.core.knowledge.documents.faq_import import FAQ_BATCH_MODE_APPEND
 from src.core.knowledge.documents.service.knowledge_service import KnowledgeService
-from src.core.knowledge.documents.types import KNOWLEDGE_TYPE_FAQ
+from src.core.knowledge.documents.types import (
+    KNOWLEDGE_TYPE_FAQ,
+    PARSE_STATUS_COMPLETED,
+)
 from src.core.knowledge.faq.import_parser import IMPORT_HEADERS, VALUE_SEPARATOR
 from src.core.knowledge.faq.service.faq_service import FAQService
 from src.core.knowledge.faq.types import ANSWER_STRATEGY_ALL
@@ -251,6 +256,24 @@ def _form_bool(
     )
 
 
+async def _create_faq_container(
+    knowledge_service: KnowledgeService,
+    *,
+    tenant_id: int,
+    knowledge_base_id: str,
+) -> str:
+    """Insert the FAQ knowledge row a first entry write needs."""
+    created = await knowledge_service.create_document(
+        tenant_id=tenant_id,
+        knowledge_base_id=knowledge_base_id,
+        type=KNOWLEDGE_TYPE_FAQ,
+        title="FAQ",
+        source="faq",
+        parse_status=PARSE_STATUS_COMPLETED,
+    )
+    return created.id
+
+
 async def resolve_faq_knowledge_id(
     knowledge_service: KnowledgeService,
     *,
@@ -260,9 +283,8 @@ async def resolve_faq_knowledge_id(
     """Resolve the FAQ container knowledge id of a knowledge base.
 
     FAQ entries belong to a FAQ-type knowledge document inside the
-    knowledge base; the FAQ service requires that container id for an
-    entry write. The newest FAQ document is used, matching the upstream
-    ``ensureFAQKnowledge`` lookup.
+    knowledge base. The newest FAQ document is used. A knowledge base
+    with none gets a completed container so the first write can persist.
     """
     documents = await knowledge_service.list_documents(
         tenant_id=tenant_id,
@@ -271,9 +293,10 @@ async def resolve_faq_knowledge_id(
     for document in documents:
         if document.type == KNOWLEDGE_TYPE_FAQ:
             return document.id
-    raise ValidationError(
-        code="faq.knowledge_container_missing",
-        message="知识库不存在 FAQ 容器，无法写入 FAQ 条目",
+    return await _create_faq_container(
+        knowledge_service,
+        tenant_id=tenant_id,
+        knowledge_base_id=knowledge_base_id,
     )
 
 

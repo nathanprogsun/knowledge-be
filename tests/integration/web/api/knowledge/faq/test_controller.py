@@ -492,6 +492,25 @@ class _FakeKnowledgeService:
         self.faq_container_id = "knowledge-faq-1"
         self.has_container = True
 
+    def _container(
+        self,
+        *,
+        tenant_id: int,
+        knowledge_base_id: str,
+    ) -> Knowledge:
+        now = datetime.now(UTC)
+        return Knowledge(
+            id=self.faq_container_id,
+            tenant_id=tenant_id,
+            knowledge_base_id=knowledge_base_id,
+            type="faq",
+            title="FAQ",
+            parse_status="completed",
+            enable_status="enabled",
+            created_at=now,
+            updated_at=now,
+        )
+
     async def list_documents(
         self,
         *,
@@ -500,20 +519,21 @@ class _FakeKnowledgeService:
     ) -> list[Knowledge]:
         if not self.has_container:
             return []
-        now = datetime.now(UTC)
-        return [
-            Knowledge(
-                id=self.faq_container_id,
-                tenant_id=tenant_id,
-                knowledge_base_id=knowledge_base_id,
-                type="faq",
-                title="FAQ",
-                parse_status="done",
-                enable_status="enabled",
-                created_at=now,
-                updated_at=now,
-            )
-        ]
+        return [self._container(tenant_id=tenant_id, knowledge_base_id=knowledge_base_id)]
+
+    async def create_document(
+        self,
+        *,
+        tenant_id: int,
+        knowledge_base_id: str,
+        type: str,
+        title: str,
+        source: str,
+        parse_status: str = "completed",
+    ) -> Knowledge:
+        self.has_container = True
+        self.faq_container_id = "knowledge-faq-created"
+        return self._container(tenant_id=tenant_id, knowledge_base_id=knowledge_base_id)
 
 
 def _entry(
@@ -723,18 +743,21 @@ async def test_create_resolves_faq_container(
     assert kwargs["knowledge_id"] == "knowledge-faq-1"
 
 
-async def test_create_without_faq_container_returns_422(
+async def test_create_without_faq_container_seeds_one(
     client: TestClient,
     default_create_faq_request: dict[str, object],
     fake_knowledge_service: _FakeKnowledgeService,
+    fake_faq_service: _FakeFAQService,
 ) -> None:
-    """A knowledge base with no FAQ document cannot take a write."""
+    """A first write creates the FAQ container and persists the entry."""
     fake_knowledge_service.has_container = False
     resp = client.post(
         f"/api/v1/knowledge-bases/{_KB_ID}/faq/entry", json=default_create_faq_request
     )
-    assert resp.status_code == 422
-    assert resp.json()["error"]["code"] == "faq.knowledge_container_missing"
+    assert resp.status_code == 200
+    method, kwargs = fake_faq_service.calls[-1]
+    assert method == "create_entry"
+    assert kwargs["knowledge_id"] == "knowledge-faq-created"
 
 
 async def test_create_rejects_missing_standard_question(client: TestClient) -> None:
@@ -851,18 +874,21 @@ async def test_import_rejects_invalid_mode(client: TestClient) -> None:
     assert resp.json()["error"]["code"] == "faq.invalid_import_mode"
 
 
-async def test_import_without_container_returns_422(
+async def test_import_without_container_seeds_one(
     client: TestClient,
     fake_knowledge_service: _FakeKnowledgeService,
+    fake_import_runner: _FakeFAQImportRunner,
 ) -> None:
-    """Import needs a FAQ container to persist into."""
+    """A first import creates the FAQ container and runs the file pipeline."""
     fake_knowledge_service.has_container = False
     resp = client.post(
         f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries",
         files={"file": ("faq.csv", _FAQ_CSV, "text/csv")},
     )
-    assert resp.status_code == 422
-    assert resp.json()["error"]["code"] == "faq.knowledge_container_missing"
+    assert resp.status_code == 200
+    method, kwargs = fake_import_runner.calls[-1]
+    assert method == "run"
+    assert kwargs["knowledge_id"] == "knowledge-faq-created"
 
 
 async def test_import_requires_file(client: TestClient) -> None:

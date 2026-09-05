@@ -11,7 +11,7 @@ The FAQ manager already called search, batch tag, batch fields, JSON `{entries, 
 
 ## Decision
 
-Keep one `POST /entries` and branch on `Content-Type`. `application/json` validates `FAQBatchUpsertPayload` and loops `FAQService.create_entry` (replace clears first). Multipart still runs `FAQImportRunner` on CSV / Excel bytes. JSON upsert records a completed in-memory progress object so the existing poller works. Search is keyword overlap over the knowledge base's entries, with `match_type=keywords` and a numeric `score`; `data` is a list. `FAQEntryTagsBatchUpdate.updates` accepts `int | None` so a null clears a tag. Last-result close updates `display_status` on the newest in-memory task for that knowledge base.
+Keep one `POST /entries` and branch on `Content-Type`. `application/json` validates `FAQBatchUpsertPayload` and loops `FAQService.create_entry` (replace clears first). Multipart still runs `FAQImportRunner` on CSV / Excel bytes. JSON upsert records a completed in-memory progress object so the existing poller works. Search is keyword overlap over the knowledge base's entries, with `match_type=keywords` and a numeric `score`; `data` is a list. `FAQEntryTagsBatchUpdate.updates` accepts `int | None` so a null clears a tag. Last-result close updates `display_status` on the newest in-memory task for that knowledge base. A first write that finds no FAQ document inserts a completed `type=faq` container, matching the manager's create and import on a new FAQ knowledge base.
 
 ## Alternatives considered
 
@@ -19,6 +19,8 @@ Keep one `POST /entries` and branch on `Content-Type`. `application/json` valida
 - **Enqueue a worker for JSON upsert** — rejected: file import is already synchronous and the SPA only needs a completed `task_id` to poll.
 - **Vector / embedding FAQ search** — rejected: the manager can render keyword hits. Embedding belongs with retrieval, not this HTTP hole.
 - **Database table for display_status** — rejected: progress already lives in `FAQImportTaskStore`. A table would outlive the process-local task the card polls.
+- **Keep `faq.knowledge_container_missing` on first write** — rejected: the manager's first create and import only toast. The container is an implementation row, not an operator step.
+- **Seed the container only when creating the knowledge base** — rejected: existing empty FAQ knowledge bases would still 422. First write covers both.
 
 ## Consequences
 

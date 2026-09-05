@@ -13,8 +13,8 @@ the SPA ``{entries, mode}`` upsert. Multipart is the CSV / Excel file
 runner. The two bodies are not interchangeable.
 
 The FAQ container knowledge id for entry writes is resolved from the
-knowledge base's documents. Without a container the write fails with
-``faq.knowledge_container_missing``.
+knowledge base's documents. A first write creates that container when
+the knowledge base has none.
 
 Swagger ``description`` strings are Chinese, mirroring the existing
 annotations; RUF001 is suppressed file-wide for the same reason as
