@@ -74,6 +74,19 @@ def _split_file_types(raw: str) -> list[str]:
     return parts
 
 
+def resolve_request_tag_ids(
+    *,
+    tag_ids: list[str] | None,
+    tag_id: str | None,
+) -> list[str] | None:
+    """Prefer ``tag_ids`` (including empty) over a single ``tag_id``."""
+    if tag_ids is not None:
+        return tag_ids
+    if tag_id:
+        return [tag_id]
+    return None
+
+
 def _dedupe_ids(raw_ids: list[str]) -> list[str]:
     """Trim, deduplicate, and drop blank ids, preserving first-seen order."""
     seen: set[str] = set()
@@ -176,6 +189,7 @@ async def update_document(
         content=body.content,
         status=body.status,
         process_config=body.process_config,
+        tag_ids=resolve_request_tag_ids(tag_ids=body.tag_ids, tag_id=body.tag_id),
     )
     return KnowledgeUpdatedEnvelope(
         success=True,
@@ -358,6 +372,7 @@ __all__ = [
     "read_spans",
     "regenerate_summary",
     "reparse_document",
+    "resolve_request_tag_ids",
     "search_knowledge_documents",
     "stream_document",
     "update_document",

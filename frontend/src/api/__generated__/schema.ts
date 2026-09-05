@@ -7014,8 +7014,14 @@ export interface components {
             status?: string | null;
             /** Tag Id */
             tag_id?: string | null;
+            /** Tag Ids */
+            tag_ids?: string[] | null;
             /** Channel */
             channel?: string | null;
+            /** Process Config */
+            process_config?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
         };
         /** CreateModelRequest */
         CreateModelRequest: {
@@ -12795,6 +12801,8 @@ export interface components {
             description?: string | null;
             /** Tag Id */
             tag_id?: string | null;
+            /** Tag Ids */
+            tag_ids?: string[] | null;
             /** Enable Status */
             enable_status?: string | null;
             /** Content */

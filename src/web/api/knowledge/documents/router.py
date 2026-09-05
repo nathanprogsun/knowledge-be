@@ -291,8 +291,12 @@ async def create_manual_document(
         title=body.title,
         content=body.content,
         status=body.status,
-        tag_ids=[body.tag_id] if body.tag_id else None,
+        tag_ids=document_reads.resolve_request_tag_ids(
+            tag_ids=body.tag_ids,
+            tag_id=body.tag_id,
+        ),
         channel=body.channel,
+        process_overrides=body.process_config,
     )
     return KnowledgeEnvelope(success=True, data=knowledge)
 

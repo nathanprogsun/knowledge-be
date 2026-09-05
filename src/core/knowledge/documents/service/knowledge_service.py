@@ -36,8 +36,12 @@ from src.core.contracts.knowledge import Knowledge
 from src.core.knowledge.documents.create_common import (
     MANUAL_CONTENT_MAX_LENGTH,
     clean_markdown,
+    validate_knowledge_tags,
 )
-from src.core.knowledge.documents.create_manual import normalize_manual_status
+from src.core.knowledge.documents.create_manual import (
+    normalize_manual_status,
+    reject_manual_publish,
+)
 from src.core.knowledge.documents.types import (
     CHANNEL_WEB,
     KNOWLEDGE_TYPE_MANUAL,
@@ -46,6 +50,7 @@ from src.core.knowledge.documents.types import (
     DocumentListFilter,
 )
 from src.db.dao.knowledge_repository import KnowledgeRepository
+from src.db.dao.knowledge_tag_repository import TagRepository
 from src.db.models.knowledge import Document
 
 _NOT_FOUND_CODE = "knowledge.not_found"
@@ -257,6 +262,7 @@ def _manual_update_changes(
         metadata["version"] = raw_version + 1 if isinstance(raw_version, int) else 1
     normalized_status = normalize_manual_status(status) if status is not None else None
     if normalized_status is not None:
+        reject_manual_publish(normalized_status)
         metadata["status"] = normalized_status
     if process_config is not None:
         metadata["process_overrides"] = process_config
@@ -279,9 +285,11 @@ class KnowledgeService:
         *,
         knowledge_repo: KnowledgeRepository,
         summary_refresher: SummaryRefresher | None = None,
+        tag_repo: TagRepository | None = None,
     ) -> None:
         self._knowledge_repo = knowledge_repo
         self._summary_refresher = summary_refresher
+        self._tag_repo = tag_repo
 
     # ── Create ──────────────────────────────────────────────────────
 
@@ -538,16 +546,9 @@ class KnowledgeService:
         content: str | None = None,
         status: str | None = None,
         process_config: JsonObject | None = None,
+        tag_ids: list[str] | None = None,
     ) -> Knowledge:
-        """Patch a document's mutable fields, returning the new shape.
-
-        Mirrors the upstream update semantics: a non-empty ``title`` /
-        ``description`` replaces the stored value; ``custom_metadata``,
-        when provided, is validated against the upstream field rules and
-        then stored wholesale. Manual rows also accept ``content`` /
-        ``status``. Omitted fields are left untouched; an update that
-        changes nothing resolves the row without a write.
-        """
+        """Patch mutable fields. ``tag_ids=[]`` clears bindings; omit to leave them."""
         _require_tenant_id(tenant_id)
         _require_document_id(id)
         row = await self._knowledge_repo.get_by_id(tenant_id, id)
@@ -569,11 +570,42 @@ class KnowledgeService:
                 row, content=content, status=status, process_config=process_config
             )
         )
+        if tag_ids is not None:
+            await self._bind_document_tags(
+                tenant_id=tenant_id,
+                knowledge_base_id=row.knowledge_base_id,
+                knowledge_id=row.id,
+                tag_ids=tag_ids,
+            )
         if not changes:
             return _to_knowledge(row)
         updated = row.model_copy(update={**changes, "updated_at": datetime.now(UTC)})
         persisted = await self._knowledge_repo.update(updated)
         return _to_knowledge(persisted)
+
+    async def _bind_document_tags(
+        self,
+        *,
+        tenant_id: int,
+        knowledge_base_id: str,
+        knowledge_id: str,
+        tag_ids: list[str],
+    ) -> None:
+        if self._tag_repo is None:
+            raise ValidationError(
+                code="knowledge.tag_repo_required",
+                message="tag_ids requires a tag repository",
+            )
+        validated = await validate_knowledge_tags(
+            tenant_id=tenant_id,
+            kb_id=knowledge_base_id,
+            tag_ids=tag_ids,
+            tag_repo=self._tag_repo,
+        )
+        await self._tag_repo.set_knowledge_tags(
+            knowledge_id=knowledge_id,
+            tag_ids=validated,
+        )
 
     async def request_summary_refresh(self, *, tenant_id: int, id: str) -> Knowledge:
         """Generate the document summary and return the updated row.

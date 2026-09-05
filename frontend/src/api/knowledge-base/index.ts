@@ -294,7 +294,13 @@ export function getKnowledgeDetails(id: string, options?: { agent_id?: string; a
 
 export function updateManualKnowledge(
   id: string,
-  data: { title: string; content: string; status: string; process_config?: KnowledgeProcessOverrides },
+  data: {
+    title: string
+    content: string
+    status: string
+    tag_ids?: string[]
+    process_config?: KnowledgeProcessOverrides
+  },
 ) {
   return put(`/api/v1/knowledge/${id}`, data);
 }

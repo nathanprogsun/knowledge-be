@@ -28185,6 +28185,20 @@
             ],
             "title": "Tag Id"
           },
+          "tag_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag Ids"
+          },
           "channel": {
             "anyOf": [
               {
@@ -28195,6 +28209,20 @@
               }
             ],
             "title": "Channel"
+          },
+          "process_config": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Config"
           }
         },
         "type": "object",
@@ -41837,6 +41865,20 @@
               }
             ],
             "title": "Tag Id"
+          },
+          "tag_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag Ids"
           },
           "enable_status": {
             "anyOf": [

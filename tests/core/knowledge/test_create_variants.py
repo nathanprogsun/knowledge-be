@@ -32,7 +32,11 @@ from sqlalchemy.pool import NullPool
 
 from src.common.exception import ConflictError, NotFoundError, ValidationError
 from src.common.json import BindParams
-from src.core.contracts.knowledge import Knowledge
+from src.core.contracts.knowledge import (
+    CreateManualKnowledgeRequest,
+    Knowledge,
+    UpdateKnowledgeRequest,
+)
 from src.core.knowledge.documents.create_manual import create_knowledge_from_manual
 from src.core.knowledge.documents.create_passage import create_knowledge_from_passage
 from src.core.knowledge.documents.create_url import create_knowledge_from_url
@@ -871,7 +875,28 @@ async def test_create_manual_draft_creates_row() -> None:
     }
 
 
-async def test_create_manual_publish_stamps_pending_and_overrides() -> None:
+async def test_create_manual_publish_is_rejected_without_insert() -> None:
+    repo, rows = _make_knowledge_repo()
+    tenant_id = make_test_tenant_id()
+    kb_id = _kbid()
+    with pytest.raises(ValidationError) as exc_info:
+        await create_knowledge_from_manual(
+            tenant_id=tenant_id,
+            kb_id=kb_id,
+            title="Post",
+            content="content",
+            status="publish",
+            process_overrides={"chunk_size": 512},
+            knowledge_repo=repo,
+            kb_service=_kb_service(info=_kb_info(tenant_id=tenant_id, kb_id=kb_id)),
+            now=_NOW,
+        )
+    assert exc_info.value.code == "knowledge.manual_publish_unavailable"
+    repo.create.assert_not_awaited()
+    assert rows == {}
+
+
+async def test_create_manual_draft_persists_process_overrides() -> None:
     repo, rows = _make_knowledge_repo()
     tenant_id = make_test_tenant_id()
     kb_id = _kbid()
@@ -880,17 +905,35 @@ async def test_create_manual_publish_stamps_pending_and_overrides() -> None:
         kb_id=kb_id,
         title="Post",
         content="content",
-        status="publish",
+        status="draft",
         process_overrides={"chunk_size": 512},
         knowledge_repo=repo,
         kb_service=_kb_service(info=_kb_info(tenant_id=tenant_id, kb_id=kb_id)),
         now=_NOW,
     )
-    assert result.parse_status == PARSE_STATUS_PENDING
+    assert result.parse_status == MANUAL_KNOWLEDGE_STATUS_DRAFT
     stored = rows[result.id]
     assert stored.metadata is not None
-    assert stored.metadata["status"] == "publish"
+    assert stored.metadata["status"] == MANUAL_KNOWLEDGE_STATUS_DRAFT
     assert stored.metadata["process_overrides"] == {"chunk_size": 512}
+
+
+def test_create_manual_request_keeps_tag_ids_and_process_config() -> None:
+    body = CreateManualKnowledgeRequest(
+        title="t",
+        content="hello",
+        tag_ids=["tag-1", "tag-2"],
+        process_config={"chunk_size": 256},
+    )
+    assert body.tag_ids == ["tag-1", "tag-2"]
+    assert body.process_config == {"chunk_size": 256}
+
+
+def test_update_knowledge_request_empty_tag_ids_clears() -> None:
+    omitted = UpdateKnowledgeRequest(content="hello")
+    assert omitted.tag_ids is None
+    cleared = UpdateKnowledgeRequest(tag_ids=[])
+    assert cleared.tag_ids == []
 
 
 async def test_create_manual_default_title_and_status() -> None:
@@ -1157,19 +1200,21 @@ async def test_integration_create_manual_round_trip(session: AsyncSession) -> No
         kb_id=kb_id,
         title="Integration notes",
         content="# Hello",
-        status="publish",
+        status="draft",
+        process_overrides={"chunk_size": 64},
         knowledge_repo=KnowledgeRepository(session),
         kb_service=kb_service,
         now=_NOW,
     )
-    assert result.parse_status == PARSE_STATUS_PENDING
+    assert result.parse_status == MANUAL_KNOWLEDGE_STATUS_DRAFT
     row = await KnowledgeRepository(session).get_by_id(tenant_id=tenant_id, id=result.id)
     assert row is not None
     assert row.type == KNOWLEDGE_TYPE_MANUAL
     assert row.file_name == "Integration notes.md"
     assert row.metadata is not None
     assert row.metadata["content"] == "# Hello"
-    assert row.metadata["status"] == "publish"
+    assert row.metadata["status"] == "draft"
+    assert row.metadata["process_overrides"] == {"chunk_size": 64}
     assert row.metadata["format"] == MANUAL_KNOWLEDGE_FORMAT_MARKDOWN
 
 

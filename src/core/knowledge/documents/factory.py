@@ -39,6 +39,7 @@ def build_knowledge_service(session: AsyncSession) -> KnowledgeService:
     knowledge_repo = KnowledgeRepository(session)
     return KnowledgeService(
         knowledge_repo=knowledge_repo,
+        tag_repo=TagRepository(session),
         summary_refresher=DocumentSummaryRefresher(
             knowledge_repo=knowledge_repo,
             chunk_repo=ChunkRepository(session),
