@@ -296,7 +296,7 @@ export function updateManualKnowledge(
   id: string,
   data: { title: string; content: string; status: string; process_config?: KnowledgeProcessOverrides },
 ) {
-  return put(`/api/v1/knowledge/manual/${id}`, data);
+  return put(`/api/v1/knowledge/${id}`, data);
 }
 
 export function reparseKnowledge(id: string, data?: { process_config?: KnowledgeProcessOverrides }) {

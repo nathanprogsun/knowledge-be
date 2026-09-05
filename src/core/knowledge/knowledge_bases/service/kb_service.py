@@ -15,7 +15,8 @@ Scope of this module
 - Reads: single (by id / by id-and-tenant), batch, and tenant list with
   best-effort count enrichment.
 - ``update_knowledge_base`` applies the mutable fields and the config
-  merge; ``delete_knowledge_base`` soft-deletes the row.
+  merge; ``update_model_config`` persists the editor's model and
+  chunking payload; ``delete_knowledge_base`` soft-deletes the row.
 - The three aggregate counts (``count_documents`` / ``count_chunks`` /
   ``count_members``) back the non-persisted response fields.
 
@@ -32,6 +33,9 @@ from datetime import UTC, datetime
 
 from src.common.exception import NotFoundError, ValidationError
 from src.common.json import JsonObject, JsonValue
+from src.core.knowledge.knowledge_bases.service.kb_model_config import (
+    apply_model_config,
+)
 from src.core.knowledge.knowledge_bases.types import (
     FAQ_INDEX_MODE_QUESTION_ANSWER,
     FAQ_QUESTION_INDEX_MODE_COMBINED,
@@ -41,6 +45,7 @@ from src.core.knowledge.knowledge_bases.types import (
     KnowledgeBaseInfo,
 )
 from src.db.dao.knowledge_base_repository import KnowledgeBaseRepository
+from src.db.dao.user_kb_pin_repository import UserKBPinRepository
 from src.db.models.knowledge_base import KnowledgeBase
 
 _NOT_FOUND_CODE = "knowledge_base.not_found"
@@ -239,8 +244,14 @@ def _apply_update_config(
 class KBService:
     """Stateless knowledge-base service, constructed per request."""
 
-    def __init__(self, *, kb_repo: KnowledgeBaseRepository) -> None:
+    def __init__(
+        self,
+        *,
+        kb_repo: KnowledgeBaseRepository,
+        pin_repo: UserKBPinRepository | None = None,
+    ) -> None:
         self._kb_repo = kb_repo
+        self._pin_repo = pin_repo
 
     # ── Create ──────────────────────────────────────────────────────
 
@@ -366,19 +377,69 @@ class KBService:
         rows = await self._kb_repo.get_by_ids(ids)
         return [KnowledgeBaseInfo.map_from_db(_ensure_defaults(row)) for row in rows]
 
-    async def list_knowledge_bases(self, *, tenant_id: int) -> list[KnowledgeBaseInfo]:
+    async def list_knowledge_bases(
+        self, *, tenant_id: int, user_id: str | None = None
+    ) -> list[KnowledgeBaseInfo]:
         """Return every live, non-temporary knowledge base of the tenant.
 
         Newest first; document-type rows carry ``knowledge_count`` and
         FAQ-type rows carry ``chunk_count`` via best-effort enrichment.
+        Pin flags are filled for ``user_id`` when pin storage is wired.
         """
         _require_tenant_id(tenant_id)
         rows = await self._kb_repo.list_by_tenant(tenant_id)
-        infos: list[KnowledgeBaseInfo] = []
-        for row in rows:
-            info = KnowledgeBaseInfo.map_from_db(_ensure_defaults(row))
-            infos.append(await self._fill_counts(tenant_id=tenant_id, info=info))
-        return infos
+        infos: list[KnowledgeBaseInfo] = [
+            KnowledgeBaseInfo.map_from_db(_ensure_defaults(row)) for row in rows
+        ]
+        infos = await self._apply_pins(infos, tenant_id=tenant_id, user_id=user_id)
+        filled: list[KnowledgeBaseInfo] = []
+        for info in infos:
+            filled.append(await self._fill_counts(tenant_id=tenant_id, info=info))
+        return filled
+
+    async def _apply_pins(
+        self,
+        infos: list[KnowledgeBaseInfo],
+        *,
+        tenant_id: int,
+        user_id: str | None,
+    ) -> list[KnowledgeBaseInfo]:
+        """Stamp per-viewer pin flags onto a listed page."""
+        if self._pin_repo is None or not user_id or not infos:
+            return infos
+        pins = await self._pin_repo.list_for_user(tenant_id=tenant_id, user_id=user_id)
+        by_id = {pin.kb_id: pin.pinned_at for pin in pins}
+        if not by_id:
+            return infos
+        return [
+            info.model_copy(update={"is_pinned": True, "pinned_at": by_id[info.id]})
+            if info.id in by_id
+            else info
+            for info in infos
+        ]
+
+    async def toggle_pin(self, *, tenant_id: int, user_id: str, kb_id: str) -> bool:
+        """Pin or unpin one knowledge base for the viewer. True when now pinned."""
+        if self._pin_repo is None:
+            raise ValidationError(
+                code="knowledge_base.pin_unavailable",
+                message="pin storage is not available",
+            )
+        await self.get_knowledge_base_by_id_and_tenant(
+            tenant_id=tenant_id,
+            knowledge_base_id=kb_id,
+        )
+        existing = await self._pin_repo.get(tenant_id=tenant_id, user_id=user_id, kb_id=kb_id)
+        if existing is not None:
+            await self._pin_repo.remove(tenant_id=tenant_id, user_id=user_id, kb_id=kb_id)
+            return False
+        await self._pin_repo.add(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            kb_id=kb_id,
+            pinned_at=_now(),
+        )
+        return True
 
     async def _fill_counts(
         self,
@@ -442,6 +503,49 @@ class KBService:
         if description is not None:
             patch["description"] = description
         patch.update(_apply_update_config(existing, config))
+        row = _ensure_defaults(existing.model_copy(update=patch))
+        persisted = await self._kb_repo.update(row)
+        return KnowledgeBaseInfo.map_from_db(persisted)
+
+    async def update_model_config(
+        self,
+        *,
+        knowledge_base_id: str,
+        summary_model_id: str,
+        embedding_model_id: str | None = None,
+        chunking_config: JsonObject | None = None,
+        vlm_config: JsonObject | None = None,
+        asr_config: JsonObject | None = None,
+        extract_config: JsonObject | None = None,
+        question_generation_config: JsonObject | None = None,
+        storage_backend_id: str | None = None,
+        storage_provider_config: JsonObject | None = None,
+        document_count: int = 0,
+    ) -> KnowledgeBaseInfo:
+        """Persist the editor's model, chunking, extract, and storage fields."""
+        _require_knowledge_base_id(knowledge_base_id)
+        existing = await self._kb_repo.get_by_id_or_none(knowledge_base_id)
+        if existing is None:
+            raise NotFoundError(
+                code=_NOT_FOUND_CODE,
+                message=f"knowledge base {knowledge_base_id} not found",
+            )
+        patch: dict[str, JsonObject | str | datetime | None] = dict(
+            apply_model_config(
+                existing,
+                summary_model_id=summary_model_id,
+                embedding_model_id=embedding_model_id,
+                chunking_config=chunking_config,
+                vlm_config=vlm_config,
+                asr_config=asr_config,
+                extract_config=extract_config,
+                question_generation_config=question_generation_config,
+                storage_backend_id=storage_backend_id,
+                storage_provider_config=storage_provider_config,
+                document_count=document_count,
+            )
+        )
+        patch["updated_at"] = _now()
         row = _ensure_defaults(existing.model_copy(update=patch))
         persisted = await self._kb_repo.update(row)
         return KnowledgeBaseInfo.map_from_db(persisted)

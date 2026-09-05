@@ -42,7 +42,8 @@ SUGGESTION_DEFAULT_LIMIT = 6
 
 # Fixed ids of the built-in agent presets. They are registry-backed
 # upstream; until that registry is ported, the service recognises the
-# ids so built-in rows can never be edited or deleted.
+# ids so built-in identity fields cannot change and the rows cannot be
+# deleted. Config-only updates stay allowed.
 BUILTIN_AGENT_IDS: frozenset[str] = frozenset(
     {
         "builtin-quick-answer",

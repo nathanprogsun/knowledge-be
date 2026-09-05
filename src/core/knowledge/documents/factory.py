@@ -10,6 +10,7 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.ai.storage.base import FileService
+from src.core.infra.models.factory import build_chat_model_service
 from src.core.knowledge.chunks.factory import build_chunk_service
 from src.core.knowledge.documents.cancel import ParseTaskInspector
 from src.core.knowledge.documents.clone import ObjectCopier, VectorIndexReplicator
@@ -18,20 +19,51 @@ from src.core.knowledge.documents.documents_orchestrator import (
     KnowledgeDocumentsOrchestrator,
 )
 from src.core.knowledge.documents.move import ReparseTrigger
+from src.core.knowledge.documents.parse_pipeline import DocumentReader
+from src.core.knowledge.documents.process_document import DocumentProcessPipeline
 from src.core.knowledge.documents.reparse import ReparseEnqueuer
 from src.core.knowledge.documents.service.knowledge_service import KnowledgeService
+from src.core.knowledge.documents.span_tracker import SpanTracker
+from src.core.knowledge.documents.summary_refresh import DocumentSummaryRefresher
 from src.core.knowledge.documents.upload_pipeline import DocumentTaskDispatcher
 from src.core.knowledge.knowledge_bases.factory import build_kb_service
 from src.core.knowledge.tags.factory import build_tag_service
 from src.db.dao.chunk_repository import ChunkRepository
 from src.db.dao.knowledge_repository import KnowledgeRepository
+from src.db.dao.knowledge_span_repository import KnowledgeSpanRepository
 from src.db.dao.knowledge_tag_repository import TagRepository
 
 
 def build_knowledge_service(session: AsyncSession) -> KnowledgeService:
     """Per-request ``KnowledgeService`` with a fresh repository."""
+    knowledge_repo = KnowledgeRepository(session)
     return KnowledgeService(
+        knowledge_repo=knowledge_repo,
+        summary_refresher=DocumentSummaryRefresher(
+            knowledge_repo=knowledge_repo,
+            chunk_repo=ChunkRepository(session),
+            kb_service=build_kb_service(session),
+            chat_models=build_chat_model_service(session),
+        ),
+    )
+
+
+def build_span_tracker(session: AsyncSession) -> SpanTracker:
+    """Per-request ``SpanTracker`` over the processing-spans table."""
+    return SpanTracker(span_store=KnowledgeSpanRepository(session))
+
+
+def build_document_process_pipeline(
+    session: AsyncSession,
+    *,
+    reader: DocumentReader | None = None,
+) -> DocumentProcessPipeline:
+    """Per-job ``DocumentProcessPipeline`` for the worker runtime."""
+    return DocumentProcessPipeline(
         knowledge_repo=KnowledgeRepository(session),
+        kb_service=build_kb_service(session),
+        chunk_repo=ChunkRepository(session),
+        reader=reader,
     )
 
 
@@ -73,4 +105,9 @@ def build_documents_orchestrator(
     )
 
 
-__all__ = ["build_documents_orchestrator", "build_knowledge_service"]
+__all__ = [
+    "build_document_process_pipeline",
+    "build_documents_orchestrator",
+    "build_knowledge_service",
+    "build_span_tracker",
+]

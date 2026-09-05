@@ -26,6 +26,7 @@ Routes registered under `/api/v1/knowledge-bases`. Path parameters use FastAPI `
 | POST | `/knowledge-bases/{id}/knowledge/passage` |
 | POST | `/knowledge-bases/{id}/knowledge/url` |
 | GET | `/knowledge-bases/{id}/move-targets` |
+| PUT | `/knowledge-bases/{id}/pin` |
 | GET | `/knowledge-bases/{id}/tags` |
 | POST | `/knowledge-bases/{id}/tags` |
 | DELETE | `/knowledge-bases/{id}/tags/{tag_id}` |

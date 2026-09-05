@@ -27,7 +27,10 @@ from src.common.exception import NotFoundError, ValidationError
 from src.common.pagination import PaginationResponse
 from src.core.contracts.knowledge import Knowledge
 from src.core.knowledge.documents.factory import build_knowledge_service
-from src.core.knowledge.documents.service.knowledge_service import KnowledgeService
+from src.core.knowledge.documents.service.knowledge_service import (
+    KnowledgeService,
+    _to_knowledge,
+)
 from src.core.knowledge.documents.types import (
     CHANNEL_API,
     CHANNEL_WEB,
@@ -261,9 +264,53 @@ def _make_repo() -> tuple[AsyncMock, dict[str, Document]]:
     repo.count_by_knowledge_base.side_effect = _count_by_knowledge_base
     repo.count_by_status.side_effect = _count_by_status
     repo.update.side_effect = _update
+
+    async def _search_across_document_kbs(
+        tenant_id: int,
+        *,
+        keyword: str,
+        offset: int,
+        limit: int,
+        file_types: list[str],
+    ) -> tuple[list[tuple[Document, str]], int]:
+        candidates = [
+            row
+            for row in rows.values()
+            if (
+                row.tenant_id == tenant_id
+                and row.deleted_at is None
+                and row.parse_status != "deleting"
+            )
+        ]
+        if keyword:
+            kw = keyword.lower()
+            candidates = [
+                row
+                for row in candidates
+                if kw in (row.file_name or "").lower() or kw in (row.title or "").lower()
+            ]
+        if file_types:
+            candidates = [row for row in candidates if _mock_file_type_match(row, file_types)]
+        candidates.sort(key=lambda row: row.updated_at, reverse=True)
+        total = len(candidates)
+        page = candidates[offset : offset + limit]
+        return [(row, "") for row in page], total
+
     repo.soft_delete.side_effect = _soft_delete
     repo.soft_delete_list.side_effect = _soft_delete_list
+    repo.search_across_document_kbs.side_effect = _search_across_document_kbs
     return repo, rows
+
+
+def _mock_file_type_match(row: Document, file_types: list[str]) -> bool:
+    """Mirror the repository url/html alias plus extension match."""
+    for file_type in file_types:
+        if file_type in ("url", "html"):
+            if row.type == "url" or (row.file_type or "") in ("html", "url"):
+                return True
+        elif (row.file_type or "").lower() == file_type:
+            return True
+    return False
 
 
 def _service(repo: AsyncMock) -> KnowledgeService:
@@ -534,6 +581,67 @@ async def test_list_documents_paged_applies_filters() -> None:
     assert status_result.data[0].id == failed.id
 
 
+async def test_search_documents_matches_keyword() -> None:
+    repo, rows = _make_repo()
+    tenant_id = make_test_tenant_id()
+    hit = _sample_row(tenant_id=tenant_id, title="Q3 budget", file_name="budget-2026.pdf")
+    miss = _sample_row(tenant_id=tenant_id, title="roadmap", file_name="roadmap.md")
+    rows[hit.id] = hit
+    rows[miss.id] = miss
+
+    items, total = await _service(repo).search_documents(
+        tenant_id=tenant_id,
+        keyword="budget",
+        offset=0,
+        limit=20,
+        file_types=[],
+        recent=False,
+    )
+
+    assert total == 1
+    assert items[0].id == hit.id
+    assert items[0].knowledge_base_name == ""
+
+
+async def test_search_documents_requires_keyword_or_recent() -> None:
+    repo, _rows = _make_repo()
+    tenant_id = make_test_tenant_id()
+    with pytest.raises(ValidationError, match="keyword is required"):
+        await _service(repo).search_documents(
+            tenant_id=tenant_id,
+            keyword="  ",
+            offset=0,
+            limit=20,
+            file_types=[],
+            recent=False,
+        )
+
+
+async def test_search_documents_recent_allows_empty_keyword() -> None:
+    repo, rows = _make_repo()
+    tenant_id = make_test_tenant_id()
+    newer = _sample_row(tenant_id=tenant_id, title="new", updated_at=_NOW)
+    older = _sample_row(
+        tenant_id=tenant_id,
+        title="old",
+        updated_at=_NOW - timedelta(days=1),
+    )
+    rows[newer.id] = newer
+    rows[older.id] = older
+
+    items, total = await _service(repo).search_documents(
+        tenant_id=tenant_id,
+        keyword="",
+        offset=0,
+        limit=20,
+        file_types=[],
+        recent=True,
+    )
+
+    assert total == 2
+    assert [row.id for row in items] == [newer.id, older.id]
+
+
 async def test_list_documents_paged_slices_page() -> None:
     repo, rows = _make_repo()
     tenant_id = make_test_tenant_id()
@@ -681,10 +789,97 @@ async def test_update_document_no_change_skips_write() -> None:
     repo.update.assert_not_awaited()
 
 
+async def test_update_document_patches_manual_content() -> None:
+    repo, rows = _make_repo()
+    row = _sample_row(
+        type="manual",
+        metadata={
+            "content": "old",
+            "format": "markdown",
+            "status": "draft",
+            "version": 1,
+        },
+    )
+    rows[row.id] = row
+    updated = await _service(repo).update_document(
+        tenant_id=row.tenant_id,
+        id=row.id,
+        title="Note",
+        content="# new",
+        status="publish",
+    )
+    assert updated.title == "Note"
+    stored = rows[row.id]
+    assert stored.metadata is not None
+    assert stored.metadata["content"] == "# new"
+    assert stored.metadata["status"] == "publish"
+    assert stored.metadata["version"] == 2
+
+
+async def test_update_document_rejects_manual_fields_on_file() -> None:
+    repo, rows = _make_repo()
+    row = _sample_row()
+    rows[row.id] = row
+    with pytest.raises(ValidationError) as exc_info:
+        await _service(repo).update_document(
+            tenant_id=row.tenant_id,
+            id=row.id,
+            content="x",
+        )
+    assert exc_info.value.code == "knowledge.manual_fields_unsupported"
+
+
 async def test_update_document_raises_for_missing_row() -> None:
     repo, _rows = _make_repo()
     with pytest.raises(NotFoundError) as exc_info:
         await _service(repo).update_document(tenant_id=1, id="doc-missing", title="x")
+    assert exc_info.value.code == "knowledge.not_found"
+
+
+async def test_request_summary_refresh_requires_runner() -> None:
+    repo, rows = _make_repo()
+    row = _sample_row(summary_status="none")
+    rows[row.id] = row
+    with pytest.raises(ValidationError) as exc_info:
+        await _service(repo).request_summary_refresh(
+            tenant_id=row.tenant_id,
+            id=row.id,
+        )
+    assert exc_info.value.code == "knowledge.summary_generation_unavailable"
+
+
+async def test_request_summary_refresh_delegates_to_runner() -> None:
+    repo, rows = _make_repo()
+    row = _sample_row(summary_status="none")
+    rows[row.id] = row
+    updated = row.model_copy(update={"summary_status": "completed", "description": "done"})
+
+    class _Runner:
+        async def refresh(self, *, tenant_id: int, knowledge_id: str) -> Knowledge:
+            assert tenant_id == row.tenant_id
+            assert knowledge_id == row.id
+            return _to_knowledge(updated)
+
+    result = await KnowledgeService(
+        knowledge_repo=repo,
+        summary_refresher=_Runner(),
+    ).request_summary_refresh(tenant_id=row.tenant_id, id=row.id)
+    assert result.summary_status == "completed"
+    assert result.description == "done"
+
+
+async def test_request_summary_refresh_missing_row() -> None:
+    repo, _rows = _make_repo()
+
+    class _Runner:
+        async def refresh(self, *, tenant_id: int, knowledge_id: str) -> Knowledge:
+            raise NotFoundError(code="knowledge.not_found", message="knowledge not found")
+
+    with pytest.raises(NotFoundError) as exc_info:
+        await KnowledgeService(
+            knowledge_repo=repo,
+            summary_refresher=_Runner(),
+        ).request_summary_refresh(tenant_id=1, id="doc-missing")
     assert exc_info.value.code == "knowledge.not_found"
 
 

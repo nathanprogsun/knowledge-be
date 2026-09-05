@@ -499,15 +499,19 @@ async def resolve_chat_model_id(
 ) -> str:
     """Resolve the chat model id for an agent-QA turn.
 
-    The custom agent's ``model_id`` is mandatory and must resolve to a
-    knowledge-QA model type; a request-level ``summary_model_id`` may
-    override it for this turn when the override also resolves to a
-    knowledge-QA model. Without an agent (not reachable for agent-QA,
-    but kept for the shared helper contract), the legacy KB / session /
-    system fallback is unavailable — the function requires an agent.
+    The custom agent's ``model_id`` should resolve to a knowledge-QA
+    model. A request-level ``summary_model_id`` may stand in when the
+    agent has none, or override a configured agent model for this turn,
+    when the override also resolves to a knowledge-QA model.
     """
     agent_model_id = _config_str(req.custom_agent.config, "model_id").strip()
+    override = (req.summary_model_id or "").strip()
     if not agent_model_id:
+        if override:
+            override_info = await model_service.get_model_by_id(ctx, override)
+            if override_info is not None and override_info.type == MODEL_TYPE_KNOWLEDGE_QA:
+                logger.info("Using request's summary model override: %s", override)
+                return override
         raise RuntimeError(
             f"chat model is not configured: please set model_id on agent {req.custom_agent.id}"
         )

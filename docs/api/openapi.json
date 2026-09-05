@@ -9009,6 +9009,164 @@
         }
       }
     },
+    "/api/v1/initialization/config/{kb_id}": {
+      "get": {
+        "tags": [
+          "initialization"
+        ],
+        "summary": "Get Kb Config",
+        "description": "Return the knowledge base's current model and chunking slots.",
+        "operationId": "get_kb_config_api_v1_initialization_config__kb_id__get",
+        "parameters": [
+          {
+            "name": "kb_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kb Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KBConfigReadEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "initialization"
+        ],
+        "summary": "Update Kb Config",
+        "description": "Persist the editor's model, chunking, extract, and storage fields.",
+        "operationId": "update_kb_config_api_v1_initialization_config__kb_id__put",
+        "parameters": [
+          {
+            "name": "kb_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kb Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/KBModelConfigRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KBConfigUpdateEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/knowledge-bases/{kb_id}/files": {
       "get": {
         "tags": [
@@ -9683,6 +9841,81 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/KnowledgeBaseListEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge-bases/{id}/pin": {
+      "put": {
+        "tags": [
+          "knowledge-bases"
+        ],
+        "summary": "Toggle Knowledge Base Pin",
+        "description": "Pin or unpin one knowledge base for the caller.",
+        "operationId": "toggle_knowledge_base_pin_api_v1_knowledge_bases__id__pin_put",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeBasePinEnvelope"
                 }
               }
             }
@@ -10457,7 +10690,7 @@
             "required": false,
             "schema": {
               "type": "integer",
-              "maximum": 100,
+              "maximum": 1000,
               "minimum": 1,
               "description": "每页数量",
               "default": 20,
@@ -11924,6 +12157,232 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PendingInvitationsCountResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/invitations": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "summary": "List My Invitations",
+        "description": "Return the caller's invitation inbox.",
+        "operationId": "list_my_invitations_api_v1_me_invitations_get",
+        "parameters": [
+          {
+            "name": "include_terminal",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Terminal"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationListEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/invitations/{invitation_id}/accept": {
+      "post": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Accept My Invitation",
+        "description": "Accept one pending invitation and join that workspace.",
+        "operationId": "accept_my_invitation_api_v1_me_invitations__invitation_id__accept_post",
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Invitation Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptInvitationEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/invitations/{invitation_id}/decline": {
+      "post": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Decline My Invitation",
+        "description": "Decline one pending invitation.",
+        "operationId": "decline_my_invitation_api_v1_me_invitations__invitation_id__decline_post",
+        "parameters": [
+          {
+            "name": "invitation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Invitation Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimpleMessageEnvelope"
                 }
               }
             }
@@ -15336,6 +15795,91 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PinSessionEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sessions/{session_id}/stop": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Stop Session",
+        "description": "Acknowledge a composer stop. The SPA already aborted the SSE client.",
+        "operationId": "stop_session_api_v1_sessions__session_id__stop_post",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StopGenerationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteSessionResponse"
                 }
               }
             }
@@ -20981,13 +21525,307 @@
         }
       }
     },
+    "/api/v1/knowledge/batch": {
+      "get": {
+        "tags": [
+          "knowledge-documents"
+        ],
+        "summary": "Batch Query Documents",
+        "description": "Return documents for ``ids``. Agent query params are accepted unused.",
+        "operationId": "batch_query_documents_api_v1_knowledge_batch_get",
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ids"
+            }
+          },
+          {
+            "name": "kb_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kb Id"
+            }
+          },
+          {
+            "name": "agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "agent_source_tenant_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Source Tenant Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeBatchEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/search": {
+      "get": {
+        "tags": [
+          "knowledge-documents"
+        ],
+        "summary": "Search Knowledge Documents",
+        "description": "Keyword file search for the chat @ picker. Agent params are unused.",
+        "operationId": "search_knowledge_documents_api_v1_knowledge_search_get",
+        "parameters": [
+          {
+            "name": "keyword",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Keyword"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Query"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "file_types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "File Types"
+            }
+          },
+          {
+            "name": "recent",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Recent"
+            }
+          },
+          {
+            "name": "agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "agent_source_tenant_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Source Tenant Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeSearchEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/knowledge/batch-delete": {
       "post": {
         "tags": [
           "knowledge-documents"
         ],
         "summary": "Batch Delete Documents",
-        "description": "Soft-delete a batch of documents under one knowledge base.\n\nValidates that every id exists and belongs to ``kb_id`` (cross-KB\ndeletion is rejected), then runs the cascade delete synchronously and\nanswers with a task id so the wire contract matches the async\nupstream submission.",
+        "description": "Soft-delete a batch of documents under one knowledge base.",
         "operationId": "batch_delete_documents_api_v1_knowledge_batch_delete_post",
         "parameters": [
           {
@@ -21063,7 +21901,7 @@
           "knowledge-documents"
         ],
         "summary": "Batch Reparse Documents",
-        "description": "Reset and re-submit a batch of documents under one knowledge base.\n\nEach document is validated to exist and belong to ``kb_id``, then\nreset for a fresh parse attempt; the response carries a task id and\nthe submitted count.",
+        "description": "Reset and re-submit a batch of documents under one knowledge base.",
         "operationId": "batch_reparse_documents_api_v1_knowledge_batch_reparse_post",
         "parameters": [
           {
@@ -21139,7 +21977,7 @@
           "knowledge-documents"
         ],
         "summary": "Update Knowledge Tag Batch",
-        "description": "Replace the tag bindings of many documents in one request.\n\nAn explicit ``kb_id`` narrows the authorized scope; without one the\nknowledge base is inferred from the first updated document (shared-KB\nresolution). Every tag must exist and belong to the same knowledge\nbase as the document it is bound to.",
+        "description": "Replace the tag bindings of many documents in one request.",
         "operationId": "update_knowledge_tag_batch_api_v1_knowledge_tags_put",
         "parameters": [
           {
@@ -21288,7 +22126,7 @@
           "knowledge-documents"
         ],
         "summary": "Update Document",
-        "description": "Update a document's mutable fields (title / description).",
+        "description": "Update a document's mutable fields, including manual content.",
         "operationId": "update_document_api_v1_knowledge__id__put",
         "parameters": [
           {
@@ -21371,7 +22209,6 @@
           "knowledge-documents"
         ],
         "summary": "Delete Document",
-        "description": "Soft-delete a document and cascade its chunks.",
         "operationId": "delete_document_api_v1_knowledge__id__delete",
         "parameters": [
           {
@@ -21440,13 +22277,323 @@
         }
       }
     },
+    "/api/v1/knowledge/{id}/spans": {
+      "get": {
+        "tags": [
+          "knowledge-documents"
+        ],
+        "summary": "Get Document Spans",
+        "description": "Return the processing-span tree for one document.",
+        "operationId": "get_document_spans_api_v1_knowledge__id__spans_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "attempt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Attempt"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeSpansEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/{id}/regenerate-summary": {
+      "post": {
+        "tags": [
+          "knowledge-documents"
+        ],
+        "summary": "Regenerate Document Summary",
+        "description": "Queue a summary refresh for one document.",
+        "operationId": "regenerate_document_summary_api_v1_knowledge__id__regenerate_summary_post",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeTaskEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/{id}/download": {
+      "get": {
+        "tags": [
+          "knowledge-documents"
+        ],
+        "summary": "Download Document",
+        "operationId": "download_document_api_v1_knowledge__id__download_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge/{id}/preview": {
+      "get": {
+        "tags": [
+          "knowledge-documents"
+        ],
+        "summary": "Preview Document",
+        "operationId": "preview_document_api_v1_knowledge__id__preview_get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/knowledge/{id}/reparse": {
       "post": {
         "tags": [
           "knowledge-documents"
         ],
         "summary": "Reparse Document",
-        "description": "Reset a document for a fresh parse attempt.",
         "operationId": "reparse_document_api_v1_knowledge__id__reparse_post",
         "parameters": [
           {
@@ -21538,7 +22685,6 @@
           "knowledge-documents"
         ],
         "summary": "Cancel Document Parse",
-        "description": "Cancel an in-flight document parse.",
         "operationId": "cancel_document_parse_api_v1_knowledge__id__cancel_parse_post",
         "parameters": [
           {
@@ -21698,7 +22844,7 @@
           "knowledge-documents"
         ],
         "summary": "Move Documents",
-        "description": "Move documents into another knowledge base (runs synchronously).\n\nThe response carries a workspace-embedded task id so the progress\nendpoint keeps the upstream wire contract; the async task record and\nbroker land with the task infrastructure.",
+        "description": "Move documents into another knowledge base (runs synchronously).",
         "operationId": "move_documents_api_v1_knowledge_move_post",
         "parameters": [
           {
@@ -21774,7 +22920,6 @@
           "knowledge-documents"
         ],
         "summary": "Get Move Progress",
-        "description": "Return a move task's progress, scoped to the caller's workspace.\n\nThe tenant guard rejects malformed task ids and hides cross-workspace\ntasks as not-found. Progress records land with the async task\ninfrastructure; until then a well-formed in-workspace task resolves\nto no record and answers not-found.",
         "operationId": "get_move_progress_api_v1_knowledge_move_progress__task_id__get",
         "parameters": [
           {
@@ -23646,6 +24791,57 @@
           "enabled"
         ],
         "title": "ASRConfig"
+      },
+      "ASRConfigBody": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id",
+            "default": ""
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "ASRConfigBody",
+        "description": "Optional ASR slot on the save-and-close body."
+      },
+      "AcceptInvitationData": {
+        "properties": {
+          "membership": {
+            "$ref": "#/components/schemas/MembershipPayload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "membership"
+        ],
+        "title": "AcceptInvitationData"
+      },
+      "AcceptInvitationEnvelope": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/AcceptInvitationData"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "AcceptInvitationEnvelope"
       },
       "AddFavoriteRequest": {
         "properties": {
@@ -28071,6 +29267,109 @@
         "title": "DeleteVectorStoreResponse",
         "description": "Wire shape for ``DELETE /vector-stores/{id}``."
       },
+      "DocumentSplittingBody": {
+        "properties": {
+          "chunkSize": {
+            "type": "integer",
+            "title": "Chunksize",
+            "default": 0
+          },
+          "chunkOverlap": {
+            "type": "integer",
+            "title": "Chunkoverlap",
+            "default": 0
+          },
+          "separators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Separators"
+          },
+          "parserEngineRules": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": {
+                    "$ref": "#/components/schemas/JsonValue"
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parserenginerules"
+          },
+          "enableParentChild": {
+            "type": "boolean",
+            "title": "Enableparentchild",
+            "default": false
+          },
+          "parentChunkSize": {
+            "type": "integer",
+            "title": "Parentchunksize",
+            "default": 0
+          },
+          "childChunkSize": {
+            "type": "integer",
+            "title": "Childchunksize",
+            "default": 0
+          },
+          "strategy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy"
+          },
+          "tokenLimit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokenlimit"
+          },
+          "languages": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Languages"
+          },
+          "tableMetadataInstructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tablemetadatainstructions"
+          }
+        },
+        "type": "object",
+        "title": "DocumentSplittingBody",
+        "description": "Chunking fields the editor sends as ``documentSplitting``."
+      },
       "DownloadOllamaModelRequest": {
         "properties": {
           "modelName": {
@@ -29004,6 +30303,28 @@
             "type": "boolean",
             "title": "Regenerate",
             "default": false
+          },
+          "query": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
           }
         },
         "type": "object",
@@ -30974,6 +32295,145 @@
         "title": "IndexingStrategy",
         "description": "Flags indicating which knowledge-base pipelines are active."
       },
+      "InvitationItem": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "tenant_id": {
+            "type": "integer",
+            "title": "Tenant Id"
+          },
+          "tenant_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant Name"
+          },
+          "invitee_user_id": {
+            "type": "string",
+            "title": "Invitee User Id"
+          },
+          "invited_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invited By"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "responded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Responded At"
+          },
+          "accepted_count": {
+            "type": "integer",
+            "title": "Accepted Count",
+            "default": 0
+          },
+          "is_share_link": {
+            "type": "boolean",
+            "title": "Is Share Link",
+            "default": false
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tenant_id",
+          "invitee_user_id",
+          "role",
+          "status",
+          "expires_at",
+          "created_at"
+        ],
+        "title": "InvitationItem",
+        "description": "One inbox row. Extra invitee/tenant display fields stay optional."
+      },
+      "InvitationListData": {
+        "properties": {
+          "invitations": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationItem"
+            },
+            "type": "array",
+            "title": "Invitations"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "invitations",
+          "total"
+        ],
+        "title": "InvitationListData"
+      },
+      "InvitationListEnvelope": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/InvitationListData"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "InvitationListEnvelope"
+      },
       "InvitationLookupRequest": {
         "properties": {
           "token": {
@@ -31336,6 +32796,108 @@
         "title": "JoinRequestRequest"
       },
       "JsonValue": {},
+      "KBConfigReadEnvelope": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "title": "KBConfigReadEnvelope",
+        "description": "``{\"success\": true, \"data\": {...}}`` for the current KB config."
+      },
+      "KBConfigUpdateEnvelope": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "message"
+        ],
+        "title": "KBConfigUpdateEnvelope",
+        "description": "``{\"success\": true, \"message\": \"...\"}`` after a config save."
+      },
+      "KBModelConfigRequest": {
+        "properties": {
+          "llmModelId": {
+            "type": "string",
+            "title": "Llmmodelid"
+          },
+          "embeddingModelId": {
+            "type": "string",
+            "title": "Embeddingmodelid",
+            "default": ""
+          },
+          "vlm_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VLMConfigBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "asr_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ASRConfigBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "documentSplitting": {
+            "$ref": "#/components/schemas/DocumentSplittingBody"
+          },
+          "multimodal": {
+            "$ref": "#/components/schemas/MultimodalToggleBody"
+          },
+          "storageBackendId": {
+            "type": "string",
+            "title": "Storagebackendid",
+            "default": ""
+          },
+          "storageProvider": {
+            "type": "string",
+            "title": "Storageprovider",
+            "default": "local"
+          },
+          "nodeExtract": {
+            "$ref": "#/components/schemas/NodeExtractBody"
+          },
+          "questionGeneration": {
+            "$ref": "#/components/schemas/QuestionGenerationBody"
+          }
+        },
+        "type": "object",
+        "required": [
+          "llmModelId"
+        ],
+        "title": "KBModelConfigRequest",
+        "description": "PUT body for ``/initialization/config/{kb_id}``."
+      },
       "Knowledge": {
         "properties": {
           "id": {
@@ -31563,6 +33125,17 @@
               }
             ],
             "title": "Deleted At"
+          },
+          "knowledge_base_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Knowledge Base Name"
           }
         },
         "type": "object",
@@ -31959,6 +33532,60 @@
         ],
         "title": "KnowledgeBaseListEnvelope",
         "description": "``{\"success\": true, \"data\": [...]}`` - list responses."
+      },
+      "KnowledgeBasePinData": {
+        "properties": {
+          "is_pinned": {
+            "type": "boolean",
+            "title": "Is Pinned"
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_pinned"
+        ],
+        "title": "KnowledgeBasePinData",
+        "description": "Inner payload of the pin toggle."
+      },
+      "KnowledgeBasePinEnvelope": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "$ref": "#/components/schemas/KnowledgeBasePinData"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "KnowledgeBasePinEnvelope",
+        "description": "``{\"success\": true, \"data\": {\"is_pinned\": ...}}``."
+      },
+      "KnowledgeBatchEnvelope": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Knowledge"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "title": "KnowledgeBatchEnvelope",
+        "description": "``{\"success\": true, \"data\": [...]}`` - batch document read."
       },
       "KnowledgeCopyEnvelope": {
         "properties": {
@@ -32382,6 +34009,38 @@
         ],
         "title": "KnowledgeReference"
       },
+      "KnowledgeSearchEnvelope": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Knowledge"
+            },
+            "type": "array",
+            "title": "Data"
+          },
+          "has_more": {
+            "type": "boolean",
+            "title": "Has More"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data",
+          "has_more",
+          "total"
+        ],
+        "title": "KnowledgeSearchEnvelope",
+        "description": "Chat file-picker page: ``data`` plus ``has_more`` / ``total``."
+      },
       "KnowledgeSearchHit": {
         "properties": {
           "id": {
@@ -32498,6 +34157,24 @@
           "chunk_type"
         ],
         "title": "KnowledgeSearchHit"
+      },
+      "KnowledgeSpansEnvelope": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SpansRead"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "title": "KnowledgeSpansEnvelope",
+        "description": "``{\"success\": true, \"data\": {...}}`` - processing-span tree."
       },
       "KnowledgeTagBatchEnvelope": {
         "properties": {
@@ -33303,6 +34980,35 @@
         ],
         "title": "Membership",
         "description": "A user's role inside one tenant."
+      },
+      "MembershipPayload": {
+        "properties": {
+          "tenant_id": {
+            "type": "integer",
+            "title": "Tenant Id"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "joined_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Joined At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tenant_id",
+          "role",
+          "status",
+          "joined_at"
+        ],
+        "title": "MembershipPayload"
       },
       "MentionedItemRequest": {
         "properties": {
@@ -34194,6 +35900,67 @@
         ],
         "title": "MultimodalTestEnvelope",
         "description": "``{\"success\": true, \"data\": {...}}`` for the multimodal probe."
+      },
+      "MultimodalToggleBody": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "MultimodalToggleBody",
+        "description": "Whether multimodal processing is on."
+      },
+      "NodeExtractBody": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "default": ""
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tags"
+          },
+          "nodes": {
+            "items": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "relations": {
+            "items": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Relations"
+          },
+          "customInstructions": {
+            "type": "string",
+            "title": "Custominstructions",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "NodeExtractBody",
+        "description": "Graph-extract fields the editor sends as ``nodeExtract``."
       },
       "OAuthAuthorizeRequestBody": {
         "properties": {
@@ -35764,6 +37531,28 @@
         ],
         "title": "ProviderTypeMeta",
         "description": "Catalog metadata for one model provider.\n\nThe wire JSON keeps camelCase (``defaultUrls``, ``modelTypes``,\n``requiresAuth``, ``extraFields``) so a UI consumer can drop in\nunchanged."
+      },
+      "QuestionGenerationBody": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "questionCount": {
+            "type": "integer",
+            "title": "Questioncount",
+            "default": 3
+          },
+          "customInstructions": {
+            "type": "string",
+            "title": "Custominstructions",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "QuestionGenerationBody",
+        "description": "Question-generation fields the editor sends as ``questionGeneration``."
       },
       "QuestionGenerationConfig": {
         "properties": {
@@ -37402,6 +39191,22 @@
         "title": "SimpleAckResponse",
         "description": "``{\"success\": true, \"message\": \"...\"}`` - simple ack responses."
       },
+      "SimpleMessageEnvelope": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "SimpleMessageEnvelope"
+      },
       "SimpleSuccessResponse": {
         "properties": {
           "success": {
@@ -37458,6 +39263,242 @@
         ],
         "title": "SkillListEnvelope",
         "description": "``{\"success\": true, \"data\": [...], \"skills_available\": bool}``."
+      },
+      "SpanLastError": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "error_code": {
+            "type": "string",
+            "title": "Error Code"
+          },
+          "error_message": {
+            "type": "string",
+            "title": "Error Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "error_code",
+          "error_message"
+        ],
+        "title": "SpanLastError",
+        "description": "Most recently finished failed span, for the timeline banner."
+      },
+      "SpanNode": {
+        "properties": {
+          "span_id": {
+            "type": "string",
+            "title": "Span Id",
+            "default": ""
+          },
+          "parent_span_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Span Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "error_code": {
+            "type": "string",
+            "title": "Error Code",
+            "default": ""
+          },
+          "error_message": {
+            "type": "string",
+            "title": "Error Message",
+            "default": ""
+          },
+          "input": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          },
+          "children": {
+            "items": {
+              "$ref": "#/components/schemas/SpanNode"
+            },
+            "type": "array",
+            "title": "Children"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "status"
+        ],
+        "title": "SpanNode",
+        "description": "One node in the nested processing-span tree."
+      },
+      "SpansRead": {
+        "properties": {
+          "knowledge_id": {
+            "type": "string",
+            "title": "Knowledge Id"
+          },
+          "attempt": {
+            "type": "integer",
+            "title": "Attempt"
+          },
+          "latest_attempt": {
+            "type": "integer",
+            "title": "Latest Attempt"
+          },
+          "current_attempt": {
+            "type": "integer",
+            "title": "Current Attempt"
+          },
+          "parse_status": {
+            "type": "string",
+            "title": "Parse Status"
+          },
+          "current_stage": {
+            "type": "string",
+            "title": "Current Stage",
+            "default": ""
+          },
+          "trace": {
+            "$ref": "#/components/schemas/SpanNode"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpanLastError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "knowledge_id",
+          "attempt",
+          "latest_attempt",
+          "current_attempt",
+          "parse_status",
+          "trace"
+        ],
+        "title": "SpansRead",
+        "description": "GET ``/knowledge/{id}/spans`` payload the timeline already consumes."
+      },
+      "StopGenerationRequest": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "title": "Message Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_id"
+        ],
+        "title": "StopGenerationRequest"
       },
       "StorageBackend": {
         "properties": {
@@ -38224,6 +40265,11 @@
               }
             ],
             "title": "Questions"
+          },
+          "allow_regenerate": {
+            "type": "boolean",
+            "title": "Allow Regenerate",
+            "default": false
           },
           "created_at": {
             "anyOf": [
@@ -39802,6 +41848,42 @@
               }
             ],
             "title": "Enable Status"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "process_config": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Process Config"
           }
         },
         "type": "object",
@@ -40564,6 +42646,33 @@
           "enabled"
         ],
         "title": "VLMConfig"
+      },
+      "VLMConfigBody": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": false
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id",
+            "default": ""
+          },
+          "description_language": {
+            "type": "string",
+            "title": "Description Language",
+            "default": ""
+          },
+          "custom_instructions": {
+            "type": "string",
+            "title": "Custom Instructions",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "VLMConfigBody",
+        "description": "Optional VLM slot on the save-and-close body."
       },
       "ValidateCredentialsRequest": {
         "properties": {

@@ -22,7 +22,7 @@ from typing import cast
 
 from sqlalchemy import JSON, bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.engine import CursorResult
+from sqlalchemy.engine import CursorResult, RowMapping
 
 from src.common.exception import DataError
 from src.common.json import BindParams, SqlValue
@@ -35,6 +35,8 @@ _JSON = JSON().with_variant(JSONB(), "postgresql")
 # Table name as a module-level literal; user input is bound via
 # ``bindparams``, never interpolated.
 _TABLE = "documents"
+_KB_TABLE = "knowledge_bases"
+_KB_TYPE_DOCUMENT = "document"
 
 # Full-row updates never touch these columns: ``deleted_at`` belongs to
 # the soft-delete pipeline, ``pending_subtasks_count`` is the exclusive
@@ -109,6 +111,61 @@ def _list_where(
         where_parts.append("updated_at <= :updated_to")
         params["updated_to"] = updated_to
     where_parts.append("deleted_at is null")
+    return " and ".join(where_parts), params
+
+
+def _search_file_type_clause(file_types: list[str], params: BindParams) -> str | None:
+    """OR-together url/html aliases and bound file-type matches."""
+    include_url = False
+    extensions: list[str] = []
+    seen: set[str] = set()
+    for raw in file_types:
+        normalized = raw.strip().lstrip(".").lower()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        if normalized in ("url", "html"):
+            include_url = True
+        else:
+            extensions.append(normalized)
+    clauses: list[str] = []
+    if include_url:
+        clauses.append("(d.type = 'url' or d.file_type in ('html', 'url'))")
+    if extensions:
+        placeholders = ", ".join(f":ft_{i}" for i in range(len(extensions)))
+        clauses.append(f"d.file_type in ({placeholders})")
+        for index, ext in enumerate(extensions):
+            params[f"ft_{index}"] = ext
+    if not clauses:
+        return None
+    return "(" + " or ".join(clauses) + ")"
+
+
+def _search_where(
+    tenant_id: int,
+    *,
+    keyword: str,
+    file_types: list[str],
+) -> tuple[str, BindParams]:
+    """Tenant-scoped search across document-type knowledge bases."""
+    where_parts = [
+        "d.tenant_id = :tenant_id",
+        "d.deleted_at is null",
+        "d.parse_status <> :status_deleting",
+        "kb.deleted_at is null",
+        "kb.type = :kb_type",
+    ]
+    params: BindParams = {
+        "tenant_id": tenant_id,
+        "status_deleting": _STATUS_DELETING,
+        "kb_type": _KB_TYPE_DOCUMENT,
+    }
+    if keyword:
+        params["kw"] = f"%{_escape_like(keyword.lower())}%"
+        where_parts.append("(lower(d.file_name) like :kw or lower(d.title) like :kw)")
+    type_clause = _search_file_type_clause(file_types, params)
+    if type_clause is not None:
+        where_parts.append(type_clause)
     return " and ".join(where_parts), params
 
 
@@ -288,6 +345,41 @@ class KnowledgeRepository(GenericRepository[Document]):
         result = await self._session.execute(stmt)
         rows = [self._hydrate(m) for m in result.mappings().all()]
         return rows, int(total) if total is not None else 0
+
+    async def search_across_document_kbs(
+        self,
+        tenant_id: int,
+        *,
+        keyword: str,
+        offset: int,
+        limit: int,
+        file_types: list[str],
+    ) -> tuple[list[tuple[Document, str]], int]:
+        """Page live documents across document-type knowledge bases."""
+        where, params = _search_where(tenant_id, keyword=keyword, file_types=file_types)
+        count_stmt = text(
+            f"select count(*) from {_TABLE} d "
+            f"inner join {_KB_TABLE} kb on kb.id = d.knowledge_base_id "
+            f"and kb.tenant_id = d.tenant_id where {where}"
+        ).bindparams(**params)
+        total = (await self._session.execute(count_stmt)).scalar_one()
+        page_params: BindParams = {**params, "limit": limit, "offset": offset}
+        stmt = text(
+            f"select d.*, kb.name as knowledge_base_name from {_TABLE} d "
+            f"inner join {_KB_TABLE} kb on kb.id = d.knowledge_base_id "
+            f"and kb.tenant_id = d.tenant_id where {where} "
+            "order by d.updated_at desc limit :limit offset :offset"
+        ).bindparams(**page_params)
+        result = await self._session.execute(stmt)
+        pairs = [self._document_and_kb_name(mapping) for mapping in result.mappings().all()]
+        return pairs, int(total) if total is not None else 0
+
+    def _document_and_kb_name(self, mapping: RowMapping) -> tuple[Document, str]:
+        """Hydrate a document row and peel off the joined KB name."""
+        payload = dict(mapping)
+        raw_name = payload.pop("knowledge_base_name", None)
+        name = raw_name if isinstance(raw_name, str) else ""
+        return self._hydrate(cast("RowMapping", payload)), name
 
     # ── Counts ──────────────────────────────────────────────────────
 

@@ -81,6 +81,17 @@ def _require_query(query: str) -> None:
         )
 
 
+def answer_delta(event: Event) -> str:
+    """Return the streamed answer fragment on a final-answer event."""
+    if event.type != EventType.AGENT_FINAL_ANSWER:
+        return ""
+    data = event.data
+    if not isinstance(data, dict):
+        return ""
+    content = data.get("content")
+    return content if isinstance(content, str) else ""
+
+
 # ── Request shapes (structural — satisfied by the web wire models) ────
 
 
@@ -572,18 +583,27 @@ class ChatService:
             finally:
                 await queue.put(None)
 
+        answer_parts: list[str] = []
         task = asyncio.create_task(_run())
         try:
             while True:
                 event = await queue.get()
                 if event is None:
                     break
+                piece = answer_delta(event)
+                if piece:
+                    answer_parts.append(piece)
                 yield event
         finally:
             if not task.done():
                 task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+            await self._message_gateway.complete_assistant_message(
+                assistant_message_id=assistant.id,
+                content="".join(answer_parts),
+                is_fallback=False,
+            )
 
 
 __all__ = [
@@ -601,6 +621,7 @@ __all__ = [
     "RequestContext",
     "SearchResult",
     "TagScope",
+    "answer_delta",
     "build_tag_scopes",
     "merge_knowledge_targets",
     "resolve_agent_mode",

@@ -182,14 +182,23 @@ export function useTypewriter(
         typedLength.value = 0;
         revealCredit = 0;
       }
-      if (reduceMotion) {
+      if (reduceMotion || getComplete()) {
         typedLength.value = target;
+        revealCredit = 0;
+        stop();
       } else if (typedLength.value < target) {
         ensure();
       }
     },
     { immediate: true },
   );
+
+  watch(getComplete, (done) => {
+    if (!done) return;
+    typedLength.value = getTarget().length;
+    revealCredit = 0;
+    stop();
+  });
 
   onBeforeUnmount(() => {
     stop();

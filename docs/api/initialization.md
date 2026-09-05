@@ -5,6 +5,8 @@ Routes registered under `/api/v1/initialization`. Path parameters use FastAPI `{
 | Method | Path |
 | --- | --- |
 | POST | `/initialization/asr/check` |
+| GET | `/initialization/config/{kb_id}` |
+| PUT | `/initialization/config/{kb_id}` |
 | POST | `/initialization/embedding/test` |
 | POST | `/initialization/extract/fabri-tag` |
 | POST | `/initialization/extract/fabri-text` |

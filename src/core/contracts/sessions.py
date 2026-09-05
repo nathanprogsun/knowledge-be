@@ -268,6 +268,7 @@ class SuggestionSet(BaseModel):
     language: str | None = Field(default=None)
     config_snapshot: JsonObject | None = Field(default=None)
     questions: list[SuggestionQuestion] | None = Field(default=None)
+    allow_regenerate: bool = False
     created_at: datetime | None = Field(default=None)
     updated_at: datetime | None = Field(default=None)
 
@@ -276,6 +277,8 @@ class EnsureSuggestionsRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     regenerate: bool = False
+    query: str | None = Field(default=None)
+    answer: str | None = Field(default=None)
 
 
 class SuggestionEventRequest(BaseModel):

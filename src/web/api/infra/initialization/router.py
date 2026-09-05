@@ -18,9 +18,9 @@ Maps the non-KB initialization endpoints from
 - ``POST /initialization/extract/fabri-text``               — Admin
 - ``POST /initialization/extract/text-relation``            — Admin
 
-The KB-scoped routes (``/initialization/config/{kbId}``,
-``/initialization/initialize/{kbId}``) belong to the knowledge domain
-and are intentionally absent.
+``GET/PUT /initialization/config/{kbId}`` persist the SPA editor's
+model and chunking payload through the knowledge-base service.
+``POST /initialization/initialize/{kbId}`` stays unimplemented.
 
 Every route carries ``AuthDep`` plus its role gate, matching the
 ``g.Viewer()`` / ``g.Admin()`` argument on the Go route registration.
@@ -50,6 +50,12 @@ from src.core.contracts.infra import (
     ModelTestRequest,
 )
 from src.core.infra.initialization.model_test import MultimodalTestConfig
+from src.web.api.infra.initialization import kb_config as kb_config_handlers
+from src.web.api.infra.initialization.kb_config_views import (
+    KBConfigReadEnvelope,
+    KBConfigUpdateEnvelope,
+    KBModelConfigRequest,
+)
 from src.web.api.infra.initialization.views import (
     DownloadProgressEnvelope,
     DownloadStartEnvelope,
@@ -77,7 +83,15 @@ from src.web.api.infra.initialization.views import (
     ollama_models_envelope,
     ollama_status_envelope,
 )
-from src.web.deps import AuthDep, ModelServiceDep, RoleAdminDep, RoleViewerDep
+from src.web.deps import (
+    AuthDep,
+    KBServiceDep,
+    KnowledgeServiceDep,
+    ModelServiceDep,
+    RoleAdminDep,
+    RoleViewerDep,
+    StorageBackendServiceDep,
+)
 from src.web.deps.context import get_tenant_id_dep
 from src.web.deps.infra_initialization import InitializationServiceDep
 
@@ -412,6 +426,53 @@ async def extract_text_relation(
     raise AIProviderError(
         _EXTRACT_NOT_WIRED_MESSAGE,
         code="initialization.extract_not_wired",
+    )
+
+
+# ── KB-scoped model / chunking config ────────────────────────────────
+
+
+@router.get("/config/{kb_id}", response_model=KBConfigReadEnvelope)
+async def get_kb_config(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+    kb_id: str,
+    kb_service: KBServiceDep,
+    knowledge_service: KnowledgeServiceDep,
+    model_service: ModelServiceDep,
+    tenant_id: _PrincipalTenant,
+) -> KBConfigReadEnvelope:
+    """Return the knowledge base's current model and chunking slots."""
+    return await kb_config_handlers.get_kb_config(
+        kb_id,
+        kb_service,
+        knowledge_service,
+        model_service,
+        tenant_id,
+    )
+
+
+@router.put("/config/{kb_id}", response_model=KBConfigUpdateEnvelope)
+async def update_kb_config(
+    _auth: AuthDep,
+    _admin: RoleAdminDep,
+    kb_id: str,
+    body: KBModelConfigRequest,
+    kb_service: KBServiceDep,
+    knowledge_service: KnowledgeServiceDep,
+    model_service: ModelServiceDep,
+    storage_service: StorageBackendServiceDep,
+    tenant_id: _PrincipalTenant,
+) -> KBConfigUpdateEnvelope:
+    """Persist the editor's model, chunking, extract, and storage fields."""
+    return await kb_config_handlers.update_kb_config(
+        kb_id,
+        body,
+        kb_service,
+        knowledge_service,
+        model_service,
+        storage_service,
+        tenant_id,
     )
 
 

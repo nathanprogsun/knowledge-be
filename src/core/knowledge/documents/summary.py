@@ -490,8 +490,8 @@ async def process_summary(
 ) -> SummaryResult:
     """Generate (or regenerate) the summary description for a knowledge item.
 
-    The knowledge base must have a summary model configured. The row is
-    marked ``processing`` first and ``completed`` (with the summary as its
+    The caller supplies the chat client. The row is marked
+    ``processing`` first and ``completed`` (with the summary as its
     description) once the model output is published. Content below the
     real-text threshold marks the row ``failed`` and raises
     ``ValidationError``; a concurrent edit of the source chunks / metadata
@@ -499,8 +499,7 @@ async def process_summary(
     ``summary_status`` untouched so a newer run can finish.
 
     Raises ``NotFoundError`` for an absent document, and
-    ``ValidationError`` for a blank scope, an unconfigured summary model,
-    or an empty source.
+    ``ValidationError`` for a blank scope or an empty source.
     """
     _require_tenant_id(tenant_id)
     _require_knowledge_id(knowledge_id)
@@ -508,11 +507,6 @@ async def process_summary(
     if row is None:
         raise NotFoundError(code=_NOT_FOUND_CODE, message="knowledge not found")
     kb = await kb_service.get_knowledge_base_by_id(knowledge_base_id=row.knowledge_base_id)
-    if not kb.summary_model_id:
-        raise ValidationError(
-            code="knowledge.summary_model_not_configured",
-            message="summary model is not configured",
-        )
 
     text_chunks = await chunk_repo.list_by_knowledge_id(tenant_id, knowledge_id)
     enabled_text = [chunk for chunk in text_chunks if chunk.is_enabled]

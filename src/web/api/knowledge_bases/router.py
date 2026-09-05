@@ -19,6 +19,7 @@ Route                                          Role
 ``GET    /knowledge-bases/{id}/move-targets``  Viewer
 ``POST   /knowledge-bases/{id}/hybrid-search`` Viewer
 ``GET    /knowledge-bases/{id}/hybrid-search`` Viewer
+``PUT    /knowledge-bases/{id}/pin``           Viewer
 ============================================  ========
 
 Route order matters: the static ``/copy`` path is declared before the
@@ -59,6 +60,8 @@ from src.web.api.knowledge_bases.views import (
     HybridSearchEnvelope,
     KnowledgeBaseEnvelope,
     KnowledgeBaseListEnvelope,
+    KnowledgeBasePinData,
+    KnowledgeBasePinEnvelope,
     KnowledgeCopyEnvelope,
     KnowledgeDuplicateEnvelope,
     knowledge_base_envelope,
@@ -236,7 +239,7 @@ async def list_knowledge_bases(
     segmented control.
     """
     tenant_id = _require_tenant(tenant_id)
-    infos = await service.list_knowledge_bases(tenant_id=tenant_id)
+    infos = await service.list_knowledge_bases(tenant_id=tenant_id, user_id=user_id)
     infos = _filter_by_creator(infos, creator=creator, user_id=user_id)
     return knowledge_base_list_envelope(infos)
 
@@ -425,6 +428,38 @@ async def list_move_targets(
         and info.embedding_model_id == source.embedding_model_id
     ]
     return knowledge_base_list_envelope(targets)
+
+
+# ── Pin ──────────────────────────────────────────────────────────────
+
+
+def _require_user(user_id: str | None) -> str:
+    """Pins are per viewer. An empty principal cannot toggle them."""
+    if not user_id:
+        raise UnauthorizedError(
+            code="auth.user_missing",
+            message="caller user id missing from context",
+        )
+    return user_id
+
+
+@router.put("/{id}/pin", response_model=KnowledgeBasePinEnvelope)
+async def toggle_knowledge_base_pin(
+    _auth: AuthDep,
+    _role: RoleViewerDep,
+    id: str,
+    service: KBServiceDep,
+    tenant_id: _PrincipalTenant,
+    user_id: _PrincipalUser,
+) -> KnowledgeBasePinEnvelope:
+    """Pin or unpin one knowledge base for the caller."""
+    tenant_id = _require_tenant(tenant_id)
+    pinned = await service.toggle_pin(
+        tenant_id=tenant_id,
+        user_id=_require_user(user_id),
+        kb_id=id,
+    )
+    return KnowledgeBasePinEnvelope(data=KnowledgeBasePinData(is_pinned=pinned))
 
 
 # ── Hybrid search ────────────────────────────────────────────────────

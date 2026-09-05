@@ -2310,6 +2310,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/initialization/config/{kb_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Kb Config
+         * @description Return the knowledge base's current model and chunking slots.
+         */
+        get: operations["get_kb_config_api_v1_initialization_config__kb_id__get"];
+        /**
+         * Update Kb Config
+         * @description Persist the editor's model, chunking, extract, and storage fields.
+         */
+        put: operations["update_kb_config_api_v1_initialization_config__kb_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/knowledge-bases/{kb_id}/files": {
         parameters: {
             query?: never;
@@ -2473,6 +2497,26 @@ export interface paths {
          */
         get: operations["list_move_targets_api_v1_knowledge_bases__id__move_targets_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge-bases/{id}/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Toggle Knowledge Base Pin
+         * @description Pin or unpin one knowledge base for the caller.
+         */
+        put: operations["toggle_knowledge_base_pin_api_v1_knowledge_bases__id__pin_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2914,6 +2958,66 @@ export interface paths {
         get: operations["pending_invitations_count_api_v1_me_invitations_pending_count_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List My Invitations
+         * @description Return the caller's invitation inbox.
+         */
+        get: operations["list_my_invitations_api_v1_me_invitations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/invitations/{invitation_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept My Invitation
+         * @description Accept one pending invitation and join that workspace.
+         */
+        post: operations["accept_my_invitation_api_v1_me_invitations__invitation_id__accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/invitations/{invitation_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decline My Invitation
+         * @description Decline one pending invitation.
+         */
+        post: operations["decline_my_invitation_api_v1_me_invitations__invitation_id__decline_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3615,6 +3719,26 @@ export interface paths {
          * @description Unpin a session for the caller (404 when absent or not owned).
          */
         delete: operations["unpin_session_api_v1_sessions__session_id__pin_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop Session
+         * @description Acknowledge a composer stop. The SPA already aborted the SSE client.
+         */
+        post: operations["stop_session_api_v1_sessions__session_id__stop_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4897,6 +5021,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/knowledge/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Batch Query Documents
+         * @description Return documents for ``ids``. Agent query params are accepted unused.
+         */
+        get: operations["batch_query_documents_api_v1_knowledge_batch_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Knowledge Documents
+         * @description Keyword file search for the chat @ picker. Agent params are unused.
+         */
+        get: operations["search_knowledge_documents_api_v1_knowledge_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/knowledge/batch-delete": {
         parameters: {
             query?: never;
@@ -4909,11 +5073,6 @@ export interface paths {
         /**
          * Batch Delete Documents
          * @description Soft-delete a batch of documents under one knowledge base.
-         *
-         *     Validates that every id exists and belongs to ``kb_id`` (cross-KB
-         *     deletion is rejected), then runs the cascade delete synchronously and
-         *     answers with a task id so the wire contract matches the async
-         *     upstream submission.
          */
         post: operations["batch_delete_documents_api_v1_knowledge_batch_delete_post"];
         delete?: never;
@@ -4934,10 +5093,6 @@ export interface paths {
         /**
          * Batch Reparse Documents
          * @description Reset and re-submit a batch of documents under one knowledge base.
-         *
-         *     Each document is validated to exist and belong to ``kb_id``, then
-         *     reset for a fresh parse attempt; the response carries a task id and
-         *     the submitted count.
          */
         post: operations["batch_reparse_documents_api_v1_knowledge_batch_reparse_post"];
         delete?: never;
@@ -4957,11 +5112,6 @@ export interface paths {
         /**
          * Update Knowledge Tag Batch
          * @description Replace the tag bindings of many documents in one request.
-         *
-         *     An explicit ``kb_id`` narrows the authorized scope; without one the
-         *     knowledge base is inferred from the first updated document (shared-KB
-         *     resolution). Every tag must exist and belong to the same knowledge
-         *     base as the document it is bound to.
          */
         put: operations["update_knowledge_tag_batch_api_v1_knowledge_tags_put"];
         post?: never;
@@ -4985,15 +5135,86 @@ export interface paths {
         get: operations["get_document_api_v1_knowledge__id__get"];
         /**
          * Update Document
-         * @description Update a document's mutable fields (title / description).
+         * @description Update a document's mutable fields, including manual content.
          */
         put: operations["update_document_api_v1_knowledge__id__put"];
         post?: never;
-        /**
-         * Delete Document
-         * @description Soft-delete a document and cascade its chunks.
-         */
+        /** Delete Document */
         delete: operations["delete_document_api_v1_knowledge__id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/{id}/spans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Document Spans
+         * @description Return the processing-span tree for one document.
+         */
+        get: operations["get_document_spans_api_v1_knowledge__id__spans_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/{id}/regenerate-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Regenerate Document Summary
+         * @description Queue a summary refresh for one document.
+         */
+        post: operations["regenerate_document_summary_api_v1_knowledge__id__regenerate_summary_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/{id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download Document */
+        get: operations["download_document_api_v1_knowledge__id__download_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge/{id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Preview Document */
+        get: operations["preview_document_api_v1_knowledge__id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -5008,10 +5229,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Reparse Document
-         * @description Reset a document for a fresh parse attempt.
-         */
+        /** Reparse Document */
         post: operations["reparse_document_api_v1_knowledge__id__reparse_post"];
         delete?: never;
         options?: never;
@@ -5028,10 +5246,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Cancel Document Parse
-         * @description Cancel an in-flight document parse.
-         */
+        /** Cancel Document Parse */
         post: operations["cancel_document_parse_api_v1_knowledge__id__cancel_parse_post"];
         delete?: never;
         options?: never;
@@ -5071,10 +5286,6 @@ export interface paths {
         /**
          * Move Documents
          * @description Move documents into another knowledge base (runs synchronously).
-         *
-         *     The response carries a workspace-embedded task id so the progress
-         *     endpoint keeps the upstream wire contract; the async task record and
-         *     broker land with the task infrastructure.
          */
         post: operations["move_documents_api_v1_knowledge_move_post"];
         delete?: never;
@@ -5090,15 +5301,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * Get Move Progress
-         * @description Return a move task's progress, scoped to the caller's workspace.
-         *
-         *     The tenant guard rejects malformed task ids and hides cross-workspace
-         *     tasks as not-found. Progress records land with the async task
-         *     infrastructure; until then a well-formed in-workspace task resolves
-         *     to no record and answers not-found.
-         */
+        /** Get Move Progress */
         get: operations["get_move_progress_api_v1_knowledge_move_progress__task_id__get"];
         put?: never;
         post?: never;
@@ -5474,6 +5677,40 @@ export interface components {
             model_id?: string | null;
             /** Language */
             language?: string | null;
+        };
+        /**
+         * ASRConfigBody
+         * @description Optional ASR slot on the save-and-close body.
+         */
+        ASRConfigBody: {
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+            /**
+             * Model Id
+             * @default
+             */
+            model_id: string;
+            /**
+             * Language
+             * @default
+             */
+            language: string;
+        };
+        /** AcceptInvitationData */
+        AcceptInvitationData: {
+            membership: components["schemas"]["MembershipPayload"];
+        };
+        /** AcceptInvitationEnvelope */
+        AcceptInvitationEnvelope: {
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+            data: components["schemas"]["AcceptInvitationData"];
         };
         /**
          * AddFavoriteRequest
@@ -7177,6 +7414,51 @@ export interface components {
              */
             success: boolean;
         };
+        /**
+         * DocumentSplittingBody
+         * @description Chunking fields the editor sends as ``documentSplitting``.
+         */
+        DocumentSplittingBody: {
+            /**
+             * Chunksize
+             * @default 0
+             */
+            chunkSize: number;
+            /**
+             * Chunkoverlap
+             * @default 0
+             */
+            chunkOverlap: number;
+            /** Separators */
+            separators?: string[];
+            /** Parserenginerules */
+            parserEngineRules?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            }[] | null;
+            /**
+             * Enableparentchild
+             * @default false
+             */
+            enableParentChild: boolean;
+            /**
+             * Parentchunksize
+             * @default 0
+             */
+            parentChunkSize: number;
+            /**
+             * Childchunksize
+             * @default 0
+             */
+            childChunkSize: number;
+            /** Strategy */
+            strategy?: string | null;
+            /** Tokenlimit */
+            tokenLimit?: number | null;
+            /** Languages */
+            languages?: string[] | null;
+            /** Tablemetadatainstructions */
+            tableMetadataInstructions?: string | null;
+        };
         /** DownloadOllamaModelRequest */
         DownloadOllamaModelRequest: {
             /** Modelname */
@@ -7682,6 +7964,10 @@ export interface components {
              * @default false
              */
             regenerate: boolean;
+            /** Query */
+            query?: string | null;
+            /** Answer */
+            answer?: string | null;
         };
         /** EvalGenerationMetrics */
         EvalGenerationMetrics: {
@@ -8457,6 +8743,66 @@ export interface components {
             graph_enabled: boolean;
         };
         /**
+         * InvitationItem
+         * @description One inbox row. Extra invitee/tenant display fields stay optional.
+         */
+        InvitationItem: {
+            /** Id */
+            id: number;
+            /** Tenant Id */
+            tenant_id: number;
+            /** Tenant Name */
+            tenant_name?: string | null;
+            /** Invitee User Id */
+            invitee_user_id: string;
+            /** Invited By */
+            invited_by?: string | null;
+            /** Role */
+            role: string;
+            /** Status */
+            status: string;
+            /** Message */
+            message?: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Responded At */
+            responded_at?: string | null;
+            /**
+             * Accepted Count
+             * @default 0
+             */
+            accepted_count: number;
+            /**
+             * Is Share Link
+             * @default false
+             */
+            is_share_link: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** InvitationListData */
+        InvitationListData: {
+            /** Invitations */
+            invitations: components["schemas"]["InvitationItem"][];
+            /** Total */
+            total: number;
+        };
+        /** InvitationListEnvelope */
+        InvitationListEnvelope: {
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+            data: components["schemas"]["InvitationListData"];
+        };
+        /**
          * InvitationLookupRequest
          * @description Body for ``POST /auth/invitations/lookup``.
          *
@@ -8609,6 +8955,57 @@ export interface components {
             role?: string | null;
         };
         JsonValue: unknown;
+        /**
+         * KBConfigReadEnvelope
+         * @description ``{"success": true, "data": {...}}`` for the current KB config.
+         */
+        KBConfigReadEnvelope: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+        };
+        /**
+         * KBConfigUpdateEnvelope
+         * @description ``{"success": true, "message": "..."}`` after a config save.
+         */
+        KBConfigUpdateEnvelope: {
+            /** Success */
+            success: boolean;
+            /** Message */
+            message: string;
+        };
+        /**
+         * KBModelConfigRequest
+         * @description PUT body for ``/initialization/config/{kb_id}``.
+         */
+        KBModelConfigRequest: {
+            /** Llmmodelid */
+            llmModelId: string;
+            /**
+             * Embeddingmodelid
+             * @default
+             */
+            embeddingModelId: string;
+            vlm_config?: components["schemas"]["VLMConfigBody"] | null;
+            asr_config?: components["schemas"]["ASRConfigBody"] | null;
+            documentSplitting?: components["schemas"]["DocumentSplittingBody"];
+            multimodal?: components["schemas"]["MultimodalToggleBody"];
+            /**
+             * Storagebackendid
+             * @default
+             */
+            storageBackendId: string;
+            /**
+             * Storageprovider
+             * @default local
+             */
+            storageProvider: string;
+            nodeExtract?: components["schemas"]["NodeExtractBody"];
+            questionGeneration?: components["schemas"]["QuestionGenerationBody"];
+        };
         /** Knowledge */
         Knowledge: {
             /** Id */
@@ -8669,6 +9066,8 @@ export interface components {
             error_message?: string | null;
             /** Deleted At */
             deleted_at?: string | null;
+            /** Knowledge Base Name */
+            knowledge_base_name?: string | null;
         };
         /**
          * KnowledgeBase
@@ -8790,6 +9189,36 @@ export interface components {
             success: boolean;
             /** Data */
             data: components["schemas"]["KnowledgeBase"][];
+        };
+        /**
+         * KnowledgeBasePinData
+         * @description Inner payload of the pin toggle.
+         */
+        KnowledgeBasePinData: {
+            /** Is Pinned */
+            is_pinned: boolean;
+        };
+        /**
+         * KnowledgeBasePinEnvelope
+         * @description ``{"success": true, "data": {"is_pinned": ...}}``.
+         */
+        KnowledgeBasePinEnvelope: {
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+            data: components["schemas"]["KnowledgeBasePinData"];
+        };
+        /**
+         * KnowledgeBatchEnvelope
+         * @description ``{"success": true, "data": [...]}`` - batch document read.
+         */
+        KnowledgeBatchEnvelope: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data: components["schemas"]["Knowledge"][];
         };
         /**
          * KnowledgeCopyEnvelope
@@ -8930,6 +9359,20 @@ export interface components {
             /** Knowledge Source */
             knowledge_source?: string | null;
         };
+        /**
+         * KnowledgeSearchEnvelope
+         * @description Chat file-picker page: ``data`` plus ``has_more`` / ``total``.
+         */
+        KnowledgeSearchEnvelope: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data: components["schemas"]["Knowledge"][];
+            /** Has More */
+            has_more: boolean;
+            /** Total */
+            total: number;
+        };
         /** KnowledgeSearchHit */
         KnowledgeSearchHit: {
             /** Id */
@@ -8962,6 +9405,15 @@ export interface components {
             knowledge_filename?: string | null;
             /** Knowledge Source */
             knowledge_source?: string | null;
+        };
+        /**
+         * KnowledgeSpansEnvelope
+         * @description ``{"success": true, "data": {...}}`` - processing-span tree.
+         */
+        KnowledgeSpansEnvelope: {
+            /** Success */
+            success: boolean;
+            data: components["schemas"]["SpansRead"];
         };
         /**
          * KnowledgeTagBatchEnvelope
@@ -9289,6 +9741,20 @@ export interface components {
              * @enum {string}
              */
             role: "owner" | "admin" | "contributor" | "viewer";
+        };
+        /** MembershipPayload */
+        MembershipPayload: {
+            /** Tenant Id */
+            tenant_id: number;
+            /** Role */
+            role: string;
+            /** Status */
+            status: string;
+            /**
+             * Joined At
+             * Format: date-time
+             */
+            joined_at: string;
         };
         /**
          * MentionedItemRequest
@@ -9648,6 +10114,48 @@ export interface components {
             /** Success */
             success: boolean;
             data: components["schemas"]["MultimodalTestDataView"];
+        };
+        /**
+         * MultimodalToggleBody
+         * @description Whether multimodal processing is on.
+         */
+        MultimodalToggleBody: {
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+        };
+        /**
+         * NodeExtractBody
+         * @description Graph-extract fields the editor sends as ``nodeExtract``.
+         */
+        NodeExtractBody: {
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+            /** Tags */
+            tags?: string[];
+            /** Nodes */
+            nodes?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            }[];
+            /** Relations */
+            relations?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            }[];
+            /**
+             * Custominstructions
+             * @default
+             */
+            customInstructions: string;
         };
         /**
          * OAuthAuthorizeRequestBody
@@ -10375,6 +10883,27 @@ export interface components {
             extraFields?: {
                 [key: string]: components["schemas"]["JsonValue"];
             }[] | null;
+        };
+        /**
+         * QuestionGenerationBody
+         * @description Question-generation fields the editor sends as ``questionGeneration``.
+         */
+        QuestionGenerationBody: {
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+            /**
+             * Questioncount
+             * @default 3
+             */
+            questionCount: number;
+            /**
+             * Custominstructions
+             * @default
+             */
+            customInstructions: string;
         };
         /** QuestionGenerationConfig */
         QuestionGenerationConfig: {
@@ -11134,6 +11663,19 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** SimpleMessageEnvelope */
+        SimpleMessageEnvelope: {
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+            /**
+             * Message
+             * @default
+             */
+            message: string;
+        };
         /**
          * SimpleSuccessResponse
          * @description ``{"success": true}`` — delete / ack responses.
@@ -11166,6 +11708,97 @@ export interface components {
             data?: components["schemas"]["SkillInfoResponse"][];
             /** Skills Available */
             skills_available: boolean;
+        };
+        /**
+         * SpanLastError
+         * @description Most recently finished failed span, for the timeline banner.
+         */
+        SpanLastError: {
+            /** Name */
+            name: string;
+            /** Error Code */
+            error_code: string;
+            /** Error Message */
+            error_message: string;
+            /** Finished At */
+            finished_at?: string | null;
+        };
+        /**
+         * SpanNode
+         * @description One node in the nested processing-span tree.
+         */
+        SpanNode: {
+            /**
+             * Span Id
+             * @default
+             */
+            span_id: string;
+            /** Parent Span Id */
+            parent_span_id?: string | null;
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
+            /** Status */
+            status: string;
+            /** Started At */
+            started_at?: string | null;
+            /** Finished At */
+            finished_at?: string | null;
+            /** Duration Ms */
+            duration_ms?: number | null;
+            /**
+             * Error Code
+             * @default
+             */
+            error_code: string;
+            /**
+             * Error Message
+             * @default
+             */
+            error_message: string;
+            /** Input */
+            input?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
+            /** Output */
+            output?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
+            /** Metadata */
+            metadata?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
+            /** Children */
+            children?: components["schemas"]["SpanNode"][];
+        };
+        /**
+         * SpansRead
+         * @description GET ``/knowledge/{id}/spans`` payload the timeline already consumes.
+         */
+        SpansRead: {
+            /** Knowledge Id */
+            knowledge_id: string;
+            /** Attempt */
+            attempt: number;
+            /** Latest Attempt */
+            latest_attempt: number;
+            /** Current Attempt */
+            current_attempt: number;
+            /** Parse Status */
+            parse_status: string;
+            /**
+             * Current Stage
+             * @default
+             */
+            current_stage: string;
+            trace: components["schemas"]["SpanNode"];
+            last_error?: components["schemas"]["SpanLastError"] | null;
+        };
+        /** StopGenerationRequest */
+        StopGenerationRequest: {
+            /** Message Id */
+            message_id: string;
         };
         /** StorageBackend */
         StorageBackend: {
@@ -11472,6 +12105,11 @@ export interface components {
             } | null;
             /** Questions */
             questions?: components["schemas"]["SuggestionQuestion"][] | null;
+            /**
+             * Allow Regenerate
+             * @default false
+             */
+            allow_regenerate: boolean;
             /** Created At */
             created_at?: string | null;
             /** Updated At */
@@ -12159,6 +12797,14 @@ export interface components {
             tag_id?: string | null;
             /** Enable Status */
             enable_status?: string | null;
+            /** Content */
+            content?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Process Config */
+            process_config?: {
+                [key: string]: components["schemas"]["JsonValue"];
+            } | null;
         };
         /** UpdateMCPServiceRequest */
         UpdateMCPServiceRequest: {
@@ -12390,6 +13036,32 @@ export interface components {
             enabled: boolean;
             /** Model Id */
             model_id?: string | null;
+        };
+        /**
+         * VLMConfigBody
+         * @description Optional VLM slot on the save-and-close body.
+         */
+        VLMConfigBody: {
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+            /**
+             * Model Id
+             * @default
+             */
+            model_id: string;
+            /**
+             * Description Language
+             * @default
+             */
+            description_language: string;
+            /**
+             * Custom Instructions
+             * @default
+             */
+            custom_instructions: string;
         };
         /** ValidateCredentialsRequest */
         ValidateCredentialsRequest: {
@@ -17610,6 +18282,78 @@ export interface operations {
             };
         };
     };
+    get_kb_config_api_v1_initialization_config__kb_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                kb_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KBConfigReadEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_kb_config_api_v1_initialization_config__kb_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                kb_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KBModelConfigRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KBConfigUpdateEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     serve_kb_file_api_v1_knowledge_bases__kb_id__files_get: {
         parameters: {
             query: {
@@ -17914,6 +18658,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnowledgeBaseListEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    toggle_knowledge_base_pin_api_v1_knowledge_bases__id__pin_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBasePinEnvelope"];
                 };
             };
             /** @description Validation Error */
@@ -18871,6 +19649,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PendingInvitationsCountResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_my_invitations_api_v1_me_invitations_get: {
+        parameters: {
+            query?: {
+                include_terminal?: boolean;
+            };
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationListEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_my_invitation_api_v1_me_invitations__invitation_id__accept_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                invitation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptInvitationEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decline_my_invitation_api_v1_me_invitations__invitation_id__decline_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                invitation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimpleMessageEnvelope"];
                 };
             };
             /** @description Validation Error */
@@ -20367,6 +21247,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PinSessionEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_session_api_v1_sessions__session_id__stop_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StopGenerationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteSessionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -22932,6 +23850,84 @@ export interface operations {
             };
         };
     };
+    batch_query_documents_api_v1_knowledge_batch_get: {
+        parameters: {
+            query?: {
+                ids?: string[] | null;
+                kb_id?: string | null;
+                agent_id?: string | null;
+                agent_source_tenant_id?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBatchEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_knowledge_documents_api_v1_knowledge_search_get: {
+        parameters: {
+            query?: {
+                keyword?: string;
+                query?: string;
+                offset?: number;
+                limit?: number;
+                file_types?: string;
+                recent?: boolean;
+                agent_id?: string | null;
+                agent_source_tenant_id?: string | null;
+            };
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeSearchEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     batch_delete_documents_api_v1_knowledge_batch_delete_post: {
         parameters: {
             query?: never;
@@ -23133,6 +24129,144 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_document_spans_api_v1_knowledge__id__spans_get: {
+        parameters: {
+            query?: {
+                attempt?: number | null;
+            };
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeSpansEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    regenerate_document_summary_api_v1_knowledge__id__regenerate_summary_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeTaskEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    download_document_api_v1_knowledge__id__download_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_document_api_v1_knowledge__id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.common.json import JsonObject
 from src.core.contracts.knowledge import Knowledge, KnowledgeMoveResponse
+from src.core.knowledge.documents.span_tree import SpansRead
 
 
 class KnowledgeEnvelope(BaseModel):
@@ -196,6 +197,35 @@ class KnowledgeTagBatchEnvelope(BaseModel):
     success: bool
 
 
+class KnowledgeBatchEnvelope(BaseModel):
+    """``{"success": true, "data": [...]}`` - batch document read."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: list[Knowledge]
+
+
+class KnowledgeSearchEnvelope(BaseModel):
+    """Chat file-picker page: ``data`` plus ``has_more`` / ``total``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: list[Knowledge]
+    has_more: bool
+    total: int
+
+
+class KnowledgeSpansEnvelope(BaseModel):
+    """``{"success": true, "data": {...}}`` - processing-span tree."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: SpansRead
+
+
 __all__ = [
     "BatchDeleteData",
     "BatchDeleteEnvelope",
@@ -207,8 +237,11 @@ __all__ = [
     "CreatePassageKnowledgeRequest",
     "DeleteEnvelope",
     "DeleteResult",
+    "KnowledgeBatchEnvelope",
     "KnowledgeEnvelope",
     "KnowledgeListEnvelope",
+    "KnowledgeSearchEnvelope",
+    "KnowledgeSpansEnvelope",
     "KnowledgeTagBatchEnvelope",
     "KnowledgeTagBatchUpdateRequest",
     "KnowledgeTaskEnvelope",

@@ -34,12 +34,13 @@ for the grouping shapes used in the JSON wire payload.
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Protocol, runtime_checkable
+from typing import Protocol, cast, runtime_checkable
 
 from src.common.exception import NotFoundError, ValidationError
-from src.common.json import JsonValue
+from src.common.json import BindParams, JsonValue
 from src.core.chat.messages.types import MessageInfo, MessageSearchMode
 from src.core.chat.pipeline.types import Context
 from src.db.dao.message_repository import MessageRepository
@@ -548,7 +549,7 @@ class MessageServiceImpl:
         return MessageInfo.map_from_db(updated)
 
     @staticmethod
-    def _mutable_columns(message: Message) -> dict[str, JsonValue]:
+    def _mutable_columns(message: Message) -> BindParams:
         """Return the columns a caller is allowed to overwrite."""
         return {
             "request_id": message.request_id,
@@ -952,7 +953,11 @@ class MessageServiceImpl:
                 embedding_model_id=self._chat_history_config.embedding_model_id(ctx),
                 knowledge_base_id=self._chat_history_config.knowledge_base_id(ctx),
             )
-        return await provider_stats(ctx)
+        typed_stats = cast(
+            Callable[[Context], Awaitable[ChatHistoryKBStats]],
+            provider_stats,
+        )
+        return await typed_stats(ctx)
 
 
 # ── Pure helpers (search fusion + grouping) ───────────────────────────

@@ -191,6 +191,7 @@ class KnowledgeDocumentsOrchestrator:
             knowledge_repo=self._knowledge_repo,
             kb_service=self._kb_service,
             tag_repo=self._tag_repo,
+            dispatcher=self._dispatcher,
         )
 
     async def create_from_passage(

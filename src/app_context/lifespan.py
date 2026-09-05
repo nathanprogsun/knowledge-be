@@ -51,6 +51,7 @@ from src.core.infra.mcp_services.oauth import (
 )
 from src.core.infra.mcp_services.types import MCPServiceInfo
 from src.core.infra.web_search.registry import build_web_search_client_registry
+from src.core.knowledge.documents.arq_enqueue import connect_arq_pool
 from src.db.base import DatabaseEngine
 from src.settings import get_settings
 from src.web.api.agents.router import router as agents_router
@@ -177,6 +178,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             state_store=oauth_state_store,
         )
 
+    arq_redis = None
+    try:
+        if settings.redis_url:
+            arq_redis = await connect_arq_pool(settings.redis_url)
+    except Exception:
+        logger.warning("ARQ Redis unavailable; document parse jobs will not enqueue")
+
     lifespan_service = LifeSpanService(
         db_engine=db_engine,
         oidc_client=oidc_client,
@@ -185,6 +193,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         mcp_oauth_secret_store=oauth_secret_store,
         mcp_oauth_http_client=oauth_http_client,
         mcp_oauth_manager_factory=_oauth_manager_factory,
+        arq_redis=arq_redis,
+        arq_queue_name=get_worker_settings().queue_name,
     )
     app.state.lifespan_service = lifespan_service
 
@@ -208,6 +218,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await mcp_connection_manager.shutdown()
         await oauth_http_client.aclose()
         await oidc_client.aclose()
+        if arq_redis is not None:
+            await arq_redis.aclose()  # type: ignore[attr-defined]
         await db_engine.close()
         await graph_repository.close()
         app.state.lifespan_service = None

@@ -475,6 +475,30 @@ async def test_update_builtin_returns_409(
     assert resp.json()["error"]["code"] == "agent.cannot_modify_builtin"
 
 
+async def test_update_builtin_config_returns_200(
+    client: TestClient,
+    agent_repo: AsyncMock,
+) -> None:
+    agent_repo._rows["builtin-quick-answer"] = _agent_row(  # type: ignore[attr-defined]
+        id="builtin-quick-answer",
+        name="快速问答",
+        is_builtin=True,
+        config={"agent_mode": "quick-answer"},
+    )
+
+    resp = client.put(
+        "/api/v1/agents/builtin-quick-answer",
+        json={
+            "name": "快速问答",
+            "config": {"agent_mode": "quick-answer", "model_id": "model-qa"},
+        },
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["data"]["config"]["model_id"] == "model-qa"
+    assert resp.json()["data"]["is_builtin"] is True
+
+
 # ── DELETE /agents/{id} ──────────────────────────────────────────────
 
 

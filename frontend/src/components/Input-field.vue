@@ -1925,16 +1925,19 @@ const createSession = async (val: string) => {
     actualAgent = builtin || agentToCheck;
   }
   const isAgentMode = actualAgent.config?.agent_mode === 'smart-reasoning';
-  const { keys: notReadyKeys, labels: notReadyReasons } = collectAgentNotReadyReasons(
+  const { keys: notReadyKeys } = collectAgentNotReadyReasons(
     actualAgent,
     isAgentMode,
     settingsStore.selectedAgentSourceTenantId ?? undefined,
   );
-  if (notReadyReasons.length > 0) {
+  const sendKeys = selectedModelId.value.trim()
+    ? notReadyKeys.filter((key) => key !== 'summary_model')
+    : notReadyKeys;
+  if (sendKeys.length > 0) {
     showAgentNotReadyMessage(
       actualAgent,
-      notReadyReasons,
-      notReadyKeys,
+      formatAgentNotReadyReasons(sendKeys, actualAgent.is_builtin),
+      sendKeys,
       settingsStore.selectedAgentSourceTenantId ?? undefined,
     );
     return;

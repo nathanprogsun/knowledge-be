@@ -1,8 +1,14 @@
 import { markRaw, nextTick, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ensureRagPipelineHistoryStream } from '@/utils/rag-pipeline-history'
+import {
+  dropEmptyIncompleteAssistants,
+  resolveStreamAssistant,
+  shouldKeepAssistantRow,
+  type ChatMessage,
+} from './chatStreamAssistant'
 
-export type ChatMessage = Record<string, unknown>
+export type { ChatMessage }
 
 export interface UseChatStreamHandlerOptions {
   messagesList: ChatMessage[]
@@ -194,14 +200,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
   }
 
   const shouldRenderAssistantMessage = (session: ChatMessage) => {
-    if (!session?.isAgentMode) return true
-    if (!session.is_completed) return true
-    const stream = session.agentEventStream
-    if (Array.isArray(stream) && stream.length > 0) return true
-    if (Array.isArray(session.knowledge_references) && session.knowledge_references.length > 0) {
-      return true
-    }
-    return false
+    return shouldKeepAssistantRow(session, messagesList)
   }
 
   const shouldShowGlobalTypingIndicator = (
@@ -472,9 +471,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
 
   const handleAgentChunk = (data: ChatMessage) => {
     const dataId = data.id as string | undefined
-    let message = findLastMessage(
-      (item) => item.request_id === dataId || item.id === dataId,
-    )
+    let message = resolveStreamAssistant(messagesList, dataId)
     let created = false
 
     if (!message) {
@@ -746,6 +743,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
             const errorMsg = String(data.content || t('chat.processError'))
             message.content = errorMsg
             message.is_completed = true
+            dropEmptyIncompleteAssistants(messagesList, message)
             isReplying.value = false
             loading.value = false
             fullContent.value = ''
@@ -757,6 +755,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
           const errorMsg = String(data.content || t('chat.processError'))
           message.content = errorMsg
           message.is_completed = true
+          dropEmptyIncompleteAssistants(messagesList, message)
           isReplying.value = false
           loading.value = false
           fullContent.value = ''
@@ -809,6 +808,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
         loading.value = false
         isReplying.value = false
         message.is_completed = true
+        dropEmptyIncompleteAssistants(messagesList, message)
         onReplyComplete?.(String(message.content || ''))
         onTurnComplete?.(message)
         fullContent.value = ''
@@ -831,6 +831,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
           reason: dataPayload?.reason || 'user_requested',
         })
         message.is_completed = true
+        dropEmptyIncompleteAssistants(messagesList, message)
         loading.value = false
         isReplying.value = false
         fullContent.value = ''
@@ -873,6 +874,9 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       let existingMessage = findLastMessage(
         (item) => item.id === data.id || item.request_id === data.id,
       )
+      if (!existingMessage) {
+        existingMessage = getTrailingIncompleteAssistant()
+      }
       const created = !existingMessage
       if (!existingMessage) {
         const assistantId = data.assistant_message_id as string | undefined
@@ -938,7 +942,10 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       if (data.response_type === 'stop') {
         log('[Stop Event] Generation stopped')
         const stoppedMessage = resolveActiveAssistantMessage(data)
-        if (stoppedMessage) markAssistantStopped(stoppedMessage)
+        if (stoppedMessage) {
+          markAssistantStopped(stoppedMessage)
+          dropEmptyIncompleteAssistants(messagesList, stoppedMessage)
+        }
         loading.value = false
         isReplying.value = false
         currentAssistantMessageId.value = ''
@@ -960,10 +967,10 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
       return
     }
 
-    const existingMessage = findLastMessage((item) => {
-      if (item.request_id === data.id) return true
-      return item.id === data.id
-    })
+    const existingMessage = resolveStreamAssistant(
+      messagesList,
+      data.id as string | undefined,
+    )
     if (existingMessage?.is_completed && data.done && !data.content) {
       log('[Non-Agent] Ignoring duplicate completion event for completed message')
       return
@@ -997,6 +1004,10 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
     }
 
     if (!existingMessage) loading.value = false
+    if (existingMessage && data.id) {
+      if (!existingMessage.request_id) existingMessage.request_id = data.id
+      if (!existingMessage.id) existingMessage.id = data.id
+    }
 
     if (data.done) {
       obj.is_completed = true
@@ -1008,6 +1019,7 @@ export function useChatStreamHandler(options: UseChatStreamHandlerOptions) {
     updateAssistantSession(obj)
     if (data.done) {
       const completed = resolveActiveAssistantMessage(data) || obj
+      dropEmptyIncompleteAssistants(messagesList, completed)
       onTurnComplete?.(completed)
     }
   }

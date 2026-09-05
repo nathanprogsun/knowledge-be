@@ -206,7 +206,9 @@
       "message_id"
     ],
     "EnsureSuggestionsRequest": [
-      "regenerate"
+      "regenerate",
+      "query",
+      "answer"
     ],
     "SuggestionEventRequest": [
       "suggestion_set_id",

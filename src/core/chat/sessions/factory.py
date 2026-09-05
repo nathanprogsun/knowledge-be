@@ -21,7 +21,9 @@ from src.core.chat.sessions.service.session_service import (
     ChatFactoryLike,
     SessionService,
 )
+from src.core.chat.sessions.stop import StopStreamService
 from src.core.chat.sessions.title_gen import TitleGenerator
+from src.core.chat.stream.manager import MemoryStreamManager
 from src.db.dao.message_repository import MessageRepository
 from src.db.dao.session_repository import SessionRepository
 
@@ -72,7 +74,13 @@ def build_session_service_with_title(
     )
 
 
+def build_stop_stream_service() -> StopStreamService:
+    """Build a stop facade. Cancel flags are process-local until chat observes them."""
+    return StopStreamService(stream_manager=MemoryStreamManager())
+
+
 __all__ = [
     "build_session_service",
     "build_session_service_with_title",
+    "build_stop_stream_service",
 ]

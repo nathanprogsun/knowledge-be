@@ -25,6 +25,7 @@ from src.core.knowledge.knowledge_bases.types import (
 )
 from src.db.dao.knowledge_base_repository import KnowledgeBaseRepository
 from src.db.models.knowledge_base import KnowledgeBase
+from src.db.models.user_kb_pin import UserKBPin
 from tests.util.service_test import ServiceTest
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
@@ -117,6 +118,8 @@ def _seed(
     extract_config: JsonObject | None = None,
     faq_config: JsonObject | None = None,
     indexing_strategy: JsonObject | None = None,
+    embedding_model_id: str = "",
+    summary_model_id: str = "",
     created_at: datetime = _NOW,
 ) -> KnowledgeBase:
     """Insert a row directly into the closure-captured store."""
@@ -131,6 +134,8 @@ def _seed(
         extract_config=extract_config,
         faq_config=faq_config,
         indexing_strategy=indexing_strategy,
+        embedding_model_id=embedding_model_id,
+        summary_model_id=summary_model_id,
         created_at=created_at,
         updated_at=created_at,
     )
@@ -579,6 +584,67 @@ class TestUpdateKnowledgeBase(ServiceTest):
             await service.update_knowledge_base(knowledge_base_id="", name="x")
 
 
+class TestUpdateModelConfig(ServiceTest):
+    async def test_writes_models_and_chunking(
+        self, service: KBService, rows: dict[str, KnowledgeBase]
+    ) -> None:
+        stored = _seed(rows, name="docs")
+
+        info = await service.update_model_config(
+            knowledge_base_id=stored.id,
+            summary_model_id="llm-1",
+            embedding_model_id="emb-1",
+            chunking_config={"chunk_size": 512, "chunk_overlap": 64, "separators": ["\n\n"]},
+            document_count=0,
+        )
+
+        assert info.summary_model_id == "llm-1"
+        assert info.embedding_model_id == "emb-1"
+        assert info.chunking_config == {
+            "chunk_size": 512,
+            "chunk_overlap": 64,
+            "separators": ["\n\n"],
+        }
+        assert rows[stored.id].summary_model_id == "llm-1"
+
+    async def test_refuses_embedding_swap_when_documents_exist(
+        self, service: KBService, rows: dict[str, KnowledgeBase]
+    ) -> None:
+        stored = _seed(rows, name="docs", embedding_model_id="emb-old")
+
+        with pytest.raises(ValidationError) as excinfo:
+            await service.update_model_config(
+                knowledge_base_id=stored.id,
+                summary_model_id="llm-1",
+                embedding_model_id="emb-new",
+                document_count=3,
+            )
+
+        assert excinfo.value.code == "knowledge_base.embedding_model_locked"
+        assert rows[stored.id].embedding_model_id == "emb-old"
+
+    async def test_keeps_embedding_when_incoming_id_is_empty(
+        self, service: KBService, rows: dict[str, KnowledgeBase]
+    ) -> None:
+        stored = _seed(rows, name="docs", embedding_model_id="emb-old")
+
+        info = await service.update_model_config(
+            knowledge_base_id=stored.id,
+            summary_model_id="llm-1",
+            embedding_model_id=None,
+            document_count=3,
+        )
+
+        assert info.embedding_model_id == "emb-old"
+
+    async def test_missing_row_raises_not_found(self, service: KBService) -> None:
+        with pytest.raises(NotFoundError):
+            await service.update_model_config(
+                knowledge_base_id="missing",
+                summary_model_id="llm-1",
+            )
+
+
 # ── delete_knowledge_base ───────────────────────────────────────────
 
 
@@ -658,6 +724,71 @@ def test_service_accepts_the_real_repository_type() -> None:
     service = KBService(kb_repo=KnowledgeBaseRepository(None))  # type: ignore[arg-type]
 
     assert isinstance(service, KBService)
+
+
+class TestTogglePin(ServiceTest):
+    async def test_pins_when_absent(
+        self,
+        repo: AsyncMock,
+        rows: dict[str, KnowledgeBase],
+    ) -> None:
+        stored = _seed(rows, name="docs")
+        pin_repo = AsyncMock()
+        pin_repo.get = AsyncMock(return_value=None)
+        pin_repo.add = AsyncMock(return_value=None)
+        service = KBService(kb_repo=repo, pin_repo=pin_repo)
+
+        pinned = await service.toggle_pin(tenant_id=7, user_id="u-1", kb_id=stored.id)
+
+        assert pinned is True
+        pin_repo.add.assert_awaited_once()
+
+    async def test_unpins_when_present(
+        self,
+        repo: AsyncMock,
+        rows: dict[str, KnowledgeBase],
+    ) -> None:
+        stored = _seed(rows, name="docs")
+        pin_repo = AsyncMock()
+        pin_repo.get = AsyncMock(
+            return_value=UserKBPin(
+                tenant_id=7,
+                user_id="u-1",
+                kb_id=stored.id,
+                pinned_at=_NOW,
+            )
+        )
+        pin_repo.remove = AsyncMock(return_value=True)
+        service = KBService(kb_repo=repo, pin_repo=pin_repo)
+
+        pinned = await service.toggle_pin(tenant_id=7, user_id="u-1", kb_id=stored.id)
+
+        assert pinned is False
+        pin_repo.remove.assert_awaited_once()
+
+    async def test_list_hydrates_pins(
+        self,
+        repo: AsyncMock,
+        rows: dict[str, KnowledgeBase],
+    ) -> None:
+        stored = _seed(rows, name="docs")
+        pin_repo = AsyncMock()
+        pin_repo.list_for_user = AsyncMock(
+            return_value=[
+                UserKBPin(
+                    tenant_id=7,
+                    user_id="u-1",
+                    kb_id=stored.id,
+                    pinned_at=_NOW,
+                )
+            ]
+        )
+        service = KBService(kb_repo=repo, pin_repo=pin_repo)
+
+        infos = await service.list_knowledge_bases(tenant_id=7, user_id="u-1")
+
+        assert infos[0].is_pinned is True
+        assert infos[0].pinned_at == _NOW
 
 
 def test_factory_builds_service_with_a_session() -> None:

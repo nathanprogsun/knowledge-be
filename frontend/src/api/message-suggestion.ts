@@ -19,10 +19,19 @@ export type MessageSuggestionSet = Partial<Omit<Schema['SuggestionSet'], 'questi
   generated_at?: string
 }
 
-export function ensureMessageSuggestions(sessionId: string, messageId: string, regenerate = false) {
+export function ensureMessageSuggestions(
+  sessionId: string,
+  messageId: string,
+  regenerate = false,
+  context?: { query?: string; answer?: string },
+) {
   return post<Schema['SuggestionEnvelope']>(
     `/api/v1/sessions/${sessionId}/messages/${messageId}/suggestions`,
-    { regenerate },
+    {
+      regenerate,
+      query: context?.query || undefined,
+      answer: context?.answer || undefined,
+    },
   )
 }
 

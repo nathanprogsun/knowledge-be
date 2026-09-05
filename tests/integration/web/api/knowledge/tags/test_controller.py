@@ -256,18 +256,18 @@ def _kb_row(*, kb_id: str = KB_ID, tenant_id: int | None = None) -> KnowledgeBas
 # ── Route inventory + permission gates ───────────────────────────────
 
 EXPECTED_ROUTES: set[tuple[str, str]] = {
-    ("GET", "/api/v1/knowledge-bases/{id}/tags"),
-    ("POST", "/api/v1/knowledge-bases/{id}/tags"),
-    ("PUT", "/api/v1/knowledge-bases/{id}/tags/{tag_id}"),
-    ("DELETE", "/api/v1/knowledge-bases/{id}/tags/{tag_id}"),
+    ("GET", "/knowledge-bases/{id}/tags"),
+    ("POST", "/knowledge-bases/{id}/tags"),
+    ("PUT", "/knowledge-bases/{id}/tags/{tag_id}"),
+    ("DELETE", "/knowledge-bases/{id}/tags/{tag_id}"),
 }
 
 # Reads are Viewer+; mutations are Contributor+.
 EXPECTED_ROLES: dict[tuple[str, str], str] = {
-    ("GET", "/api/v1/knowledge-bases/{id}/tags"): "viewer",
-    ("POST", "/api/v1/knowledge-bases/{id}/tags"): "contributor",
-    ("PUT", "/api/v1/knowledge-bases/{id}/tags/{tag_id}"): "contributor",
-    ("DELETE", "/api/v1/knowledge-bases/{id}/tags/{tag_id}"): "contributor",
+    ("GET", "/knowledge-bases/{id}/tags"): "viewer",
+    ("POST", "/knowledge-bases/{id}/tags"): "contributor",
+    ("PUT", "/knowledge-bases/{id}/tags/{tag_id}"): "contributor",
+    ("DELETE", "/knowledge-bases/{id}/tags/{tag_id}"): "contributor",
 }
 
 
@@ -277,6 +277,8 @@ def _declared_routes() -> set[tuple[str, str]]:
         methods: set[str] = getattr(route, "methods", set()) or set()
         path = getattr(route, "path", "")
         for method in methods:
+            if method in {"HEAD", "OPTIONS"}:
+                continue
             found.add((method, path))
     return found
 
@@ -311,6 +313,8 @@ def test_every_endpoint_declares_the_expected_role_gate() -> None:
                 if isinstance(cell.cell_contents, str):
                     roles.add(cell.cell_contents)
         for method in methods:
+            if method in {"HEAD", "OPTIONS"}:
+                continue
             expected = EXPECTED_ROLES[(method, path)]
             assert expected in roles, f"{method} {path} expected role gate {expected}, got {roles}"
 
@@ -391,6 +395,19 @@ async def test_list_rejects_invalid_pagination(client: TestClient) -> None:
     )
 
     assert resp.status_code == 422
+
+
+async def test_list_accepts_page_size_1000(
+    client: TestClient,
+    owned_kb: KnowledgeBase,
+) -> None:
+    resp = client.get(
+        f"/api/v1/knowledge-bases/{owned_kb.id}/tags",
+        params={"page": 1, "page_size": 1000},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["data"]["page_size"] == 1000
 
 
 # ── POST /knowledge-bases/{id}/tags ──────────────────────────────────

@@ -199,30 +199,32 @@ def _create_body(**overrides: object) -> dict[str, object]:
 
 
 EXPECTED_ROUTES: set[tuple[str, str]] = {
-    ("POST", "/api/v1/knowledge-bases"),
-    ("GET", "/api/v1/knowledge-bases"),
-    ("GET", "/api/v1/knowledge-bases/{id}"),
-    ("PUT", "/api/v1/knowledge-bases/{id}"),
-    ("DELETE", "/api/v1/knowledge-bases/{id}"),
-    ("POST", "/api/v1/knowledge-bases/{id}/duplicate"),
-    ("POST", "/api/v1/knowledge-bases/copy"),
-    ("GET", "/api/v1/knowledge-bases/{id}/move-targets"),
-    ("POST", "/api/v1/knowledge-bases/{id}/hybrid-search"),
-    ("GET", "/api/v1/knowledge-bases/{id}/hybrid-search"),
+    ("POST", "/knowledge-bases"),
+    ("GET", "/knowledge-bases"),
+    ("GET", "/knowledge-bases/{id}"),
+    ("PUT", "/knowledge-bases/{id}"),
+    ("DELETE", "/knowledge-bases/{id}"),
+    ("POST", "/knowledge-bases/{id}/duplicate"),
+    ("POST", "/knowledge-bases/copy"),
+    ("GET", "/knowledge-bases/{id}/move-targets"),
+    ("POST", "/knowledge-bases/{id}/hybrid-search"),
+    ("GET", "/knowledge-bases/{id}/hybrid-search"),
+    ("PUT", "/knowledge-bases/{id}/pin"),
 }
 
 # Reads are Viewer+; content-mutating operations are Admin+.
 EXPECTED_ROLES: dict[tuple[str, str], str] = {
-    ("POST", "/api/v1/knowledge-bases"): "admin",
-    ("GET", "/api/v1/knowledge-bases"): "viewer",
-    ("GET", "/api/v1/knowledge-bases/{id}"): "viewer",
-    ("PUT", "/api/v1/knowledge-bases/{id}"): "admin",
-    ("DELETE", "/api/v1/knowledge-bases/{id}"): "admin",
-    ("POST", "/api/v1/knowledge-bases/{id}/duplicate"): "admin",
-    ("POST", "/api/v1/knowledge-bases/copy"): "admin",
-    ("GET", "/api/v1/knowledge-bases/{id}/move-targets"): "viewer",
-    ("POST", "/api/v1/knowledge-bases/{id}/hybrid-search"): "viewer",
-    ("GET", "/api/v1/knowledge-bases/{id}/hybrid-search"): "viewer",
+    ("POST", "/knowledge-bases"): "admin",
+    ("GET", "/knowledge-bases"): "viewer",
+    ("GET", "/knowledge-bases/{id}"): "viewer",
+    ("PUT", "/knowledge-bases/{id}"): "admin",
+    ("DELETE", "/knowledge-bases/{id}"): "admin",
+    ("POST", "/knowledge-bases/{id}/duplicate"): "admin",
+    ("POST", "/knowledge-bases/copy"): "admin",
+    ("GET", "/knowledge-bases/{id}/move-targets"): "viewer",
+    ("POST", "/knowledge-bases/{id}/hybrid-search"): "viewer",
+    ("GET", "/knowledge-bases/{id}/hybrid-search"): "viewer",
+    ("PUT", "/knowledge-bases/{id}/pin"): "viewer",
 }
 
 

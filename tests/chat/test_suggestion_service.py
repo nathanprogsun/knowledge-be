@@ -11,10 +11,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-import pytest
 from sqlalchemy.sql.expression import TextClause
 
-from src.common.exception import NotImplementedFeatureError
 from src.core.chat.messages.suggestion_service import (
     SUGGESTION_EVENT_CLICK,
     SUGGESTION_EVENT_DISMISS,
@@ -136,34 +134,53 @@ def test_event_vocabulary() -> None:
     assert SUGGESTION_EVENT_REGENERATE == "regenerate"
 
 
-# ── service surface (stub) ────────────────────────────────────────────
+# ── service surface ───────────────────────────────────────────────────
 
 
-async def test_service_stub_methods_raise_not_implemented() -> None:
-    service = MessageSuggestionService()
+async def test_ensure_follow_ups_returns_ready_questions() -> None:
+    service = MessageSuggestionService(tenant_id=1)
+    result = await service.ensure_follow_ups(
+        session_id="sess-1",
+        assistant_message_id="msg-1",
+        regenerate=False,
+        query="公募基金",
+        answer="月报显示权益仓位上升。",
+    )
+    assert result.status == SUGGESTION_STATUS_READY
+    assert isinstance(result.questions, list)
+    assert len(result.questions) == 3
 
-    with pytest.raises(NotImplementedFeatureError):
-        await service.ensure_follow_ups(
-            session_id="sess-1",
-            assistant_message_id="msg-1",
-            regenerate=False,
-        )
-    with pytest.raises(NotImplementedFeatureError):
-        await service.get_follow_ups(session_id="sess-1", assistant_message_id="msg-1")
-    with pytest.raises(NotImplementedFeatureError):
-        await service.record_event(
-            session_id="sess-1",
-            suggestion_set_id="set-1",
-            question_id="q-1",
-            event_type=SUGGESTION_EVENT_CLICK,
-        )
-    with pytest.raises(NotImplementedFeatureError):
-        await service.validate_attribution(
-            session_id="sess-1",
-            query="follow-up",
-            suggestion_set_id="set-1",
-            question_id="q-1",
-        )
+
+async def test_ensure_follow_ups_suppresses_empty_turn() -> None:
+    service = MessageSuggestionService(tenant_id=1)
+    result = await service.ensure_follow_ups(
+        session_id="sess-1",
+        assistant_message_id="msg-1",
+        regenerate=False,
+    )
+    assert result.status == SUGGESTION_STATUS_SUPPRESSED
+    assert result.suppression_reason == "empty_context"
+
+
+async def test_get_follow_ups_none_without_store() -> None:
+    service = MessageSuggestionService(tenant_id=1)
+    assert await service.get_follow_ups(session_id="sess-1", assistant_message_id="msg-1") is None
+
+
+async def test_record_and_validate_are_noop() -> None:
+    service = MessageSuggestionService(tenant_id=1)
+    await service.record_event(
+        session_id="sess-1",
+        suggestion_set_id="set-1",
+        question_id="q-1",
+        event_type=SUGGESTION_EVENT_CLICK,
+    )
+    await service.validate_attribution(
+        session_id="sess-1",
+        query="follow-up",
+        suggestion_set_id="set-1",
+        question_id="q-1",
+    )
 
 
 # ── create ────────────────────────────────────────────────────────────
@@ -254,6 +271,25 @@ async def test_acquire_generation_returns_ready_row_without_regenerate() -> None
     assert result is not None
     assert result.status == SUGGESTION_STATUS_READY
     assert len(session.executed) == 2, "insert + cache-key lookup, no UPDATE"
+
+
+async def test_acquire_generation_reacquires_ready_row_on_regenerate() -> None:
+    session = _FakeSession(
+        {
+            "insert into message_suggestion_sets": [],
+            "select * from": [_row(status=SUGGESTION_STATUS_READY)],
+            "update message_suggestion_sets": [_row(status=SUGGESTION_STATUS_GENERATING)],
+        }
+    )
+    repo = _repo(session)
+
+    result, acquired = await repo.acquire_generation(_sample_set(), regenerate=True, now=_NOW)
+
+    assert acquired is True
+    assert result is not None
+    update_sql = [s for s in session.executed if s.lstrip().startswith("update")]
+    assert len(update_sql) == 1
+    assert "status = :ready" in update_sql[0]
 
 
 async def test_acquire_generation_reacquires_expired_lease() -> None:

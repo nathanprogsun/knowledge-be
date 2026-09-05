@@ -43,8 +43,10 @@ from src.core.knowledge.documents.types import (
     MANUAL_KNOWLEDGE_FORMAT_MARKDOWN,
     MANUAL_KNOWLEDGE_STATUS_DRAFT,
     PARSE_STATUS_COMPLETED,
+    PARSE_STATUS_FAILED,
     PARSE_STATUS_PENDING,
 )
+from src.core.knowledge.documents.upload_pipeline import DocumentProcessPayload
 from src.core.knowledge.knowledge_bases.service.kb_service import KBService
 from src.core.knowledge.knowledge_bases.types import KnowledgeBaseInfo
 from src.db.dao.chunk_repository import ChunkRepository
@@ -361,6 +363,66 @@ async def test_create_url_routes_file_url_and_extracts_name() -> None:
     assert result.source == url
     assert result.title == "report.pdf"
     assert result.file_hash == _hash(url)
+
+
+class _FakeDispatcher:
+    """Capture create-url dispatch payloads; ``fail`` marks enqueue broken."""
+
+    def __init__(self, *, fail: bool = False) -> None:
+        self.fail = fail
+        self.payloads: list[DocumentProcessPayload] = []
+
+    async def dispatch(self, *, payload: DocumentProcessPayload) -> str:
+        if self.fail:
+            raise RuntimeError("queue unavailable")
+        self.payloads.append(payload)
+        return "task-1"
+
+
+async def test_create_url_dispatches_web_url() -> None:
+    repo, _rows = _make_knowledge_repo()
+    tenant_id = make_test_tenant_id()
+    kb_id = _kbid()
+    dispatcher = _FakeDispatcher()
+    url = "https://example.com/docs/guide"
+    result = await create_knowledge_from_url(
+        tenant_id=tenant_id,
+        kb_id=kb_id,
+        url=url,
+        title="Guide",
+        enable_multimodel=True,
+        knowledge_repo=repo,
+        kb_service=_kb_service(info=_kb_info(tenant_id=tenant_id, kb_id=kb_id)),
+        url_guard=_url_guard_ok,
+        dispatcher=dispatcher,
+        now=_NOW,
+    )
+    assert result.parse_status == PARSE_STATUS_PENDING
+    assert len(dispatcher.payloads) == 1
+    payload = dispatcher.payloads[0]
+    assert payload.knowledge_id == result.id
+    assert payload.url == url
+    assert payload.file_type == "html"
+    assert payload.enable_multimodel is True
+
+
+async def test_create_url_marks_failed_when_dispatch_raises() -> None:
+    repo, rows = _make_knowledge_repo()
+    tenant_id = make_test_tenant_id()
+    kb_id = _kbid()
+    result = await create_knowledge_from_url(
+        tenant_id=tenant_id,
+        kb_id=kb_id,
+        url="https://example.com/docs/guide",
+        knowledge_repo=repo,
+        kb_service=_kb_service(info=_kb_info(tenant_id=tenant_id, kb_id=kb_id)),
+        url_guard=_url_guard_ok,
+        dispatcher=_FakeDispatcher(fail=True),
+        now=_NOW,
+    )
+    assert result.parse_status == PARSE_STATUS_FAILED
+    assert result.error_message == "Failed to enqueue processing task"
+    assert rows[result.id].parse_status == PARSE_STATUS_FAILED
 
 
 # ── create_from_url: validation ───────────────────────────────────────

@@ -48,6 +48,7 @@ from src.web.deps.chat_sessions import (
     get_message_service,
     get_message_suggestion_service,
     get_session_service,
+    get_stop_stream_service,
 )
 from src.web.exception_handler import register_exception_handlers
 from src.web.middleware.auth import require_auth
@@ -161,6 +162,10 @@ def _build_app(**service_overrides: object) -> FastAPI:
     if "suggestion_service" in service_overrides:
         app.dependency_overrides[get_message_suggestion_service] = lambda: service_overrides[
             "suggestion_service"
+        ]
+    if "stop_service" in service_overrides:
+        app.dependency_overrides[get_stop_stream_service] = lambda: service_overrides[
+            "stop_service"
         ]
     return app
 
@@ -385,6 +390,41 @@ def test_pin_unknown_session_returns_404() -> None:
     assert response.status_code == 404
 
 
+def test_stop_session_returns_200() -> None:
+    session_service = AsyncMock()
+    session_service.get = AsyncMock(return_value=_session_row())
+    stop_service = AsyncMock()
+    stop_service.stop = AsyncMock(return_value=None)
+    app = _build_app(session_service=session_service, stop_service=stop_service)
+
+    with _client(app) as client:
+        response = client.post(
+            "/api/v1/sessions/sess-1/stop",
+            json={"message_id": "msg-1"},
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {"success": True, "message": "Generation stopped"}
+    session_service.get.assert_awaited_once_with("sess-1")
+    stop_service.stop.assert_awaited_once_with("sess-1", "msg-1")
+
+
+def test_stop_unknown_session_returns_404() -> None:
+    session_service = AsyncMock()
+    session_service.get = AsyncMock(
+        side_effect=NotFoundError(code="session.not_found", message="missing")
+    )
+    app = _build_app(session_service=session_service, stop_service=AsyncMock())
+
+    with _client(app) as client:
+        response = client.post(
+            "/api/v1/sessions/missing/stop",
+            json={"message_id": "msg-1"},
+        )
+
+    assert response.status_code == 404
+
+
 def test_clear_session_messages() -> None:
     fake = AsyncMock()
     fake.clear_session_messages = AsyncMock(return_value=3)
@@ -580,12 +620,14 @@ def test_ensure_suggestions_returns_200_for_ready() -> None:
     with _client(app) as client:
         response = client.post(
             "/api/v1/sessions/sess-1/messages/msg-1/suggestions",
-            json={"regenerate": True},
+            json={"regenerate": True, "query": "基金", "answer": "月报"},
         )
 
     assert response.status_code == 200
     assert response.json()["data"]["id"] == "set-1"
     assert fake.ensure_follow_ups.await_args.kwargs["regenerate"] is True
+    assert fake.ensure_follow_ups.await_args.kwargs["query"] == "基金"
+    assert fake.ensure_follow_ups.await_args.kwargs["answer"] == "月报"
 
 
 def test_ensure_suggestions_returns_202_for_generating() -> None:

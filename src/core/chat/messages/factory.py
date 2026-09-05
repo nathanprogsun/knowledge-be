@@ -18,7 +18,10 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.chat.messages.service.message_service import MessageServiceImpl
+from src.core.chat.messages.suggestion_service import MessageSuggestionService
+from src.core.infra.models.factory import build_chat_model_service
 from src.db.dao.message_repository import MessageRepository
+from src.db.dao.message_suggestion_repository import MessageSuggestionRepository
 from src.db.dao.session_repository import SessionRepository
 
 
@@ -35,4 +38,18 @@ def build_message_service(session: AsyncSession) -> MessageServiceImpl:
     )
 
 
-__all__ = ["build_message_service"]
+def build_message_suggestion_service(
+    session: AsyncSession,
+    *,
+    tenant_id: int,
+) -> MessageSuggestionService:
+    """Build the follow-up generator on the shared session."""
+    return MessageSuggestionService(
+        tenant_id=tenant_id,
+        messages=MessageRepository(session),
+        suggestions=MessageSuggestionRepository(session),
+        chat_models=build_chat_model_service(session),
+    )
+
+
+__all__ = ["build_message_service", "build_message_suggestion_service"]

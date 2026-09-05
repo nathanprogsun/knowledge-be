@@ -240,6 +240,8 @@ async def ensure_suggestions(
         session_id=session_id,
         assistant_message_id=message_id,
         regenerate=regenerate,
+        query=body.query if body is not None else None,
+        answer=body.answer if body is not None else None,
     )
     if suggestion_set is not None and suggestion_set.status == SUGGESTION_STATUS_GENERATING:
         response.status_code = 202

@@ -36,6 +36,7 @@ from src.core.knowledge.documents.documents_orchestrator import (
     KnowledgeDocumentsOrchestrator,
 )
 from src.core.knowledge.documents.service.knowledge_service import KnowledgeService
+from src.core.knowledge.documents.span_tracker import SpanProgress, SpanTracker
 from src.web.api.knowledge.documents.router import (
     documents_router,
     kb_documents_router,
@@ -43,6 +44,7 @@ from src.web.api.knowledge.documents.router import (
 from src.web.deps.knowledge_documents import (
     get_documents_orchestrator,
     get_knowledge_service,
+    get_span_tracker,
 )
 from src.web.deps.rbac import make_role_dep
 from src.web.middleware.auth import require_auth
@@ -82,15 +84,23 @@ def orchestrator() -> AsyncMock:
 
 
 @pytest.fixture
+def span_tracker() -> AsyncMock:
+    """``AsyncMock(spec=SpanTracker)`` for the processing-span read."""
+    return AsyncMock(spec=SpanTracker)
+
+
+@pytest.fixture
 def app(
     request: pytest.FixtureRequest,
     web_app: FastAPI,
     knowledge_service: AsyncMock,
     orchestrator: AsyncMock,
+    span_tracker: AsyncMock,
 ) -> FastAPI:
     """Override both document dependency factories on the shared web app."""
     web_app.dependency_overrides[get_knowledge_service] = lambda: knowledge_service
     web_app.dependency_overrides[get_documents_orchestrator] = lambda: orchestrator
+    web_app.dependency_overrides[get_span_tracker] = lambda: span_tracker
     return web_app
 
 
@@ -108,6 +118,7 @@ def _knowledge(
     kb_id: str = KB_ID,
     title: str = "doc",
     parse_status: str = "completed",
+    summary_status: str = "none",
 ) -> Knowledge:
     if tenant_id is None:
         tenant_id = TENANT_ID
@@ -121,7 +132,7 @@ def _knowledge(
         source="manual",
         channel="web",
         tag_id=None,
-        summary_status="none",
+        summary_status=summary_status,
         parse_status=parse_status,
         enable_status="enabled",
         embedding_model_id=None,
@@ -142,38 +153,56 @@ def _knowledge(
 
 # ── Route inventory + permission gates ───────────────────────────────
 
-# The upstream document route table, verbatim.
+# Route table as declared on the routers (prefix included, no /api/v1).
 EXPECTED_ROUTES: set[tuple[str, str]] = {
-    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/file"),
-    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/url"),
-    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/passage"),
-    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/manual"),
-    ("GET", "/api/v1/knowledge-bases/{id}/knowledge"),
-    ("GET", "/api/v1/knowledge/{id}"),
-    ("PUT", "/api/v1/knowledge/{id}"),
-    ("DELETE", "/api/v1/knowledge/{id}"),
-    ("POST", "/api/v1/knowledge/{id}/reparse"),
-    ("POST", "/api/v1/knowledge/{id}/cancel-parse"),
-    ("POST", "/api/v1/knowledge/{id}/clone"),
-    ("POST", "/api/v1/knowledge/move"),
-    ("GET", "/api/v1/knowledge/move/progress/{task_id}"),
+    ("POST", "/knowledge-bases/{id}/knowledge/file"),
+    ("POST", "/knowledge-bases/{id}/knowledge/url"),
+    ("POST", "/knowledge-bases/{id}/knowledge/passage"),
+    ("POST", "/knowledge-bases/{id}/knowledge/manual"),
+    ("GET", "/knowledge-bases/{id}/knowledge"),
+    ("GET", "/knowledge/batch"),
+    ("GET", "/knowledge/search"),
+    ("POST", "/knowledge/batch-delete"),
+    ("POST", "/knowledge/batch-reparse"),
+    ("PUT", "/knowledge/tags"),
+    ("GET", "/knowledge/{id}"),
+    ("PUT", "/knowledge/{id}"),
+    ("DELETE", "/knowledge/{id}"),
+    ("GET", "/knowledge/{id}/spans"),
+    ("GET", "/knowledge/{id}/download"),
+    ("GET", "/knowledge/{id}/preview"),
+    ("POST", "/knowledge/{id}/regenerate-summary"),
+    ("POST", "/knowledge/{id}/reparse"),
+    ("POST", "/knowledge/{id}/cancel-parse"),
+    ("POST", "/knowledge/{id}/clone"),
+    ("POST", "/knowledge/move"),
+    ("GET", "/knowledge/move/progress/{task_id}"),
 }
 
 # Reads are Viewer+; every content mutation is Contributor+.
 EXPECTED_ROLES: dict[tuple[str, str], str] = {
-    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/file"): "contributor",
-    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/url"): "contributor",
-    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/passage"): "contributor",
-    ("POST", "/api/v1/knowledge-bases/{id}/knowledge/manual"): "contributor",
-    ("GET", "/api/v1/knowledge-bases/{id}/knowledge"): "viewer",
-    ("GET", "/api/v1/knowledge/{id}"): "viewer",
-    ("PUT", "/api/v1/knowledge/{id}"): "contributor",
-    ("DELETE", "/api/v1/knowledge/{id}"): "contributor",
-    ("POST", "/api/v1/knowledge/{id}/reparse"): "contributor",
-    ("POST", "/api/v1/knowledge/{id}/cancel-parse"): "contributor",
-    ("POST", "/api/v1/knowledge/{id}/clone"): "contributor",
-    ("POST", "/api/v1/knowledge/move"): "contributor",
-    ("GET", "/api/v1/knowledge/move/progress/{task_id}"): "viewer",
+    ("POST", "/knowledge-bases/{id}/knowledge/file"): "contributor",
+    ("POST", "/knowledge-bases/{id}/knowledge/url"): "contributor",
+    ("POST", "/knowledge-bases/{id}/knowledge/passage"): "contributor",
+    ("POST", "/knowledge-bases/{id}/knowledge/manual"): "contributor",
+    ("GET", "/knowledge-bases/{id}/knowledge"): "viewer",
+    ("GET", "/knowledge/batch"): "viewer",
+    ("GET", "/knowledge/search"): "viewer",
+    ("POST", "/knowledge/batch-delete"): "contributor",
+    ("POST", "/knowledge/batch-reparse"): "contributor",
+    ("PUT", "/knowledge/tags"): "contributor",
+    ("GET", "/knowledge/{id}"): "viewer",
+    ("PUT", "/knowledge/{id}"): "contributor",
+    ("DELETE", "/knowledge/{id}"): "contributor",
+    ("GET", "/knowledge/{id}/spans"): "viewer",
+    ("GET", "/knowledge/{id}/download"): "contributor",
+    ("GET", "/knowledge/{id}/preview"): "viewer",
+    ("POST", "/knowledge/{id}/regenerate-summary"): "contributor",
+    ("POST", "/knowledge/{id}/reparse"): "contributor",
+    ("POST", "/knowledge/{id}/cancel-parse"): "contributor",
+    ("POST", "/knowledge/{id}/clone"): "contributor",
+    ("POST", "/knowledge/move"): "contributor",
+    ("GET", "/knowledge/move/progress/{task_id}"): "viewer",
 }
 
 
@@ -184,6 +213,8 @@ def _declared_routes() -> set[tuple[str, str]]:
             methods: set[str] = getattr(route, "methods", set()) or set()
             path = getattr(route, "path", "")
             for method in methods:
+                if method in {"HEAD", "OPTIONS"}:
+                    continue
                 found.add((method, path))
     return found
 
@@ -213,6 +244,8 @@ def test_every_endpoint_declares_the_expected_role_gate() -> None:
                     if isinstance(cell.cell_contents, str):
                         roles.add(cell.cell_contents)
             for method in methods:
+                if method in {"HEAD", "OPTIONS"}:
+                    continue
                 expected = EXPECTED_ROLES[(method, path)]
                 assert expected in roles, (
                     f"{method} {path} expected role gate {expected}, got {roles}"
@@ -435,6 +468,195 @@ async def test_get_cross_tenant_returns_404(
     )
 
     resp = client.get("/api/v1/knowledge/kn-theirs")
+
+    assert resp.status_code == 404
+
+
+# ── GET /knowledge/batch ──────────────────────────────────────────────
+
+
+async def test_batch_returns_matching_documents(
+    client: TestClient,
+    knowledge_service: AsyncMock,
+) -> None:
+    knowledge_service.get_documents.return_value = [
+        _knowledge(id="kn-1"),
+        _knowledge(id="kn-2"),
+    ]
+
+    resp = client.get("/api/v1/knowledge/batch", params=[("ids", "kn-1"), ("ids", "kn-2")])
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    assert [row["id"] for row in body["data"]] == ["kn-1", "kn-2"]
+    knowledge_service.get_documents.assert_awaited_once_with(
+        tenant_id=TENANT_ID,
+        ids=["kn-1", "kn-2"],
+    )
+
+
+async def test_batch_filters_by_kb_id(
+    client: TestClient,
+    knowledge_service: AsyncMock,
+) -> None:
+    knowledge_service.get_documents.return_value = [
+        _knowledge(id="kn-1", kb_id=KB_ID),
+        _knowledge(id="kn-2", kb_id="kb-other"),
+    ]
+
+    resp = client.get(
+        "/api/v1/knowledge/batch",
+        params=[("ids", "kn-1"), ("ids", "kn-2"), ("kb_id", KB_ID)],
+    )
+
+    assert resp.status_code == 200
+    assert [row["id"] for row in resp.json()["data"]] == ["kn-1"]
+
+
+async def test_search_returns_picker_envelope(
+    client: TestClient,
+    knowledge_service: AsyncMock,
+) -> None:
+    knowledge_service.search_documents.return_value = ([_knowledge(id="kn-1")], 1)
+
+    resp = client.get("/api/v1/knowledge/search", params={"keyword": "budget"})
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    assert body["has_more"] is False
+    assert body["total"] == 1
+    assert [row["id"] for row in body["data"]] == ["kn-1"]
+    knowledge_service.search_documents.assert_awaited_once_with(
+        tenant_id=TENANT_ID,
+        keyword="budget",
+        offset=0,
+        limit=20,
+        file_types=[],
+        recent=False,
+    )
+
+
+async def test_search_recent_passes_empty_keyword(
+    client: TestClient,
+    knowledge_service: AsyncMock,
+) -> None:
+    knowledge_service.search_documents.return_value = ([], 0)
+
+    resp = client.get("/api/v1/knowledge/search", params={"recent": "true"})
+
+    assert resp.status_code == 200
+    knowledge_service.search_documents.assert_awaited_once_with(
+        tenant_id=TENANT_ID,
+        keyword="",
+        offset=0,
+        limit=20,
+        file_types=[],
+        recent=True,
+    )
+
+
+async def test_batch_rejects_too_many_ids(client: TestClient) -> None:
+    ids = [f"kn-{i}" for i in range(201)]
+    resp = client.get("/api/v1/knowledge/batch", params=[("ids", value) for value in ids])
+
+    assert resp.status_code == 422
+
+
+# ── GET /knowledge/{id}/spans ─────────────────────────────────────────
+
+
+async def test_spans_never_tracked_returns_empty_tree(
+    client: TestClient,
+    knowledge_service: AsyncMock,
+    span_tracker: AsyncMock,
+) -> None:
+    knowledge_service.get_document.return_value = _knowledge(parse_status="processing")
+    span_tracker.get_progress.side_effect = NotFoundError(
+        code="span.not_found",
+        message="no processing attempt recorded for this knowledge",
+    )
+
+    resp = client.get("/api/v1/knowledge/kn-1/spans")
+
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["knowledge_id"] == "kn-1"
+    assert data["attempt"] == 0
+    assert data["trace"]["span_id"] == ""
+    assert data["parse_status"] == "processing"
+
+
+async def test_spans_returns_tree_when_tracked(
+    client: TestClient,
+    knowledge_service: AsyncMock,
+    span_tracker: AsyncMock,
+) -> None:
+    knowledge_service.get_document.return_value = _knowledge(parse_status="processing")
+    span_tracker.get_progress.return_value = SpanProgress(
+        knowledge_id="kn-1",
+        attempt=1,
+        latest_attempt=1,
+        spans=(),
+    )
+
+    resp = client.get("/api/v1/knowledge/kn-1/spans")
+
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["attempt"] == 1
+    assert data["current_attempt"] == 1
+
+
+async def test_spans_missing_document_returns_404(
+    client: TestClient,
+    knowledge_service: AsyncMock,
+) -> None:
+    knowledge_service.get_document.side_effect = NotFoundError(
+        code="knowledge.not_found",
+        message="knowledge not found",
+    )
+
+    resp = client.get("/api/v1/knowledge/nope/spans")
+
+    assert resp.status_code == 404
+
+
+# ── POST /knowledge/{id}/regenerate-summary ───────────────────────────
+
+
+async def test_regenerate_summary_marks_pending(
+    client: TestClient,
+    knowledge_service: AsyncMock,
+) -> None:
+    knowledge_service.request_summary_refresh.return_value = _knowledge(
+        id="kn-1",
+        summary_status="pending",
+    )
+
+    resp = client.post("/api/v1/knowledge/kn-1/regenerate-summary")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    assert body["data"]["summary_status"] == "pending"
+    knowledge_service.request_summary_refresh.assert_awaited_once_with(
+        tenant_id=TENANT_ID,
+        id="kn-1",
+    )
+
+
+async def test_regenerate_summary_missing_returns_404(
+    client: TestClient,
+    knowledge_service: AsyncMock,
+) -> None:
+    knowledge_service.request_summary_refresh.side_effect = NotFoundError(
+        code="knowledge.not_found",
+        message="knowledge not found",
+    )
+
+    resp = client.post("/api/v1/knowledge/nope/regenerate-summary")
 
     assert resp.status_code == 404
 

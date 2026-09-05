@@ -33,6 +33,7 @@ from typing import Protocol, TypeVar, runtime_checkable
 
 from src.ai.embedding import Context, Embedder, TaskContext
 from src.app_logging import logger
+from src.common.exception import ValidationError
 from src.common.json import JsonObject
 from src.core.knowledge.documents.chunk_pipeline import (
     ParsedChunk,
@@ -586,13 +587,11 @@ class DocumentProcessPipeline:
     ) -> ProcessOutcome:
         """Settle the row after a successful index.
 
-        A document with text chunks stays ``processing`` because the
-        enrichment stages still have work to fan out; a document with no
-        text chunks completes immediately. Either way the row becomes
-        queryable (``enable_status=enabled``) with storage and processed
-        timestamps recorded.
+        Chunks stay ``processing`` only when a post-process dispatcher
+        will still run; otherwise the row completes immediately.
         """
-        parse_status = PARSE_STATUS_PROCESSING if text_chunk_count > 0 else PARSE_STATUS_COMPLETED
+        awaiting_enrichment = text_chunk_count > 0 and self._post_process_dispatcher is not None
+        parse_status = PARSE_STATUS_PROCESSING if awaiting_enrichment else PARSE_STATUS_COMPLETED
         updated = row.model_copy(
             update={
                 "parse_status": parse_status,
@@ -774,21 +773,21 @@ async def process_document(
 ) -> ProcessOutcome:
     """Worker-side entry point for one document-process run.
 
-    Constructs a :class:`DocumentProcessPipeline` (or accepts an
-    externally-built one) and forwards the parsed task payload to
-    :meth:`DocumentProcessPipeline.run`. All seams default to
-    ``None``; the worker wiring layer is responsible for providing a
-    fully composed pipeline (knowledge repo, KB service, chunk repo,
+    Requires a composed :class:`DocumentProcessPipeline`. The worker
+    wiring layer supplies knowledge repo, KB service, chunk repo,
     reader, file reader, embedding / index resolvers, post-process
-    dispatcher, storage resolver) before the pipeline can perform a
-    real run.
+    dispatcher, and storage resolver.
 
     ``ctx`` defaults to a background :class:`TaskContext` so background
     ingestion workers hit the provider governor's throttled path.
     """
-    selected = pipeline or DocumentProcessPipeline()
+    if pipeline is None:
+        raise ValidationError(
+            code="knowledge.pipeline_required",
+            message="document process pipeline is not composed",
+        )
     selected_ctx = ctx or TaskContext(is_background_task=True)
-    return await selected.run(
+    return await pipeline.run(
         ctx=selected_ctx,
         tenant_id=tenant_id,
         knowledge_id=knowledge_id,

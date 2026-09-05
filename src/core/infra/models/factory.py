@@ -10,6 +10,7 @@ from __future__ import annotations
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.infra.models.chat_service import ChatModelService
 from src.core.infra.models.rerank_service import RerankService
 from src.core.infra.models.service.model_service import ModelService
 from src.core.infra.models.service.provider_service import CloudService
@@ -20,6 +21,11 @@ from src.db.dao.tenants_repository import TenantRepository
 def build_model_service(session: AsyncSession) -> ModelService:
     """Per-request ``ModelService`` with a fresh repository."""
     return ModelService(models_repo=ModelRepository(session))
+
+
+def build_chat_model_service(session: AsyncSession) -> ChatModelService:
+    """Per-request ``ChatModelService`` with a fresh repository."""
+    return ChatModelService(models_repo=ModelRepository(session))
 
 
 def build_rerank_service(
@@ -55,4 +61,9 @@ def build_kb_cloud_service(
     )
 
 
-__all__ = ["build_kb_cloud_service", "build_model_service", "build_rerank_service"]
+__all__ = [
+    "build_chat_model_service",
+    "build_kb_cloud_service",
+    "build_model_service",
+    "build_rerank_service",
+]
