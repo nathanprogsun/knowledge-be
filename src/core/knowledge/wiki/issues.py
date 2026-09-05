@@ -14,12 +14,18 @@ issue-repository instance.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Protocol
+from typing import Protocol, Self
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.common.exception import NotFoundError, ValidationError
+from src.db.dao.wiki_page_issue_repository import (
+    WikiPageIssueRepository as WikiPageIssueDao,
+)
+from src.db.models.wiki_page import WikiPageIssue as WikiPageIssueRow
+
+_WIKIPAGEISSUE_EXCLUDE_COLUMNS: frozenset[str] = frozenset({"deleted_at"})
 
 WIKI_ISSUE_STATUS_PENDING = "pending"
 WIKI_ISSUE_STATUS_IGNORED = "ignored"
@@ -52,6 +58,14 @@ class WikiPageIssue(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    @classmethod
+    def map_from_db(cls, db: WikiPageIssueRow) -> Self:
+        """Project a storage row; ``deleted_at`` stays off the wire."""
+        record = db.model_dump(exclude=set(_WIKIPAGEISSUE_EXCLUDE_COLUMNS))
+        ids = record.get("suspected_knowledge_ids")
+        record["suspected_knowledge_ids"] = list(ids) if ids else []
+        return cls.model_validate(record)
+
 
 class WikiPageIssueRepository(Protocol):
     """Persistence seam for wiki page issues."""
@@ -65,6 +79,49 @@ class WikiPageIssueRepository(Protocol):
     async def get_by_id_or_none(self, *, issue_id: str) -> WikiPageIssue | None: ...
 
     async def update_status(self, *, issue_id: str, status: str) -> None: ...
+
+
+class WikiPageIssueStore:
+    """Adapts the TableModel DAO onto the issue Protocol."""
+
+    def __init__(self, dao: WikiPageIssueDao) -> None:
+        self._dao = dao
+
+    async def create(self, issue: WikiPageIssue) -> WikiPageIssue:
+        """Persist a protocol issue and return the stored projection."""
+        row = WikiPageIssueRow(
+            id=issue.id,
+            tenant_id=issue.tenant_id,
+            knowledge_base_id=issue.knowledge_base_id,
+            slug=issue.slug,
+            issue_type=issue.issue_type,
+            description=issue.description,
+            suspected_knowledge_ids=list(issue.suspected_knowledge_ids),
+            status=issue.status,
+            reported_by=issue.reported_by,
+            created_at=issue.created_at,
+            updated_at=issue.updated_at,
+            deleted_at=None,
+        )
+        return WikiPageIssue.map_from_db(await self._dao.create(row))
+
+    async def list(
+        self, *, knowledge_base_id: str, slug: str = "", status: str = ""
+    ) -> list[WikiPageIssue]:
+        """Return live issues as protocol DTOs, newest first."""
+        rows = await self._dao.list(knowledge_base_id=knowledge_base_id, slug=slug, status=status)
+        return [WikiPageIssue.map_from_db(row) for row in rows]
+
+    async def get_by_id_or_none(self, *, issue_id: str) -> WikiPageIssue | None:
+        """Return one live issue DTO, or ``None`` when absent."""
+        row = await self._dao.get_by_id_or_none(issue_id=issue_id)
+        if row is None:
+            return None
+        return WikiPageIssue.map_from_db(row)
+
+    async def update_status(self, *, issue_id: str, status: str) -> None:
+        """Forward a status write to the DAO."""
+        await self._dao.update_status(issue_id=issue_id, status=status)
 
 
 async def create_issue(
@@ -192,6 +249,7 @@ __all__ = [
     "WIKI_ISSUE_STATUS_RESOLVED",
     "WikiPageIssue",
     "WikiPageIssueRepository",
+    "WikiPageIssueStore",
     "create_issue",
     "is_valid_issue_status",
     "list_issues",

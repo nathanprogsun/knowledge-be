@@ -12,9 +12,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.knowledge.knowledge_bases.factory import build_kb_service
 from src.core.knowledge.wiki.folders import WikiFolderService
+from src.core.knowledge.wiki.issues import WikiPageIssueRepository, WikiPageIssueStore
 from src.core.knowledge.wiki.lint_service import WikiLintService
 from src.core.knowledge.wiki.page_service import WikiPageService
+from src.db.dao.wiki_page_issue_repository import (
+    WikiPageIssueRepository as WikiPageIssueDao,
+)
 from src.db.dao.wiki_page_repository import WikiFolderRepository, WikiPageRepository
+from src.db.dao.wiki_page_revision_repository import WikiPageRevisionRepository
+
+
+def build_wiki_issue_repository(session: AsyncSession) -> WikiPageIssueRepository:
+    """Per-request issue Protocol backed by the TableModel DAO."""
+    return WikiPageIssueStore(dao=WikiPageIssueDao(session))
 
 
 def build_wiki_page_service(session: AsyncSession) -> WikiPageService:
@@ -22,6 +32,8 @@ def build_wiki_page_service(session: AsyncSession) -> WikiPageService:
     return WikiPageService(
         page_repo=WikiPageRepository(session),
         folder_repo=WikiFolderRepository(session),
+        revision_repo=WikiPageRevisionRepository(session),
+        issue_repo=build_wiki_issue_repository(session),
     )
 
 
@@ -43,6 +55,7 @@ def build_wiki_lint_service(session: AsyncSession) -> WikiLintService:
 
 __all__ = [
     "build_wiki_folder_service",
+    "build_wiki_issue_repository",
     "build_wiki_lint_service",
     "build_wiki_page_service",
 ]

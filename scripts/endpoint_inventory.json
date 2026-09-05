@@ -1,5 +1,5 @@
 {
-  "total_paths": 260,
+  "total_paths": 264,
   "endpoints": [
     {
       "method": "POST",
@@ -699,6 +699,14 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/issues"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/issues/{issue_id}/status"
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/knowledgebase/{kb_id}/wiki/lint"
     },
     {
@@ -728,6 +736,14 @@
     {
       "method": "POST",
       "path": "/api/v1/knowledgebase/{kb_id}/wiki/rebuild-links"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/revert"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledgebase/{kb_id}/wiki/revisions/{slug}"
     },
     {
       "method": "GET",

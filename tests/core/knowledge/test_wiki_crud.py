@@ -52,7 +52,8 @@ from src.core.knowledge.wiki.types import (
 )
 from src.db.base import DatabaseEngine
 from src.db.dao.wiki_page_repository import WikiFolderRepository, WikiPageRepository
-from src.db.models.wiki_page import WikiFolder, WikiIndexEntry, WikiPage
+from src.db.dao.wiki_page_revision_repository import WikiPageRevisionRepository
+from src.db.models.wiki_page import WikiFolder, WikiIndexEntry, WikiPage, WikiPageRevision
 from src.settings import get_settings, reset_settings_cache
 from tests.integration.conftest import make_test_tenant_id
 
@@ -427,11 +428,58 @@ def _make_folder_repo() -> AsyncMock:
     return repo
 
 
+def _make_revision_repo() -> AsyncMock:
+    repo = AsyncMock(spec=WikiPageRevisionRepository)
+    rows: dict[tuple[str, int], WikiPageRevision] = {}
+    repo.rows = rows  # type: ignore[attr-defined]
+
+    async def _insert_snapshot(row: WikiPageRevision) -> WikiPageRevision | None:
+        key = (row.page_id, row.version)
+        if key in rows:
+            return None
+        rows[key] = row
+        return row
+
+    async def _list_by_slug(
+        *, knowledge_base_id: str, slug: str, limit: int, offset: int
+    ) -> tuple[list[WikiPageRevision], int]:
+        matches = [
+            row
+            for row in rows.values()
+            if row.knowledge_base_id == knowledge_base_id and row.slug == slug
+        ]
+        matches.sort(key=lambda row: row.version, reverse=True)
+        return matches[offset : offset + limit], len(matches)
+
+    async def _get_by_slug_version(
+        *, knowledge_base_id: str, slug: str, version: int
+    ) -> WikiPageRevision | None:
+        for row in rows.values():
+            if (
+                row.knowledge_base_id == knowledge_base_id
+                and row.slug == slug
+                and row.version == version
+            ):
+                return row
+        return None
+
+    repo.insert_snapshot.side_effect = _insert_snapshot
+    repo.list_by_slug.side_effect = _list_by_slug
+    repo.get_by_slug_version.side_effect = _get_by_slug_version
+    return repo
+
+
 def _services(
-    page_repo: AsyncMock, folder_repo: AsyncMock
+    page_repo: AsyncMock,
+    folder_repo: AsyncMock,
+    revision_repo: AsyncMock | None = None,
 ) -> tuple[WikiPageService, WikiFolderService]:
     return (
-        WikiPageService(page_repo=page_repo, folder_repo=folder_repo),
+        WikiPageService(
+            page_repo=page_repo,
+            folder_repo=folder_repo,
+            revision_repo=revision_repo,
+        ),
         WikiFolderService(folder_repo=folder_repo, page_repo=page_repo),
     )
 
@@ -777,6 +825,92 @@ class TestUpdatePage:
         assert updated.version == 4
         assert updated.content == "plain body [[entity/other]]"
         assert updated.out_links == ["entity/other"]
+
+
+class TestSnapshotAndRevert:
+    async def test_content_change_snapshots_pre_edit_version(self) -> None:
+        page_repo = _make_page_repo()
+        folder_repo = _make_folder_repo()
+        revision_repo = _make_revision_repo()
+        service, _ = _services(page_repo, folder_repo, revision_repo)
+        existing = _sample_page(
+            knowledge_base_id="kb-1",
+            slug="entity/acme",
+            title="Acme",
+            content="v1 body",
+            version=1,
+        )
+        page_repo.rows[existing.id] = existing  # type: ignore[attr-defined]
+
+        updated = await service.update_page(
+            page=existing.model_copy(update={"content": "v2 body"}),
+            edit_source="user",
+            editor_id="usr-2",
+        )
+        assert updated.version == 2
+        stored = revision_repo.rows[(existing.id, 1)]  # type: ignore[attr-defined]
+        assert stored.content == "v1 body"
+        assert stored.version == 1
+
+        listing = await service.list_revisions(knowledge_base_id="kb-1", slug="entity/acme")
+        assert listing.current_version == 2
+        assert listing.total == 1
+        assert listing.revisions[0].content is None
+
+    async def test_bookkeeping_write_does_not_snapshot(self) -> None:
+        page_repo = _make_page_repo()
+        folder_repo = _make_folder_repo()
+        revision_repo = _make_revision_repo()
+        service, _ = _services(page_repo, folder_repo, revision_repo)
+        existing = _sample_page(
+            knowledge_base_id="kb-1",
+            slug="entity/acme",
+            content="same body",
+        )
+        page_repo.rows[existing.id] = existing  # type: ignore[attr-defined]
+
+        await service.update_page(page=existing.model_copy(update={"source_refs": ["k-9"]}))
+        assert revision_repo.rows == {}  # type: ignore[attr-defined]
+
+    async def test_revert_snapshots_current_and_restores(self) -> None:
+        page_repo = _make_page_repo()
+        folder_repo = _make_folder_repo()
+        revision_repo = _make_revision_repo()
+        service, _ = _services(page_repo, folder_repo, revision_repo)
+        existing = _sample_page(
+            knowledge_base_id="kb-1",
+            slug="entity/acme",
+            content="v1 body",
+            version=1,
+        )
+        page_repo.rows[existing.id] = existing  # type: ignore[attr-defined]
+        await service.update_page(
+            page=existing.model_copy(update={"content": "v2 body"}),
+            edit_source="user",
+        )
+
+        reverted = await service.revert_page(
+            knowledge_base_id="kb-1",
+            slug="entity/acme",
+            version=1,
+            editor_id="usr-9",
+        )
+        assert reverted.content == "v1 body"
+        assert reverted.version == 3
+        assert reverted.last_edit_source == "revert"
+        assert (existing.id, 2) in revision_repo.rows  # type: ignore[attr-defined]
+
+    async def test_revert_missing_version_is_not_found(self) -> None:
+        page_repo = _make_page_repo()
+        folder_repo = _make_folder_repo()
+        revision_repo = _make_revision_repo()
+        service, _ = _services(page_repo, folder_repo, revision_repo)
+        existing = _sample_page(knowledge_base_id="kb-1", slug="entity/acme")
+        page_repo.rows[existing.id] = existing  # type: ignore[attr-defined]
+
+        with pytest.raises(NotFoundError) as excinfo:
+            await service.revert_page(knowledge_base_id="kb-1", slug="entity/acme", version=9)
+        assert excinfo.value.code == "wiki.revision_not_found"
 
 
 # ── WikiPageService — read / delete ─────────────────────────────────
@@ -1296,7 +1430,12 @@ async def test_integration_page_crud_round_trip(db_session: AsyncSession) -> Non
     kb_id = _kb()
     page_repo = WikiPageRepository(db_session)
     folder_repo = WikiFolderRepository(db_session)
-    service = WikiPageService(page_repo=page_repo, folder_repo=folder_repo)
+    revision_repo = WikiPageRevisionRepository(db_session)
+    service = WikiPageService(
+        page_repo=page_repo,
+        folder_repo=folder_repo,
+        revision_repo=revision_repo,
+    )
 
     created = await service.create_page(
         page=_sample_page(
