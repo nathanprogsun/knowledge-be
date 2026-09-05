@@ -21,15 +21,24 @@ from __future__ import annotations
 import csv
 import io
 import json
+from dataclasses import dataclass
+from json import JSONDecodeError
 
+from fastapi import Request, UploadFile
 from pydantic import BaseModel, ConfigDict
+from pydantic import ValidationError as PydanticValidationError
+from starlette.datastructures import FormData
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from src.common.exception import ValidationError
+from src.common.json import JsonObject, JsonValue
 from src.core.contracts.knowledge import (
+    FAQBatchUpsertPayload,
     FAQEntry,
     FAQEntryListResponse,
     FAQImportTaskProgress,
 )
+from src.core.knowledge.documents.faq_import import FAQ_BATCH_MODE_APPEND
 from src.core.knowledge.documents.service.knowledge_service import KnowledgeService
 from src.core.knowledge.documents.types import KNOWLEDGE_TYPE_FAQ
 from src.core.knowledge.faq.import_parser import IMPORT_HEADERS, VALUE_SEPARATOR
@@ -67,12 +76,39 @@ class FAQImportProgressEnvelope(BaseModel):
     data: FAQImportTaskProgress
 
 
+class FAQSearchEnvelope(BaseModel):
+    """``{"success": true, "data": [...]}`` — search hits, not a paged list."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: list[FAQEntry]
+
+
 class DeleteFAQEntriesResponse(BaseModel):
     """``{"success": true}`` — batch-delete ack response."""
 
     model_config = ConfigDict(frozen=True)
 
     success: bool
+
+
+class FAQAckResponse(BaseModel):
+    """``{"success": true}`` — batch tag / field ack."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+
+
+@dataclass(frozen=True)
+class MultipartFAQImport:
+    """Parsed multipart file import; CSV / Excel bytes only."""
+
+    file_data: bytes
+    filename: str
+    mode: str
+    dry_run: bool
 
 
 def entry_envelope(entry: FAQEntry) -> FAQEntryEnvelope:
@@ -93,6 +129,126 @@ def import_progress_envelope(progress: FAQImportTaskProgress) -> FAQImportProgre
 def delete_ack() -> DeleteFAQEntriesResponse:
     """Build the batch-delete acknowledgement."""
     return DeleteFAQEntriesResponse(success=True)
+
+
+def search_envelope(entries: list[FAQEntry]) -> FAQSearchEnvelope:
+    """Wrap search hits as a bare list in ``data``."""
+    return FAQSearchEnvelope(success=True, data=entries)
+
+
+def mutation_ack() -> FAQAckResponse:
+    """Build the batch tag / field acknowledgement."""
+    return FAQAckResponse(success=True)
+
+
+def inlined_json_schema(model: type[BaseModel]) -> JsonObject:
+    """Return a JSON Schema with ``$defs`` refs expanded.
+
+    ``openapi-typescript`` cannot resolve Pydantic ``#/$defs/...`` refs
+    when they are pasted into a path-level requestBody.
+    """
+    raw: JsonValue = model.model_json_schema()
+    if not isinstance(raw, dict):
+        return {}
+    defs_raw = raw.pop("$defs", {})
+    defs: JsonObject = defs_raw if isinstance(defs_raw, dict) else {}
+    expanded = _expand_schema_refs(raw, defs)
+    return expanded if isinstance(expanded, dict) else {}
+
+
+def _expand_schema_refs(node: JsonValue, defs: JsonObject) -> JsonValue:
+    if isinstance(node, dict):
+        ref = node.get("$ref")
+        if isinstance(ref, str) and ref.startswith("#/$defs/"):
+            replacement = defs.get(ref.rsplit("/", 1)[-1])
+            if replacement is not None:
+                return _expand_schema_refs(replacement, defs)
+        expanded: JsonObject = {}
+        for key, value in node.items():
+            expanded[str(key)] = _expand_schema_refs(value, defs)
+        return expanded
+    if isinstance(node, list):
+        return [_expand_schema_refs(item, defs) for item in node]
+    return node
+
+
+def is_json_content_type(content_type: str) -> bool:
+    """Whether the request is the SPA JSON upsert, not a file upload."""
+    media_type = content_type.split(";", 1)[0].strip().lower()
+    return media_type == "application/json"
+
+
+async def read_json_upsert_payload(request: Request) -> FAQBatchUpsertPayload:
+    """Parse ``POST /entries`` JSON into the frozen upsert contract."""
+    try:
+        raw: JsonValue = await request.json()
+    except JSONDecodeError as exc:
+        raise ValidationError(
+            code="faq.invalid_json",
+            message="FAQ 批量写入请求不是合法 JSON",
+        ) from exc
+    try:
+        return FAQBatchUpsertPayload.model_validate(raw)
+    except PydanticValidationError as exc:
+        raise ValidationError(
+            code="faq.invalid_upsert_payload",
+            message="FAQ 批量写入请求不合法",
+        ) from exc
+
+
+async def read_multipart_import(request: Request) -> MultipartFAQImport:
+    """Read the CSV / Excel file part and the mode / dry-run switches."""
+    form = await request.form()
+    try:
+        return await _multipart_from_form(form)
+    finally:
+        await form.close()
+
+
+async def _multipart_from_form(form: FormData) -> MultipartFAQImport:
+    upload = form.get("file")
+    if not isinstance(upload, (UploadFile, StarletteUploadFile)):
+        raise ValidationError(
+            code="faq.import_file_required",
+            message="请上传 FAQ 导入文件",
+        )
+    file_data = await upload.read()
+    return MultipartFAQImport(
+        file_data=file_data,
+        filename=upload.filename or "",
+        mode=_form_str(form.get("mode"), FAQ_BATCH_MODE_APPEND),
+        dry_run=_form_bool(form.get("dry_run"), default=False),
+    )
+
+
+def _form_str(value: str | UploadFile | StarletteUploadFile | None, default: str) -> str:
+    if value is None or value == "":
+        return default
+    if isinstance(value, str):
+        return value
+    raise ValidationError(
+        code="faq.invalid_import_mode",
+        message="模式仅支持 append 或 replace",
+    )
+
+
+def _form_bool(
+    value: str | bool | UploadFile | StarletteUploadFile | None, *, default: bool
+) -> bool:
+    if value is None or value == "":
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "1", "yes"}:
+            return True
+        if lowered in {"false", "0", "no"}:
+            return False
+    raise ValidationError(
+        code="faq.invalid_dry_run",
+        message="dry_run 仅支持 true 或 false",
+    )
 
 
 async def resolve_faq_knowledge_id(
@@ -200,15 +356,24 @@ def _bool_token(value: bool) -> str:
 
 __all__ = [
     "DeleteFAQEntriesResponse",
+    "FAQAckResponse",
     "FAQEntryEnvelope",
     "FAQEntryListEnvelope",
     "FAQImportProgressEnvelope",
+    "FAQSearchEnvelope",
+    "MultipartFAQImport",
     "build_export_csv",
     "build_export_json",
     "collect_all_entries",
     "delete_ack",
     "entry_envelope",
     "import_progress_envelope",
+    "inlined_json_schema",
+    "is_json_content_type",
     "list_envelope",
+    "mutation_ack",
+    "read_json_upsert_payload",
+    "read_multipart_import",
     "resolve_faq_knowledge_id",
+    "search_envelope",
 ]

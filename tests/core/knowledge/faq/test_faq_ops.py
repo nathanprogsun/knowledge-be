@@ -13,6 +13,7 @@ from src.core.knowledge.documents.faq_ops import (
     duplicate_error_for,
     faq_row_to_entry,
 )
+from src.core.knowledge.faq.service.faq_service import score_faq_keyword_match
 from src.core.knowledge.faq.types import CHUNK_TYPE_FAQ, FAQContent
 from src.db.models.faq import Faq
 
@@ -178,3 +179,28 @@ def test_duplicate_error_for_reports_standard_before_similar() -> None:
     assert error is not None
     assert isinstance(error, ValidationError)
     assert "标准问" in error.message
+
+
+# ── keyword search scoring ───────────────────────────────────────────
+
+
+def test_keyword_score_matches_standard_question_substring() -> None:
+    entry = faq_row_to_entry(_row())
+    scored = score_faq_keyword_match("充值", entry)
+    assert scored is not None
+    score, matched = scored
+    assert score > 0
+    assert matched == "如何充值？"
+
+
+def test_keyword_score_prefers_similar_question_when_only_it_hits() -> None:
+    entry = faq_row_to_entry(_row())
+    scored = score_faq_keyword_match("怎么充值", entry)
+    assert scored is not None
+    _score, matched = scored
+    assert matched == "怎么充值"
+
+
+def test_keyword_score_returns_none_when_nothing_overlaps() -> None:
+    entry = faq_row_to_entry(_row())
+    assert score_faq_keyword_match("退货流程", entry) is None

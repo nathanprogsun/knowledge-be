@@ -1,5 +1,5 @@
 {
-  "total_paths": 252,
+  "total_paths": 256,
   "endpoints": [
     {
       "method": "POST",
@@ -494,6 +494,14 @@
       "path": "/api/v1/knowledge-bases/{id}/faq/entries/export"
     },
     {
+      "method": "PUT",
+      "path": "/api/v1/knowledge-bases/{id}/faq/entries/fields"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledge-bases/{id}/faq/entries/tags"
+    },
+    {
       "method": "GET",
       "path": "/api/v1/knowledge-bases/{id}/faq/entries/{entry_id}"
     },
@@ -504,6 +512,14 @@
     {
       "method": "POST",
       "path": "/api/v1/knowledge-bases/{id}/faq/entry"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledge-bases/{id}/faq/import/last-result/display"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-bases/{id}/faq/search"
     },
     {
       "method": "GET",

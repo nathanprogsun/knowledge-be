@@ -1680,11 +1680,10 @@ export interface paths {
         put?: never;
         /**
          * Import Faq Entries
-         * @description Import FAQ entries from a CSV / Excel file into the knowledge base.
+         * @description Import FAQ entries from JSON upsert or a CSV / Excel file.
          *
-         *     The import runs synchronously; the returned progress describes the
-         *     completed task, which the progress endpoint reads back by ``task_id``.
-         *     ``dry_run`` validates without persisting.
+         *     ``application/json`` is the SPA payload. Multipart stays the file
+         *     runner. Both record a completed progress object for later polling.
          */
         post: operations["import_faq_entries_api_v1_knowledge_bases__id__faq_entries_post"];
         /**
@@ -1713,6 +1712,46 @@ export interface paths {
          */
         get: operations["export_faq_entries_api_v1_knowledge_bases__id__faq_entries_export_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge-bases/{id}/faq/entries/tags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Faq Entry Tags
+         * @description Set or clear tags for the given entry ids. ``null`` clears a tag.
+         */
+        put: operations["update_faq_entry_tags_api_v1_knowledge_bases__id__faq_entries_tags_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge-bases/{id}/faq/entries/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Faq Entry Fields
+         * @description Batch-update enabled / recommended / tag fields by id or tag.
+         */
+        put: operations["update_faq_entry_fields_api_v1_knowledge_bases__id__faq_entries_fields_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1758,6 +1797,46 @@ export interface paths {
          * @description Create one FAQ entry under the knowledge base's FAQ container.
          */
         post: operations["create_faq_entry_api_v1_knowledge_bases__id__faq_entry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge-bases/{id}/faq/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search Faq Entries
+         * @description Keyword-overlap search. ``data`` is a list of scored entries.
+         */
+        post: operations["search_faq_entries_api_v1_knowledge_bases__id__faq_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge-bases/{id}/faq/import/last-result/display": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Faq Import Result Display
+         * @description Persist last-result card visibility on the newest import task.
+         */
+        put: operations["update_faq_import_result_display_api_v1_knowledge_bases__id__faq_import_last_result_display_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6686,26 +6765,6 @@ export interface components {
             /** File */
             file?: string | null;
         };
-        /** Body_import_faq_entries_api_v1_knowledge_bases__id__faq_entries_post */
-        Body_import_faq_entries_api_v1_knowledge_bases__id__faq_entries_post: {
-            /**
-             * File
-             * @description FAQ 导入文件（CSV / Excel）
-             */
-            file: string;
-            /**
-             * Mode
-             * @description 导入模式：append 或 replace
-             * @default append
-             */
-            mode: string;
-            /**
-             * Dry Run
-             * @description 仅验证，不实际导入
-             * @default false
-             */
-            dry_run: boolean;
-        };
         /** Body_test_multimodal_function_api_v1_initialization_multimodal_test_post */
         Body_test_multimodal_function_api_v1_initialization_multimodal_test_post: {
             /**
@@ -8418,6 +8477,14 @@ export interface components {
             /** Relations */
             relations?: string[] | null;
         };
+        /**
+         * FAQAckResponse
+         * @description ``{"success": true}`` — batch tag / field ack.
+         */
+        FAQAckResponse: {
+            /** Success */
+            success: boolean;
+        };
         /** FAQBatchDeleteRequest */
         FAQBatchDeleteRequest: {
             /** Ids */
@@ -8486,6 +8553,28 @@ export interface components {
             success: boolean;
             data: components["schemas"]["FAQEntry"];
         };
+        /** FAQEntryFieldsBatchUpdate */
+        FAQEntryFieldsBatchUpdate: {
+            /** By Id */
+            by_id?: {
+                [key: string]: components["schemas"]["FAQEntryFieldsUpdate"];
+            } | null;
+            /** By Tag */
+            by_tag?: {
+                [key: string]: components["schemas"]["FAQEntryFieldsUpdate"];
+            } | null;
+            /** Exclude Ids */
+            exclude_ids?: number[] | null;
+        };
+        /** FAQEntryFieldsUpdate */
+        FAQEntryFieldsUpdate: {
+            /** Is Enabled */
+            is_enabled?: boolean | null;
+            /** Is Recommended */
+            is_recommended?: boolean | null;
+            /** Tag Id */
+            tag_id?: number | null;
+        };
         /**
          * FAQEntryListEnvelope
          * @description ``{"success": true, "data": {total, page, page_size, data}}`` — list responses.
@@ -8528,6 +8617,18 @@ export interface components {
             is_enabled?: boolean | null;
             /** Is Recommended */
             is_recommended?: boolean | null;
+        };
+        /** FAQEntryTagsBatchUpdate */
+        FAQEntryTagsBatchUpdate: {
+            /** Updates */
+            updates: {
+                [key: string]: number | null;
+            };
+        };
+        /** FAQImportDisplayStatusRequest */
+        FAQImportDisplayStatusRequest: {
+            /** Display Status */
+            display_status: string;
         };
         /**
          * FAQImportProgressEnvelope
@@ -8593,6 +8694,34 @@ export interface components {
             display_status?: string | null;
             /** Processing Time */
             processing_time?: number | null;
+        };
+        /**
+         * FAQSearchEnvelope
+         * @description ``{"success": true, "data": [...]}`` — search hits, not a paged list.
+         */
+        FAQSearchEnvelope: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data: components["schemas"]["FAQEntry"][];
+        };
+        /** FAQSearchRequest */
+        FAQSearchRequest: {
+            /** Query Text */
+            query_text: string;
+            /** Vector Threshold */
+            vector_threshold?: number | null;
+            /** Match Count */
+            match_count?: number | null;
+            /** First Priority Tag Ids */
+            first_priority_tag_ids?: number[] | null;
+            /** Second Priority Tag Ids */
+            second_priority_tag_ids?: number[] | null;
+            /**
+             * Only Recommended
+             * @default false
+             */
+            only_recommended: boolean;
         };
         /**
          * FabriTagData
@@ -17588,7 +17717,53 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_import_faq_entries_api_v1_knowledge_bases__id__faq_entries_post"];
+                "application/json": {
+                    /** Entries */
+                    entries: {
+                        /** Id */
+                        id?: number | null;
+                        /** Standard Question */
+                        standard_question: string;
+                        /** Similar Questions */
+                        similar_questions?: string[] | null;
+                        /** Negative Questions */
+                        negative_questions?: string[] | null;
+                        /** Answers */
+                        answers?: string[] | null;
+                        /** Answer Strategy */
+                        answer_strategy?: string | null;
+                        /** Tag Id */
+                        tag_id?: number | null;
+                        /** Tag Name */
+                        tag_name?: string | null;
+                        /** Is Enabled */
+                        is_enabled?: boolean | null;
+                        /** Is Recommended */
+                        is_recommended?: boolean | null;
+                    }[];
+                    /** Mode */
+                    mode: string;
+                    /** Knowledge Id */
+                    knowledge_id?: string | null;
+                    /** Task Id */
+                    task_id?: string | null;
+                    /**
+                     * Dry Run
+                     * @default false
+                     */
+                    dry_run?: boolean;
+                };
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description FAQ 导入文件（CSV / Excel）
+                     */
+                    file: string;
+                    /** @description 导入模式：append 或 replace */
+                    mode?: string;
+                    /** @description 仅验证，不实际导入 */
+                    dry_run?: boolean;
+                };
             };
         };
         responses: {
@@ -17674,6 +17849,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_faq_entry_tags_api_v1_knowledge_bases__id__faq_entries_tags_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FAQEntryTagsBatchUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FAQAckResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_faq_entry_fields_api_v1_knowledge_bases__id__faq_entries_fields_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FAQEntryFieldsBatchUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FAQAckResponse"];
                 };
             };
             /** @description Validation Error */
@@ -17786,6 +18037,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FAQEntryEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_faq_entries_api_v1_knowledge_bases__id__faq_search_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FAQSearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FAQSearchEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_faq_import_result_display_api_v1_knowledge_bases__id__faq_import_last_result_display_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FAQImportDisplayStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FAQImportProgressEnvelope"];
                 };
             };
             /** @description Validation Error */
