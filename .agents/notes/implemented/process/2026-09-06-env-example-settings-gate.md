@@ -11,7 +11,7 @@ The README and `.env.example` taught `DATABASE_URL` as the compose override. Set
 
 ## Decision
 
-`.env.example` lists every Settings field as an assignment or a commented assignment. The override name is `DATABASE_URL_OVERRIDE`. `SYSTEM_AES_KEY` is a 32-character ASCII secret (`secrets.token_hex(16)`). RBAC rollout flags are active local keys. OTEL, OIDC, and header-auth stay commented. `scripts/check_env_example.py` imports `Settings` (class only, no instance) and treats `# KEY=` as present. `DATABASE_URL` in the template is a dedicated failure pointing at `DATABASE_URL_OVERRIDE`. WorkerSettings `WORKER_*` keys are not required. The script is part of `make check`. Helper tests use tempfile examples so they do not depend on a live template rewrite. Worker start is `make dev-worker` (`python -m src.workers.main`). Compose env templates live under `deploy/env/`. Vector-store and MinIO `os.getenv` keys stay out of the template; they are not Settings fields and a `.env` file does not populate `os.environ`.
+`.env.example` lists every Settings field as an assignment or a commented assignment. The override name is `DATABASE_URL_OVERRIDE`. `SYSTEM_AES_KEY` is a 32-character ASCII secret (`secrets.token_hex(16)`). RBAC rollout flags are active local keys. OTEL, OIDC, and header-auth stay commented. `scripts/check_env_example.py` imports `Settings` (class only, no instance) and treats `# KEY=` as present. `DATABASE_URL` in the template is a dedicated failure pointing at `DATABASE_URL_OVERRIDE`. WorkerSettings `WORKER_*` keys are not required. The script is part of `make check` via `uv run python` so CI's system interpreter does not need pydantic on `PATH`. Helper tests use tempfile examples so they do not depend on a live template rewrite. Worker start is `make dev-worker` (`python -m src.workers.main`). Compose env templates live under `deploy/env/`. Vector-store and MinIO `os.getenv` keys stay out of the template; they are not Settings fields and a `.env` file does not populate `os.environ`.
 
 ## Alternatives considered
 
@@ -25,7 +25,7 @@ A new clone can copy `.env.example` and name the URL override correctly. AES com
 
 ## Required verification
 
-- `python scripts/check_env_example.py --repo-root .`
+- `make check-env-example` (`uv run python scripts/check_env_example.py --repo-root .`)
 - `uv run pytest tests/scripts/test_env_example.py`
 - `make help` lists `dev-app`, `dev-worker`, `openapi`
 - `python scripts/verify_agent_notes.py --repo-root .`

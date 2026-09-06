@@ -103,7 +103,7 @@ check-feature-map:
 	python scripts/check_feature_map.py --repo-root .
 
 check-env-example:
-	python scripts/check_env_example.py --repo-root .
+	uv run python scripts/check_env_example.py --repo-root .
 
 dev-app:
 	uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
