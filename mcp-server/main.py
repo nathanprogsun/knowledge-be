@@ -70,7 +70,7 @@ def parse_arguments():
   python main.py                    # 使用默认配置启动
   python main.py --check-only       # 仅检查环境，不启动服务器
   python main.py --verbose          # 启用详细日志
-  
+
 环境变量:
   WEKNORA_BASE_URL       WeKnora API 基础 URL (默认: http://localhost:8080/api/v1)
   WEKNORA_API_KEY        WeKnora API 密钥

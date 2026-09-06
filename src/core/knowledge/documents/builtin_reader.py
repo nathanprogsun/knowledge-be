@@ -8,13 +8,15 @@ stored bytes; this reader does not fetch URLs.
 from __future__ import annotations
 
 import asyncio
+import importlib
+import importlib.util
 import json
 import os
 import tempfile
 from collections.abc import Callable, Mapping
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath
-from typing import Final, TypeAlias
+from typing import Final, Protocol, TypeAlias, cast
 from urllib.parse import urlparse
 
 from src.common.exception import ExternalServiceError
@@ -22,10 +24,29 @@ from src.common.json import JsonValue
 from src.core.knowledge.documents.parse_pipeline import ParseResult, ReadRequest
 from src.core.system.parser_engine import BUILTIN_ENGINE_NAME, SIMPLE_ENGINE_NAME
 
-try:
-    import opendataloader_pdf as _opendataloader_pdf
-except ImportError:  # optional extra; PDF path fails closed when missing
+
+class _OpenDataLoaderPdf(Protocol):
+    def convert(
+        self,
+        *,
+        input_path: str,
+        output_dir: str,
+        format: str,
+        image_output: str,
+        image_dir: str,
+        quiet: bool,
+        hybrid: str,
+        hybrid_url: str,
+        hybrid_fallback: bool,
+    ) -> None: ...
+
+
+# Optional extra; PDF path fails closed when the package is not installed.
+_opendataloader_pdf: _OpenDataLoaderPdf | None
+if importlib.util.find_spec("opendataloader_pdf") is None:
     _opendataloader_pdf = None
+else:
+    _opendataloader_pdf = cast(_OpenDataLoaderPdf, importlib.import_module("opendataloader_pdf"))
 
 
 Handler: TypeAlias = Callable[[bytes, ReadRequest], ParseResult]

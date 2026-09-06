@@ -418,12 +418,12 @@ class WeKnoraClient:
 
         Centralised helper used by both chat() and agent_chat().
         Timeout: (10s connect, WEKNORA_CHAT_TIMEOUT read) — configurable via env var.
-        
+
         Server-Sent Events (SSE) stream format:
           data: {"response_type": "answer", "content": "..."}
           data: {"response_type": "references", "knowledge_references": [...]}
           data: {"response_type": "complete"}
-        
+
         We accumulate answer chunks and extract references, returning them as a dict.
         """
         try:
