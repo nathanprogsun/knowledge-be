@@ -4722,6 +4722,138 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenants/{tenant_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Members
+         * @description List workspace members. ``q`` matches email or username when joined.
+         */
+        get: operations["list_members_api_v1_tenants__tenant_id__members_get"];
+        put?: never;
+        /**
+         * Add Member
+         * @description Add a registered user by email. Unknown emails are 404, not an invite.
+         */
+        post: operations["add_member_api_v1_tenants__tenant_id__members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant_id}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Member Role
+         * @description Change a member's role. Demoting the last owner is a conflict.
+         */
+        put: operations["update_member_role_api_v1_tenants__tenant_id__members__user_id__put"];
+        post?: never;
+        /**
+         * Delete Member
+         * @description Remove a member. Removing the last owner is a conflict.
+         */
+        delete: operations["delete_member_api_v1_tenants__tenant_id__members__user_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant_id}/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Leave Tenant
+         * @description Leave the workspace as the caller. Last owner is a typed conflict.
+         */
+        post: operations["leave_tenant_api_v1_tenants__tenant_id__leave_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant_id}/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Invitations
+         * @description List this workspace's invitations. Defaults to pending rows.
+         */
+        get: operations["list_invitations_api_v1_tenants__tenant_id__invitations_get"];
+        put?: never;
+        /**
+         * Create Invitation
+         * @description Invite a registered user. The invitee sees the row on ``/me/invitations``.
+         */
+        post: operations["create_invitation_api_v1_tenants__tenant_id__invitations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant_id}/invitations/{inv_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Invitation
+         * @description Revoke a pending invitation. Other workspaces' rows look missing.
+         */
+        delete: operations["revoke_invitation_api_v1_tenants__tenant_id__invitations__inv_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant_id}/invite-links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Invite Link
+         * @description Issue a reusable share link and return its copy URL.
+         */
+        post: operations["create_invite_link_api_v1_tenants__tenant_id__invite_links_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/vector-stores/types": {
         parameters: {
             query?: never;
@@ -5725,6 +5857,13 @@ export interface components {
             type: string;
             /** Id */
             id: string;
+        };
+        /** AddMemberBody */
+        AddMemberBody: {
+            /** Email */
+            email: string;
+            /** Role */
+            role: string;
         };
         /** Agent */
         Agent: {
@@ -6867,6 +7006,22 @@ export interface components {
             sync_deletions: boolean | null;
             /** Sync Log Retention Days */
             sync_log_retention_days?: number | null;
+        };
+        /** CreateInvitationBody */
+        CreateInvitationBody: {
+            /** Email */
+            email: string;
+            /** Role */
+            role: string;
+            /** Message */
+            message?: string | null;
+        };
+        /** CreateInviteLinkBody */
+        CreateInviteLinkBody: {
+            /** Role */
+            role: string;
+            /** Message */
+            message?: string | null;
         };
         /** CreateKnowledgeBaseRequest */
         CreateKnowledgeBaseRequest: {
@@ -8748,6 +8903,15 @@ export interface components {
              */
             graph_enabled: boolean;
         };
+        /** InvitationEnvelope */
+        InvitationEnvelope: {
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+            data: components["schemas"]["TenantInvitationItem"];
+        };
         /**
          * InvitationItem
          * @description One inbox row. Extra invitee/tenant display fields stay optional.
@@ -8791,22 +8955,6 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
-        };
-        /** InvitationListData */
-        InvitationListData: {
-            /** Invitations */
-            invitations: components["schemas"]["InvitationItem"][];
-            /** Total */
-            total: number;
-        };
-        /** InvitationListEnvelope */
-        InvitationListEnvelope: {
-            /**
-             * Success
-             * @default true
-             */
-            success: boolean;
-            data: components["schemas"]["InvitationListData"];
         };
         /**
          * InvitationLookupRequest
@@ -9724,14 +9872,25 @@ export interface components {
             success: boolean;
             data: components["schemas"]["MeData"];
         };
-        /**
-         * MemberListEnvelope
-         * @description ``{"success": true, "data": {"members": [...]}}`` responses.
-         */
-        MemberListEnvelope: {
-            /** Success */
+        /** MemberEnvelope */
+        MemberEnvelope: {
+            /**
+             * Success
+             * @default true
+             */
             success: boolean;
-            data: components["schemas"]["OrgMemberListResponse"];
+            data: components["schemas"]["TenantMemberItem"];
+        };
+        /** MemberListData */
+        MemberListData: {
+            /** Members */
+            members: components["schemas"]["TenantMemberItem"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
         };
         /**
          * Membership
@@ -12523,6 +12682,60 @@ export interface components {
             data: components["schemas"]["Tenant"];
         };
         /**
+         * TenantInvitationItem
+         * @description One invitation row. Display names stay optional when no join filled them.
+         */
+        TenantInvitationItem: {
+            /** Id */
+            id: number;
+            /** Tenant Id */
+            tenant_id: number;
+            /** Tenant Name */
+            tenant_name?: string | null;
+            /** Invitee User Id */
+            invitee_user_id: string;
+            /** Invitee Email */
+            invitee_email?: string | null;
+            /** Invitee Name */
+            invitee_name?: string | null;
+            /** Invited By */
+            invited_by?: string | null;
+            /** Inviter Email */
+            inviter_email?: string | null;
+            /** Inviter Name */
+            inviter_name?: string | null;
+            /** Role */
+            role: string;
+            /** Status */
+            status: string;
+            /** Message */
+            message?: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Responded At */
+            responded_at?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Invite Url */
+            invite_url?: string | null;
+            /**
+             * Is Share Link
+             * @default false
+             */
+            is_share_link: boolean;
+            /**
+             * Accepted Count
+             * @default 0
+             */
+            accepted_count: number;
+        };
+        /**
          * TenantInviteCandidate
          * @description One row in the search-tenants-for-invite picker.
          *
@@ -12607,6 +12820,37 @@ export interface components {
             /** Success */
             success: boolean;
             data: components["schemas"]["TenantList"];
+        };
+        /**
+         * TenantMemberItem
+         * @description One workspace member as the members table already renders it.
+         */
+        TenantMemberItem: {
+            /** User Id */
+            user_id: string;
+            /**
+             * Email
+             * @default
+             */
+            email: string;
+            /**
+             * Username
+             * @default
+             */
+            username: string;
+            /** Avatar */
+            avatar?: string | null;
+            /** Role */
+            role: string;
+            /** Status */
+            status: string;
+            /** Invited By */
+            invited_by?: string | null;
+            /**
+             * Joined At
+             * Format: date-time
+             */
+            joined_at: string;
         };
         /** TestStorageBackendRequest */
         TestStorageBackendRequest: {
@@ -12837,6 +13081,11 @@ export interface components {
             } | null;
             auth_config?: components["schemas"]["MCPMcpServiceAuthConfig"] | null;
             advanced_config?: components["schemas"]["MCPServiceAdvancedConfig"] | null;
+        };
+        /** UpdateMemberRoleBody */
+        UpdateMemberRoleBody: {
+            /** Role */
+            role: string;
         };
         /** UpdateMemberRoleRequest */
         UpdateMemberRoleRequest: {
@@ -14130,6 +14379,60 @@ export interface components {
              * @default false
              */
             is_active: boolean;
+        };
+        /** InvitationListData */
+        src__web__api__me__views__InvitationListData: {
+            /** Invitations */
+            invitations: components["schemas"]["InvitationItem"][];
+            /** Total */
+            total: number;
+        };
+        /** InvitationListEnvelope */
+        src__web__api__me__views__InvitationListEnvelope: {
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+            data: components["schemas"]["src__web__api__me__views__InvitationListData"];
+        };
+        /**
+         * MemberListEnvelope
+         * @description ``{"success": true, "data": {"members": [...]}}`` responses.
+         */
+        src__web__api__organizations__views__MemberListEnvelope: {
+            /** Success */
+            success: boolean;
+            data: components["schemas"]["OrgMemberListResponse"];
+        };
+        /** InvitationListData */
+        src__web__api__tenants__views__InvitationListData: {
+            /** Invitations */
+            invitations: components["schemas"]["TenantInvitationItem"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** InvitationListEnvelope */
+        src__web__api__tenants__views__InvitationListEnvelope: {
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+            data: components["schemas"]["src__web__api__tenants__views__InvitationListData"];
+        };
+        /** MemberListEnvelope */
+        src__web__api__tenants__views__MemberListEnvelope: {
+            /**
+             * Success
+             * @default true
+             */
+            success: boolean;
+            data: components["schemas"]["MemberListData"];
         };
     };
     responses: never;
@@ -19690,7 +19993,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InvitationListEnvelope"];
+                    "application/json": components["schemas"]["src__web__api__me__views__InvitationListEnvelope"];
                 };
             };
             /** @description Validation Error */
@@ -20673,7 +20976,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MemberListEnvelope"];
+                    "application/json": components["schemas"]["src__web__api__organizations__views__MemberListEnvelope"];
                 };
             };
             /** @description Validation Error */
@@ -23225,6 +23528,339 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeleteTenantResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_members_api_v1_tenants__tenant_id__members_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                tenant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["src__web__api__tenants__views__MemberListEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_member_api_v1_tenants__tenant_id__members_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                tenant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddMemberBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_member_role_api_v1_tenants__tenant_id__members__user_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                tenant_id: number;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMemberRoleBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteTenantResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_member_api_v1_tenants__tenant_id__members__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                tenant_id: number;
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteTenantResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leave_tenant_api_v1_tenants__tenant_id__leave_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                tenant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteTenantResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_invitations_api_v1_tenants__tenant_id__invitations_get: {
+        parameters: {
+            query?: {
+                include_terminal?: boolean;
+                page?: number;
+                page_size?: number;
+            };
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                tenant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["src__web__api__tenants__views__InvitationListEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_invitation_api_v1_tenants__tenant_id__invitations_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                tenant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInvitationBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_invitation_api_v1_tenants__tenant_id__invitations__inv_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                tenant_id: number;
+                inv_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteTenantResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_invite_link_api_v1_tenants__tenant_id__invite_links_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                tenant_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateInviteLinkBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationEnvelope"];
                 };
             };
             /** @description Validation Error */
