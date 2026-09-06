@@ -3,7 +3,7 @@
 Backend service for knowledge management and AI-powered Q&A. FastAPI +
 SQLAlchemy (async) + ARQ task queue.
 
-> Conventions: see `AGENTS.md` (single source of truth — layered arch,
+> Conventions: see `AGENTS.md` (single source of truth: layered arch,
 > DI scope, error hierarchy, async purity, agent workflow).
 > Frontend conventions: `frontend/AGENTS.md`. Product surface map:
 > `.agents/feature-map/ui.md`.
@@ -22,16 +22,19 @@ SQLAlchemy (async) + ARQ task queue.
 ```bash
 # Install uv (if needed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
-# uv version is pinned in pyproject.toml [tool.uv] — keep it aligned with CI.
+# uv version is pinned in pyproject.toml [tool.uv]; keep it aligned with CI.
 
 # Sync deps
 uv sync --all-extras
 
 # Copy and edit environment
 cp .env.example .env
-# See "Configuration" below for the full list of required env vars.
+# Postgres and Redis must be reachable at DB_* and REDIS_URL.
+# Optional local stack (reads deploy/env/api.env.example and
+# deploy/env/worker.env.example; compose overrides DB_HOST and REDIS_URL):
+#   docker compose -f deploy/docker/docker-compose.yml up -d postgres redis
 
-# Lint / typecheck / unit tests
+# Lint / typecheck / tests
 make lint
 make typecheck
 make test
@@ -42,7 +45,7 @@ make format-fix      # rewrite in place
 
 # Anti-drift gates (layer / DI / endpoint / schema / imports / sql /
 # pr-leak / map_from_db / exception-types / agent-notes). Run before
-# declaring a non-trivial change "done" — see AGENTS.md §9.
+# declaring a non-trivial change "done". See AGENTS.md §9.
 make check
 
 # Apply DB migrations (requires Postgres at $DB_HOST:$DB_PORT)
@@ -53,7 +56,15 @@ make openapi
 
 # Start the API (requires Postgres + Redis at the URLs in .env)
 make dev-app
+
+# Background worker (same Redis as REDIS_URL unless WORKER_REDIS_URL is set)
+make dev-worker
+# or: uv run python -m src.workers.main
 ```
+
+`make typecheck` is full mypy; CI uses the mypy ratchet (`make check-mypy-baseline`).
+`make test` runs the full pytest tree, including live-Postgres suites; CI ignores those suites.
+Document parsing needs a docreader gRPC process at `DOCREADER_ADDR`; compose does not start it yet.
 
 ### Frontend dev loop
 
@@ -116,7 +127,7 @@ knowledge-be/
 ├── mypy.ini              ← strict type checker
 ├── pyrightconfig.json    ← LSP type-checker config (points at .venv)
 ├── Makefile              ← dev + CI targets (see "Quick start")
-├── AGENTS.md             ← project conventions — READ THIS FIRST
+├── AGENTS.md             ← project conventions. READ THIS FIRST
 └── README.md             ← this file
 ```
 
@@ -131,19 +142,21 @@ knowledge-be/
 
 ## Configuration
 
-Settings are loaded from a `.env` file in the project root (no prefix;
-`pydantic-settings` reads canonical variable names directly). See
-`src/settings.py` for the full schema. Required variables:
+`src/settings.py` is the schema. `.env.example` is the template. Copy it
+to `.env` and edit for your machine (no prefix; `pydantic-settings`
+reads the canonical names).
 
 | Group | Variable | Notes |
 | --- | --- | --- |
 | Runtime | `APP_NAME`, `ENVIRONMENT` | |
-| Database | `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_DRIVER` | Auto-composed into `DATABASE_URL`; set `DATABASE_URL` directly to override |
-| Redis | `REDIS_URL` | ARQ broker + cache |
-| Auth | `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `JWT_EXPIRE_MINUTES`, `REFRESH_TOKEN_EXPIRE_DAYS` | `JWT_SECRET_KEY` is required |
-| Telemetry | `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT` | See `src/common/telemetry.py`; zero overhead when disabled |
+| Database | `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_DRIVER` | Auto-composed into the computed `database_url`. Set `DATABASE_URL_OVERRIDE` (Settings field `database_url_override`) to replace that URL. A bare `DATABASE_URL` is ignored. |
+| Redis | `REDIS_URL` | ARQ broker + cache. Worker falls back to this unless `WORKER_REDIS_URL` is set. |
+| Auth | `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `JWT_EXPIRE_MINUTES`, `REFRESH_TOKEN_EXPIRE_DAYS` | `JWT_SECRET_KEY` is must-set for real deploys. |
+| Secrets | `SYSTEM_AES_KEY` | Raw 32-byte UTF-8 string (exactly 32 bytes). Must-set for real deploys. |
+| RBAC | `RBAC_ENFORCED`, `CROSS_TENANT_ACCESS_ENABLED` | Role guards and cross-tenant superuser routes. |
+| Telemetry | `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT` | See `src/common/telemetry.py`. Zero overhead when disabled. |
 
-See `.env.example` for defaults.
+See `.env.example` for optional OIDC, header-auth, and other keys.
 
 ## License
 

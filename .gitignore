@@ -156,6 +156,10 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+# Compose templates live here. Root `ENV/` matches `deploy/env` on
+# case-insensitive filesystems.
+!deploy/env/
+!deploy/env/*.example
 
 # Spyder project settings
 .spyderproject

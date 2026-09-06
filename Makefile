@@ -1,17 +1,25 @@
-.PHONY: help install sync lint typecheck format format-fix test migrate clean dev-app openapi frontend-install frontend-typecheck frontend-test frontend-build check check-layer check-singleton check-endpoint check-schema check-imports check-sql check-pr-leak check-map-from-db check-exception-types check-agent-notes check-feature-map
+.PHONY: help install sync lint typecheck format format-fix test migrate clean dev-app dev-worker openapi frontend-install frontend-typecheck frontend-test frontend-build check check-layer check-singleton check-endpoint check-schema check-imports check-sql check-pr-leak check-map-from-db check-exception-types check-agent-notes check-feature-map check-env-example
 
 help:
 	@echo "Targets:"
-	@echo "  install     create venv + install deps (uv)"
-	@echo "  sync        uv sync (dev deps)"
-	@echo "  lint        ruff check ."
-	@echo "  format      ruff format --check .  (CI gate — fails if unformatted)"
-	@echo "  format-fix  ruff format .          (rewrites files in place)"
-	@echo "  typecheck   uv run mypy (strict from mypy.ini; project venv only)"
-	@echo "  test        pytest tests/"
-	@echo "  check       run all anti-drift checks"
-	@echo "  migrate     alembic upgrade head"
-	@echo "  clean       remove caches"
+	@echo "  install              create venv + install deps (uv)"
+	@echo "  sync                 uv sync (dev deps)"
+	@echo "  lint                 ruff check ."
+	@echo "  format               ruff format --check .  (CI gate — fails if unformatted)"
+	@echo "  format-fix           ruff format .          (rewrites files in place)"
+	@echo "  typecheck            uv run mypy (strict from mypy.ini; project venv only)"
+	@echo "  test                 pytest tests/ (includes live-Postgres suites; CI ignores those)"
+	@echo "  check                run all anti-drift gates"
+	@echo "  migrate              alembic upgrade head"
+	@echo "  clean                remove caches"
+	@echo "  dev-app              uvicorn with reload on :8000"
+	@echo "  dev-worker           uv run python -m src.workers.main"
+	@echo "  openapi              export OpenAPI + generate frontend schema.ts"
+	@echo "  frontend-install     npm ci in frontend/"
+	@echo "  frontend-typecheck   vue-tsc"
+	@echo "  frontend-test        frontend unit tests"
+	@echo "  frontend-build       vite build"
+	@echo "  check-mypy-baseline  mypy ratchet vs recorded baseline"
 
 AUTH_TENANT_DOMAINS := auth,tenants,system
 
@@ -56,7 +64,7 @@ clean:
 INFRA_DOMAINS := datasources,initialization,mcp_services,models,storage_backends,vector_stores,web_search
 PRODUCT_DOMAINS := favorites,chat,organizations,channels,knowledge,knowledge_bases,agents,evaluation,sharing,me,files,cloud
 
-check: check-layer check-singleton check-endpoint check-schema check-imports check-sql check-pr-leak check-map-from-db check-agent-notes check-mypy-baseline check-exception-types check-feature-map
+check: check-layer check-singleton check-endpoint check-schema check-imports check-sql check-pr-leak check-map-from-db check-agent-notes check-mypy-baseline check-exception-types check-feature-map check-env-example
 	@echo "All anti-drift checks passed"
 
 # Layer check covers auth/tenant, infra, and product domains. `ai` and
@@ -94,8 +102,14 @@ check-agent-notes:
 check-feature-map:
 	python scripts/check_feature_map.py --repo-root .
 
+check-env-example:
+	python scripts/check_env_example.py --repo-root .
+
 dev-app:
 	uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+
+dev-worker:
+	uv run python -m src.workers.main
 
 # ── Frontend contract codegen ───────────────────────────────────────────
 # Single source of truth: FastAPI OpenAPI schema. Frontend TS types are
