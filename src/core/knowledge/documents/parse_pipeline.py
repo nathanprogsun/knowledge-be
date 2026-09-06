@@ -1,12 +1,11 @@
 """Parse stage of the document-processing pipeline.
 
 Turns a stored file (or a URL) into parsed markdown through an injectable
-document-reader seam. The real docreader gRPC client is not wired yet —
-the worker layer composes it later — so this module only defines the seam
-contract (``DocumentReader`` / ``FileReader``) and the small read flow
-around it: load file bytes through the file-reader seam when needed,
-forward the read request, and surface the parsed document plus extraction
-metadata.
+document-reader seam. The worker default is the in-process builtin
+reader; this module owns the seam contract (``DocumentReader`` /
+``FileReader``) and the small read flow around it: load file bytes
+through the file-reader seam when needed, forward the read request, and
+surface the parsed document plus extraction metadata.
 
 ``parse_document`` raises ``ExternalServiceError`` for a request without
 any content source; a reader that cannot serve the document should raise
@@ -58,7 +57,7 @@ class ParseResult:
 
 @runtime_checkable
 class DocumentReader(Protocol):
-    """Document-parsing seam (satisfied by the docreader client).
+    """Document-parsing seam (satisfied by the in-process builtin reader).
 
     ``read`` returns the parsed markdown document or raises on failure.
     A parser-level error (bad file, unsupported format, timeout) surfaces

@@ -3,16 +3,17 @@
 The worker process must not import ``db`` or ``web``. This module builds
 the engine, reader, and per-job pipeline inside ``core`` and exposes a
 runner the ARQ handler can call from its startup-wired context. The
-pipeline factory attaches the file-service resolver so a ``file_url``
-row can persist bytes before parse.
+default reader is the in-process builtin. The pipeline factory attaches
+the file-service resolver so a ``file_url`` row can persist bytes before
+parse.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from src.ai.docreader.client import new_client
 from src.common.session_provider import session_scope
+from src.core.knowledge.documents.builtin_reader import BuiltinDocumentReader
 from src.core.knowledge.documents.docreader_adapter import DocReaderAdapter
 from src.core.knowledge.documents.factory import build_document_process_pipeline
 from src.core.knowledge.documents.parse_pipeline import DocumentReader
@@ -84,7 +85,7 @@ def build_document_process_runtime() -> DocumentProcessRuntime:
         pool_size=settings.db_pool_size,
         max_overflow=settings.db_max_overflow,
     )
-    reader = DocReaderAdapter(new_client(settings.docreader_addr))
+    reader: DocumentReader = BuiltinDocumentReader()
     return DocumentProcessRuntime(engine=engine, reader=reader)
 
 

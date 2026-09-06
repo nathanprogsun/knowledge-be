@@ -49,17 +49,13 @@ PADDLEOCR_VL_CLOUD_TOKEN_OVERRIDE: Final = "paddleocr_vl_cloud_token"
 # ── File-type sets ──────────────────────────────────────────────────
 
 _BUILTIN_FILE_TYPES: Final[tuple[str, ...]] = (
-    "docx",
-    "doc",
-    "pdf",
     "md",
     "markdown",
-    "xlsx",
-    "xls",
-    "epub",
+    "txt",
+    "csv",
+    "json",
     "html",
     "htm",
-    "mhtml",
     "jpg",
     "jpeg",
     "png",
@@ -67,11 +63,6 @@ _BUILTIN_FILE_TYPES: Final[tuple[str, ...]] = (
     "bmp",
     "tiff",
     "webp",
-    "mp3",
-    "wav",
-    "m4a",
-    "flac",
-    "ogg",
 )
 
 _SIMPLE_FILE_TYPES: Final[tuple[str, ...]] = (
@@ -130,7 +121,6 @@ _PADDLEOCR_VL_FILE_TYPES: Final[tuple[str, ...]] = (
 
 # ── Unavailable reasons (verbatim from Go) ──────────────────────────
 
-_DOCREADER_DISCONNECTED_REASON: Final = "DocReader service not connected"
 _KB_CLOUD_UNCONFIGURED_REASON: Final = "Knowledge Base Cloud credentials not configured. Go to Settings → Knowledge Base Cloud to set up."
 _MINERU_UNCONFIGURED_REASON: Final = "MinerU service not configured"
 _MINERU_CLOUD_UNCONFIGURED_REASON: Final = "MinerU API Key not configured"
@@ -177,10 +167,10 @@ class ParserEngineSpec:
 LOCAL_PARSER_ENGINES: Final[tuple[ParserEngineSpec, ...]] = (
     ParserEngineSpec(
         name=BUILTIN_ENGINE_NAME,
-        description="DocReader built-in parser engine",
+        description="In-process built-in parser (no external reader service)",
         file_types=_BUILTIN_FILE_TYPES,
-        unconfigured_reason=_DOCREADER_DISCONNECTED_REASON,
-        requires_docreader=True,
+        unconfigured_reason="",
+        requires_docreader=False,
     ),
     ParserEngineSpec(
         name=SIMPLE_ENGINE_NAME,

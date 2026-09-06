@@ -65,15 +65,32 @@ def test_every_local_engine_declares_file_types() -> None:
         assert spec.description, spec.name
 
 
-def test_builtin_engine_file_types_cover_the_complex_formats() -> None:
+def test_builtin_engine_file_types_match_in_process_handlers() -> None:
     # Arrange
-    engines = {e.name: e for e in list_all_engines(docreader_connected=True)}
+    engines = {e.name: e for e in list_all_engines(docreader_connected=False)}
 
     # Act
     builtin = engines[BUILTIN_ENGINE_NAME]
 
-    # Assert
-    assert {"docx", "pdf", "epub", "mhtml", "flac"} <= set(builtin.file_types)
+    # Assert — only types the in-process reader actually handles
+    assert {
+        "md",
+        "markdown",
+        "txt",
+        "csv",
+        "json",
+        "html",
+        "htm",
+        "jpg",
+        "jpeg",
+        "png",
+        "gif",
+        "bmp",
+        "tiff",
+        "webp",
+    } <= set(builtin.file_types)
+    assert "docx" not in builtin.file_types
+    assert "pdf" not in builtin.file_types
 
 
 # ── Parser engines: availability ────────────────────────────────────
@@ -88,20 +105,12 @@ def test_simple_engine_is_available_without_any_configuration() -> None:
     assert engines[SIMPLE_ENGINE_NAME].unavailable_reason == ""
 
 
-def test_builtin_engine_is_unavailable_when_docreader_is_disconnected() -> None:
+@pytest.mark.parametrize("docreader_connected", [False, True])
+def test_builtin_engine_is_available_without_docreader(docreader_connected: bool) -> None:
     # Arrange / Act
-    engines = {e.name: e for e in list_all_engines(docreader_connected=False)}
+    engines = {e.name: e for e in list_all_engines(docreader_connected=docreader_connected)}
 
-    # Assert
-    assert engines[BUILTIN_ENGINE_NAME].available is False
-    assert engines[BUILTIN_ENGINE_NAME].unavailable_reason == "DocReader service not connected"
-
-
-def test_builtin_engine_is_available_when_docreader_is_connected() -> None:
-    # Arrange / Act
-    engines = {e.name: e for e in list_all_engines(docreader_connected=True)}
-
-    # Assert
+    # Assert — builtin is in-process; docreader connectivity does not gate it
     assert engines[BUILTIN_ENGINE_NAME].available is True
     assert engines[BUILTIN_ENGINE_NAME].unavailable_reason == ""
 

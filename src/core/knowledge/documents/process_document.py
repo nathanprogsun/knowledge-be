@@ -82,7 +82,7 @@ from src.db.models.knowledge import Document
 _ENABLE_STATUS_ENABLED = "enabled"
 
 # Message stamped when no document reader is configured.
-_DOCREADER_NOT_CONFIGURED = "document parsing service is not configured"
+_DOCREADER_NOT_CONFIGURED = "document reader is not configured"
 
 # Bounds the error message written to the documents row.
 _MAX_ERROR_MESSAGE_CHARS = 2048

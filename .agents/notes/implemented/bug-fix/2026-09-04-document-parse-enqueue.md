@@ -19,8 +19,7 @@ Open an APP-scope ARQ pool in the FastAPI lifespan and inject
 `ArqDocumentEnqueuer` as both the file dispatcher and the reparse
 enqueuer. URL create now submits `document_process` with `url=` after
 insert. The worker startup builds a core `DocumentProcessRuntime`
-(session factory + `DocReaderAdapter` over `DocReaderClient`) so a
-consumed job can parse. Worker Redis falls back to `REDIS_URL` when
+(session factory + document reader) so a consumed job can parse. Worker Redis falls back to `REDIS_URL` when
 `WORKER_REDIS_URL` is unset. Password-only Redis URLs normalize an
 empty username and unquote the password before AUTH.
 `GET /system/parser-engines` probes `DOCREADER_ADDR` instead of

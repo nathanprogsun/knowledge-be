@@ -986,7 +986,7 @@ class TestPipelineRun:
 
         # Assert
         assert outcome.parse_status == PARSE_STATUS_FAILED
-        assert outcome.error_message == "document parsing service is not configured"
+        assert outcome.error_message == "document reader is not configured"
         assert harness.knowledge_repo.rows[row.id].parse_status == PARSE_STATUS_FAILED
 
     async def test_parse_error_marks_document_failed(self) -> None:
