@@ -38,7 +38,9 @@ from src.core.knowledge.documents.types import (
     DocumentListFilter,
 )
 from src.db.dao.knowledge_repository import KnowledgeRepository
+from src.db.dao.knowledge_tag_repository import TagRepository
 from src.db.models.knowledge import Document
+from src.db.models.knowledge_tag import KnowledgeTag
 from src.settings import get_settings, reset_settings_cache
 from tests.integration.conftest import make_test_tenant_id
 
@@ -326,6 +328,8 @@ def test_factory_builds_request_scoped_service() -> None:
     assert isinstance(service, KnowledgeService)
     assert isinstance(service._knowledge_repo, KnowledgeRepository)
     assert service._knowledge_repo._session is session
+    assert isinstance(service._tag_repo, TagRepository)
+    assert service._tag_repo._session is session
 
 
 # ── Create ─────────────────────────────────────────────────────────────
@@ -806,14 +810,127 @@ async def test_update_document_patches_manual_content() -> None:
         id=row.id,
         title="Note",
         content="# new",
-        status="publish",
+        status="draft",
+        process_config={"chunk_size": 128},
     )
     assert updated.title == "Note"
     stored = rows[row.id]
     assert stored.metadata is not None
     assert stored.metadata["content"] == "# new"
-    assert stored.metadata["status"] == "publish"
+    assert stored.metadata["status"] == "draft"
+    assert stored.metadata["process_overrides"] == {"chunk_size": 128}
     assert stored.metadata["version"] == 2
+
+
+async def test_update_document_rejects_publish() -> None:
+    repo, rows = _make_repo()
+    row = _sample_row(
+        type="manual",
+        metadata={"content": "old", "format": "markdown", "status": "draft", "version": 1},
+    )
+    rows[row.id] = row
+    with pytest.raises(ValidationError) as exc_info:
+        await _service(repo).update_document(
+            tenant_id=row.tenant_id,
+            id=row.id,
+            status="publish",
+        )
+    assert exc_info.value.code == "knowledge.manual_publish_unavailable"
+    repo.update.assert_not_awaited()
+
+
+def _make_tag_repo() -> tuple[AsyncMock, dict[str, KnowledgeTag]]:
+    repo = AsyncMock(spec=TagRepository)
+    tags: dict[str, KnowledgeTag] = {}
+
+    async def _get_by_ids(tenant_id: int, ids: list[str]) -> list[KnowledgeTag]:
+        return [
+            tag
+            for tag_id in ids
+            if (tag := tags.get(tag_id)) is not None and tag.tenant_id == tenant_id
+        ]
+
+    repo.get_by_ids.side_effect = _get_by_ids
+    repo.set_knowledge_tags.return_value = None
+    return repo, tags
+
+
+def _seed_tag(
+    *,
+    tags: dict[str, KnowledgeTag],
+    tag_id: str,
+    tenant_id: int,
+    kb_id: str,
+) -> None:
+    tags[tag_id] = KnowledgeTag(
+        id=tag_id,
+        seq_id=1,
+        tenant_id=tenant_id,
+        knowledge_base_id=kb_id,
+        name=tag_id,
+        color="",
+        sort_order=0,
+        created_at=_NOW,
+        updated_at=_NOW,
+    )
+
+
+async def test_update_document_sets_and_clears_tags() -> None:
+    repo, rows = _make_repo()
+    tag_repo, tags = _make_tag_repo()
+    row = _sample_row(
+        type="manual",
+        metadata={"content": "old", "format": "markdown", "status": "draft", "version": 1},
+    )
+    rows[row.id] = row
+    _seed_tag(
+        tags=tags,
+        tag_id="tag-1",
+        tenant_id=row.tenant_id,
+        kb_id=row.knowledge_base_id,
+    )
+    service = KnowledgeService(knowledge_repo=repo, tag_repo=tag_repo)
+    await service.update_document(tenant_id=row.tenant_id, id=row.id, tag_ids=["tag-1"])
+    tag_repo.set_knowledge_tags.assert_awaited()
+    assert tag_repo.set_knowledge_tags.await_args.kwargs["knowledge_id"] == row.id
+    assert tag_repo.set_knowledge_tags.await_args.kwargs["tag_ids"] == ["tag-1"]
+    await service.update_document(tenant_id=row.tenant_id, id=row.id, tag_ids=[])
+    assert tag_repo.set_knowledge_tags.await_args.kwargs["tag_ids"] == []
+
+
+async def test_update_document_file_row_accepts_tags_only() -> None:
+    repo, rows = _make_repo()
+    tag_repo, tags = _make_tag_repo()
+    row = _sample_row(file_path="kb/files/budget-2026.pdf", file_hash="abc")
+    rows[row.id] = row
+    _seed_tag(
+        tags=tags,
+        tag_id="tag-1",
+        tenant_id=row.tenant_id,
+        kb_id=row.knowledge_base_id,
+    )
+    updated = await KnowledgeService(knowledge_repo=repo, tag_repo=tag_repo).update_document(
+        tenant_id=row.tenant_id,
+        id=row.id,
+        tag_ids=["tag-1"],
+    )
+    assert updated.file_path == "kb/files/budget-2026.pdf"
+    assert updated.file_hash == "abc"
+    tag_repo.set_knowledge_tags.assert_awaited_once()
+    repo.update.assert_not_awaited()
+
+
+async def test_update_document_tags_require_tag_repo() -> None:
+    repo, rows = _make_repo()
+    row = _sample_row()
+    rows[row.id] = row
+    with pytest.raises(ValidationError) as exc_info:
+        await _service(repo).update_document(
+            tenant_id=row.tenant_id,
+            id=row.id,
+            tag_ids=["tag-1"],
+        )
+    assert exc_info.value.code == "knowledge.tag_repo_required"
 
 
 async def test_update_document_rejects_manual_fields_on_file() -> None:

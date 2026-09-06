@@ -5,8 +5,8 @@
 Standalone create-variant: validates the payload (content cleanliness and
 length, title, status), persists a ``manual`` knowledge row through the
 merged repositories with the manual metadata JSON, and attaches tag
-bindings. Publish rows are stamped ``pending`` ready for the async
-processing seam; draft rows stay ``draft``.
+bindings. Publish is refused because the manual worker cannot finish a
+parse; a pending stamp would spin the editor. Draft rows stay ``draft``.
 
 Behaviour mirrors the upstream create-manual service:
 
@@ -15,9 +15,10 @@ Behaviour mirrors the upstream create-manual service:
 - the title is input-validated and defaults to a timestamped name when
   blank;
 - the status must be ``draft`` or ``publish`` (blank means ``draft``);
+  ``publish`` raises ``knowledge.manual_publish_unavailable``;
 - the manual metadata (content, format, status, version, updated_at) is
   stored in the row's JSON metadata column, with any process overrides
-  embedded for publish rows.
+  the client sent.
 """
 
 from __future__ import annotations
@@ -45,7 +46,6 @@ from src.core.knowledge.documents.types import (
     MANUAL_KNOWLEDGE_FORMAT_MARKDOWN,
     MANUAL_KNOWLEDGE_STATUS_DRAFT,
     MANUAL_KNOWLEDGE_STATUS_PUBLISH,
-    PARSE_STATUS_PENDING,
 )
 from src.core.knowledge.knowledge_bases.service.kb_service import KBService
 from src.db.dao.knowledge_repository import KnowledgeRepository
@@ -63,6 +63,15 @@ def normalize_manual_status(status: str | None) -> str:
             message="状态仅支持 draft 或 publish",
         )
     return normalized
+
+
+def reject_manual_publish(status: str) -> None:
+    """Refuse publish until the manual worker can finish a parse."""
+    if status == MANUAL_KNOWLEDGE_STATUS_PUBLISH:
+        raise ValidationError(
+            code="knowledge.manual_publish_unavailable",
+            message="manual knowledge publish is not available",
+        )
 
 
 async def create_knowledge_from_manual(
@@ -101,6 +110,7 @@ async def create_knowledge_from_manual(
             message="标题包含非法字符或超出长度限制",
         )
     status = normalize_manual_status(status)
+    reject_manual_publish(status)
     kb = await kb_service.get_knowledge_base_by_id(knowledge_base_id=kb_id)
     stamp = now or datetime.now(UTC)
     display_title = safe_title or f"Knowledge-{stamp:%Y%m%d-%H%M%S}"
@@ -112,13 +122,9 @@ async def create_knowledge_from_manual(
         "version": 1,
         "updated_at": stamp.isoformat(),
     }
-    if status == MANUAL_KNOWLEDGE_STATUS_PUBLISH and process_overrides is not None:
+    if process_overrides is not None:
         metadata["process_overrides"] = process_overrides
-    parse_status = (
-        PARSE_STATUS_PENDING
-        if status == MANUAL_KNOWLEDGE_STATUS_PUBLISH
-        else MANUAL_KNOWLEDGE_STATUS_DRAFT
-    )
+    parse_status = MANUAL_KNOWLEDGE_STATUS_DRAFT
     row = build_document_row(
         tenant_id=tenant_id,
         knowledge_base_id=kb_id,
@@ -159,4 +165,8 @@ async def create_knowledge_from_manual(
     return to_knowledge(persisted)
 
 
-__all__ = ["create_knowledge_from_manual", "normalize_manual_status"]
+__all__ = [
+    "create_knowledge_from_manual",
+    "normalize_manual_status",
+    "reject_manual_publish",
+]

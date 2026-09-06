@@ -338,7 +338,9 @@ class CreateManualKnowledgeRequest(BaseModel):
     content: str
     status: str | None = Field(default=None)
     tag_id: str | None = Field(default=None)
+    tag_ids: list[str] | None = Field(default=None)
     channel: str | None = Field(default=None)
+    process_config: JsonObject | None = Field(default=None)
 
 
 class ListKnowledgeQuery(BaseModel):
@@ -361,6 +363,7 @@ class UpdateKnowledgeRequest(BaseModel):
     title: str | None = Field(default=None)
     description: str | None = Field(default=None)
     tag_id: str | None = Field(default=None)
+    tag_ids: list[str] | None = Field(default=None)
     enable_status: str | None = Field(default=None)
     content: str | None = Field(default=None)
     status: str | None = Field(default=None)
