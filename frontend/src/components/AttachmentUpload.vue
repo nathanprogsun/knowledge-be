@@ -135,12 +135,19 @@ const emitFiles = () => emit('update:files', [...attachments.value]);
 
 type UploadPayload = { id: string; status?: TemporaryAttachmentStatus; error_message?: string };
 
-function unwrapUpload(response: { data?: UploadPayload } | UploadPayload): UploadPayload | null {
-  if (response && typeof response === 'object' && 'id' in response && typeof response.id === 'string') {
+function isUploadPayload(value: unknown): value is UploadPayload {
+  return typeof value === 'object' && value !== null && typeof (value as { id?: unknown }).id === 'string';
+}
+
+function unwrapUpload(response: unknown): UploadPayload | null {
+  if (isUploadPayload(response)) {
     return response;
   }
-  if (response && typeof response === 'object' && response.data && typeof response.data.id === 'string') {
-    return response.data;
+  if (typeof response === 'object' && response !== null && 'data' in response) {
+    const nested = (response as { data?: unknown }).data;
+    if (isUploadPayload(nested)) {
+      return nested;
+    }
   }
   return null;
 }
