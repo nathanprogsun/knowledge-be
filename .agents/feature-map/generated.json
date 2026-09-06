@@ -1316,6 +1316,36 @@
       "domain": "chat"
     },
     {
+      "method": "GET",
+      "path": "/api/v1/sessions/{session_id}/attachments",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/sessions/{session_id}/attachments",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/sessions/{session_id}/attachments/{attachment_id}",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sessions/{session_id}/attachments/{attachment_id}",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sessions/{session_id}/attachments/{attachment_id}/preview",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
       "method": "DELETE",
       "path": "/api/v1/sessions/{session_id}/messages",
       "file": "src/web/api/chat/sessions/router.py",
@@ -1882,6 +1912,11 @@
     {
       "name": "build_tag_service",
       "file": "src/core/knowledge/tags/factory.py",
+      "domain": "knowledge"
+    },
+    {
+      "name": "build_temporary_document_service",
+      "file": "src/core/knowledge/documents/factory.py",
       "domain": "knowledge"
     },
     {
