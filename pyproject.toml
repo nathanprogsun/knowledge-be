@@ -53,6 +53,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+odl = [
+    "opendataloader-pdf[hybrid]>=2.4.7",
+]
 dev = [
     "ruff>=0.6",
     "mypy>=1.10",

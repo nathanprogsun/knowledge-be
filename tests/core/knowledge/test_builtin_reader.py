@@ -37,9 +37,19 @@ async def test_phase1_types_return_markdown(
 
 async def test_unsupported_extension_raises_unsupported_type() -> None:
     with pytest.raises(ExternalServiceError) as exc_info:
-        await _reader().read(ReadRequest(file_content=b"%PDF", file_type="pdf"))
+        await _reader().read(ReadRequest(file_content=b"PK", file_type="docx"))
 
     assert exc_info.value.code == "document_parse.unsupported_type"
+
+
+async def test_pdf_without_odl_url_raises_engine_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ODL_HYBRID_URL", raising=False)
+    with pytest.raises(ExternalServiceError) as exc_info:
+        await _reader().read(ReadRequest(file_content=b"%PDF", file_type="pdf"))
+
+    assert exc_info.value.code == "document_parse.engine_unavailable"
 
 
 async def test_simple_engine_rejects_html() -> None:

@@ -1,0 +1,30 @@
+# Local Dex OIDC IdP for compose profile ``dex``.
+# Issuer is reachable from the SPA on the host and from api containers
+# via host.docker.internal / the published port.
+
+issuer: http://127.0.0.1:5556/dex
+storage:
+  type: memory
+web:
+  http: 0.0.0.0:5556
+staticClients:
+  - id: knowledge-be
+    redirectURIs:
+      - "http://127.0.0.1:5173/api/v1/auth/oidc/callback"
+      - "http://localhost:5173/api/v1/auth/oidc/callback"
+      - "http://127.0.0.1:8000/api/v1/auth/oidc/callback"
+    name: knowledge-be
+    secret: knowledge-be-dex-local-secret
+enablePasswordDB: true
+oauth2:
+  responseTypes:
+    - code
+    - id_token
+    - token
+  skipApprovalScreen: true
+staticPasswords:
+  - email: "admin@kb.local"
+    # bcrypt hash of "password" (local only)
+    hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1quSHyJXnqKeC"
+    username: "admin"
+    userID: "knowledge-be-local-admin"

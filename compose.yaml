@@ -1,0 +1,474 @@
+# Local stack aligned with WeKnora's compose shape.
+#
+# Default (no profile):
+#   Postgres (pgvector), Redis, migrate, API, worker, Vite SPA
+#   Local file storage on files_data → /data/files
+#   Retrieve driver postgres; sandbox mode local
+#
+# Optional profiles:
+#   minio | neo4j | qdrant | milvus | weaviate | searxng | doris
+#   sandbox | mcp | dex | langfuse | odl-hybrid
+#   full → minio + neo4j + qdrant + searxng + sandbox + mcp + dex
+#
+# Not shipped: WeKnora docreader image (parse is in-process / ODL).
+#
+#   docker compose up -d --build
+#   docker compose --profile full up -d --build
+#   WITH_ODL=1 docker compose --profile odl-hybrid up -d --build
+
+name: knowledge-be
+
+x-app-env: &app-env
+  env_file:
+    - deploy/env/compose.env
+  environment:
+    DB_HOST: postgres
+    DB_PORT: "5432"
+    REDIS_URL: redis://redis:6379
+    LOCAL_STORAGE_BASE_DIR: /data/files
+    RETRIEVE_DRIVER: postgres
+    KB_SANDBOX_MODE: ${KB_SANDBOX_MODE:-local}
+    KB_SANDBOX_DOCKER_IMAGE: knowledge-be-sandbox:local
+    MINIO_ENDPOINT: minio:9000
+    MINIO_ACCESS_KEY_ID: minioadmin
+    MINIO_SECRET_ACCESS_KEY: minioadmin
+    MINIO_BUCKET_NAME: knowledge-be
+    NEO4J_URI: bolt://neo4j:7687
+    NEO4J_USERNAME: neo4j
+    NEO4J_PASSWORD: password
+    QDRANT_HOST: qdrant
+    QDRANT_PORT: "6334"
+    MILVUS_ADDRESS: milvus:19530
+    WEAVIATE_HOST: weaviate:8080
+    WEAVIATE_GRPC_ADDRESS: weaviate:50051
+    WEAVIATE_SCHEME: http
+    DORIS_ADDR: doris-fe:9030
+    DORIS_HTTP_PORT: "8030"
+    DORIS_DATABASE: knowledge_be
+    DORIS_USERNAME: root
+    DORIS_PASSWORD: ""
+    ODL_HYBRID_URL: ${ODL_HYBRID_URL:-http://odl-hybrid:5002}
+    ODL_HYBRID: ${ODL_HYBRID:-docling-fast}
+  volumes:
+    - files_data:/data/files
+    - /var/run/docker.sock:/var/run/docker.sock
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: knowledge_be
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d knowledge_be"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  migrate:
+    <<: *app-env
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+      target: api
+      args:
+        WITH_ODL: ${WITH_ODL:-0}
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    <<: *app-env
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+      target: api
+      args:
+        WITH_ODL: ${WITH_ODL:-0}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    <<: *app-env
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+      target: worker
+      args:
+        WITH_ODL: ${WITH_ODL:-0}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  web:
+    image: node:22-bookworm
+    working_dir: /frontend
+    volumes:
+      - ./frontend:/frontend
+      - web_node_modules:/frontend/node_modules
+    environment:
+      VITE_DEV_PROXY_TARGET: http://api:8000
+    command:
+      - sh
+      - -c
+      - test -d node_modules/vite || npm ci; npm run dev -- --host 0.0.0.0 --port 5173
+    ports:
+      - "5173:5173"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  sandbox:
+    image: knowledge-be-sandbox:local
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.sandbox
+    command: ["true"]
+    restart: "no"
+    profiles: [sandbox, full]
+
+  mcp:
+    build:
+      context: ./mcp-server
+    ports:
+      - "${MCP_PORT:-8082}:8000"
+    environment:
+      KNOWLEDGE_BE_BASE_URL: http://api:8000/api/v1
+      KNOWLEDGE_BE_API_KEY: ${KNOWLEDGE_BE_API_KEY:-}
+      MCP_SERVER_AUTH_TOKEN: ${MCP_SERVER_AUTH_TOKEN:-knowledge-be-local-mcp-token}
+      MCP_ALLOWED_UPLOAD_DIRS: /data/files
+    volumes:
+      - files_data:/data/files
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    profiles: [mcp, full]
+
+  dex:
+    image: dexidp/dex:v2.41.1
+    command: ["dex", "serve", "/etc/dex/config.yaml"]
+    ports:
+      - "5556:5556"
+    volumes:
+      - ./deploy/dex/config.yaml:/etc/dex/config.yaml:ro
+    restart: unless-stopped
+    profiles: [dex, full]
+
+  odl-hybrid:
+    image: knowledge-be-odl-hybrid:local
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile.odl-hybrid
+    environment:
+      ODL_HYBRID_EXTRA_ARGS: ${ODL_HYBRID_EXTRA_ARGS:---no-ocr}
+    expose:
+      - "5002"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+    profiles: [odl-hybrid]
+
+  langfuse-db-init:
+    image: pgvector/pgvector:pg16
+    environment:
+      PGPASSWORD: postgres
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        until pg_isready -h postgres -U postgres; do sleep 1; done;
+        psql -h postgres -U postgres -d postgres -tc
+        "SELECT 1 FROM pg_database WHERE datname='langfuse'"
+        | grep -q 1
+        || psql -h postgres -U postgres -d postgres
+        -c "CREATE DATABASE langfuse TEMPLATE template0;"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    profiles: [langfuse]
+
+  langfuse-clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    restart: unless-stopped
+    profiles: [langfuse]
+
+  langfuse-minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    entrypoint: ["/bin/sh"]
+    environment:
+      MINIO_ROOT_USER: langfuseminio
+      MINIO_ROOT_PASSWORD: langfuseminiosecret
+    volumes:
+      - langfuse_minio_data:/data
+    restart: unless-stopped
+    profiles: [langfuse]
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    depends_on:
+      langfuse-db-init:
+        condition: service_completed_successfully
+      langfuse-clickhouse:
+        condition: service_started
+      langfuse-minio:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/langfuse
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: langfuseminio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: langfuseminiosecret
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: langfuseminio
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: langfuseminiosecret
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+    restart: unless-stopped
+    profiles: [langfuse]
+
+  langfuse-web:
+    image: langfuse/langfuse:3
+    depends_on:
+      langfuse-worker:
+        condition: service_started
+    ports:
+      - "${LANGFUSE_WEB_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/langfuse
+      CLICKHOUSE_URL: http://langfuse-clickhouse:8123
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_MIGRATION_URL: clickhouse://langfuse-clickhouse:9000
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      NEXTAUTH_URL: http://127.0.0.1:3000
+      NEXTAUTH_SECRET: knowledge-be-langfuse-nextauth-secret
+      SALT: knowledge-be-langfuse-salt
+      ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+      LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: langfuseminio
+      LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: langfuseminiosecret
+      LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+      LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+      LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: langfuseminio
+      LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: langfuseminiosecret
+      LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://langfuse-minio:9000
+      LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+    restart: unless-stopped
+    profiles: [langfuse]
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    command: server --console-address ":9001" /data
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    profiles: [minio, full]
+
+  neo4j:
+    image: neo4j:2025.10.1
+    environment:
+      NEO4J_AUTH: neo4j/password
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_apoc_export_file_enabled: "true"
+      NEO4J_apoc_import_file_enabled: "true"
+      NEO4J_apoc_import_file_use__neo4j__config: "true"
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+    restart: unless-stopped
+    profiles: [neo4j, full]
+
+  qdrant:
+    image: qdrant/qdrant:v1.16.2
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+    profiles: [qdrant, full]
+
+  milvus:
+    image: milvusdb/milvus:v2.6.11
+    security_opt:
+      - seccomp:unconfined
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_USE_EMBED: "true"
+      ETCD_DATA_DIR: /var/lib/milvus/etcd
+      COMMON_STORAGETYPE: local
+      DEPLOY_MODE: STANDALONE
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    volumes:
+      - milvus_data:/var/lib/milvus
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+    profiles: [milvus]
+
+  weaviate:
+    image: semitechnologies/weaviate:1.28.4
+    environment:
+      PERSISTENCE_DATA_PATH: /var/lib/weaviate
+      CLUSTER_HOSTNAME: node1
+      DEFAULT_VECTORIZER_MODULE: none
+      ENABLE_MODULES: none
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      CLUSTER_GOSSIP_BIND_PORT: "7000"
+      CLUSTER_DATA_BIND_PORT: "7001"
+      RAFT_BOOTSTRAP_EXPECT: "1"
+    ports:
+      - "9035:8080"
+      - "50052:50051"
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    restart: unless-stopped
+    profiles: [weaviate]
+
+  searxng:
+    image: searxng/searxng:latest
+    ports:
+      - "127.0.0.1:8888:8080"
+    environment:
+      SEARXNG_BASE_URL: http://127.0.0.1:8888/
+      SEARXNG_SECRET: knowledge-be-local-searxng-secret
+    volumes:
+      - searxng_data:/etc/searxng
+    restart: unless-stopped
+    profiles: [searxng, full]
+
+  doris-fe:
+    image: apache/doris:fe-4.1.0
+    hostname: doris-fe
+    environment:
+      FE_SERVERS: fe1:doris-fe:9010
+      FE_ID: "1"
+    ports:
+      - "8030:8030"
+      - "9030:9030"
+    volumes:
+      - doris_fe_meta:/opt/apache-doris/fe/doris-meta
+      - doris_fe_log:/opt/apache-doris/fe/log
+    restart: unless-stopped
+    profiles: [doris]
+
+  doris-be:
+    image: apache/doris:be-4.1.0
+    hostname: doris-be
+    environment:
+      FE_SERVERS: fe1:doris-fe:9010
+      BE_ADDR: doris-be:9050
+    ports:
+      - "8040:8040"
+    volumes:
+      - doris_be_storage:/opt/apache-doris/be/storage
+      - doris_be_log:/opt/apache-doris/be/log
+    depends_on:
+      - doris-fe
+    restart: unless-stopped
+    profiles: [doris]
+
+volumes:
+  postgres_data:
+  redis_data:
+  files_data:
+  web_node_modules:
+  minio_data:
+  neo4j_data:
+  qdrant_data:
+  milvus_data:
+  weaviate_data:
+  searxng_data:
+  doris_fe_meta:
+  doris_fe_log:
+  doris_be_storage:
+  doris_be_log:
+  langfuse_clickhouse_data:
+  langfuse_minio_data:

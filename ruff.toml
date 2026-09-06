@@ -4,7 +4,7 @@ src = ["src", "tests"]
 # `scripts/` holds standalone anti-drift tooling; it is not
 # application code and is not linted. `*_pb2*` files are
 # protoc-generated — never hand-edited, so lint/format skip them.
-extend-exclude = ["scripts", "src/ai/docreader/proto"]
+extend-exclude = ["scripts", "src/ai/docreader/proto", "mcp-server"]
 
 [lint]
 select = [

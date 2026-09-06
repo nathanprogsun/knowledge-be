@@ -27,12 +27,22 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Sync deps
 uv sync --all-extras
 
-# Copy and edit environment
+# Copy and edit environment (host `make dev-app`; not used by compose)
 cp .env.example .env
-# Postgres and Redis must be reachable at DB_* and REDIS_URL.
-# Optional local stack (reads deploy/env/api.env.example and
-# deploy/env/worker.env.example; compose overrides DB_HOST and REDIS_URL):
-#   docker compose -f deploy/docker/docker-compose.yml up -d postgres redis
+# Full local stack (Postgres, Redis, migrate, API, worker, SPA):
+#   docker compose up -d --build
+# WeKnora-shaped optional sidecars (minio / neo4j / qdrant / searxng):
+#   docker compose --profile full up -d --build
+# Single profile examples:
+#   docker compose --profile minio up -d
+#   docker compose --profile qdrant up -d
+# Infra only, then run the API on the host:
+#   docker compose up -d postgres redis
+# Compose credentials are deploy/env/compose.env (DB_PASSWORD=postgres,
+# REDIS_URL without a password). Point host `.env` at those values.
+# Default file storage is local at /data/files (shared volume on api/worker).
+# After login, create a `local` storage backend (or MinIO when that profile
+# is up) and set it as the tenant default before uploading documents.
 
 # Lint / typecheck / tests
 make lint
@@ -64,7 +74,14 @@ make dev-worker
 
 `make typecheck` is full mypy; CI uses the mypy ratchet (`make check-mypy-baseline`).
 `make test` runs the full pytest tree, including live-Postgres suites; CI ignores those suites.
-Document parsing needs a docreader gRPC process at `DOCREADER_ADDR`; compose does not start it yet.
+Document parse is in-process (`BuiltinDocumentReader`); compose does not start a WeKnora docreader image.
+The SPA is `http://127.0.0.1:5173` and the API is `http://127.0.0.1:8000`. Compose sets `AUTO_SETUP_ENABLED=true` so `/api/v1/auth/auto-setup` can mint the default account.
+Default retrieve driver is `postgres` (pgvector). Optional compose profiles:
+`minio`, `neo4j`, `qdrant`, `milvus`, `weaviate`, `searxng`, `doris`,
+`sandbox`, `mcp`, `dex`, `langfuse`, `odl-hybrid`, and `full`
+(minio+neo4j+qdrant+searxng+sandbox+mcp+dex).
+Sandbox image is `knowledge-be-sandbox:local` (built here).
+PDF via OpenDataLoader: `WITH_ODL=1 docker compose --profile odl-hybrid up -d --build`.
 
 ### Frontend dev loop
 

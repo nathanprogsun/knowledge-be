@@ -1,4 +1,4 @@
-.PHONY: help install sync lint typecheck format format-fix test migrate clean dev-app dev-worker openapi frontend-install frontend-typecheck frontend-test frontend-build check check-layer check-singleton check-endpoint check-schema check-imports check-sql check-pr-leak check-map-from-db check-exception-types check-agent-notes check-feature-map check-env-example
+.PHONY: help install sync lint typecheck format format-fix test migrate clean dev-app dev-worker compose-up compose-full compose-down openapi frontend-install frontend-typecheck frontend-test frontend-build check check-layer check-singleton check-endpoint check-schema check-imports check-sql check-pr-leak check-map-from-db check-exception-types check-agent-notes check-feature-map check-env-example
 
 help:
 	@echo "Targets:"
@@ -14,6 +14,9 @@ help:
 	@echo "  clean                remove caches"
 	@echo "  dev-app              uvicorn with reload on :8000"
 	@echo "  dev-worker           uv run python -m src.workers.main"
+	@echo "  compose-up           docker compose up -d --build"
+	@echo "  compose-full         docker compose --profile full up -d --build"
+	@echo "  compose-down         docker compose down"
 	@echo "  openapi              export OpenAPI + generate frontend schema.ts"
 	@echo "  frontend-install     npm ci in frontend/"
 	@echo "  frontend-typecheck   vue-tsc"
@@ -110,6 +113,15 @@ dev-app:
 
 dev-worker:
 	uv run python -m src.workers.main
+
+compose-up:
+	docker compose up -d --build
+
+compose-full:
+	docker compose --profile full up -d --build
+
+compose-down:
+	docker compose down
 
 # ── Frontend contract codegen ───────────────────────────────────────────
 # Single source of truth: FastAPI OpenAPI schema. Frontend TS types are

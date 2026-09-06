@@ -29,7 +29,7 @@ before proceeding.
 docker build -f deploy/docker/Dockerfile -t knowledge-be-api:<tag> .
 
 # Worker image
-docker build -f deploy/docker/Dockerfile.worker -t knowledge-be-worker:<tag> .
+docker build -f deploy/docker/Dockerfile --target worker -t knowledge-be-worker:<tag> .
 ```
 
 ## Phase 2 — Migrate the database

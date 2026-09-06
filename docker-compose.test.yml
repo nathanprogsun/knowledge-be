@@ -1,35 +1,10 @@
-# docker-compose.test.yml — placeholder for the initial scaffold.
+# Integration-test infra. Same Postgres + Redis as the local stack.
 #
-# The scaffold ships the file commented out; integration tests are
-# expected to enable these services before running. When uncommented
-# and `docker compose up -d` is invoked, both services come up on
-# default ports with the env vars expected by src/settings.py.
-#
-# Usage (later):
-#   docker compose -f docker-compose.test.yml up -d
+#   docker compose up -d postgres redis
 #   uv run pytest tests/
+#
+# The historical file listed commented stubs. The running definitions
+# live in compose.yaml at the repository root.
 
-services:
-  # postgres:
-  #   image: postgres:16-alpine
-  #   environment:
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: postgres
-  #     POSTGRES_DB: knowledge_be
-  #   ports:
-  #     - "5432:5432"
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
-  #     interval: 5s
-  #     timeout: 3s
-  #     retries: 5
-
-  # redis:
-  #   image: redis:7-alpine
-  #   ports:
-  #     - "6379:6379"
-  #   healthcheck:
-  #     test: ["CMD", "redis-cli", "ping"]
-  #     interval: 5s
-  #     timeout: 3s
-  #     retries: 5
+include:
+  - path: compose.yaml

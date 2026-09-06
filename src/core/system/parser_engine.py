@@ -56,6 +56,7 @@ _BUILTIN_FILE_TYPES: Final[tuple[str, ...]] = (
     "json",
     "html",
     "htm",
+    "pdf",
     "jpg",
     "jpeg",
     "png",

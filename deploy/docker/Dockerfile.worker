@@ -1,26 +1,26 @@
-FROM python:3.11-slim-bookworm
+# syntax=docker/dockerfile:1
+# Alias for the shared worker target. Canonical command:
+#   docker build -f deploy/docker/Dockerfile --target worker -t knowledge-be-worker .
+#
+# `docker build -f deploy/docker/Dockerfile.worker` still produces that image.
 
-LABEL component="knowledge-be-worker"
-LABEL description="ARQ background worker for the knowledge management backend"
+FROM python:3.11-slim-bookworm AS runtime
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    PATH="/app/.venv/bin:$PATH"
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+COPY --from=ghcr.io/astral-sh/uv:0.10.9 /uv /bin/uv
 
 WORKDIR /app
 
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -e ".[dev]"
-
-COPY src/ ./src/
-COPY alembic/ ./alembic/
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src
+COPY alembic ./alembic
 COPY alembic.ini ./
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD pgrep -f "python -m src.workers.main" > /dev/null || exit 1
+RUN uv sync --frozen --no-dev --no-editable
 
 CMD ["python", "-m", "src.workers.main"]

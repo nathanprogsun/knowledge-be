@@ -81,6 +81,7 @@ def test_builtin_engine_file_types_match_in_process_handlers() -> None:
         "json",
         "html",
         "htm",
+        "pdf",
         "jpg",
         "jpeg",
         "png",
@@ -90,7 +91,6 @@ def test_builtin_engine_file_types_match_in_process_handlers() -> None:
         "webp",
     } <= set(builtin.file_types)
     assert "docx" not in builtin.file_types
-    assert "pdf" not in builtin.file_types
 
 
 # ── Parser engines: availability ────────────────────────────────────

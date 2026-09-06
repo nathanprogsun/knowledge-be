@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import tempfile
 from collections.abc import Callable, Mapping
 from html.parser import HTMLParser
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Final, TypeAlias
 from urllib.parse import urlparse
 
@@ -19,6 +21,12 @@ from src.common.exception import ExternalServiceError
 from src.common.json import JsonValue
 from src.core.knowledge.documents.parse_pipeline import ParseResult, ReadRequest
 from src.core.system.parser_engine import BUILTIN_ENGINE_NAME, SIMPLE_ENGINE_NAME
+
+try:
+    import opendataloader_pdf as _opendataloader_pdf
+except ImportError:  # optional extra; PDF path fails closed when missing
+    _opendataloader_pdf = None
+
 
 Handler: TypeAlias = Callable[[bytes, ReadRequest], ParseResult]
 
@@ -97,6 +105,58 @@ def _read_image(_payload: bytes, request: ReadRequest) -> ParseResult:
     return _result(f"![{name}]({name})", request)
 
 
+def _read_pdf(payload: bytes, request: ReadRequest) -> ParseResult:
+    """Parse PDF via OpenDataLoader hybrid when ``ODL_HYBRID_URL`` is set.
+
+    Requires the optional ``opendataloader-pdf`` package (compose builds
+    the worker with ``WITH_ODL=1`` under ``--profile odl-hybrid``).
+    """
+    hybrid_url = os.getenv("ODL_HYBRID_URL", "").strip()
+    if not hybrid_url:
+        raise ExternalServiceError(
+            code=_ENGINE_UNAVAILABLE,
+            message=("PDF parse requires ODL_HYBRID_URL (docker compose --profile odl-hybrid)"),
+        )
+    if _opendataloader_pdf is None:
+        raise ExternalServiceError(
+            code=_ENGINE_UNAVAILABLE,
+            message=(
+                "opendataloader-pdf is not installed; rebuild the worker image with WITH_ODL=1"
+            ),
+        )
+
+    safe_name = PurePosixPath(request.file_name.strip() or "document.pdf").name
+    if not safe_name.lower().endswith(".pdf"):
+        safe_name = f"{PurePosixPath(safe_name).stem or 'document'}.pdf"
+    stem = PurePosixPath(safe_name).stem
+
+    with tempfile.TemporaryDirectory(prefix="kb-odl-") as tmp_dir:
+        pdf_path = Path(tmp_dir) / safe_name
+        pdf_path.write_bytes(payload)
+        image_dir = Path(tmp_dir) / "images"
+        image_dir.mkdir(parents=True, exist_ok=True)
+        _opendataloader_pdf.convert(
+            input_path=str(pdf_path),
+            output_dir=tmp_dir,
+            format="markdown",
+            image_output="external",
+            image_dir=str(image_dir),
+            quiet=True,
+            hybrid=os.getenv("ODL_HYBRID", "docling-fast").strip() or "docling-fast",
+            hybrid_url=hybrid_url,
+            hybrid_fallback=True,
+        )
+        md_candidates = sorted(Path(tmp_dir).rglob("*.md"))
+        if not md_candidates:
+            raise ExternalServiceError(
+                code=_FAILED,
+                message="OpenDataLoader produced no markdown",
+            )
+        preferred = [p for p in md_candidates if p.stem == stem or p.stem.startswith(stem)]
+        md_path = preferred[0] if preferred else max(md_candidates, key=lambda p: p.stat().st_mtime)
+        return _result(md_path.read_text(encoding="utf-8", errors="replace"), request)
+
+
 HANDLERS: Final[Mapping[str, Handler]] = {
     "txt": _read_text,
     "md": _read_text,
@@ -105,6 +165,7 @@ HANDLERS: Final[Mapping[str, Handler]] = {
     "json": _read_json,
     "html": _read_html,
     "htm": _read_html,
+    "pdf": _read_pdf,
     "jpg": _read_image,
     "jpeg": _read_image,
     "png": _read_image,

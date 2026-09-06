@@ -17,7 +17,10 @@ from src.core.agents.engine.sandbox.errors import SandboxConfigError
 DEFAULT_TIMEOUT = 60.0  # seconds
 DEFAULT_MEMORY_LIMIT = 256 * 1024 * 1024  # 256MB
 DEFAULT_CPU_LIMIT = 1.0  # 1 CPU core
-DEFAULT_DOCKER_IMAGE = "wechatopenai/kb-sandbox:latest"
+# Built by ``deploy/docker/Dockerfile.sandbox`` (compose profile ``sandbox``).
+# Not ``wechatopenai/kb-sandbox``: that name was a port-time rename of
+# WeKnora's image and was never published for this product.
+DEFAULT_DOCKER_IMAGE = "knowledge-be-sandbox:local"
 
 
 class SandboxType(StrEnum):

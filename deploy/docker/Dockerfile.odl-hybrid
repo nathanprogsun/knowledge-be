@@ -1,0 +1,25 @@
+# knowledge-be OpenDataLoader PDF hybrid backend (Docling).
+# Local build: docker compose --profile odl-hybrid up -d --build
+# Default --no-ocr; override ODL_HYBRID_EXTRA_ARGS for OCR.
+FROM python:3.10.18-bookworm
+
+# Docling table/layout models import cv2 (OpenCV), which needs libGL at runtime
+# even when hybrid runs with --no-ocr.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    libgl1 \
+    libglib2.0-0 \
+    libgomp1 \
+    libsm6 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir "opendataloader-pdf[hybrid]>=2.4.7"
+
+EXPOSE 5002
+
+ENV ODL_HYBRID_EXTRA_ARGS="--no-ocr"
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=5 --start-period=120s \
+    CMD curl -f http://localhost:5002/health || exit 1
+
+CMD ["bash", "-c", "exec opendataloader-pdf-hybrid --host 0.0.0.0 --port 5002 ${ODL_HYBRID_EXTRA_ARGS}"]
