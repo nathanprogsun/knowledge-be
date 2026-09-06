@@ -1533,6 +1533,60 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/invitations",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/invitations",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/tenants/{tenant_id}/invitations/{inv_id}",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/invite-links",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/leave",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/members",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/members",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/tenants/{tenant_id}/members/{user_id}",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/tenants/{tenant_id}/members/{user_id}",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/user/favorites",
       "file": "src/web/api/favorites/router.py",
       "domain": "favorites"
