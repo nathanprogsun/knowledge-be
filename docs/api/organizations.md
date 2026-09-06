@@ -25,3 +25,5 @@ Routes registered under `/api/v1/organizations`. Path parameters use FastAPI `{n
 | POST | `/organizations/{id}/request-upgrade` |
 | GET | `/organizations/{id}/search-tenants` |
 | GET | `/organizations/{id}/search-users` |
+| GET | `/organizations/{id}/shares` |
+| GET | `/organizations/{id}/shared-knowledge-bases` |

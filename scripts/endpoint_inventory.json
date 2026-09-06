@@ -1,5 +1,5 @@
 {
-  "total_paths": 256,
+  "total_paths": 260,
   "endpoints": [
     {
       "method": "POST",
@@ -559,6 +559,22 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/knowledge-bases/{id}/shares"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-bases/{id}/shares"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/knowledge-bases/{id}/shares/{share_id}"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledge-bases/{id}/shares/{share_id}"
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/knowledge-bases/{id}/tags"
     },
     {
@@ -928,6 +944,14 @@
     {
       "method": "GET",
       "path": "/api/v1/organizations/{id}/search-users"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organizations/{id}/shared-knowledge-bases"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organizations/{id}/shares"
     },
     {
       "method": "GET",

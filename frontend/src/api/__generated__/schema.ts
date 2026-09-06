@@ -2636,6 +2636,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/knowledge-bases/{id}/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Knowledge Base Shares
+         * @description List live grants of a knowledge base owned by the caller.
+         */
+        get: operations["list_knowledge_base_shares_api_v1_knowledge_bases__id__shares_get"];
+        put?: never;
+        /**
+         * Share Knowledge Base
+         * @description Share an owned knowledge base into an organization.
+         */
+        post: operations["share_knowledge_base_api_v1_knowledge_bases__id__shares_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge-bases/{id}/shares/{share_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Knowledge Base Share
+         * @description Update a stored knowledge-base share grant.
+         */
+        put: operations["update_knowledge_base_share_api_v1_knowledge_bases__id__shares__share_id__put"];
+        post?: never;
+        /**
+         * Remove Knowledge Base Share
+         * @description Revoke a knowledge-base share grant.
+         */
+        delete: operations["remove_knowledge_base_share_api_v1_knowledge_bases__id__shares__share_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/knowledge-bases/{id}/knowledge/file": {
         parameters: {
             query?: never;
@@ -3903,6 +3951,46 @@ export interface paths {
          * @description List knowledge bases shared into the caller's workspace.
          */
         get: operations["list_shared_knowledge_bases_api_v1_shared_knowledge_bases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{id}/shared-knowledge-bases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Organization Shared Knowledge Bases
+         * @description List knowledge bases shared into one organization, including the caller's.
+         */
+        get: operations["list_organization_shared_knowledge_bases_api_v1_organizations__id__shared_knowledge_bases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizations/{id}/shares": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Organization Knowledge Base Shares
+         * @description List knowledge-base grants held by one organization.
+         */
+        get: operations["list_organization_knowledge_base_shares_api_v1_organizations__id__shares_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7197,6 +7285,13 @@ export interface components {
             /** Vector Store Id */
             vector_store_id?: string | null;
         };
+        /** CreateKnowledgeBaseShareRequest */
+        CreateKnowledgeBaseShareRequest: {
+            /** Organization Id */
+            organization_id: string;
+            /** Permission */
+            permission: string;
+        };
         /** CreateKnowledgeFromURLRequest */
         CreateKnowledgeFromURLRequest: {
             /** Url */
@@ -9571,6 +9666,67 @@ export interface components {
              */
             success: boolean;
             data: components["schemas"]["KnowledgeBasePinData"];
+        };
+        /** KnowledgeBaseShare */
+        KnowledgeBaseShare: {
+            /** Id */
+            id: string;
+            /** Knowledge Base Id */
+            knowledge_base_id?: string | null;
+            /** Knowledge Base Name */
+            knowledge_base_name?: string | null;
+            /** Knowledge Base Type */
+            knowledge_base_type?: string | null;
+            /** Knowledge Count */
+            knowledge_count?: number | null;
+            /** Chunk Count */
+            chunk_count?: number | null;
+            /** Organization Id */
+            organization_id: string;
+            /** Organization Name */
+            organization_name?: string | null;
+            /** Shared By User Id */
+            shared_by_user_id?: string | null;
+            /** Shared By Username */
+            shared_by_username?: string | null;
+            /** Source Tenant Id */
+            source_tenant_id: number;
+            /** Permission */
+            permission: string;
+            /** My Role In Org */
+            my_role_in_org?: string | null;
+            /** My Permission */
+            my_permission?: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * KnowledgeBaseShareEnvelope
+         * @description ``{"success": true, "data": {...}}`` - single KB-share responses.
+         */
+        KnowledgeBaseShareEnvelope: {
+            /** Success */
+            success: boolean;
+            data: components["schemas"]["KnowledgeBaseShare"];
+        };
+        /**
+         * KnowledgeBaseShareListEnvelope
+         * @description ``{"success": true, "data": {"shares": [...], "total": n}}``.
+         */
+        KnowledgeBaseShareListEnvelope: {
+            /** Success */
+            success: boolean;
+            data: components["schemas"]["KnowledgeBaseShareListResponse"];
+        };
+        /** KnowledgeBaseShareListResponse */
+        KnowledgeBaseShareListResponse: {
+            /** Shares */
+            shares: components["schemas"]["KnowledgeBaseShare"][];
+            /** Total */
+            total: number;
         };
         /**
          * KnowledgeBatchEnvelope
@@ -13305,6 +13461,11 @@ export interface components {
             config?: {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
+        };
+        /** UpdateKnowledgeBaseShareRequest */
+        UpdateKnowledgeBaseShareRequest: {
+            /** Permission */
+            permission: string;
         };
         /** UpdateKnowledgeRequest */
         UpdateKnowledgeRequest: {
@@ -19555,6 +19716,152 @@ export interface operations {
             };
         };
     };
+    list_knowledge_base_shares_api_v1_knowledge_bases__id__shares_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBaseShareListEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    share_knowledge_base_api_v1_knowledge_bases__id__shares_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateKnowledgeBaseShareRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBaseShareEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_knowledge_base_share_api_v1_knowledge_bases__id__shares__share_id__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                id: string;
+                share_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateKnowledgeBaseShareRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBaseShareEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_knowledge_base_share_api_v1_knowledge_bases__id__shares__share_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                id: string;
+                share_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBaseShareEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     create_file_document_api_v1_knowledge_bases__id__knowledge_file_post: {
         parameters: {
             query?: never;
@@ -22272,6 +22579,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SharedKnowledgeBaseListEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_organization_shared_knowledge_bases_api_v1_organizations__id__shared_knowledge_bases_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SharedKnowledgeBaseListEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_organization_knowledge_base_shares_api_v1_organizations__id__shares_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBaseShareListEnvelope"];
                 };
             };
             /** @description Validation Error */

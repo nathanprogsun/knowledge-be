@@ -19,11 +19,13 @@ from src.common.json import JsonObject
 from src.core.contracts.organizations import (
     AgentShare,
     AgentShareListResponse,
+    KnowledgeBaseShare,
+    KnowledgeBaseShareListResponse,
     SharedAgentListItem,
     SharedKnowledgeBaseListItem,
 )
 from src.core.organizations.types import SharedAgentInfo, SharedKnowledgeBaseInfo
-from src.core.sharing.types import AgentShareInfo
+from src.core.sharing.types import AgentShareInfo, KnowledgeBaseShareInfo
 from src.web.api.agents.views import agent_to_contract
 from src.web.api.knowledge_bases.views import knowledge_base_to_contract
 
@@ -73,7 +75,11 @@ def _shared_kb_payload(info: SharedKnowledgeBaseInfo) -> JsonObject:
     return kb
 
 
-def _shared_kb_row(info: SharedKnowledgeBaseInfo) -> SharedKnowledgeBaseListItem:
+def _shared_kb_row(
+    info: SharedKnowledgeBaseInfo,
+    *,
+    emit_is_mine: bool,
+) -> SharedKnowledgeBaseListItem:
     """Project the service DTO onto the frozen shared-KB contract."""
     return SharedKnowledgeBaseListItem(
         knowledge_base=_shared_kb_payload(info),
@@ -83,7 +89,7 @@ def _shared_kb_row(info: SharedKnowledgeBaseInfo) -> SharedKnowledgeBaseListItem
         permission=info.permission,
         source_tenant_id=info.source_tenant_id,
         shared_at=info.shared_at,
-        is_mine=None,
+        is_mine=info.is_mine if emit_is_mine else None,
         source_from_agent=None,
     )
 
@@ -114,11 +120,13 @@ def _shared_agent_row(info: SharedAgentInfo) -> SharedAgentListItem:
 
 def shared_knowledge_base_list_envelope(
     items: list[SharedKnowledgeBaseInfo],
+    *,
+    emit_is_mine: bool = False,
 ) -> SharedKnowledgeBaseListEnvelope:
     """Wrap the shared-KB rows in the success envelope."""
     return SharedKnowledgeBaseListEnvelope(
         success=True,
-        data=[_shared_kb_row(info) for info in items],
+        data=[_shared_kb_row(info, emit_is_mine=emit_is_mine) for info in items],
         total=len(items),
     )
 
@@ -213,10 +221,86 @@ def agent_share_list_envelope(
     )
 
 
+class KnowledgeBaseShareEnvelope(BaseModel):
+    """``{"success": true, "data": {...}}`` - single KB-share responses."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: KnowledgeBaseShare
+
+
+class KnowledgeBaseShareListEnvelope(BaseModel):
+    """``{"success": true, "data": {"shares": [...], "total": n}}``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: KnowledgeBaseShareListResponse
+
+
+def kb_share_to_contract(
+    share: KnowledgeBaseShareInfo,
+    *,
+    org_name: str | None = None,
+) -> KnowledgeBaseShare:
+    """Project one KB-share row onto the wire contract."""
+    return KnowledgeBaseShare(
+        id=share.id,
+        knowledge_base_id=share.knowledge_base_id,
+        organization_id=share.organization_id,
+        organization_name=org_name,
+        shared_by_user_id=share.shared_by_user_id,
+        source_tenant_id=share.source_tenant_id,
+        permission=share.permission,
+        my_role_in_org=share.my_role_in_org,
+        my_permission=share.my_permission,
+        created_at=share.created_at,
+    )
+
+
+def kb_share_envelope(
+    share: KnowledgeBaseShareInfo,
+    *,
+    org_name: str | None = None,
+) -> KnowledgeBaseShareEnvelope:
+    """Wrap one KB-share row in the success envelope."""
+    return KnowledgeBaseShareEnvelope(
+        success=True,
+        data=kb_share_to_contract(share, org_name=org_name),
+    )
+
+
+def kb_share_list_envelope(
+    shares: list[KnowledgeBaseShareInfo],
+    *,
+    org_names: dict[str, str],
+) -> KnowledgeBaseShareListEnvelope:
+    """Wrap the KB-share rows in the success envelope."""
+    return KnowledgeBaseShareListEnvelope(
+        success=True,
+        data=KnowledgeBaseShareListResponse(
+            shares=[
+                kb_share_to_contract(share, org_name=org_names.get(share.organization_id))
+                for share in shares
+            ],
+            total=len(shares),
+        ),
+    )
+
+
 __all__ = [
+    "AgentShareEnvelope",
+    "AgentShareListEnvelope",
+    "KnowledgeBaseShareEnvelope",
+    "KnowledgeBaseShareListEnvelope",
     "SharedAgentDisabledEnvelope",
     "SharedAgentListEnvelope",
     "SharedKnowledgeBaseListEnvelope",
+    "agent_share_envelope",
+    "agent_share_list_envelope",
+    "kb_share_envelope",
+    "kb_share_list_envelope",
     "shared_agent_disabled_envelope",
     "shared_agent_list_envelope",
     "shared_knowledge_base_list_envelope",

@@ -10,6 +10,10 @@ Routes registered under `/api/v1/knowledge-bases`. Path parameters use FastAPI `
 | DELETE | `/knowledge-bases/{id}` |
 | GET | `/knowledge-bases/{id}` |
 | PUT | `/knowledge-bases/{id}` |
+| GET | `/knowledge-bases/{id}/shares` |
+| POST | `/knowledge-bases/{id}/shares` |
+| DELETE | `/knowledge-bases/{id}/shares/{share_id}` |
+| PUT | `/knowledge-bases/{id}/shares/{share_id}` |
 | POST | `/knowledge-bases/{id}/duplicate` |
 | DELETE | `/knowledge-bases/{id}/faq/entries` |
 | GET | `/knowledge-bases/{id}/faq/entries` |

@@ -22,7 +22,7 @@ share and the owning tenant are untouched.
 
 from __future__ import annotations
 
-from src.common.exception import PermissionDeniedError
+from src.common.exception import NotFoundError, PermissionDeniedError
 from src.core.agents.types import CustomAgentInfo
 from src.core.auth.permissions import TenantRole
 from src.core.knowledge.knowledge_bases.types import (
@@ -50,6 +50,7 @@ from src.db.dao.tenant_disabled_shared_agent_repository import (
 from src.db.dao.users_repository import UserRepository
 from src.db.dao.web_search_provider_repository import WebSearchProviderRepository
 from src.db.models.custom_agent import CustomAgent
+from src.db.models.kb_share import KnowledgeBaseShare
 from src.db.models.organization import has_org_permission
 
 # Error code reused for the "no share row" rejection on the hide toggle.
@@ -165,6 +166,80 @@ class SharedResourceService:
             ):
                 by_kb[kb.id] = info
         return list(by_kb.values())
+
+    async def list_organization_shared_knowledge_bases(
+        self,
+        *,
+        organization_id: str,
+        tenant_id: int,
+        caller_tenant_role: str,
+    ) -> list[SharedKnowledgeBaseInfo]:
+        """Knowledge bases shared into one organization.
+
+        Includes grants the caller tenant made (``is_mine``). Agent-carried
+        knowledge bases stay out of this list.
+        """
+        org = await self._org_repo.get_by_id_or_none(organization_id)
+        if org is None:
+            raise NotFoundError(
+                code="organization.not_found",
+                message=f"organization {organization_id} not found",
+            )
+        member = await self._member_repo.get_member(
+            organization_id=organization_id,
+            tenant_id=tenant_id,
+        )
+        if member is None:
+            raise NotFoundError(
+                code="organization.tenant_not_member",
+                message=f"tenant {tenant_id} is not a member of this organization",
+            )
+        shares = await self._kb_share_repo.list_by_organization(organization_id)
+        kb_by_id = await self._load_knowledge_bases({share.knowledge_base_id for share in shares})
+        items: list[SharedKnowledgeBaseInfo] = []
+        for share in shares:
+            kb = kb_by_id.get(share.knowledge_base_id)
+            if kb is None:
+                continue
+            items.append(
+                await self._organization_shared_kb_row(
+                    share,
+                    kb=kb,
+                    org_name=org.name,
+                    tenant_id=tenant_id,
+                    member_role=member.role,
+                    caller_tenant_role=caller_tenant_role,
+                )
+            )
+        return items
+
+    async def _organization_shared_kb_row(
+        self,
+        share: KnowledgeBaseShare,
+        *,
+        kb: KnowledgeBaseInfo,
+        org_name: str,
+        tenant_id: int,
+        member_role: str,
+        caller_tenant_role: str,
+    ) -> SharedKnowledgeBaseInfo:
+        is_mine = share.source_tenant_id == tenant_id
+        permission = share.permission
+        if not is_mine:
+            permission = _apply_tenant_role_cap(
+                _min_org_role(permission, member_role),
+                caller_tenant_role,
+            )
+        return SharedKnowledgeBaseInfo(
+            knowledge_base=await self._fill_kb_counts(kb, source_tenant_id=share.source_tenant_id),
+            share_id=share.id,
+            organization_id=share.organization_id,
+            org_name=org_name,
+            permission=permission,
+            source_tenant_id=share.source_tenant_id,
+            shared_at=share.created_at,
+            is_mine=is_mine,
+        )
 
     # ── Shared agents ──────────────────────────────────────────────
 
