@@ -650,6 +650,18 @@
       "domain": "knowledge"
     },
     {
+      "method": "PUT",
+      "path": "/api/v1/knowledge-bases/{id}/faq/entries/fields",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledge-bases/{id}/faq/entries/tags",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
       "method": "GET",
       "path": "/api/v1/knowledge-bases/{id}/faq/entries/{entry_id}",
       "file": "src/web/api/knowledge/faq/router.py",
@@ -664,6 +676,18 @@
     {
       "method": "POST",
       "path": "/api/v1/knowledge-bases/{id}/faq/entry",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledge-bases/{id}/faq/import/last-result/display",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-bases/{id}/faq/search",
       "file": "src/web/api/knowledge/faq/router.py",
       "domain": "knowledge"
     },
@@ -1244,6 +1268,36 @@
       "domain": "chat"
     },
     {
+      "method": "GET",
+      "path": "/api/v1/sessions/{session_id}/attachments",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/sessions/{session_id}/attachments",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/sessions/{session_id}/attachments/{attachment_id}",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sessions/{session_id}/attachments/{attachment_id}",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sessions/{session_id}/attachments/{attachment_id}/preview",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
       "method": "DELETE",
       "path": "/api/v1/sessions/{session_id}/messages",
       "file": "src/web/api/chat/sessions/router.py",
@@ -1450,6 +1504,60 @@
     {
       "method": "PUT",
       "path": "/api/v1/tenants/{tenant_id}/api-principal-config",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/invitations",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/invitations",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/tenants/{tenant_id}/invitations/{inv_id}",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/invite-links",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/leave",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/tenants/{tenant_id}/members",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/tenants/{tenant_id}/members",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/tenants/{tenant_id}/members/{user_id}",
+      "file": "src/web/api/tenants/router.py",
+      "domain": "tenants"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/tenants/{tenant_id}/members/{user_id}",
       "file": "src/web/api/tenants/router.py",
       "domain": "tenants"
     },
@@ -1735,6 +1843,11 @@
     {
       "name": "build_tag_service",
       "file": "src/core/knowledge/tags/factory.py",
+      "domain": "knowledge"
+    },
+    {
+      "name": "build_temporary_document_service",
+      "file": "src/core/knowledge/documents/factory.py",
       "domain": "knowledge"
     },
     {
