@@ -22,6 +22,7 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from random import randint
+from typing import cast
 from unittest.mock import AsyncMock
 
 import pytest
@@ -30,6 +31,7 @@ from faker import Faker
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
+from src.ai.storage.base import FileService
 from src.common.exception import ConflictError, NotFoundError, ValidationError
 from src.common.json import BindParams
 from src.core.contracts.knowledge import (
@@ -40,6 +42,10 @@ from src.core.contracts.knowledge import (
 from src.core.knowledge.documents.create_manual import create_knowledge_from_manual
 from src.core.knowledge.documents.create_passage import create_knowledge_from_passage
 from src.core.knowledge.documents.create_url import create_knowledge_from_url
+from src.core.knowledge.documents.file_url_store import (
+    FileUrlDownload,
+    store_file_url_bytes,
+)
 from src.core.knowledge.documents.types import (
     CHANNEL_API,
     CHANNEL_WEB,
@@ -625,6 +631,191 @@ async def test_create_url_duplicate_file_url_raises_conflict() -> None:
             url_guard=_url_guard_ok,
         )
     assert exc_info.value.code == "knowledge.duplicate_file"
+
+
+# ── file_url persist bytes ────────────────────────────────────────────
+
+
+class _SaveBytesFileService:
+    """Record ``save_bytes`` calls for the persist helper."""
+
+    def __init__(self, *, saved_path: str = "local://7/kb/report.pdf") -> None:
+        self.saved_path = saved_path
+        self.calls: list[tuple[bytes, int, str, bool]] = []
+
+    async def save_bytes(self, *, data: bytes, tenant_id: int, file_name: str, temp: bool) -> str:
+        self.calls.append((data, tenant_id, file_name, temp))
+        return self.saved_path
+
+
+class _FixedResolver:
+    def __init__(self, service: _SaveBytesFileService) -> None:
+        self.service = service
+
+    async def resolve_file_service(
+        self, *, knowledge_base_id: str, tenant_id: int
+    ) -> FileService | None:
+        return cast(FileService, self.service)
+
+
+class _FixedDownloader:
+    def __init__(self, *, data: bytes, content_type: str) -> None:
+        self.data = data
+        self.content_type = content_type
+        self.urls: list[str] = []
+
+    async def download(self, *, url: str) -> FileUrlDownload:
+        self.urls.append(url)
+        return FileUrlDownload(data=self.data, content_type=self.content_type)
+
+
+async def test_store_file_url_bytes_saves_and_writes_path() -> None:
+    repo, rows = _make_knowledge_repo()
+    tenant_id = make_test_tenant_id()
+    kb_id = _kbid()
+    source = "https://example.com/files/report.pdf"
+    row = _sample_row(
+        tenant_id=tenant_id,
+        kb_id=kb_id,
+        type="file_url",
+        title="report.pdf",
+        source=source,
+        file_name="report.pdf",
+        file_path="",
+        parse_status=PARSE_STATUS_PENDING,
+    )
+    rows[row.id] = row
+    file_service = _SaveBytesFileService()
+    downloader = _FixedDownloader(data=b"%PDF-1.4 bytes", content_type="application/pdf")
+
+    result = await store_file_url_bytes(
+        row=row,
+        file_path="",
+        url=source,
+        file_name="report.pdf",
+        file_type="pdf",
+        resolver=_FixedResolver(file_service),
+        downloader=downloader,
+        knowledge_repo=repo,
+        now=_NOW,
+    )
+
+    assert file_service.calls == [(b"%PDF-1.4 bytes", tenant_id, "report.pdf", False)]
+    assert downloader.urls == [source]
+    assert result.file_path == file_service.saved_path
+    assert result.file_content == b"%PDF-1.4 bytes"
+    assert result.url == ""
+    assert rows[row.id].file_path == file_service.saved_path
+
+
+async def test_store_url_row_skips_save_bytes() -> None:
+    repo, rows = _make_knowledge_repo()
+    tenant_id = make_test_tenant_id()
+    kb_id = _kbid()
+    source = "https://finance.sina.com.cn/stock/page"
+    row = _sample_row(
+        tenant_id=tenant_id,
+        kb_id=kb_id,
+        type="url",
+        title="Sina",
+        source=source,
+        file_name=None,
+        file_path=None,
+        file_type="html",
+        parse_status=PARSE_STATUS_PENDING,
+    )
+    rows[row.id] = row
+    file_service = _SaveBytesFileService()
+    downloader = _FixedDownloader(data=b"<html>page</html>", content_type="text/html")
+
+    result = await store_file_url_bytes(
+        row=row,
+        file_path="",
+        url=source,
+        file_name="",
+        file_type="html",
+        resolver=_FixedResolver(file_service),
+        downloader=downloader,
+        knowledge_repo=repo,
+        now=_NOW,
+    )
+
+    assert file_service.calls == []
+    assert downloader.urls == []
+    assert result.file_path == ""
+    assert result.file_content is None
+    assert result.url == source
+    assert rows[row.id].file_path is None
+
+
+async def test_store_file_url_rejects_html_web_page() -> None:
+    repo, rows = _make_knowledge_repo()
+    tenant_id = make_test_tenant_id()
+    kb_id = _kbid()
+    row = _sample_row(
+        tenant_id=tenant_id,
+        kb_id=kb_id,
+        type="file_url",
+        source="https://example.com/files/report.pdf",
+        file_name="report.pdf",
+        file_path="",
+        parse_status=PARSE_STATUS_PENDING,
+    )
+    rows[row.id] = row
+    file_service = _SaveBytesFileService()
+    downloader = _FixedDownloader(data=b"<html>login</html>", content_type="text/html")
+
+    with pytest.raises(ValidationError) as exc_info:
+        await store_file_url_bytes(
+            row=row,
+            file_path="",
+            url=row.source,
+            file_name="report.pdf",
+            file_type="pdf",
+            resolver=_FixedResolver(file_service),
+            downloader=downloader,
+            knowledge_repo=repo,
+            now=_NOW,
+        )
+
+    assert exc_info.value.code == "knowledge.file_url_html_rejected"
+    assert file_service.calls == []
+    assert rows[row.id].file_path == ""
+
+
+async def test_store_file_url_existing_path_skips_save_bytes() -> None:
+    repo, rows = _make_knowledge_repo()
+    tenant_id = make_test_tenant_id()
+    kb_id = _kbid()
+    row = _sample_row(
+        tenant_id=tenant_id,
+        kb_id=kb_id,
+        type="file_url",
+        source="https://example.com/files/report.pdf",
+        file_name="report.pdf",
+        file_path="local://already/stored.pdf",
+        parse_status=PARSE_STATUS_PENDING,
+    )
+    rows[row.id] = row
+    file_service = _SaveBytesFileService()
+    downloader = _FixedDownloader(data=b"x", content_type="application/pdf")
+
+    result = await store_file_url_bytes(
+        row=row,
+        file_path="",
+        url=row.source,
+        file_name="report.pdf",
+        file_type="pdf",
+        resolver=_FixedResolver(file_service),
+        downloader=downloader,
+        knowledge_repo=repo,
+        now=_NOW,
+    )
+
+    assert file_service.calls == []
+    assert result.file_path == "local://already/stored.pdf"
+    assert result.file_content is None
+    assert result.url == row.source
 
 
 # ── create_from_url: tags ─────────────────────────────────────────────

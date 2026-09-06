@@ -6,6 +6,9 @@ document status transitions:
 - entry guards short-circuit ``deleting`` / ``cancelled`` (abort) and
   ``completed`` (idempotent skip), while ``failed`` rows are retryable;
 - the row is flipped to ``processing`` before any work happens;
+- a ``file_url`` row with an empty ``file_path`` is downloaded and
+  stored through ``FileService.save_bytes`` before parse; type ``url``
+  is left without bytes;
 - parse → chunk → persist → index runs in order; a failure in any stage
   marks the row ``failed`` with the error message;
 - on success the row becomes queryable (``enable_status=enabled``,
@@ -17,15 +20,15 @@ document status transitions:
   (``PostProcessDispatcher``) the worker layer wires later.
 
 All external dependencies are injected: the document reader (docreader),
-the storage file reader, the embedding resolver, the retrieval-index
-resolver, the post-process dispatcher and the tenant storage accounting.
-Until those are composed by the worker layer, the seams stay protocols.
+the storage file reader, the file-service resolver, the embedding
+resolver, the retrieval-index resolver, the post-process dispatcher and
+the tenant storage accounting. Until those are composed by the worker
+layer, the seams stay protocols.
 """
 
 from __future__ import annotations
 
 import contextlib
-import uuid
 from collections.abc import Awaitable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -33,11 +36,17 @@ from typing import Protocol, TypeVar, runtime_checkable
 
 from src.ai.embedding import Context, Embedder, TaskContext
 from src.app_logging import logger
-from src.common.exception import ValidationError
+from src.common.exception import ApplicationError, ValidationError
 from src.common.json import JsonObject
 from src.core.knowledge.documents.chunk_pipeline import (
-    ParsedChunk,
     chunk_markdown,
+)
+from src.core.knowledge.documents.chunk_rows import build_chunk_rows
+from src.core.knowledge.documents.create_file import StorageResolver
+from src.core.knowledge.documents.file_url_store import (
+    FileUrlDownloader,
+    FileUrlStoreResult,
+    store_file_url_bytes,
 )
 from src.core.knowledge.documents.index_pipeline import IndexEngine, build_index_infos
 from src.core.knowledge.documents.parse_pipeline import (
@@ -65,14 +74,9 @@ from src.core.knowledge.knowledge_bases.service.kb_service import KBService
 from src.core.knowledge.knowledge_bases.types import KnowledgeBaseInfo
 from src.db.dao.chunk_repository import ChunkRepository
 from src.db.dao.knowledge_repository import KnowledgeRepository
-from src.db.models.chunk import Chunk
 from src.db.models.knowledge import Document
 
 # ── Constants ──────────────────────────────────────────────────────────
-
-# Chunk types persisted to the ``chunks`` table.
-_CHUNK_TYPE_TEXT = "text"
-_CHUNK_TYPE_PARENT_TEXT = "parent_text"
 
 # Rows become queryable once chunks and indexes are persisted.
 _ENABLE_STATUS_ENABLED = "enabled"
@@ -188,133 +192,6 @@ class TenantStorageResolver(Protocol):
         ...
 
 
-# ── Chunk row construction ────────────────────────────────────────────
-
-
-def _link_sequence(rows: list[Chunk]) -> list[Chunk]:
-    """Return new rows with prev/next ids wired between consecutive entries.
-
-    The input rows are frozen and never mutated; links are applied via
-    copies.
-    """
-    if len(rows) < 2:
-        return rows
-    linked: list[Chunk] = []
-    for i, row in enumerate(rows):
-        updates: dict[str, str | None] = {}
-        if i > 0:
-            updates["pre_chunk_id"] = rows[i - 1].id
-        if i < len(rows) - 1:
-            updates["next_chunk_id"] = rows[i + 1].id
-        linked.append(row.model_copy(update=updates) if updates else row)
-    return linked
-
-
-def build_chunk_rows(
-    *,
-    tenant_id: int,
-    knowledge_id: str,
-    knowledge_base_id: str,
-    chunks: list[ParsedChunk],
-    parent_chunks: list[ParsedChunk],
-    now: datetime,
-) -> tuple[list[Chunk], list[Chunk]]:
-    """Convert parsed chunks into storage rows.
-
-    Parent rows (parent-child mode) are stored as ``parent_text`` and
-    never indexed; text rows are stored as ``text`` and carry prev/next
-    links only in flat mode, mirroring the upstream chunk-write. In
-    parent-child mode each text row references its parent and only
-    parented rows join the index subset. Returns ``(all_rows, text_rows)``
-    with ``all_rows`` in document order and ``text_rows`` the subset that
-    feeds the vector index.
-    """
-    has_parent_child = bool(parent_chunks)
-
-    def _row(
-        *,
-        content: str,
-        chunk_index: int,
-        start_at: int,
-        end_at: int,
-        chunk_type: str,
-        context_header: str = "",
-        parent_chunk_id: str | None = None,
-    ) -> Chunk:
-        return Chunk(
-            id=str(uuid.uuid4()),
-            tenant_id=tenant_id,
-            knowledge_base_id=knowledge_base_id,
-            knowledge_id=knowledge_id,
-            content=content,
-            chunk_index=chunk_index,
-            is_enabled=True,
-            start_at=start_at,
-            end_at=end_at,
-            chunk_type=chunk_type,
-            parent_chunk_id=parent_chunk_id,
-            context_header=context_header,
-            created_at=now,
-            updated_at=now,
-        )
-
-    rows: list[Chunk] = []
-    if has_parent_child:
-        parents = [
-            _row(
-                content=pc.content,
-                chunk_index=pc.seq,
-                start_at=pc.start,
-                end_at=pc.end,
-                chunk_type=_CHUNK_TYPE_PARENT_TEXT,
-                context_header=pc.context_header,
-            )
-            for pc in parent_chunks
-        ]
-        rows.extend(_link_sequence(parents))
-        for pc in chunks:
-            if not pc.content.strip():
-                continue
-            rows.append(
-                _row(
-                    content=pc.content,
-                    chunk_index=pc.seq,
-                    start_at=pc.start,
-                    end_at=pc.end,
-                    chunk_type=_CHUNK_TYPE_TEXT,
-                    context_header=pc.context_header,
-                    parent_chunk_id=(
-                        parents[pc.parent_index].id if 0 <= pc.parent_index < len(parents) else None
-                    ),
-                )
-            )
-    else:
-        for pc in chunks:
-            if not pc.content.strip():
-                continue
-            rows.append(
-                _row(
-                    content=pc.content,
-                    chunk_index=pc.seq,
-                    start_at=pc.start,
-                    end_at=pc.end,
-                    chunk_type=_CHUNK_TYPE_TEXT,
-                    context_header=pc.context_header,
-                )
-            )
-
-    ordered = sorted(rows, key=lambda row: row.chunk_index)
-    if not has_parent_child:
-        ordered = _link_sequence(ordered)
-    text_rows = [
-        row
-        for row in ordered
-        if row.chunk_type == _CHUNK_TYPE_TEXT
-        and (not has_parent_child or row.parent_chunk_id is not None)
-    ]
-    return ordered, text_rows
-
-
 def kb_needs_embedding(indexing_strategy: JsonObject | None) -> bool:
     """True when vector or keyword indexing is enabled.
 
@@ -366,6 +243,8 @@ class DocumentProcessPipeline:
         index_engine_resolver: IndexEngineResolver | None = None,
         post_process_dispatcher: PostProcessDispatcher | None = None,
         storage_resolver: TenantStorageResolver | None = None,
+        file_service_resolver: StorageResolver | None = None,
+        file_url_downloader: FileUrlDownloader | None = None,
     ) -> None:
         self._knowledge_repo = knowledge_repo
         self._kb_service = kb_service
@@ -376,6 +255,8 @@ class DocumentProcessPipeline:
         self._index_engine_resolver = index_engine_resolver
         self._post_process_dispatcher = post_process_dispatcher
         self._storage_resolver = storage_resolver
+        self._file_service_resolver = file_service_resolver
+        self._file_url_downloader = file_url_downloader
 
     # ── Entry ────────────────────────────────────────────────────────
 
@@ -439,24 +320,28 @@ class DocumentProcessPipeline:
             now=now,
         )
 
-        # ── Parse ──────────────────────────────────────────────────
-        if self._reader is None:
-            return await self._fail(processing, _DOCREADER_NOT_CONFIGURED, now)
-        try:
-            parse_result = await parse_document(
-                reader=self._reader,
-                request=ReadRequest(
-                    file_path=file_path,
-                    file_name=file_name,
-                    file_type=file_type,
-                    url=url,
-                    title=processing.title,
-                    request_id=request_id,
-                ),
-                file_reader=self._file_reader,
-            )
-        except Exception as exc:
-            return await self._fail(processing, f"document read failed: {exc}", now)
+        stored = await self._store_file_url_or_fail(
+            processing,
+            file_path=file_path,
+            url=url,
+            file_name=file_name,
+            file_type=file_type,
+            now=now,
+        )
+        if isinstance(stored, ProcessOutcome):
+            return stored
+        processing = stored.row
+        parse_result = await self._parse_or_fail(
+            processing,
+            stored=stored,
+            file_path=file_path,
+            file_name=file_name,
+            file_type=file_type,
+            request_id=request_id,
+            now=now,
+        )
+        if isinstance(parse_result, ProcessOutcome):
+            return parse_result
 
         # URL imports adopt the extracted page title when no title is set.
         if url and (not processing.title or processing.title == url):
@@ -548,6 +433,63 @@ class DocumentProcessPipeline:
     async def _is_aborted(self, *, tenant_id: int, knowledge_id: str) -> bool:
         status = await self._current_status(tenant_id=tenant_id, knowledge_id=knowledge_id)
         return status in (PARSE_STATUS_DELETING, PARSE_STATUS_CANCELLED)
+
+    async def _store_file_url_or_fail(
+        self,
+        processing: Document,
+        *,
+        file_path: str,
+        url: str,
+        file_name: str,
+        file_type: str,
+        now: datetime,
+    ) -> FileUrlStoreResult | ProcessOutcome:
+        """Persist ``file_url`` bytes, or mark the row failed."""
+        try:
+            return await store_file_url_bytes(
+                row=processing,
+                file_path=file_path,
+                url=url,
+                file_name=file_name,
+                file_type=file_type,
+                resolver=self._file_service_resolver,
+                downloader=self._file_url_downloader,
+                knowledge_repo=self._knowledge_repo,
+                now=now,
+            )
+        except ApplicationError as exc:
+            return await self._fail(processing, exc.message, now)
+
+    async def _parse_or_fail(
+        self,
+        processing: Document,
+        *,
+        stored: FileUrlStoreResult,
+        file_path: str,
+        file_name: str,
+        file_type: str,
+        request_id: str,
+        now: datetime,
+    ) -> ParseResult | ProcessOutcome:
+        """Parse from stored bytes/path, or mark the row failed."""
+        if self._reader is None:
+            return await self._fail(processing, _DOCREADER_NOT_CONFIGURED, now)
+        try:
+            return await parse_document(
+                reader=self._reader,
+                request=ReadRequest(
+                    file_content=stored.file_content,
+                    file_path=stored.file_path or file_path,
+                    file_name=file_name,
+                    file_type=file_type,
+                    url=stored.url,
+                    title=processing.title,
+                    request_id=request_id,
+                ),
+                file_reader=self._file_reader,
+            )
+        except Exception as exc:
+            return await self._fail(processing, f"document read failed: {exc}", now)
 
     async def _mark_processing(self, row: Document, now: datetime) -> Document:
         """Flip the row to ``processing`` and return the persisted row."""

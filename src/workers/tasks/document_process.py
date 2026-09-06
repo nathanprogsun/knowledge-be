@@ -6,11 +6,8 @@ to the core pipeline :func:`src.core.knowledge.documents.process_document.proces
 
 The handler stays thin: payload parsing, logging, and result shaping
 live here; the actual parse / chunk / embed / index orchestration lives
-in the core layer. The worker wiring layer is responsible for
-constructing a fully composed :class:`DocumentProcessPipeline` (with
-all seams wired) before any real ingestion runs — until then the
-pipeline runs in its deferred-seam mode and short-circuits before any
-external work.
+in the core layer. The worker runtime composes the pipeline, including
+the file-service resolver used to persist ``file_url`` bytes.
 
 Wire field names mirror the upstream contract so payloads enqueued by
 the existing web/CLI paths deserialize without translation.
