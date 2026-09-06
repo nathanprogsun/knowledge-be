@@ -109,6 +109,7 @@ from src.web.api.knowledge.faq.router import (
 )
 from src.web.api.knowledge.faq.router import router as faq_router
 from src.web.api.knowledge.tags.router import router as knowledge_tags_router
+from src.web.api.knowledge.wiki.history_router import router as wiki_history_router
 from src.web.api.knowledge.wiki.router import router as wiki_router
 from src.web.api.knowledge_bases.router import router as knowledge_bases_router
 from src.web.api.knowledge_bases.shares_router import (
@@ -301,6 +302,7 @@ def create_app() -> FastAPI:
         web_search_router,
         documents_router,
         wiki_router,
+        wiki_history_router,
     ]
     for router in api_routers:
         application.include_router(router, prefix=api_v1_prefix)

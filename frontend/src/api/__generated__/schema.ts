@@ -5941,6 +5941,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/knowledgebase/{kb_id}/wiki/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Issues
+         * @description List issues for the KB. ``data`` is the list itself (empty is 200).
+         */
+        get: operations["get_issues_api_v1_knowledgebase__kb_id__wiki_issues_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledgebase/{kb_id}/wiki/issues/{issue_id}/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Put Issue Status
+         * @description Set an issue's status (``pending`` / ``ignored`` / ``resolved``).
+         */
+        put: operations["put_issue_status_api_v1_knowledgebase__kb_id__wiki_issues__issue_id__status_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledgebase/{kb_id}/wiki/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revert Page
+         * @description Restore a stored snapshot as a new edit. Missing version is 404.
+         */
+        post: operations["revert_page_api_v1_knowledgebase__kb_id__wiki_revert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledgebase/{kb_id}/wiki/revisions/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Revisions
+         * @description List snapshots, or return one snapshot with content when ``version`` is set.
+         */
+        get: operations["get_revisions_api_v1_knowledgebase__kb_id__wiki_revisions__slug__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/files": {
         parameters: {
             query?: never;
@@ -14036,6 +14116,13 @@ export interface components {
             /** Extraction Instructions */
             extraction_instructions?: string | null;
         };
+        /** WikiEnvelope[Union[WikiRevisionListData, WikiRevisionView]] */
+        WikiEnvelope_Union_WikiRevisionListData__WikiRevisionView__: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data: components["schemas"]["WikiRevisionListData"] | components["schemas"]["WikiRevisionView"];
+        };
         /** WikiEnvelope[WikiAutoFixData] */
         WikiEnvelope_WikiAutoFixData_: {
             /** Success */
@@ -14065,6 +14152,12 @@ export interface components {
             /** Success */
             success: boolean;
             data: components["schemas"]["WikiIndexData"];
+        };
+        /** WikiEnvelope[WikiIssueView] */
+        WikiEnvelope_WikiIssueView_: {
+            /** Success */
+            success: boolean;
+            data: components["schemas"]["WikiIssueView"];
         };
         /** WikiEnvelope[WikiLintReport] */
         WikiEnvelope_WikiLintReport_: {
@@ -14101,6 +14194,13 @@ export interface components {
             /** Success */
             success: boolean;
             data: components["schemas"]["WikiStats"];
+        };
+        /** WikiEnvelope[list[WikiIssueView]] */
+        WikiEnvelope_list_WikiIssueView__: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data: components["schemas"]["WikiIssueView"][];
         };
         /**
          * WikiFolderCreateRequest
@@ -14390,6 +14490,51 @@ export interface components {
              * @default
              */
             next_cursor: string;
+        };
+        /**
+         * WikiIssueStatusRequest
+         * @description Body for ``PUT /wiki/issues/{issue_id}/status``.
+         */
+        WikiIssueStatusRequest: {
+            /** Status */
+            status: string;
+        };
+        /**
+         * WikiIssueView
+         * @description One wiki page issue on the wire.
+         */
+        WikiIssueView: {
+            /** Id */
+            id: string;
+            /** Tenant Id */
+            tenant_id: number;
+            /** Knowledge Base Id */
+            knowledge_base_id: string;
+            /** Slug */
+            slug: string;
+            /** Issue Type */
+            issue_type: string;
+            /** Description */
+            description: string;
+            /** Suspected Knowledge Ids */
+            suspected_knowledge_ids?: string[];
+            /** Status */
+            status: string;
+            /**
+             * Reported By
+             * @default
+             */
+            reported_by: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /**
          * WikiLintIssue
@@ -14768,6 +14913,90 @@ export interface components {
             updated_at: string;
             /** Deleted At */
             deleted_at?: string | null;
+        };
+        /**
+         * WikiRevertRequest
+         * @description Body for ``POST /wiki/revert``.
+         */
+        WikiRevertRequest: {
+            /** Slug */
+            slug: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * WikiRevisionListData
+         * @description Revision listing — ``{revisions, total, current_version}``.
+         */
+        WikiRevisionListData: {
+            /** Revisions */
+            revisions: components["schemas"]["WikiRevisionView"][];
+            /** Total */
+            total: number;
+            /** Current Version */
+            current_version: number;
+        };
+        /**
+         * WikiRevisionView
+         * @description One page snapshot on the wire. List rows omit ``content``.
+         */
+        WikiRevisionView: {
+            /** Id */
+            id: string;
+            /** Tenant Id */
+            tenant_id: number;
+            /** Knowledge Base Id */
+            knowledge_base_id: string;
+            /** Page Id */
+            page_id: string;
+            /** Slug */
+            slug: string;
+            /** Version */
+            version: number;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /**
+             * Page Type
+             * @default
+             */
+            page_type: string;
+            /**
+             * Status
+             * @default
+             */
+            status: string;
+            /** Content */
+            content?: string | null;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            /** Aliases */
+            aliases?: string[];
+            /**
+             * Edit Source
+             * @default
+             */
+            edit_source: string;
+            /**
+             * Editor Id
+             * @default
+             */
+            editor_id: string;
+            /**
+             * Edited At
+             * Format: date-time
+             */
+            edited_at: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /**
          * WikiSearchData
@@ -26736,6 +26965,159 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WikiEnvelope_WikiAutoFixData_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_issues_api_v1_knowledgebase__kb_id__wiki_issues_get: {
+        parameters: {
+            query?: {
+                slug?: string;
+                status?: string;
+            };
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                kb_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiEnvelope_list_WikiIssueView__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_issue_status_api_v1_knowledgebase__kb_id__wiki_issues__issue_id__status_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                kb_id: string;
+                issue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WikiIssueStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiEnvelope_WikiIssueView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revert_page_api_v1_knowledgebase__kb_id__wiki_revert_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                kb_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WikiRevertRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiEnvelope_WikiPageView_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_revisions_api_v1_knowledgebase__kb_id__wiki_revisions__slug__get: {
+        parameters: {
+            query?: {
+                version?: number | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                kb_id: string;
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WikiEnvelope_Union_WikiRevisionListData__WikiRevisionView__"];
                 };
             };
             /** @description Validation Error */

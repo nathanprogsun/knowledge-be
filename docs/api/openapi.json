@@ -26785,6 +26785,403 @@
         }
       }
     },
+    "/api/v1/knowledgebase/{kb_id}/wiki/issues": {
+      "get": {
+        "tags": [
+          "wiki"
+        ],
+        "summary": "Get Issues",
+        "description": "List issues for the KB. ``data`` is the list itself (empty is 200).",
+        "operationId": "get_issues_api_v1_knowledgebase__kb_id__wiki_issues_get",
+        "parameters": [
+          {
+            "name": "kb_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kb Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Status"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiEnvelope_list_WikiIssueView__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledgebase/{kb_id}/wiki/issues/{issue_id}/status": {
+      "put": {
+        "tags": [
+          "wiki"
+        ],
+        "summary": "Put Issue Status",
+        "description": "Set an issue's status (``pending`` / ``ignored`` / ``resolved``).",
+        "operationId": "put_issue_status_api_v1_knowledgebase__kb_id__wiki_issues__issue_id__status_put",
+        "parameters": [
+          {
+            "name": "kb_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kb Id"
+            }
+          },
+          {
+            "name": "issue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Issue Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WikiIssueStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiEnvelope_WikiIssueView_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledgebase/{kb_id}/wiki/revert": {
+      "post": {
+        "tags": [
+          "wiki"
+        ],
+        "summary": "Revert Page",
+        "description": "Restore a stored snapshot as a new edit. Missing version is 404.",
+        "operationId": "revert_page_api_v1_knowledgebase__kb_id__wiki_revert_post",
+        "parameters": [
+          {
+            "name": "kb_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kb Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WikiRevertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiEnvelope_WikiPageView_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledgebase/{kb_id}/wiki/revisions/{slug}": {
+      "get": {
+        "tags": [
+          "wiki"
+        ],
+        "summary": "Get Revisions",
+        "description": "List snapshots, or return one snapshot with content when ``version`` is set.",
+        "operationId": "get_revisions_api_v1_knowledgebase__kb_id__wiki_revisions__slug__get",
+        "parameters": [
+          {
+            "name": "kb_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kb Id"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WikiEnvelope_Union_WikiRevisionListData__WikiRevisionView__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/files": {
       "get": {
         "tags": [
@@ -46639,6 +47036,31 @@
         "title": "WikiConfig",
         "description": "Wiki-ingest settings for a knowledge base."
       },
+      "WikiEnvelope_Union_WikiRevisionListData__WikiRevisionView__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WikiRevisionListData"
+              },
+              {
+                "$ref": "#/components/schemas/WikiRevisionView"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "title": "WikiEnvelope[Union[WikiRevisionListData, WikiRevisionView]]"
+      },
       "WikiEnvelope_WikiAutoFixData_": {
         "properties": {
           "success": {
@@ -46723,6 +47145,23 @@
           "data"
         ],
         "title": "WikiEnvelope[WikiIndexData]"
+      },
+      "WikiEnvelope_WikiIssueView_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "$ref": "#/components/schemas/WikiIssueView"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "title": "WikiEnvelope[WikiIssueView]"
       },
       "WikiEnvelope_WikiLintReport_": {
         "properties": {
@@ -46825,6 +47264,27 @@
           "data"
         ],
         "title": "WikiEnvelope[WikiStats]"
+      },
+      "WikiEnvelope_list_WikiIssueView__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/WikiIssueView"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "title": "WikiEnvelope[list[WikiIssueView]]"
       },
       "WikiFolderCreateRequest": {
         "properties": {
@@ -47270,6 +47730,88 @@
         ],
         "title": "WikiIndexGroupView",
         "description": "One page-type group in the index response."
+      },
+      "WikiIssueStatusRequest": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "WikiIssueStatusRequest",
+        "description": "Body for ``PUT /wiki/issues/{issue_id}/status``."
+      },
+      "WikiIssueView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "tenant_id": {
+            "type": "integer",
+            "title": "Tenant Id"
+          },
+          "knowledge_base_id": {
+            "type": "string",
+            "title": "Knowledge Base Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "issue_type": {
+            "type": "string",
+            "title": "Issue Type"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "suspected_knowledge_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Suspected Knowledge Ids"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reported_by": {
+            "type": "string",
+            "title": "Reported By",
+            "default": ""
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tenant_id",
+          "knowledge_base_id",
+          "slug",
+          "issue_type",
+          "description",
+          "status",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "WikiIssueView",
+        "description": "One wiki page issue on the wire."
       },
       "WikiLintIssue": {
         "properties": {
@@ -47912,6 +48454,151 @@
         ],
         "title": "WikiPageView",
         "description": "One wiki page on the wire — mirrors the upstream ``WikiPage`` JSON."
+      },
+      "WikiRevertRequest": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "version"
+        ],
+        "title": "WikiRevertRequest",
+        "description": "Body for ``POST /wiki/revert``."
+      },
+      "WikiRevisionListData": {
+        "properties": {
+          "revisions": {
+            "items": {
+              "$ref": "#/components/schemas/WikiRevisionView"
+            },
+            "type": "array",
+            "title": "Revisions"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "current_version": {
+            "type": "integer",
+            "title": "Current Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revisions",
+          "total",
+          "current_version"
+        ],
+        "title": "WikiRevisionListData",
+        "description": "Revision listing — ``{revisions, total, current_version}``."
+      },
+      "WikiRevisionView": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "tenant_id": {
+            "type": "integer",
+            "title": "Tenant Id"
+          },
+          "knowledge_base_id": {
+            "type": "string",
+            "title": "Knowledge Base Id"
+          },
+          "page_id": {
+            "type": "string",
+            "title": "Page Id"
+          },
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": ""
+          },
+          "page_type": {
+            "type": "string",
+            "title": "Page Type",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": ""
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases"
+          },
+          "edit_source": {
+            "type": "string",
+            "title": "Edit Source",
+            "default": ""
+          },
+          "editor_id": {
+            "type": "string",
+            "title": "Editor Id",
+            "default": ""
+          },
+          "edited_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Edited At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tenant_id",
+          "knowledge_base_id",
+          "page_id",
+          "slug",
+          "version",
+          "edited_at",
+          "created_at"
+        ],
+        "title": "WikiRevisionView",
+        "description": "One page snapshot on the wire. List rows omit ``content``."
       },
       "WikiSearchData": {
         "properties": {

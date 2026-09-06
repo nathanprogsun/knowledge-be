@@ -132,9 +132,11 @@ from src.web.deps.knowledge_tags import (
 )
 from src.web.deps.knowledge_wiki import (
     WikiFolderServiceDep,
+    WikiIssueRepoDep,
     WikiLintServiceDep,
     WikiPageServiceDep,
     get_wiki_folder_service,
+    get_wiki_issue_repository,
     get_wiki_lint_service,
     get_wiki_page_service,
 )
@@ -238,6 +240,7 @@ __all__ = [
     "VectorStoreServiceDep",
     "WebSearchProviderServiceDep",
     "WikiFolderServiceDep",
+    "WikiIssueRepoDep",
     "WikiLintServiceDep",
     "WikiPageServiceDep",
     "extract_embed_token",
@@ -290,6 +293,7 @@ __all__ = [
     "get_vector_store_service",
     "get_web_search_provider_service",
     "get_wiki_folder_service",
+    "get_wiki_issue_repository",
     "get_wiki_lint_service",
     "get_wiki_page_service",
     "require_embed_session",

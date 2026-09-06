@@ -27,6 +27,7 @@ from src.core.knowledge.wiki.hierarchy import (
     apply_folder_to_page,
     normalize_wiki_hierarchy,
 )
+from src.core.knowledge.wiki.issues import WikiPageIssueRepository, pending_issue_count
 from src.core.knowledge.wiki.link_utils import (
     collect_link_refs,
     linkify_content,
@@ -36,8 +37,15 @@ from src.core.knowledge.wiki.link_utils import (
     strip_page_chunk_citations,
     strip_wiki_inline_chunk_citations,
 )
+from src.core.knowledge.wiki.revisions import (
+    WikiPageRevisionInfo,
+    WikiRevisionList,
+    snapshot_row_from_page,
+)
 from src.core.knowledge.wiki.slug_utils import resolve_dead_slug
+from src.core.knowledge.wiki.stats import get_stats as compute_wiki_stats
 from src.core.knowledge.wiki.types import (
+    WIKI_EDIT_SOURCE_REVERT,
     WIKI_GRAPH_MODE_EGO,
     WIKI_GRAPH_MODE_OVERVIEW,
     WIKI_INDEX_CONTENT_PAGE_TYPES,
@@ -45,6 +53,7 @@ from src.core.knowledge.wiki.types import (
     WIKI_INDEX_MAX_LIMIT,
     WIKI_PAGE_STATUS_PUBLISHED,
     WIKI_PAGE_TYPE_INDEX,
+    WIKI_PAGE_TYPE_SUMMARY,
     WikiGraphData,
     WikiGraphEdge,
     WikiGraphMeta,
@@ -56,8 +65,10 @@ from src.core.knowledge.wiki.types import (
     WikiPageListResponse,
     WikiStats,
     normalize_edit_source,
+    split_page_types,
 )
 from src.db.dao.wiki_page_repository import WikiFolderRepository, WikiPageRepository
+from src.db.dao.wiki_page_revision_repository import WikiPageRevisionRepository
 from src.db.models.wiki_page import WikiIndexEntry, WikiPage, WikiPageLite
 
 logger = logging.getLogger(__name__)
@@ -69,6 +80,10 @@ _DEFAULT_INDEX_CONTENT = (
 
 # Error codes shared with the persistence layer.
 _ERROR_PAGE_NOT_FOUND = "wiki.page_not_found"
+_ERROR_REVISION_NOT_FOUND = "wiki.revision_not_found"
+
+_REVISION_LIST_DEFAULT = 50
+_REVISION_LIST_MAX = 200
 
 
 class WikiPageService:
@@ -79,9 +94,13 @@ class WikiPageService:
         *,
         page_repo: WikiPageRepository,
         folder_repo: WikiFolderRepository,
+        revision_repo: WikiPageRevisionRepository | None = None,
+        issue_repo: WikiPageIssueRepository | None = None,
     ) -> None:
         self._page_repo = page_repo
         self._folder_repo = folder_repo
+        self._revision_repo = revision_repo
+        self._issue_repo = issue_repo
 
     # ── Create ──────────────────────────────────────────────────────
 
@@ -115,6 +134,7 @@ class WikiPageService:
             update={
                 "id": page.id or str(uuid4()),
                 "status": page.status or WIKI_PAGE_STATUS_PUBLISHED,
+                "page_type": page.page_type or WIKI_PAGE_TYPE_SUMMARY,
                 "version": page.version or 1,
                 "last_edit_source": normalize_edit_source(edit_source),
                 "last_editor_id": editor_id,
@@ -187,6 +207,7 @@ class WikiPageService:
 
         now = datetime.now(UTC)
         if content_changed:
+            await self._snapshot_current(existing, now=now)
             authored = merged.model_copy(
                 update={
                     "version": existing.version,
@@ -305,7 +326,7 @@ class WikiPageService:
         """
         pages, total = await self._page_repo.list_pages(
             knowledge_base_id=filters.knowledge_base_id,
-            page_types=[filters.page_type] if filters.page_type else None,
+            page_types=split_page_types(filters.page_type),
             status=filters.status,
             query=filters.query,
             folder_id=filters.folder_id,
@@ -450,28 +471,100 @@ class WikiPageService:
     async def get_stats(self, *, knowledge_base_id: str) -> WikiStats:
         """Return aggregate statistics about the KB's wiki.
 
-        The pending-task / pending-issue counts and the in-progress flag
-        need wiring that is not yet merged, so they are reported as zero /
-        ``False``.
+        Pending ingest-task counts stay at the neutral zero until that
+        seam is wired. Pending issues are counted when an issue repo is
+        bound.
         """
-        counts = await self._page_repo.count_by_type(knowledge_base_id=knowledge_base_id)
-        total = sum(counts.values())
-        orphans = await self._page_repo.count_orphans(knowledge_base_id=knowledge_base_id)
-        pages = await self._page_repo.list_all(knowledge_base_id=knowledge_base_id)
-        total_links = sum(len(page.out_links) for page in pages)
-        recent, _ = await self._page_repo.list_pages(
+        issue_repo = self._issue_repo
+
+        async def _pending_issues() -> int:
+            if issue_repo is None:
+                return 0
+            return await pending_issue_count(
+                issue_repo=issue_repo, knowledge_base_id=knowledge_base_id
+            )
+
+        return await compute_wiki_stats(
+            page_repo=self._page_repo,
             knowledge_base_id=knowledge_base_id,
-            page=1,
-            page_size=10,
-            sort_by="updated_at",
-            sort_order="desc",
+            pending_issue_count=_pending_issues if issue_repo is not None else None,
         )
-        return WikiStats(
-            total_pages=total,
-            pages_by_type=counts,
-            total_links=total_links,
-            orphan_count=orphans,
-            recent_updates=[strip_page_chunk_citations(p) for p in recent],
+
+    async def list_revisions(
+        self,
+        *,
+        knowledge_base_id: str,
+        slug: str,
+        limit: int = 0,
+        offset: int = 0,
+    ) -> WikiRevisionList:
+        """Return historical snapshots newest first, without ``content``."""
+        page = await self._require_page(knowledge_base_id, slug)
+        if self._revision_repo is None:
+            return WikiRevisionList(revisions=[], total=0, current_version=page.version)
+        window = _REVISION_LIST_DEFAULT if limit <= 0 else min(limit, _REVISION_LIST_MAX)
+        start = max(0, offset)
+        rows, total = await self._revision_repo.list_by_slug(
+            knowledge_base_id=knowledge_base_id,
+            slug=slug,
+            limit=window,
+            offset=start,
+        )
+        return WikiRevisionList(
+            revisions=[
+                WikiPageRevisionInfo.map_from_db(row, include_content=False) for row in rows
+            ],
+            total=total,
+            current_version=page.version,
+        )
+
+    async def get_revision(
+        self, *, knowledge_base_id: str, slug: str, version: int
+    ) -> WikiPageRevisionInfo:
+        """Return one snapshot with content, or ``wiki.revision_not_found``."""
+        await self._require_page(knowledge_base_id, slug)
+        if self._revision_repo is None:
+            raise NotFoundError(
+                code=_ERROR_REVISION_NOT_FOUND,
+                message=f"wiki revision {version} not found for {slug}",
+            )
+        row = await self._revision_repo.get_by_slug_version(
+            knowledge_base_id=knowledge_base_id, slug=slug, version=version
+        )
+        if row is None:
+            raise NotFoundError(
+                code=_ERROR_REVISION_NOT_FOUND,
+                message=f"wiki revision {version} not found for {slug}",
+            )
+        return WikiPageRevisionInfo.map_from_db(row, include_content=True)
+
+    async def revert_page(
+        self,
+        *,
+        knowledge_base_id: str,
+        slug: str,
+        version: int,
+        editor_id: str = "",
+    ) -> WikiPage:
+        """Restore a stored snapshot as a new edit (itself revertable)."""
+        page = await self._require_page(knowledge_base_id, slug)
+        snapshot = await self.get_revision(
+            knowledge_base_id=knowledge_base_id, slug=slug, version=version
+        )
+        restored = page.model_copy(
+            update={
+                "title": snapshot.title,
+                "content": snapshot.content or "",
+                "summary": snapshot.summary,
+                "page_type": snapshot.page_type,
+                "status": snapshot.status,
+                "aliases": list(snapshot.aliases),
+            }
+        )
+        return await self.update_page(
+            page=restored,
+            edit_source=WIKI_EDIT_SOURCE_REVERT,
+            editor_id=editor_id,
         )
 
     async def rebuild_links(self, *, knowledge_base_id: str) -> None:
@@ -695,6 +788,12 @@ class WikiPageService:
         """
 
     # ── Internal helpers ────────────────────────────────────────────
+
+    async def _snapshot_current(self, page: WikiPage, *, now: datetime) -> None:
+        """Insert the pre-edit page as ``(page_id, version)`` when a repo is bound."""
+        if self._revision_repo is None:
+            return
+        await self._revision_repo.insert_snapshot(snapshot_row_from_page(page, now=now))
 
     async def _require_page(self, knowledge_base_id: str, slug: str) -> WikiPage:
         """Return the live page for (KB, slug) or raise ``wiki.page_not_found``."""

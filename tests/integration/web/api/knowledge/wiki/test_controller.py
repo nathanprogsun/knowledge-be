@@ -21,6 +21,8 @@ The load-bearing checks:
 
 from __future__ import annotations
 
+import os
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock
 
@@ -31,16 +33,28 @@ from fastapi.testclient import TestClient
 from src.common.exception import ConflictError, NotFoundError
 from src.core.knowledge.knowledge_bases.service.kb_service import KBService
 from src.core.knowledge.wiki.folders import WikiFolderService
+from src.core.knowledge.wiki.issues import WikiPageIssue
 from src.core.knowledge.wiki.lint_service import WikiLintService
 from src.core.knowledge.wiki.page_service import WikiPageService
+from src.core.tenants.member_service import ROLE_VIEWER
 from src.db.dao.knowledge_base_repository import KnowledgeBaseRepository
 from src.db.dao.wiki_page_repository import WikiFolderRepository, WikiPageRepository
+from src.db.dao.wiki_page_revision_repository import WikiPageRevisionRepository
 from src.db.models.knowledge_base import KnowledgeBase
-from src.db.models.wiki_page import WikiFolder, WikiIndexEntry, WikiPage, WikiPageLite
+from src.db.models.wiki_page import (
+    WikiFolder,
+    WikiIndexEntry,
+    WikiPage,
+    WikiPageLite,
+    WikiPageRevision,
+)
+from src.settings import reset_settings_cache
+from src.web.api.knowledge.wiki.history_router import router as history_router
 from src.web.api.knowledge.wiki.router import router
 from src.web.deps.knowledge_wiki import (
     get_kb_service,
     get_wiki_folder_service,
+    get_wiki_issue_repository,
     get_wiki_lint_service,
     get_wiki_page_service,
 )
@@ -338,6 +352,87 @@ def folder_repo() -> AsyncMock:
 
 
 @pytest.fixture
+def revision_repo() -> AsyncMock:
+    """``AsyncMock(spec=WikiPageRevisionRepository)`` with stateful closures."""
+    repo = AsyncMock(spec=WikiPageRevisionRepository)
+    rows: dict[tuple[str, int], WikiPageRevision] = {}
+
+    async def _insert_snapshot(row: WikiPageRevision) -> WikiPageRevision | None:
+        key = (row.page_id, row.version)
+        if key in rows:
+            return None
+        rows[key] = row
+        return row
+
+    async def _list_by_slug(
+        *, knowledge_base_id: str, slug: str, limit: int, offset: int
+    ) -> tuple[list[WikiPageRevision], int]:
+        matches = [
+            row
+            for row in rows.values()
+            if row.knowledge_base_id == knowledge_base_id and row.slug == slug
+        ]
+        matches.sort(key=lambda row: row.version, reverse=True)
+        return matches[offset : offset + limit], len(matches)
+
+    async def _get_by_slug_version(
+        *, knowledge_base_id: str, slug: str, version: int
+    ) -> WikiPageRevision | None:
+        for row in rows.values():
+            if (
+                row.knowledge_base_id == knowledge_base_id
+                and row.slug == slug
+                and row.version == version
+            ):
+                return row
+        return None
+
+    repo.insert_snapshot.side_effect = _insert_snapshot
+    repo.list_by_slug.side_effect = _list_by_slug
+    repo.get_by_slug_version.side_effect = _get_by_slug_version
+    repo._rows = rows  # type: ignore[attr-defined]
+    return repo
+
+
+@pytest.fixture
+def issue_repo() -> AsyncMock:
+    """Stateful issue Protocol mock (core DTO rows)."""
+    repo = AsyncMock()
+    rows: dict[str, WikiPageIssue] = {}
+
+    async def _list(
+        *, knowledge_base_id: str, slug: str = "", status: str = ""
+    ) -> list[WikiPageIssue]:
+        matches = [row for row in rows.values() if row.knowledge_base_id == knowledge_base_id]
+        if slug:
+            matches = [row for row in matches if row.slug == slug]
+        if status:
+            matches = [row for row in matches if row.status == status]
+        matches.sort(key=lambda row: row.created_at, reverse=True)
+        return matches
+
+    async def _get_by_id_or_none(*, issue_id: str) -> WikiPageIssue | None:
+        return rows.get(issue_id)
+
+    async def _update_status(*, issue_id: str, status: str) -> None:
+        existing = rows.get(issue_id)
+        if existing is None:
+            return
+        rows[issue_id] = existing.model_copy(update={"status": status})
+
+    async def _create(issue: WikiPageIssue) -> WikiPageIssue:
+        rows[issue.id] = issue
+        return issue
+
+    repo.list.side_effect = _list
+    repo.get_by_id_or_none.side_effect = _get_by_id_or_none
+    repo.update_status.side_effect = _update_status
+    repo.create.side_effect = _create
+    repo._rows = rows  # type: ignore[attr-defined]
+    return repo
+
+
+@pytest.fixture
 def kb_service(kb_repo: AsyncMock) -> KBService:
     return KBService(kb_repo=kb_repo)
 
@@ -346,8 +441,15 @@ def kb_service(kb_repo: AsyncMock) -> KBService:
 def wiki_service(
     page_repo: AsyncMock,
     folder_repo: AsyncMock,
+    revision_repo: AsyncMock,
+    issue_repo: AsyncMock,
 ) -> WikiPageService:
-    return WikiPageService(page_repo=page_repo, folder_repo=folder_repo)
+    return WikiPageService(
+        page_repo=page_repo,
+        folder_repo=folder_repo,
+        revision_repo=revision_repo,
+        issue_repo=issue_repo,
+    )
 
 
 @pytest.fixture
@@ -374,12 +476,14 @@ def app(
     wiki_service: WikiPageService,
     folder_service: WikiFolderService,
     lint_service: WikiLintService,
+    issue_repo: AsyncMock,
 ) -> FastAPI:
     """Override the wiki service deps on the shared web app."""
     web_app.dependency_overrides[get_kb_service] = lambda: kb_service
     web_app.dependency_overrides[get_wiki_page_service] = lambda: wiki_service
     web_app.dependency_overrides[get_wiki_folder_service] = lambda: folder_service
     web_app.dependency_overrides[get_wiki_lint_service] = lambda: lint_service
+    web_app.dependency_overrides[get_wiki_issue_repository] = lambda: issue_repo
     return web_app
 
 
@@ -420,6 +524,24 @@ def _page(**overrides: object) -> WikiPage:
     return WikiPage(**defaults)  # type: ignore[arg-type]
 
 
+def _issue(**overrides: object) -> WikiPageIssue:
+    defaults: dict[str, object] = {
+        "id": "issue-1",
+        "tenant_id": TENANT_ID,
+        "knowledge_base_id": KB_ID,
+        "slug": "entity/acme-corp",
+        "issue_type": "inaccurate",
+        "description": "Dates look wrong",
+        "suspected_knowledge_ids": [],
+        "status": "pending",
+        "reported_by": "user-1",
+        "created_at": NOW,
+        "updated_at": NOW,
+    }
+    defaults.update(overrides)
+    return WikiPageIssue(**defaults)  # type: ignore[arg-type]
+
+
 def _folder(**overrides: object) -> WikiFolder:
     defaults: dict[str, object] = {
         "id": "folder-1",
@@ -439,50 +561,62 @@ def _folder(**overrides: object) -> WikiFolder:
 # ── Route inventory + permission gates ───────────────────────────────
 
 EXPECTED_ROUTES: set[tuple[str, str]] = {
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/pages"),
-    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/pages"),
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/pages/{slug:path}"),
-    ("PUT", "/api/v1/knowledgebase/{kb_id}/wiki/pages/{slug:path}"),
-    ("DELETE", "/api/v1/knowledgebase/{kb_id}/wiki/pages/{slug:path}"),
-    ("PUT", "/api/v1/knowledgebase/{kb_id}/wiki/move-page"),
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/folders"),
-    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/folders"),
-    ("PUT", "/api/v1/knowledgebase/{kb_id}/wiki/folders/{folder_id}"),
-    ("DELETE", "/api/v1/knowledgebase/{kb_id}/wiki/folders/{folder_id}"),
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/index"),
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/graph"),
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/stats"),
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/search"),
-    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/rebuild-links"),
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/lint"),
-    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/auto-fix"),
+    ("GET", "/knowledgebase/{kb_id}/wiki/pages"),
+    ("POST", "/knowledgebase/{kb_id}/wiki/pages"),
+    ("GET", "/knowledgebase/{kb_id}/wiki/pages/{slug:path}"),
+    ("PUT", "/knowledgebase/{kb_id}/wiki/pages/{slug:path}"),
+    ("DELETE", "/knowledgebase/{kb_id}/wiki/pages/{slug:path}"),
+    ("PUT", "/knowledgebase/{kb_id}/wiki/move-page"),
+    ("GET", "/knowledgebase/{kb_id}/wiki/folders"),
+    ("POST", "/knowledgebase/{kb_id}/wiki/folders"),
+    ("PUT", "/knowledgebase/{kb_id}/wiki/folders/{folder_id}"),
+    ("DELETE", "/knowledgebase/{kb_id}/wiki/folders/{folder_id}"),
+    ("GET", "/knowledgebase/{kb_id}/wiki/index"),
+    ("GET", "/knowledgebase/{kb_id}/wiki/graph"),
+    ("GET", "/knowledgebase/{kb_id}/wiki/stats"),
+    ("GET", "/knowledgebase/{kb_id}/wiki/search"),
+    ("POST", "/knowledgebase/{kb_id}/wiki/rebuild-links"),
+    ("GET", "/knowledgebase/{kb_id}/wiki/lint"),
+    ("POST", "/knowledgebase/{kb_id}/wiki/auto-fix"),
+    ("GET", "/knowledgebase/{kb_id}/wiki/issues"),
+    ("PUT", "/knowledgebase/{kb_id}/wiki/issues/{issue_id}/status"),
+    ("GET", "/knowledgebase/{kb_id}/wiki/revisions/{slug:path}"),
+    ("POST", "/knowledgebase/{kb_id}/wiki/revert"),
 }
 
 # Reads are Viewer+; content mutations and maintenance are Admin+.
 EXPECTED_ROLES: dict[tuple[str, str], str] = {
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/pages"): "viewer",
-    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/pages"): "admin",
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/pages/{slug:path}"): "viewer",
-    ("PUT", "/api/v1/knowledgebase/{kb_id}/wiki/pages/{slug:path}"): "admin",
-    ("DELETE", "/api/v1/knowledgebase/{kb_id}/wiki/pages/{slug:path}"): "admin",
-    ("PUT", "/api/v1/knowledgebase/{kb_id}/wiki/move-page"): "admin",
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/folders"): "viewer",
-    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/folders"): "admin",
-    ("PUT", "/api/v1/knowledgebase/{kb_id}/wiki/folders/{folder_id}"): "admin",
-    ("DELETE", "/api/v1/knowledgebase/{kb_id}/wiki/folders/{folder_id}"): "admin",
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/index"): "viewer",
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/graph"): "viewer",
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/stats"): "viewer",
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/search"): "viewer",
-    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/rebuild-links"): "admin",
-    ("GET", "/api/v1/knowledgebase/{kb_id}/wiki/lint"): "viewer",
-    ("POST", "/api/v1/knowledgebase/{kb_id}/wiki/auto-fix"): "admin",
+    ("GET", "/knowledgebase/{kb_id}/wiki/pages"): "viewer",
+    ("POST", "/knowledgebase/{kb_id}/wiki/pages"): "admin",
+    ("GET", "/knowledgebase/{kb_id}/wiki/pages/{slug:path}"): "viewer",
+    ("PUT", "/knowledgebase/{kb_id}/wiki/pages/{slug:path}"): "admin",
+    ("DELETE", "/knowledgebase/{kb_id}/wiki/pages/{slug:path}"): "admin",
+    ("PUT", "/knowledgebase/{kb_id}/wiki/move-page"): "admin",
+    ("GET", "/knowledgebase/{kb_id}/wiki/folders"): "viewer",
+    ("POST", "/knowledgebase/{kb_id}/wiki/folders"): "admin",
+    ("PUT", "/knowledgebase/{kb_id}/wiki/folders/{folder_id}"): "admin",
+    ("DELETE", "/knowledgebase/{kb_id}/wiki/folders/{folder_id}"): "admin",
+    ("GET", "/knowledgebase/{kb_id}/wiki/index"): "viewer",
+    ("GET", "/knowledgebase/{kb_id}/wiki/graph"): "viewer",
+    ("GET", "/knowledgebase/{kb_id}/wiki/stats"): "viewer",
+    ("GET", "/knowledgebase/{kb_id}/wiki/search"): "viewer",
+    ("POST", "/knowledgebase/{kb_id}/wiki/rebuild-links"): "admin",
+    ("GET", "/knowledgebase/{kb_id}/wiki/lint"): "viewer",
+    ("POST", "/knowledgebase/{kb_id}/wiki/auto-fix"): "admin",
+    ("GET", "/knowledgebase/{kb_id}/wiki/issues"): "viewer",
+    ("PUT", "/knowledgebase/{kb_id}/wiki/issues/{issue_id}/status"): "admin",
+    ("GET", "/knowledgebase/{kb_id}/wiki/revisions/{slug:path}"): "viewer",
+    ("POST", "/knowledgebase/{kb_id}/wiki/revert"): "admin",
 }
+
+
+def _wiki_routes() -> list[object]:
+    return [*router.routes, *history_router.routes]
 
 
 def _declared_routes() -> set[tuple[str, str]]:
     found: set[tuple[str, str]] = set()
-    for route in router.routes:
+    for route in _wiki_routes():
         methods: set[str] = getattr(route, "methods", set()) or set()
         path = getattr(route, "path", "")
         for method in methods:
@@ -495,13 +629,13 @@ def test_router_declares_exactly_the_upstream_routes() -> None:
 
 
 def test_every_endpoint_declares_the_auth_gate() -> None:
-    for route in router.routes:
+    for route in _wiki_routes():
         deps = [d.call for d in getattr(route, "dependant", None).dependencies]  # type: ignore[union-attr]
         assert require_auth in deps, f"{route.path} is missing AuthDep"  # type: ignore[attr-defined]
 
 
 def test_every_endpoint_declares_the_expected_role_gate() -> None:
-    for route in router.routes:
+    for route in _wiki_routes():
         path = getattr(route, "path", "")
         methods: set[str] = getattr(route, "methods", set()) or set()
         dependant = getattr(route, "dependant", None)
@@ -580,6 +714,27 @@ async def test_list_pages_filters_by_status(client: TestClient, page_repo: Async
     assert [p["slug"] for p in resp.json()["data"]["pages"]] == ["concept/rag"]
 
 
+async def test_list_pages_splits_comma_page_types(client: TestClient, page_repo: AsyncMock) -> None:
+    page_repo._rows["page-1"] = _page()  # type: ignore[attr-defined]
+    page_repo._rows["page-2"] = _page(  # type: ignore[attr-defined]
+        id="page-2", slug="concept/rag", title="RAG", page_type="concept"
+    )
+    page_repo._rows["page-3"] = _page(  # type: ignore[attr-defined]
+        id="page-3", slug="home", title="Home", page_type="summary"
+    )
+
+    resp = client.get(
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/pages",
+        params={"page_type": "entity,concept,synthesis,comparison"},
+    )
+
+    assert resp.status_code == 200
+    assert [p["slug"] for p in resp.json()["data"]["pages"]] == [
+        "entity/acme-corp",
+        "concept/rag",
+    ]
+
+
 # ── POST /wiki/pages ─────────────────────────────────────────────────
 
 
@@ -604,6 +759,20 @@ async def test_create_page_returns_201(
     assert data["knowledge_base_id"] == KB_ID
     rows = page_repo._rows  # type: ignore[attr-defined]
     assert data["id"] in rows
+
+
+async def test_create_page_defaults_empty_type_to_summary(
+    client: TestClient,
+    page_repo: AsyncMock,
+) -> None:
+    resp = client.post(
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/pages",
+        json={"slug": "home"},
+    )
+
+    assert resp.status_code == 201
+    assert resp.json()["data"]["page_type"] == "summary"
+    assert resp.json()["data"]["status"] == "published"
 
 
 async def test_create_page_rejects_invalid_page_type(
@@ -1025,3 +1194,179 @@ async def test_auto_fix_returns_fixed(
     body = resp.json()
     assert body["success"] is True
     assert body["data"]["fixed"] == 0
+
+
+@pytest.fixture
+def viewer_client(app: FastAPI, admin_user: tuple[int, int]) -> Iterator[TestClient]:
+    """Same principal, gated at Viewer so Admin+ writes return 403."""
+    os.environ["RBAC_ENFORCED"] = "true"
+    reset_settings_cache()
+    user_id, tenant_id = admin_user
+    try:
+        with TestClient(app=app) as client:
+            client.headers.update(
+                {
+                    "X-User-Id": user_id,
+                    "X-Tenant-ID": str(tenant_id),
+                    "X-Roles": ROLE_VIEWER,
+                }
+            )
+            yield client
+    finally:
+        os.environ["RBAC_ENFORCED"] = "false"
+        reset_settings_cache()
+
+
+# ── Issues / revisions ───────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "method,path",
+    [
+        ("GET", f"/api/v1/knowledgebase/{KB_ID}/wiki/issues"),
+        ("PUT", f"/api/v1/knowledgebase/{KB_ID}/wiki/issues/issue-1/status"),
+        ("GET", f"/api/v1/knowledgebase/{KB_ID}/wiki/revisions/entity/acme-corp"),
+        ("POST", f"/api/v1/knowledgebase/{KB_ID}/wiki/revert"),
+    ],
+)
+async def test_new_routes_wiki_off_returns_422(
+    client: TestClient,
+    kb_repo: AsyncMock,
+    method: str,
+    path: str,
+) -> None:
+    row = _kb_row()
+    kb_repo._rows[KB_ID] = row.model_copy(  # type: ignore[attr-defined]
+        update={"indexing_strategy": {"wiki_enabled": False}}
+    )
+    payload = (
+        {"status": "ignored"} if method == "PUT" else {"slug": "entity/acme-corp", "version": 1}
+    )
+    resp = client.request(method, path, json=payload if method != "GET" else None)
+    assert resp.status_code == 422
+    assert resp.json()["error"]["code"] == "wiki.kb_wiki_not_enabled"
+
+
+async def test_list_issues_returns_empty_list(client: TestClient) -> None:
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/issues")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    assert body["data"] == []
+
+
+async def test_list_issues_returns_rows(client: TestClient, issue_repo: AsyncMock) -> None:
+    issue_repo._rows["issue-1"] = _issue()  # type: ignore[attr-defined]
+
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/issues")
+
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert isinstance(data, list)
+    assert len(data) == 1
+    assert data[0]["id"] == "issue-1"
+    assert data[0]["status"] == "pending"
+
+
+async def test_update_issue_status_returns_updated(
+    client: TestClient, issue_repo: AsyncMock
+) -> None:
+    issue_repo._rows["issue-1"] = _issue()  # type: ignore[attr-defined]
+
+    resp = client.put(
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/issues/issue-1/status",
+        json={"status": "ignored"},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["data"]["status"] == "ignored"
+    assert issue_repo._rows["issue-1"].status == "ignored"  # type: ignore[attr-defined]
+
+
+async def test_list_revisions_returns_envelope(client: TestClient, page_repo: AsyncMock) -> None:
+    page_repo._rows["page-1"] = _page()  # type: ignore[attr-defined]
+
+    resp = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/revisions/entity/acme-corp")
+
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["revisions"] == []
+    assert data["total"] == 0
+    assert data["current_version"] == 1
+
+
+async def test_update_then_list_and_get_revision(
+    client: TestClient,
+    page_repo: AsyncMock,
+) -> None:
+    page_repo._rows["page-1"] = _page(content="# Acme v1")  # type: ignore[attr-defined]
+
+    update = client.put(
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/pages/entity/acme-corp",
+        json={"content": "# Acme v2"},
+    )
+    assert update.status_code == 200
+    assert update.json()["data"]["version"] == 2
+
+    listing = client.get(f"/api/v1/knowledgebase/{KB_ID}/wiki/revisions/entity/acme-corp")
+    assert listing.status_code == 200
+    data = listing.json()["data"]
+    assert data["current_version"] == 2
+    assert data["total"] == 1
+    assert data["revisions"][0]["version"] == 1
+    assert data["revisions"][0].get("content") in (None, "")
+
+    one = client.get(
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/revisions/entity/acme-corp",
+        params={"version": 1},
+    )
+    assert one.status_code == 200
+    assert one.json()["data"]["content"] == "# Acme v1"
+    assert one.json()["data"]["version"] == 1
+
+
+async def test_revert_restores_snapshot(client: TestClient, page_repo: AsyncMock) -> None:
+    page_repo._rows["page-1"] = _page(content="# Acme v1")  # type: ignore[attr-defined]
+    client.put(
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/pages/entity/acme-corp",
+        json={"content": "# Acme v2"},
+    )
+
+    resp = client.post(
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/revert",
+        json={"slug": "entity/acme-corp", "version": 1},
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["content"] == "# Acme v1"
+    assert data["version"] == 3
+    assert data["last_edit_source"] == "revert"
+
+
+async def test_revert_missing_version_returns_404(client: TestClient, page_repo: AsyncMock) -> None:
+    page_repo._rows["page-1"] = _page()  # type: ignore[attr-defined]
+
+    resp = client.post(
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/revert",
+        json={"slug": "entity/acme-corp", "version": 99},
+    )
+
+    assert resp.status_code == 404
+    assert resp.json()["error"]["code"] == "wiki.revision_not_found"
+
+
+async def test_viewer_forbidden_on_revert_and_issue_status(
+    viewer_client: TestClient,
+) -> None:
+    revert = viewer_client.post(
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/revert",
+        json={"slug": "entity/acme-corp", "version": 1},
+    )
+    status = viewer_client.put(
+        f"/api/v1/knowledgebase/{KB_ID}/wiki/issues/issue-1/status",
+        json={"status": "ignored"},
+    )
+    assert revert.status_code == 403
+    assert status.status_code == 403

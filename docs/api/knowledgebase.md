@@ -11,6 +11,8 @@ Routes registered under `/api/v1/knowledgebase`. Path parameters use FastAPI `{n
 | PUT | `/knowledgebase/{kb_id}/wiki/folders/{folder_id}` |
 | GET | `/knowledgebase/{kb_id}/wiki/graph` |
 | GET | `/knowledgebase/{kb_id}/wiki/index` |
+| GET | `/knowledgebase/{kb_id}/wiki/issues` |
+| PUT | `/knowledgebase/{kb_id}/wiki/issues/{issue_id}/status` |
 | GET | `/knowledgebase/{kb_id}/wiki/lint` |
 | PUT | `/knowledgebase/{kb_id}/wiki/move-page` |
 | GET | `/knowledgebase/{kb_id}/wiki/pages` |
@@ -19,5 +21,7 @@ Routes registered under `/api/v1/knowledgebase`. Path parameters use FastAPI `{n
 | GET | `/knowledgebase/{kb_id}/wiki/pages/{slug:path}` |
 | PUT | `/knowledgebase/{kb_id}/wiki/pages/{slug:path}` |
 | POST | `/knowledgebase/{kb_id}/wiki/rebuild-links` |
+| POST | `/knowledgebase/{kb_id}/wiki/revert` |
+| GET | `/knowledgebase/{kb_id}/wiki/revisions/{slug:path}` |
 | GET | `/knowledgebase/{kb_id}/wiki/search` |
 | GET | `/knowledgebase/{kb_id}/wiki/stats` |

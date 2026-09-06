@@ -26,7 +26,9 @@ from src.common.exception import (
 )
 from src.common.json import JsonObject
 from src.core.knowledge.knowledge_bases.service.kb_service import KBService
+from src.core.knowledge.wiki.issues import WikiPageIssue
 from src.core.knowledge.wiki.lint_service import WikiLintReport
+from src.core.knowledge.wiki.revisions import WikiPageRevisionInfo, WikiRevisionList
 from src.core.knowledge.wiki.types import (
     WikiFolder,
     WikiFolderNode,
@@ -284,6 +286,74 @@ class WikiAutoFixData(BaseModel):
     message: str
 
 
+class WikiIssueView(BaseModel):
+    """One wiki page issue on the wire."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    tenant_id: int
+    knowledge_base_id: str
+    slug: str
+    issue_type: str
+    description: str
+    suspected_knowledge_ids: list[str] = Field(default_factory=list)
+    status: str
+    reported_by: str = ""
+    created_at: datetime
+    updated_at: datetime
+
+
+class WikiIssueStatusRequest(BaseModel):
+    """Body for ``PUT /wiki/issues/{issue_id}/status``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    status: str
+
+
+class WikiRevisionView(BaseModel):
+    """One page snapshot on the wire. List rows omit ``content``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    tenant_id: int
+    knowledge_base_id: str
+    page_id: str
+    slug: str
+    version: int
+    title: str = ""
+    page_type: str = ""
+    status: str = ""
+    content: str | None = None
+    summary: str = ""
+    aliases: list[str] = Field(default_factory=list)
+    edit_source: str = ""
+    editor_id: str = ""
+    edited_at: datetime
+    created_at: datetime
+
+
+class WikiRevisionListData(BaseModel):
+    """Revision listing — ``{revisions, total, current_version}``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    revisions: list[WikiRevisionView]
+    total: int
+    current_version: int
+
+
+class WikiRevertRequest(BaseModel):
+    """Body for ``POST /wiki/revert``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    slug: str
+    version: int
+
+
 # ── Converters ───────────────────────────────────────────────────────
 
 
@@ -360,6 +430,54 @@ def index_to_view(response: WikiIndexResponse) -> WikiIndexData:
             )
             for group in response.groups
         ],
+    )
+
+
+def issue_to_view(issue: WikiPageIssue) -> WikiIssueView:
+    """Project an issue DTO onto the wire shape."""
+    return WikiIssueView(
+        id=issue.id,
+        tenant_id=issue.tenant_id,
+        knowledge_base_id=issue.knowledge_base_id,
+        slug=issue.slug,
+        issue_type=issue.issue_type,
+        description=issue.description,
+        suspected_knowledge_ids=list(issue.suspected_knowledge_ids),
+        status=issue.status,
+        reported_by=issue.reported_by,
+        created_at=issue.created_at,
+        updated_at=issue.updated_at,
+    )
+
+
+def revision_to_view(revision: WikiPageRevisionInfo) -> WikiRevisionView:
+    """Project a revision DTO onto the wire shape."""
+    return WikiRevisionView(
+        id=revision.id,
+        tenant_id=revision.tenant_id,
+        knowledge_base_id=revision.knowledge_base_id,
+        page_id=revision.page_id,
+        slug=revision.slug,
+        version=revision.version,
+        title=revision.title,
+        page_type=revision.page_type,
+        status=revision.status,
+        content=revision.content,
+        summary=revision.summary,
+        aliases=list(revision.aliases),
+        edit_source=revision.edit_source,
+        editor_id=revision.editor_id,
+        edited_at=revision.edited_at,
+        created_at=revision.created_at,
+    )
+
+
+def revision_list_to_view(result: WikiRevisionList) -> WikiRevisionListData:
+    """Project a revision list onto the wire shape."""
+    return WikiRevisionListData(
+        revisions=[revision_to_view(row) for row in result.revisions],
+        total=result.total,
+        current_version=result.current_version,
     )
 
 
@@ -455,6 +573,8 @@ __all__ = [
     "WikiIndexData",
     "WikiIndexEntryView",
     "WikiIndexGroupView",
+    "WikiIssueStatusRequest",
+    "WikiIssueView",
     "WikiLintReport",
     "WikiMessage",
     "WikiPageCreateRequest",
@@ -462,11 +582,17 @@ __all__ = [
     "WikiPageMoveRequest",
     "WikiPageUpdateRequest",
     "WikiPageView",
+    "WikiRevertRequest",
+    "WikiRevisionListData",
+    "WikiRevisionView",
     "WikiSearchData",
     "WikiStats",
     "folder_node_to_view",
     "folder_to_view",
     "index_to_view",
+    "issue_to_view",
     "page_to_view",
     "require_wiki_kb",
+    "revision_list_to_view",
+    "revision_to_view",
 ]
