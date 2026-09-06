@@ -95,13 +95,15 @@ jobs:
       - name: Run pytest with coverage report
         # Live-Postgres suites stay out of this job until it grows a
         # services: block (AGENTS.md §14). That includes tests/integration,
-        # tests/contract, tests/db, and any test_integration_* case
-        # that still lives under tests/core.
+        # tests/contract, tests/db, share-repo files that still live
+        # under tests/core, and any test_integration_* case.
         run: >
           uv run pytest -q
           --ignore=tests/integration
           --ignore=tests/contract
           --ignore=tests/db
+          --ignore=tests/core/sharing/test_agent_share.py
+          --ignore=tests/core/sharing/test_kb_share.py
           -k "not integration"
           --cov=src
           --cov-report=term-missing
