@@ -9,7 +9,7 @@ import os
 import re
 import shutil
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from http_probe import get_json_or_text
@@ -56,7 +56,7 @@ def cmd_launch() -> dict[str, object]:
     web = get_json_or_text(f"{web_base()}/login")
     payload: dict[str, object] = {
         "step": "launch",
-        "at": datetime.now(timezone.utc).isoformat(),
+        "at": datetime.now(UTC).isoformat(),
         "started_servers": False,
         "api": api,
         "web": web,
@@ -90,7 +90,7 @@ def cmd_doctor() -> dict[str, object]:
     root = repo_root()
     payload: dict[str, object] = {
         "step": "doctor",
-        "at": datetime.now(timezone.utc).isoformat(),
+        "at": datetime.now(UTC).isoformat(),
         "env_file": (root / ".env").is_file() or (root / ".env.example").is_file(),
         "frontend_node_modules": (root / "frontend" / "node_modules").is_dir(),
         "feature_headings": _feature_heading_report(),
@@ -119,7 +119,7 @@ def cmd_drive() -> dict[str, object]:
         }
     payload: dict[str, object] = {
         "step": "drive",
-        "at": datetime.now(timezone.utc).isoformat(),
+        "at": datetime.now(UTC).isoformat(),
         "features": {
             "login": {"probes": {"web_login": login_probe, "auth_config": auth_config}},
             "knowledge-base-list": {"probes": {"knowledge_bases": kb_probe}},
@@ -137,7 +137,7 @@ def cmd_evidence() -> dict[str, object]:
     lines = [
         "# kb-verify-flow last run",
         "",
-        f"At: {datetime.now(timezone.utc).isoformat()}",
+        f"At: {datetime.now(UTC).isoformat()}",
         "",
         "## Launch",
         "",

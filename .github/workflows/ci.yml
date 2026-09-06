@@ -78,6 +78,10 @@ jobs:
     env:
       PYTHON_VERSION: "3.11"
       UV_PYTHON: "3.11"
+      # jieba 0.42.1 emits compile-time SyntaxWarning; pytest's
+      # filterwarnings=error would turn that into a collection
+      # SyntaxError before conftest can ignore the module.
+      PYTHONWARNINGS: "ignore::SyntaxWarning"
     steps:
       - uses: actions/checkout@v4
       - name: Install uv
@@ -129,14 +133,13 @@ jobs:
         run: npm ci
         working-directory: frontend
       - name: Contract drift check (openapi-typescript)
-        # Regenerate from the live FastAPI schema and fail if the
-        # committed schema.ts differs — hand-edits and backend drift
-        # both surface here.
+        # Export runs from the repo root. The frontend working
+        # directory would look for frontend/scripts/export_openapi.py.
+        # Then codegen and the drift diff stay inside frontend/.
         run: |
           uv run python scripts/export_openapi.py --output docs/api/openapi.json
-          npm run gen:api
-          git diff --exit-code -- src/api/__generated__/schema.ts
-        working-directory: frontend
+          npm --prefix frontend run gen:api
+          git diff --exit-code -- frontend/src/api/__generated__/schema.ts
       - name: Type-check (vue-tsc)
         run: npm run type-check
         working-directory: frontend

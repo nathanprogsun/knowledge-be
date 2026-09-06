@@ -16,7 +16,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import cast
 
-import jieba
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     Distance,
@@ -48,6 +47,7 @@ from src.ai.retrieval.types import (
 )
 from src.app_logging import logger
 from src.common.exception import ValidationError
+from src.common.jieba_compat import jieba
 
 # ── Payload field names ───────────────────────────────────────────────
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
-from typing import Mapping
+from collections.abc import Mapping
 
 
 def get_json_or_text(

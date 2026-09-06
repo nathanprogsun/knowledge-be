@@ -14,8 +14,7 @@ from __future__ import annotations
 
 import re
 
-import jieba
-
+from src.common.jieba_compat import jieba
 from src.core.chat.pipeline.common import pipeline_info
 from src.core.chat.pipeline.context import PipelineContext
 

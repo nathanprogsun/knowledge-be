@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import pytest
 
+# Rewrite jieba's unescaped regex before workers pull retrieval in.
+import src.common.jieba_compat
+
 # Eagerly import ``src.workers.tasks`` so the @register_task side
 # effects fire once at collection time, not the first time a worker
 # test happens to import a single task module. Several per-file
