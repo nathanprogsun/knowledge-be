@@ -3,7 +3,7 @@
 Status: implemented
 Date: 2026-09-06
 Scope: make the GitHub Actions lint, format, test, and frontend jobs install the tools they invoke and reach their real gates
-Related files: .github/workflows/ci.yml, frontend/.npmrc, .gitignore, src/common/jieba_compat.py, .agents/feature-map/generated.json
+Related files: .github/workflows/ci.yml, frontend/.npmrc, .gitignore, src/common/jieba_compat.py, frontend/src/components/AttachmentUpload.vue, .agents/feature-map/generated.json
 
 ## Context
 
@@ -11,7 +11,7 @@ PR CI on the operator stack failed before any product gate ran. `uv run ruff` bu
 
 ## Decision
 
-Lint and format invoke `uv run --extra dev ruff`. The test job sets `UV_PYTHON=3.11` and `PYTHONWARNINGS=ignore::SyntaxWarning`. `frontend/.npmrc` commits `legacy-peer-deps=true` so `npm ci` matches local installs. The repo-wide `.*` ignore had been hiding that file; `.gitignore` now re-includes `.npmrc`. The OpenAPI export runs from the repo root. `src/common/jieba_compat.py` rewrites jieba's `re.compile` literals to raw strings before import. The feature map is regenerated from the current routers.
+Lint and format invoke `uv run --extra dev ruff`. The test job sets `UV_PYTHON=3.11` and `PYTHONWARNINGS=ignore::SyntaxWarning`. `frontend/.npmrc` commits `legacy-peer-deps=true` so `npm ci` matches local installs. The repo-wide `.*` ignore had been hiding that file; `.gitignore` now re-includes `.npmrc`. The OpenAPI export runs from the repo root. `src/common/jieba_compat.py` rewrites jieba's `re.compile` literals to raw strings before import. The unit job also ignores live-Postgres trees (`tests/contract`, `tests/db`, `test_integration_*`). The feature map is regenerated from the current routers.
 
 ## Alternatives considered
 

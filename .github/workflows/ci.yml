@@ -93,10 +93,19 @@ jobs:
       - name: Sync dependencies
         run: uv sync --all-extras
       - name: Run pytest with coverage report
-        # Integration suites (tests/integration) need live Postgres/Redis
-        # and are excluded until the CI job grows a services: block —
-        # tracked in AGENTS.md §14.
-        run: uv run pytest -q --ignore=tests/integration --cov=src --cov-report=term-missing --cov-report=xml
+        # Live-Postgres suites stay out of this job until it grows a
+        # services: block (AGENTS.md §14). That includes tests/integration,
+        # tests/contract, tests/db, and any test_integration_* case
+        # that still lives under tests/core.
+        run: >
+          uv run pytest -q
+          --ignore=tests/integration
+          --ignore=tests/contract
+          --ignore=tests/db
+          -k "not integration"
+          --cov=src
+          --cov-report=term-missing
+          --cov-report=xml
 
   check:
     name: anti-drift check

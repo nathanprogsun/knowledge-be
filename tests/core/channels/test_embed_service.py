@@ -49,7 +49,7 @@ from src.core.channels.embed.session import (
     sign_embed_session_handle,
     verify_embed_session_handle,
 )
-from src.core.channels.embed.types import EMBED_SESSION_MARKER_PREFIX
+from src.core.channels.embed.types import EMBED_SESSION_MARKER_PREFIX, EmbedChannelOwnedInfo
 from src.core.channels.embed.webhook import (
     SIGNATURE_HEADER_NAME,
     SIGNATURE_PREFIX,
@@ -363,9 +363,9 @@ async def test_get_owned_channel_returns_raw_row_with_secrets(
 ) -> None:
     _seed_channel(rows, id="ch-1", publish_token="em_secret-token")
     row = await service.get_owned_channel(tenant_id=_TENANT, channel_id="ch-1")
-    assert isinstance(row, EmbedChannel)
+    assert isinstance(row, EmbedChannelOwnedInfo)
     assert row.publish_token == "em_secret-token"
-    assert row.webhook_secret == "whsec_secret"
+    assert row.has_webhook_secret is True
 
 
 async def test_list_channels_by_agent(
