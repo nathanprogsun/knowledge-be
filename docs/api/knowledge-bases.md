@@ -14,10 +14,14 @@ Routes registered under `/api/v1/knowledge-bases`. Path parameters use FastAPI `
 | DELETE | `/knowledge-bases/{id}/faq/entries` |
 | GET | `/knowledge-bases/{id}/faq/entries` |
 | POST | `/knowledge-bases/{id}/faq/entries` |
+| PUT | `/knowledge-bases/{id}/faq/entries/fields` |
 | GET | `/knowledge-bases/{id}/faq/entries/export` |
+| PUT | `/knowledge-bases/{id}/faq/entries/tags` |
 | GET | `/knowledge-bases/{id}/faq/entries/{entry_id}` |
 | PUT | `/knowledge-bases/{id}/faq/entries/{entry_id}` |
 | POST | `/knowledge-bases/{id}/faq/entry` |
+| PUT | `/knowledge-bases/{id}/faq/import/last-result/display` |
+| POST | `/knowledge-bases/{id}/faq/search` |
 | GET | `/knowledge-bases/{id}/hybrid-search` |
 | POST | `/knowledge-bases/{id}/hybrid-search` |
 | GET | `/knowledge-bases/{id}/knowledge` |

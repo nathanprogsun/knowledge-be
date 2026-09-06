@@ -9,14 +9,18 @@ Endpoint coverage:
 
 | Method | Path                                         |
 | ------ | -------------------------------------------- |
-| GET    | /knowledge-bases/{id}/faq/entries            |
-| POST   | /knowledge-bases/{id}/faq/entries            |
-| POST   | /knowledge-bases/{id}/faq/entry              |
-| PUT    | /knowledge-bases/{id}/faq/entries/{entry_id} |
-| DELETE | /knowledge-bases/{id}/faq/entries            |
-| GET    | /knowledge-bases/{id}/faq/entries/{entry_id} |
-| GET    | /knowledge-bases/{id}/faq/entries/export     |
-| GET    | /faq/import/progress/{task_id}               |
+| GET    | /knowledge-bases/{id}/faq/entries                     |
+| POST   | /knowledge-bases/{id}/faq/entries                     |
+| POST   | /knowledge-bases/{id}/faq/entry                       |
+| PUT    | /knowledge-bases/{id}/faq/entries/{entry_id}          |
+| DELETE | /knowledge-bases/{id}/faq/entries                     |
+| GET    | /knowledge-bases/{id}/faq/entries/{entry_id}          |
+| GET    | /knowledge-bases/{id}/faq/entries/export              |
+| PUT    | /knowledge-bases/{id}/faq/entries/tags                |
+| PUT    | /knowledge-bases/{id}/faq/entries/fields              |
+| POST   | /knowledge-bases/{id}/faq/search                      |
+| PUT    | /knowledge-bases/{id}/faq/import/last-result/display  |
+| GET    | /faq/import/progress/{task_id}                        |
 
 Auth: the authed client carries the ``X-User-Id/X-Tenant-ID/X-Roles`` header trio; the
 unauthorised tests build a bare ``TestClient`` and assert the 401 raised
@@ -26,6 +30,7 @@ by the global ``require_auth`` dependency.
 from __future__ import annotations
 
 import itertools
+import os
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from typing import Any
@@ -34,15 +39,19 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.common.exception import NotFoundError
+from src.common.exception import NotFoundError, ValidationError
 from src.core.contracts.knowledge import (
     FAQEntry,
+    FAQEntryFieldsBatchUpdate,
     FAQEntryListResponse,
     FAQEntryPayload,
     FAQImportTaskProgress,
+    FAQSearchRequest,
     Knowledge,
 )
 from src.core.knowledge.faq.task_ids import generate_task_id
+from src.core.tenants.member_service import ROLE_VIEWER
+from src.settings import reset_settings_cache
 from src.web.deps.knowledge import get_knowledge_service
 from src.web.deps.knowledge_faq import get_faq_import_runner, get_faq_service
 
@@ -75,6 +84,7 @@ class _FakeFAQService:
         """Insert pre-existing entries."""
         for entry in entries:
             self.rows[entry.id] = entry
+        self._id_seq = itertools.count((max(self.rows) if self.rows else 0) + 1)
 
     def _record(self, method: str, **kwargs: Any) -> None:
         self.calls.append((method, kwargs))
@@ -223,6 +233,137 @@ class _FakeFAQService:
             self.rows.pop(entry_id, None)
         return len(entry_ids)
 
+    async def upsert_entries(
+        self,
+        *,
+        tenant_id: int,
+        knowledge_base_id: str,
+        knowledge_id: str,
+        entries: list[FAQEntryPayload],
+        mode: str,
+        dry_run: bool = False,
+    ) -> list[FAQEntry]:
+        self._record(
+            "upsert_entries",
+            tenant_id=tenant_id,
+            knowledge_base_id=knowledge_base_id,
+            knowledge_id=knowledge_id,
+            mode=mode,
+            dry_run=dry_run,
+        )
+        if mode not in {"append", "replace"}:
+            raise ValidationError(code="faq.invalid_import_mode", message="bad mode")
+        if not entries:
+            raise ValidationError(code="faq.entries_required", message="empty")
+        if dry_run:
+            return []
+        if mode == "replace":
+            for entry_id in [
+                eid for eid, row in self.rows.items() if row.knowledge_base_id == knowledge_base_id
+            ]:
+                self.rows.pop(entry_id, None)
+        created: list[FAQEntry] = []
+        for payload in entries:
+            created.append(
+                await self.create_entry(
+                    tenant_id=tenant_id,
+                    knowledge_base_id=knowledge_base_id,
+                    knowledge_id=knowledge_id,
+                    payload=payload,
+                )
+            )
+        return created
+
+    async def search_entries(
+        self,
+        *,
+        tenant_id: int,
+        knowledge_base_id: str,
+        request: FAQSearchRequest,
+    ) -> list[FAQEntry]:
+        self._record(
+            "search_entries",
+            tenant_id=tenant_id,
+            knowledge_base_id=knowledge_base_id,
+            query_text=request.query_text,
+        )
+        if not request.query_text.strip():
+            raise ValidationError(code="faq.empty_query", message="搜索内容不能为空")
+        query = request.query_text.strip().lower()
+        hits: list[FAQEntry] = []
+        for row in self.rows.values():
+            if row.knowledge_base_id != knowledge_base_id:
+                continue
+            if query not in row.standard_question.lower() and not any(
+                query in item.lower() for item in row.similar_questions
+            ):
+                continue
+            hits.append(
+                row.model_copy(
+                    update={
+                        "score": 1.0,
+                        "match_type": "keywords",
+                        "matched_question": row.standard_question,
+                    }
+                )
+            )
+        cap = request.match_count if request.match_count is not None else 10
+        return hits[:cap]
+
+    async def update_entry_tags(
+        self,
+        *,
+        tenant_id: int,
+        knowledge_base_id: str,
+        updates: dict[int, int | None],
+    ) -> int:
+        self._record(
+            "update_entry_tags",
+            tenant_id=tenant_id,
+            knowledge_base_id=knowledge_base_id,
+            updates=dict(updates),
+        )
+        for entry_id, tag_id in updates.items():
+            row = self.rows.get(entry_id)
+            if row is None or row.knowledge_base_id != knowledge_base_id:
+                raise NotFoundError(code="faq.not_found", message="FAQ条目不存在")
+            self.rows[entry_id] = row.model_copy(
+                update={"tag_id": tag_id, "tag_name": None if tag_id is None else row.tag_name}
+            )
+        return len(updates)
+
+    async def update_entry_fields(
+        self,
+        *,
+        tenant_id: int,
+        knowledge_base_id: str,
+        batch: FAQEntryFieldsBatchUpdate,
+    ) -> int:
+        self._record(
+            "update_entry_fields",
+            tenant_id=tenant_id,
+            knowledge_base_id=knowledge_base_id,
+        )
+        exclude = set(batch.exclude_ids or [])
+        changed = 0
+        for entry_id, patch in (batch.by_id or {}).items():
+            if entry_id in exclude:
+                continue
+            row = self.rows.get(entry_id)
+            if row is None or row.knowledge_base_id != knowledge_base_id:
+                raise NotFoundError(code="faq.not_found", message="FAQ条目不存在")
+            self.rows[entry_id] = row.model_copy(
+                update={
+                    "is_enabled": row.is_enabled if patch.is_enabled is None else patch.is_enabled,
+                    "is_recommended": (
+                        row.is_recommended if patch.is_recommended is None else patch.is_recommended
+                    ),
+                    "tag_id": patch.tag_id if "tag_id" in patch.model_fields_set else row.tag_id,
+                }
+            )
+            changed += 1
+        return changed
+
 
 class _FakeFAQImportRunner:
     """In-memory FAQ import runner; stores completed progress by task id."""
@@ -277,6 +418,72 @@ class _FakeFAQImportRunner:
     def get_progress(self, task_id: str) -> FAQImportTaskProgress | None:
         return self.tasks.get(task_id)
 
+    def record_completed(
+        self,
+        *,
+        tenant_id: int,
+        knowledge_base_id: str,
+        knowledge_id: str,
+        mode: str,
+        dry_run: bool,
+        total: int,
+        success_count: int,
+        failed_count: int = 0,
+        skipped_count: int = 0,
+        task_id: str | None = None,
+    ) -> FAQImportTaskProgress:
+        self._record(
+            "record_completed",
+            tenant_id=tenant_id,
+            knowledge_base_id=knowledge_base_id,
+            mode=mode,
+            dry_run=dry_run,
+        )
+        resolved = task_id or generate_task_id(tenant_id=tenant_id)
+        now = int(datetime.now(UTC).timestamp())
+        progress = FAQImportTaskProgress(
+            task_id=resolved,
+            kb_id=knowledge_base_id,
+            knowledge_id=knowledge_id,
+            status="completed",
+            progress=100,
+            total=total,
+            processed=success_count + failed_count,
+            success_count=success_count,
+            failed_count=failed_count,
+            skipped_count=skipped_count,
+            created_at=now,
+            updated_at=now,
+            dry_run=dry_run,
+            import_mode=mode,
+            display_status="open",
+        )
+        self.tasks[resolved] = progress
+        return progress
+
+    def set_display_status(
+        self,
+        *,
+        knowledge_base_id: str,
+        display_status: str,
+        task_id: str | None = None,
+    ) -> FAQImportTaskProgress | None:
+        self._record(
+            "set_display_status",
+            knowledge_base_id=knowledge_base_id,
+            display_status=display_status,
+        )
+        if task_id is not None:
+            progress = self.tasks.get(task_id)
+        else:
+            matches = [item for item in self.tasks.values() if item.kb_id == knowledge_base_id]
+            progress = max(matches, key=lambda item: item.updated_at) if matches else None
+        if progress is None or progress.kb_id != knowledge_base_id:
+            return None
+        updated = progress.model_copy(update={"display_status": display_status})
+        self.tasks[updated.task_id] = updated
+        return updated
+
 
 class _FakeKnowledgeService:
     """Serves one FAQ container document for a knowledge base."""
@@ -284,6 +491,25 @@ class _FakeKnowledgeService:
     def __init__(self) -> None:
         self.faq_container_id = "knowledge-faq-1"
         self.has_container = True
+
+    def _container(
+        self,
+        *,
+        tenant_id: int,
+        knowledge_base_id: str,
+    ) -> Knowledge:
+        now = datetime.now(UTC)
+        return Knowledge(
+            id=self.faq_container_id,
+            tenant_id=tenant_id,
+            knowledge_base_id=knowledge_base_id,
+            type="faq",
+            title="FAQ",
+            parse_status="completed",
+            enable_status="enabled",
+            created_at=now,
+            updated_at=now,
+        )
 
     async def list_documents(
         self,
@@ -293,20 +519,21 @@ class _FakeKnowledgeService:
     ) -> list[Knowledge]:
         if not self.has_container:
             return []
-        now = datetime.now(UTC)
-        return [
-            Knowledge(
-                id=self.faq_container_id,
-                tenant_id=tenant_id,
-                knowledge_base_id=knowledge_base_id,
-                type="faq",
-                title="FAQ",
-                parse_status="done",
-                enable_status="enabled",
-                created_at=now,
-                updated_at=now,
-            )
-        ]
+        return [self._container(tenant_id=tenant_id, knowledge_base_id=knowledge_base_id)]
+
+    async def create_document(
+        self,
+        *,
+        tenant_id: int,
+        knowledge_base_id: str,
+        type: str,
+        title: str,
+        source: str,
+        parse_status: str = "completed",
+    ) -> Knowledge:
+        self.has_container = True
+        self.faq_container_id = "knowledge-faq-created"
+        return self._container(tenant_id=tenant_id, knowledge_base_id=knowledge_base_id)
 
 
 def _entry(
@@ -379,6 +606,31 @@ def anon_client(app: FastAPI) -> Iterator[TestClient]:
     """A ``TestClient`` without the auth header trio — 401 surface."""
     with TestClient(app=app) as c:
         yield c
+
+
+@pytest.fixture
+def viewer_client(app: FastAPI, admin_user: tuple[int, int]) -> Iterator[TestClient]:
+    """Same principal as the authed client, gated at Viewer (lane 10).
+
+    The integration suite turns RBAC off so header-auth tests do not
+    need membership rows. These assertions need the gate on.
+    """
+    os.environ["RBAC_ENFORCED"] = "true"
+    reset_settings_cache()
+    user_id, tenant_id = admin_user
+    try:
+        with TestClient(app=app) as client:
+            client.headers.update(
+                {
+                    "X-User-Id": user_id,
+                    "X-Tenant-ID": str(tenant_id),
+                    "X-Roles": ROLE_VIEWER,
+                }
+            )
+            yield client
+    finally:
+        os.environ["RBAC_ENFORCED"] = "false"
+        reset_settings_cache()
 
 
 # ── GET /knowledge-bases/{id}/faq/entries ────────────────────────────
@@ -491,18 +743,21 @@ async def test_create_resolves_faq_container(
     assert kwargs["knowledge_id"] == "knowledge-faq-1"
 
 
-async def test_create_without_faq_container_returns_422(
+async def test_create_without_faq_container_seeds_one(
     client: TestClient,
     default_create_faq_request: dict[str, object],
     fake_knowledge_service: _FakeKnowledgeService,
+    fake_faq_service: _FakeFAQService,
 ) -> None:
-    """A knowledge base with no FAQ document cannot take a write."""
+    """A first write creates the FAQ container and persists the entry."""
     fake_knowledge_service.has_container = False
     resp = client.post(
         f"/api/v1/knowledge-bases/{_KB_ID}/faq/entry", json=default_create_faq_request
     )
-    assert resp.status_code == 422
-    assert resp.json()["error"]["code"] == "faq.knowledge_container_missing"
+    assert resp.status_code == 200
+    method, kwargs = fake_faq_service.calls[-1]
+    assert method == "create_entry"
+    assert kwargs["knowledge_id"] == "knowledge-faq-created"
 
 
 async def test_create_rejects_missing_standard_question(client: TestClient) -> None:
@@ -619,18 +874,21 @@ async def test_import_rejects_invalid_mode(client: TestClient) -> None:
     assert resp.json()["error"]["code"] == "faq.invalid_import_mode"
 
 
-async def test_import_without_container_returns_422(
+async def test_import_without_container_seeds_one(
     client: TestClient,
     fake_knowledge_service: _FakeKnowledgeService,
+    fake_import_runner: _FakeFAQImportRunner,
 ) -> None:
-    """Import needs a FAQ container to persist into."""
+    """A first import creates the FAQ container and runs the file pipeline."""
     fake_knowledge_service.has_container = False
     resp = client.post(
         f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries",
         files={"file": ("faq.csv", _FAQ_CSV, "text/csv")},
     )
-    assert resp.status_code == 422
-    assert resp.json()["error"]["code"] == "faq.knowledge_container_missing"
+    assert resp.status_code == 200
+    method, kwargs = fake_import_runner.calls[-1]
+    assert method == "run"
+    assert kwargs["knowledge_id"] == "knowledge-faq-created"
 
 
 async def test_import_requires_file(client: TestClient) -> None:
@@ -761,6 +1019,177 @@ async def test_unauthed_write_returns_401(anon_client: TestClient) -> None:
     assert resp.status_code == 401
 
 
+# ── JSON POST /entries (upsert) ──────────────────────────────────────
+
+
+def _upsert_entry(question: str, answer: str = "答案") -> dict[str, object]:
+    return {"standard_question": question, "answers": [answer]}
+
+
+async def test_json_upsert_append_creates_rows(
+    client: TestClient,
+    fake_faq_service: _FakeFAQService,
+) -> None:
+    """JSON append adds rows and returns a pollable task id."""
+    fake_faq_service.seed(_entry(1, "已有问题"))
+    resp = client.post(
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries",
+        json={"entries": [_upsert_entry("新问题")], "mode": "append"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    assert body["data"]["task_id"]
+    assert body["data"]["import_mode"] == "append"
+    questions = {row.standard_question for row in fake_faq_service.rows.values()}
+    assert questions == {"已有问题", "新问题"}
+
+
+async def test_json_upsert_replace_replaces_rows(
+    client: TestClient,
+    fake_faq_service: _FakeFAQService,
+) -> None:
+    """JSON replace clears existing rows then writes the payload."""
+    fake_faq_service.seed(_entry(1, "旧问题"))
+    resp = client.post(
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries",
+        json={"entries": [_upsert_entry("替换后")], "mode": "replace"},
+    )
+    assert resp.status_code == 200
+    questions = {row.standard_question for row in fake_faq_service.rows.values()}
+    assert questions == {"替换后"}
+
+
+async def test_multipart_import_still_accepts_csv(client: TestClient) -> None:
+    """File upload on the same path still runs the CSV import."""
+    resp = client.post(
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries",
+        files={"file": ("faq.csv", _FAQ_CSV, "text/csv")},
+        data={"mode": "append"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["import_mode"] == "append"
+
+
+# ── POST /search ─────────────────────────────────────────────────────
+
+
+async def test_search_returns_entry_list(
+    client: TestClient,
+    fake_faq_service: _FakeFAQService,
+) -> None:
+    """Search ``data`` is a list of entries, not a paged envelope."""
+    fake_faq_service.seed(_entry(1, "如何充值"), _entry(2, "如何退款"))
+    resp = client.post(
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/search",
+        json={"query_text": "充值", "match_count": 10},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    assert isinstance(body["data"], list)
+    assert body["data"][0]["standard_question"] == "如何充值"
+    assert body["data"][0]["match_type"] == "keywords"
+    assert body["data"][0]["score"] == 1.0
+
+
+async def test_search_empty_query_returns_422(client: TestClient) -> None:
+    """An empty query is a typed client error."""
+    resp = client.post(
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/search",
+        json={"query_text": "   "},
+    )
+    assert resp.status_code == 422
+    assert resp.json()["error"]["code"] == "faq.empty_query"
+
+
+# ── PUT /entries/tags and /entries/fields ────────────────────────────
+
+
+async def test_batch_tags_updates_and_clears(
+    client: TestClient,
+    fake_faq_service: _FakeFAQService,
+) -> None:
+    """A null tag value clears the entry's tag."""
+    fake_faq_service.seed(_entry(3, "带标签", tag_id=8))
+    resp = client.put(
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries/tags",
+        json={"updates": {"3": None}},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True
+    assert fake_faq_service.rows[3].tag_id is None
+
+
+async def test_batch_fields_updates_flags(
+    client: TestClient,
+    fake_faq_service: _FakeFAQService,
+) -> None:
+    """Field patches flip enabled / recommended on the named ids."""
+    fake_faq_service.seed(_entry(4, "可推荐"))
+    resp = client.put(
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries/fields",
+        json={"by_id": {"4": {"is_enabled": False, "is_recommended": True}}},
+    )
+    assert resp.status_code == 200
+    row = fake_faq_service.rows[4]
+    assert row.is_enabled is False
+    assert row.is_recommended is True
+
+
+# ── PUT /import/last-result/display ──────────────────────────────────
+
+
+async def test_last_result_display_close_survives_progress_get(
+    client: TestClient,
+) -> None:
+    """Closing the last-result card persists on a later progress GET."""
+    started = client.post(
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries",
+        json={"entries": [_upsert_entry("导入问")], "mode": "append"},
+    )
+    assert started.status_code == 200
+    task_id = started.json()["data"]["task_id"]
+
+    closed = client.put(
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/import/last-result/display",
+        json={"display_status": "close"},
+    )
+    assert closed.status_code == 200
+    assert closed.json()["data"]["display_status"] == "close"
+
+    progress = client.get(f"/api/v1/faq/import/progress/{task_id}")
+    assert progress.status_code == 200
+    assert progress.json()["data"]["display_status"] == "close"
+
+
+# ── Viewer 403 on mutations ──────────────────────────────────────────
+
+
+async def test_viewer_put_tags_returns_403(viewer_client: TestClient) -> None:
+    resp = viewer_client.put(
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries/tags",
+        json={"updates": {"1": 2}},
+    )
+    assert resp.status_code == 403
+
+
+async def test_viewer_put_fields_returns_403(viewer_client: TestClient) -> None:
+    resp = viewer_client.put(
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/entries/fields",
+        json={"by_id": {"1": {"is_enabled": False}}},
+    )
+    assert resp.status_code == 403
+
+
+async def test_viewer_put_display_returns_403(viewer_client: TestClient) -> None:
+    resp = viewer_client.put(
+        f"/api/v1/knowledge-bases/{_KB_ID}/faq/import/last-result/display",
+        json={"display_status": "close"},
+    )
+    assert resp.status_code == 403
+
+
 __all__ = [
     "_FakeFAQImportRunner",
     "_FakeFAQService",
@@ -771,4 +1200,5 @@ __all__ = [
     "fake_faq_service",
     "fake_import_runner",
     "fake_knowledge_service",
+    "viewer_client",
 ]

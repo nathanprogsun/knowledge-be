@@ -6636,7 +6636,7 @@
           "knowledge.faq"
         ],
         "summary": "Import Faq Entries",
-        "description": "Import FAQ entries from a CSV / Excel file into the knowledge base.\n\nThe import runs synchronously; the returned progress describes the\ncompleted task, which the progress endpoint reads back by ``task_id``.\n``dry_run`` validates without persisting.",
+        "description": "Import FAQ entries from JSON upsert or a CSV / Excel file.\n\n``application/json`` is the SPA payload. Multipart stays the file\nrunner. Both record a completed progress object for later polling.",
         "operationId": "import_faq_entries_api_v1_knowledge_bases__id__faq_entries_post",
         "parameters": [
           {
@@ -6681,16 +6681,6 @@
             }
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_import_faq_entries_api_v1_knowledge_bases__id__faq_entries_post"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -6708,6 +6698,202 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "entries": {
+                    "items": {
+                      "properties": {
+                        "id": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Id"
+                        },
+                        "standard_question": {
+                          "title": "Standard Question",
+                          "type": "string"
+                        },
+                        "similar_questions": {
+                          "anyOf": [
+                            {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Similar Questions"
+                        },
+                        "negative_questions": {
+                          "anyOf": [
+                            {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Negative Questions"
+                        },
+                        "answers": {
+                          "anyOf": [
+                            {
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Answers"
+                        },
+                        "answer_strategy": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Answer Strategy"
+                        },
+                        "tag_id": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Tag Id"
+                        },
+                        "tag_name": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Tag Name"
+                        },
+                        "is_enabled": {
+                          "anyOf": [
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Is Enabled"
+                        },
+                        "is_recommended": {
+                          "anyOf": [
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "title": "Is Recommended"
+                        }
+                      },
+                      "required": [
+                        "standard_question"
+                      ],
+                      "title": "FAQEntryPayload",
+                      "type": "object"
+                    },
+                    "title": "Entries",
+                    "type": "array"
+                  },
+                  "mode": {
+                    "title": "Mode",
+                    "type": "string"
+                  },
+                  "knowledge_id": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Knowledge Id"
+                  },
+                  "task_id": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Task Id"
+                  },
+                  "dry_run": {
+                    "default": false,
+                    "title": "Dry Run",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "entries",
+                  "mode"
+                ],
+                "title": "FAQBatchUpsertPayload",
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "FAQ 导入文件（CSV / Excel）"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "description": "导入模式：append 或 replace"
+                  },
+                  "dry_run": {
+                    "type": "boolean",
+                    "description": "仅验证，不实际导入"
+                  }
                 }
               }
             }
@@ -6784,6 +6970,176 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge-bases/{id}/faq/entries/tags": {
+      "put": {
+        "tags": [
+          "knowledge.faq"
+        ],
+        "summary": "Update Faq Entry Tags",
+        "description": "Set or clear tags for the given entry ids. ``null`` clears a tag.",
+        "operationId": "update_faq_entry_tags_api_v1_knowledge_bases__id__faq_entries_tags_put",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FAQEntryTagsBatchUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FAQAckResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge-bases/{id}/faq/entries/fields": {
+      "put": {
+        "tags": [
+          "knowledge.faq"
+        ],
+        "summary": "Update Faq Entry Fields",
+        "description": "Batch-update enabled / recommended / tag fields by id or tag.",
+        "operationId": "update_faq_entry_fields_api_v1_knowledge_bases__id__faq_entries_fields_put",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FAQEntryFieldsBatchUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FAQAckResponse"
+                }
               }
             }
           },
@@ -7044,6 +7400,176 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FAQEntryEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge-bases/{id}/faq/search": {
+      "post": {
+        "tags": [
+          "knowledge.faq"
+        ],
+        "summary": "Search Faq Entries",
+        "description": "Keyword-overlap search. ``data`` is a list of scored entries.",
+        "operationId": "search_faq_entries_api_v1_knowledge_bases__id__faq_search_post",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FAQSearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FAQSearchEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/knowledge-bases/{id}/faq/import/last-result/display": {
+      "put": {
+        "tags": [
+          "knowledge.faq"
+        ],
+        "summary": "Update Faq Import Result Display",
+        "description": "Persist last-result card visibility on the newest import task.",
+        "operationId": "update_faq_import_result_display_api_v1_knowledge_bases__id__faq_import_last_result_display_put",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-API-Key",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Api-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FAQImportDisplayStatusRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FAQImportProgressEnvelope"
                 }
               }
             }
@@ -27838,33 +28364,6 @@
         "type": "object",
         "title": "Body_debug_model_api_v1_models__model_id__debug_post"
       },
-      "Body_import_faq_entries_api_v1_knowledge_bases__id__faq_entries_post": {
-        "properties": {
-          "file": {
-            "type": "string",
-            "contentMediaType": "application/octet-stream",
-            "title": "File",
-            "description": "FAQ 导入文件（CSV / Excel）"
-          },
-          "mode": {
-            "type": "string",
-            "title": "Mode",
-            "description": "导入模式：append 或 replace",
-            "default": "append"
-          },
-          "dry_run": {
-            "type": "boolean",
-            "title": "Dry Run",
-            "description": "仅验证，不实际导入",
-            "default": false
-          }
-        },
-        "type": "object",
-        "required": [
-          "file"
-        ],
-        "title": "Body_import_faq_entries_api_v1_knowledge_bases__id__faq_entries_post"
-      },
       "Body_test_multimodal_function_api_v1_initialization_multimodal_test_post": {
         "properties": {
           "image": {
@@ -32284,6 +32783,20 @@
         ],
         "title": "ExtractConfig"
       },
+      "FAQAckResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "FAQAckResponse",
+        "description": "``{\"success\": true}`` — batch tag / field ack."
+      },
       "FAQBatchDeleteRequest": {
         "properties": {
           "ids": {
@@ -32490,6 +33003,93 @@
         "title": "FAQEntryEnvelope",
         "description": "``{\"success\": true, \"data\": {...}}`` — single-entry responses."
       },
+      "FAQEntryFieldsBatchUpdate": {
+        "properties": {
+          "by_id": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/FAQEntryFieldsUpdate"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By Id"
+          },
+          "by_tag": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/FAQEntryFieldsUpdate"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "By Tag"
+          },
+          "exclude_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exclude Ids"
+          }
+        },
+        "type": "object",
+        "title": "FAQEntryFieldsBatchUpdate"
+      },
+      "FAQEntryFieldsUpdate": {
+        "properties": {
+          "is_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Enabled"
+          },
+          "is_recommended": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Recommended"
+          },
+          "tag_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag Id"
+          }
+        },
+        "type": "object",
+        "title": "FAQEntryFieldsUpdate"
+      },
       "FAQEntryListEnvelope": {
         "properties": {
           "success": {
@@ -32659,6 +33259,42 @@
           "standard_question"
         ],
         "title": "FAQEntryPayload"
+      },
+      "FAQEntryTagsBatchUpdate": {
+        "properties": {
+          "updates": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Updates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "updates"
+        ],
+        "title": "FAQEntryTagsBatchUpdate"
+      },
+      "FAQImportDisplayStatusRequest": {
+        "properties": {
+          "display_status": {
+            "type": "string",
+            "title": "Display Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "display_status"
+        ],
+        "title": "FAQImportDisplayStatusRequest"
       },
       "FAQImportProgressEnvelope": {
         "properties": {
@@ -32903,6 +33539,96 @@
           "updated_at"
         ],
         "title": "FAQImportTaskProgress"
+      },
+      "FAQSearchEnvelope": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/FAQEntry"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success",
+          "data"
+        ],
+        "title": "FAQSearchEnvelope",
+        "description": "``{\"success\": true, \"data\": [...]}`` — search hits, not a paged list."
+      },
+      "FAQSearchRequest": {
+        "properties": {
+          "query_text": {
+            "type": "string",
+            "title": "Query Text"
+          },
+          "vector_threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vector Threshold"
+          },
+          "match_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match Count"
+          },
+          "first_priority_tag_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Priority Tag Ids"
+          },
+          "second_priority_tag_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Priority Tag Ids"
+          },
+          "only_recommended": {
+            "type": "boolean",
+            "title": "Only Recommended",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "query_text"
+        ],
+        "title": "FAQSearchRequest"
       },
       "FabriTagData": {
         "properties": {

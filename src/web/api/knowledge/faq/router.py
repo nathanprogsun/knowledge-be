@@ -1,26 +1,22 @@
 """FAQ HTTP endpoints — knowledge-base-scoped entries plus import progress.
 
-Maps the FAQ endpoints from the upstream handler. Entries are knowledge-base
-content: reads are Viewer+, every mutation (create / update / delete /
-batch import) is Contributor+ — mirroring the upstream route guards.
+Entries are knowledge-base content: reads are Viewer+, every mutation
+(create / update / delete / batch import / batch patch) is Contributor+.
 
-Route order matters: the static ``/entries/export`` path is declared before
-the ``/entries/{entry_id}``-shaped routes so a literal segment is never
-captured as an entry id.
+Route order matters: static paths such as ``/entries/export``,
+``/entries/tags``, and ``/entries/fields`` are declared before
+``/entries/{entry_id}`` so a literal segment is never captured as an
+entry id.
 
-Scope notes (this build):
+``POST /entries`` branches on ``Content-Type``. ``application/json`` is
+the SPA ``{entries, mode}`` upsert. Multipart is the CSV / Excel file
+runner. The two bodies are not interchangeable.
 
-- ``POST /entries`` is the FAQ batch import. The merged import pipeline
-  consumes a CSV / Excel file, so this route binds a file upload plus the
-  ``mode`` / ``dry_run`` switches; the JSON batch-upsert body of the
-  upstream handler is not yet wired.
-- Search, similar-question append, batch field / tag updates, and the
-  import-result display switch need not-yet-merged services and are absent.
-- The FAQ container knowledge id for entry writes is resolved from the
-  knowledge base's documents (the FAQ knowledge). Without a container the
-  write fails with ``faq.knowledge_container_missing``.
+The FAQ container knowledge id for entry writes is resolved from the
+knowledge base's documents. A first write creates that container when
+the knowledge base has none.
 
-Swagger ``description`` strings are Chinese, mirroring the upstream
+Swagger ``description`` strings are Chinese, mirroring the existing
 annotations; RUF001 is suppressed file-wide for the same reason as
 ``src/web/api/system/router.py``.
 """
@@ -29,28 +25,48 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile
+from fastapi import APIRouter, Depends, Query, Request, Response
 
 from src.common.exception import NotFoundError, UnauthorizedError, ValidationError
-from src.core.contracts.knowledge import FAQBatchDeleteRequest, FAQEntryPayload
+from src.common.json import JsonObject
+from src.core.contracts.knowledge import (
+    FAQBatchDeleteRequest,
+    FAQBatchUpsertPayload,
+    FAQEntryFieldsBatchUpdate,
+    FAQEntryPayload,
+    FAQEntryTagsBatchUpdate,
+    FAQImportDisplayStatusRequest,
+    FAQSearchRequest,
+)
 from src.core.knowledge.documents.faq_import import (
     FAQ_BATCH_MODE_APPEND,
     FAQ_BATCH_MODE_REPLACE,
 )
+from src.core.knowledge.documents.service.knowledge_service import KnowledgeService
+from src.core.knowledge.faq.import_runner import FAQImportRunner
+from src.core.knowledge.faq.service.faq_service import FAQService
 from src.core.knowledge.faq.task_ids import task_tenant_id
 from src.web.api.knowledge.faq.views import (
     DeleteFAQEntriesResponse,
+    FAQAckResponse,
     FAQEntryEnvelope,
     FAQEntryListEnvelope,
     FAQImportProgressEnvelope,
+    FAQSearchEnvelope,
     build_export_csv,
     build_export_json,
     collect_all_entries,
     delete_ack,
     entry_envelope,
     import_progress_envelope,
+    inlined_json_schema,
+    is_json_content_type,
     list_envelope,
+    mutation_ack,
+    read_json_upsert_payload,
+    read_multipart_import,
     resolve_faq_knowledge_id,
+    search_envelope,
 )
 from src.web.deps import AuthDep, RoleContributorDep, RoleViewerDep
 from src.web.deps.context import get_tenant_id_dep
@@ -60,10 +76,37 @@ from src.web.deps.knowledge_faq import FAQImportRunnerDep, FAQServiceDep
 # Function-arg-style principal dependency aliases.
 _PrincipalTenant = Annotated[int, Depends(get_tenant_id_dep)]
 
-# Multipart parameter aliases (module-level markers for the B008 rule).
-ImportFile = Annotated[UploadFile, File(description="FAQ 导入文件（CSV / Excel）")]
-ModeField = Annotated[str, Form(description="导入模式：append 或 replace")]
-DryRunField = Annotated[bool, Form(description="仅验证，不实际导入")]
+_DISPLAY_STATUSES: frozenset[str] = frozenset({"open", "close"})
+
+_ENTRIES_POST_OPENAPI: JsonObject = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "application/json": {"schema": inlined_json_schema(FAQBatchUpsertPayload)},
+            "multipart/form-data": {
+                "schema": {
+                    "type": "object",
+                    "required": ["file"],
+                    "properties": {
+                        "file": {
+                            "type": "string",
+                            "format": "binary",
+                            "description": "FAQ 导入文件（CSV / Excel）",
+                        },
+                        "mode": {
+                            "type": "string",
+                            "description": "导入模式：append 或 replace",
+                        },
+                        "dry_run": {
+                            "type": "boolean",
+                            "description": "仅验证，不实际导入",
+                        },
+                    },
+                }
+            },
+        },
+    }
+}
 
 # UTF-8 BOM prepended to the CSV export for Excel compatibility.
 _CSV_BOM = b"\xef\xbb\xbf"
@@ -232,6 +275,44 @@ async def export_faq_entries(
     )
 
 
+@router.put("/entries/tags", response_model=FAQAckResponse)
+async def update_faq_entry_tags(
+    _auth: AuthDep,
+    _contributor: RoleContributorDep,
+    id: str,
+    body: FAQEntryTagsBatchUpdate,
+    faq_service: FAQServiceDep,
+    tenant_id: _PrincipalTenant,
+) -> FAQAckResponse:
+    """Set or clear tags for the given entry ids. ``null`` clears a tag."""
+    tenant_id = _require_tenant(tenant_id)
+    await faq_service.update_entry_tags(
+        tenant_id=tenant_id,
+        knowledge_base_id=id,
+        updates=body.updates,
+    )
+    return mutation_ack()
+
+
+@router.put("/entries/fields", response_model=FAQAckResponse)
+async def update_faq_entry_fields(
+    _auth: AuthDep,
+    _contributor: RoleContributorDep,
+    id: str,
+    body: FAQEntryFieldsBatchUpdate,
+    faq_service: FAQServiceDep,
+    tenant_id: _PrincipalTenant,
+) -> FAQAckResponse:
+    """Batch-update enabled / recommended / tag fields by id or tag."""
+    tenant_id = _require_tenant(tenant_id)
+    await faq_service.update_entry_fields(
+        tenant_id=tenant_id,
+        knowledge_base_id=id,
+        batch=body,
+    )
+    return mutation_ack()
+
+
 @router.get("/entries/{entry_id}", response_model=FAQEntryEnvelope)
 async def get_faq_entry(
     _auth: AuthDep,
@@ -320,45 +401,89 @@ async def delete_faq_entries(
     return delete_ack()
 
 
-@router.post("/entries", response_model=FAQImportProgressEnvelope)
+@router.post(
+    "/entries",
+    response_model=FAQImportProgressEnvelope,
+    openapi_extra=_ENTRIES_POST_OPENAPI,
+)
 async def import_faq_entries(
+    request: Request,
     _auth: AuthDep,
     _contributor: RoleContributorDep,
     id: str,
     runner: FAQImportRunnerDep,
+    faq_service: FAQServiceDep,
     knowledge_service: KnowledgeServiceDep,
     tenant_id: _PrincipalTenant,
-    file: ImportFile,
-    mode: ModeField = FAQ_BATCH_MODE_APPEND,
-    dry_run: DryRunField = False,
 ) -> FAQImportProgressEnvelope:
-    """Import FAQ entries from a CSV / Excel file into the knowledge base.
+    """Import FAQ entries from JSON upsert or a CSV / Excel file.
 
-    The import runs synchronously; the returned progress describes the
-    completed task, which the progress endpoint reads back by ``task_id``.
-    ``dry_run`` validates without persisting.
+    ``application/json`` is the SPA payload. Multipart stays the file
+    runner. Both record a completed progress object for later polling.
     """
     tenant_id = _require_tenant(tenant_id)
-    if mode not in (FAQ_BATCH_MODE_APPEND, FAQ_BATCH_MODE_REPLACE):
-        raise ValidationError(
-            code="faq.invalid_import_mode",
-            message="模式仅支持 append 或 replace",
+    if is_json_content_type(request.headers.get("content-type", "")):
+        return await _upsert_json_entries(
+            request=request,
+            faq_service=faq_service,
+            runner=runner,
+            knowledge_service=knowledge_service,
+            tenant_id=tenant_id,
+            knowledge_base_id=id,
         )
-    knowledge_id = await resolve_faq_knowledge_id(
-        knowledge_service,
+    return await _import_file_entries(
+        request=request,
+        runner=runner,
+        knowledge_service=knowledge_service,
         tenant_id=tenant_id,
         knowledge_base_id=id,
     )
-    file_data = await file.read()
-    progress = await runner.run(
-        file_data=file_data,
-        filename=file.filename or "",
+
+
+@router.post("/search", response_model=FAQSearchEnvelope)
+async def search_faq_entries(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+    id: str,
+    body: FAQSearchRequest,
+    faq_service: FAQServiceDep,
+    tenant_id: _PrincipalTenant,
+) -> FAQSearchEnvelope:
+    """Keyword-overlap search. ``data`` is a list of scored entries."""
+    tenant_id = _require_tenant(tenant_id)
+    hits = await faq_service.search_entries(
         tenant_id=tenant_id,
         knowledge_base_id=id,
-        knowledge_id=knowledge_id,
-        mode=mode,
-        dry_run=dry_run,
+        request=body,
     )
+    return search_envelope(hits)
+
+
+@router.put("/import/last-result/display", response_model=FAQImportProgressEnvelope)
+async def update_faq_import_result_display(
+    _auth: AuthDep,
+    _contributor: RoleContributorDep,
+    id: str,
+    body: FAQImportDisplayStatusRequest,
+    runner: FAQImportRunnerDep,
+    tenant_id: _PrincipalTenant,
+) -> FAQImportProgressEnvelope:
+    """Persist last-result card visibility on the newest import task."""
+    tenant_id = _require_tenant(tenant_id)
+    if body.display_status not in _DISPLAY_STATUSES:
+        raise ValidationError(
+            code="faq.invalid_display_status",
+            message="display_status 仅支持 open 或 close",
+        )
+    progress = runner.set_display_status(
+        knowledge_base_id=id,
+        display_status=body.display_status,
+    )
+    if progress is None:
+        raise NotFoundError(
+            code="faq.import_task_not_found",
+            message="FAQ 导入任务不存在",
+        )
     return import_progress_envelope(progress)
 
 
@@ -386,6 +511,81 @@ async def get_faq_import_progress(
             message="FAQ 导入任务不存在",
         )
     return import_progress_envelope(progress)
+
+
+async def _upsert_json_entries(
+    *,
+    request: Request,
+    faq_service: FAQService,
+    runner: FAQImportRunner,
+    knowledge_service: KnowledgeService,
+    tenant_id: int,
+    knowledge_base_id: str,
+) -> FAQImportProgressEnvelope:
+    """Persist a JSON upsert and record completed progress for polling."""
+    payload = await read_json_upsert_payload(request)
+    _require_import_mode(payload.mode)
+    knowledge_id = await resolve_faq_knowledge_id(
+        knowledge_service,
+        tenant_id=tenant_id,
+        knowledge_base_id=knowledge_base_id,
+    )
+    created = await faq_service.upsert_entries(
+        tenant_id=tenant_id,
+        knowledge_base_id=knowledge_base_id,
+        knowledge_id=knowledge_id,
+        entries=payload.entries,
+        mode=payload.mode,
+        dry_run=payload.dry_run,
+    )
+    success_count = len(created) if not payload.dry_run else len(payload.entries)
+    progress = runner.record_completed(
+        tenant_id=tenant_id,
+        knowledge_base_id=knowledge_base_id,
+        knowledge_id=knowledge_id,
+        mode=payload.mode,
+        dry_run=payload.dry_run,
+        total=len(payload.entries),
+        success_count=success_count,
+        task_id=payload.task_id,
+    )
+    return import_progress_envelope(progress)
+
+
+async def _import_file_entries(
+    *,
+    request: Request,
+    runner: FAQImportRunner,
+    knowledge_service: KnowledgeService,
+    tenant_id: int,
+    knowledge_base_id: str,
+) -> FAQImportProgressEnvelope:
+    """Run the CSV / Excel import pipeline and record completed progress."""
+    multipart = await read_multipart_import(request)
+    _require_import_mode(multipart.mode)
+    knowledge_id = await resolve_faq_knowledge_id(
+        knowledge_service,
+        tenant_id=tenant_id,
+        knowledge_base_id=knowledge_base_id,
+    )
+    progress = await runner.run(
+        file_data=multipart.file_data,
+        filename=multipart.filename,
+        tenant_id=tenant_id,
+        knowledge_base_id=knowledge_base_id,
+        knowledge_id=knowledge_id,
+        mode=multipart.mode,
+        dry_run=multipart.dry_run,
+    )
+    return import_progress_envelope(progress)
+
+
+def _require_import_mode(mode: str) -> None:
+    if mode not in (FAQ_BATCH_MODE_APPEND, FAQ_BATCH_MODE_REPLACE):
+        raise ValidationError(
+            code="faq.invalid_import_mode",
+            message="模式仅支持 append 或 replace",
+        )
 
 
 __all__ = ["import_progress_router", "router"]

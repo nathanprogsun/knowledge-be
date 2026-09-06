@@ -56,6 +56,39 @@ class FAQImportTaskStore:
         """Return the recorded progress, or ``None`` when unknown."""
         return self._tasks.get(task_id)
 
+    def latest_for_knowledge_base(self, knowledge_base_id: str) -> FAQImportTaskProgress | None:
+        """Return the newest recorded task for ``knowledge_base_id``."""
+        matches = [item for item in self._tasks.values() if item.kb_id == knowledge_base_id]
+        if not matches:
+            return None
+        return max(matches, key=lambda item: (item.updated_at, item.created_at))
+
+    def set_display_status(
+        self,
+        *,
+        display_status: str,
+        knowledge_base_id: str,
+        task_id: str | None = None,
+    ) -> FAQImportTaskProgress | None:
+        """Set ``display_status`` on one task and return the updated record.
+
+        A named ``task_id`` wins when it belongs to ``knowledge_base_id``.
+        Otherwise the newest task for that knowledge base is updated. The
+        last-result card reads this field on a later progress GET, so the
+        close must survive across requests.
+        """
+        if task_id is not None:
+            progress = self._tasks.get(task_id)
+            if progress is None or progress.kb_id != knowledge_base_id:
+                return None
+        else:
+            progress = self.latest_for_knowledge_base(knowledge_base_id)
+            if progress is None:
+                return None
+        updated = progress.model_copy(update={"display_status": display_status})
+        self._tasks[updated.task_id] = updated
+        return updated
+
 
 class FAQImportRunner:
     """Run one FAQ file import and persist its completed progress."""
@@ -116,6 +149,62 @@ class FAQImportRunner:
     def get_progress(self, task_id: str) -> FAQImportTaskProgress | None:
         """Return the recorded progress for ``task_id``, or ``None``."""
         return self._task_store.get(task_id)
+
+    def record_completed(
+        self,
+        *,
+        tenant_id: int,
+        knowledge_base_id: str,
+        knowledge_id: str,
+        mode: str,
+        dry_run: bool,
+        total: int,
+        success_count: int,
+        failed_count: int = 0,
+        skipped_count: int = 0,
+        task_id: str | None = None,
+    ) -> FAQImportTaskProgress:
+        """Record a completed JSON upsert the same way a file import is recorded.
+
+        The payload is already persisted by ``FAQService``; this only writes
+        the in-memory progress object the poller and last-result card read.
+        """
+        finished = datetime.now(UTC)
+        progress = FAQImportTaskProgress(
+            task_id=task_id or generate_task_id(tenant_id=tenant_id),
+            kb_id=knowledge_base_id,
+            knowledge_id=knowledge_id,
+            status=_STATUS_COMPLETED,
+            progress=_PROGRESS_COMPLETE,
+            total=total,
+            processed=success_count + failed_count,
+            success_count=success_count,
+            failed_count=failed_count,
+            skipped_count=skipped_count,
+            created_at=int(finished.timestamp()),
+            updated_at=int(finished.timestamp()),
+            dry_run=dry_run,
+            import_mode=mode,
+            imported_at=finished if not dry_run else None,
+            display_status="open",
+            processing_time=0,
+        )
+        self._task_store.put(progress)
+        return progress
+
+    def set_display_status(
+        self,
+        *,
+        knowledge_base_id: str,
+        display_status: str,
+        task_id: str | None = None,
+    ) -> FAQImportTaskProgress | None:
+        """Update ``display_status`` on the named or latest task for the KB."""
+        return self._task_store.set_display_status(
+            display_status=display_status,
+            knowledge_base_id=knowledge_base_id,
+            task_id=task_id,
+        )
 
 
 def _result_to_progress(

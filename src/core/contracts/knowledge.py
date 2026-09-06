@@ -657,7 +657,7 @@ class FAQEntryFieldsBatchUpdate(BaseModel):
 class FAQEntryTagsBatchUpdate(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    updates: dict[int, int]
+    updates: dict[int, int | None]
 
 
 class FAQBatchDeleteRequest(BaseModel):

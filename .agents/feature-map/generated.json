@@ -662,6 +662,18 @@
       "domain": "knowledge"
     },
     {
+      "method": "PUT",
+      "path": "/api/v1/knowledge-bases/{id}/faq/entries/fields",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledge-bases/{id}/faq/entries/tags",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
       "method": "GET",
       "path": "/api/v1/knowledge-bases/{id}/faq/entries/{entry_id}",
       "file": "src/web/api/knowledge/faq/router.py",
@@ -676,6 +688,18 @@
     {
       "method": "POST",
       "path": "/api/v1/knowledge-bases/{id}/faq/entry",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/knowledge-bases/{id}/faq/import/last-result/display",
+      "file": "src/web/api/knowledge/faq/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge-bases/{id}/faq/search",
       "file": "src/web/api/knowledge/faq/router.py",
       "domain": "knowledge"
     },
