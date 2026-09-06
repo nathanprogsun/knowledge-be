@@ -10,6 +10,11 @@ Routes registered under `/api/v1/sessions`. Path parameters use FastAPI `{name}`
 | DELETE | `/sessions/{session_id}` |
 | GET | `/sessions/{session_id}` |
 | PUT | `/sessions/{session_id}` |
+| GET | `/sessions/{session_id}/attachments` |
+| POST | `/sessions/{session_id}/attachments` |
+| DELETE | `/sessions/{session_id}/attachments/{attachment_id}` |
+| GET | `/sessions/{session_id}/attachments/{attachment_id}` |
+| GET | `/sessions/{session_id}/attachments/{attachment_id}/preview` |
 | DELETE | `/sessions/{session_id}/messages` |
 | GET | `/sessions/{session_id}/messages/{message_id}/suggestions` |
 | POST | `/sessions/{session_id}/messages/{message_id}/suggestions` |

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.common.json import JsonObject
+
+TemporaryAttachmentStatus = Literal["uploaded", "processing", "ready", "failed"]
 
 
 class Session(BaseModel):
@@ -289,6 +292,31 @@ class SuggestionEventRequest(BaseModel):
     event_type: str
 
 
+class TemporaryAttachmentImageRef(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    original_ref: str | None = Field(default=None)
+    url: str
+    mime_type: str | None = Field(default=None)
+
+
+class TemporaryAttachment(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    session_id: str
+    file_name: str
+    file_type: str
+    file_size: int
+    mime_type: str | None = Field(default=None)
+    status: TemporaryAttachmentStatus
+    token_count: int
+    chunk_count: int
+    image_refs: list[TemporaryAttachmentImageRef] | None = Field(default=None)
+    error_message: str | None = Field(default=None)
+    expires_at: datetime
+
+
 __all__ = [
     "AgentChatRequest",
     "BatchDeleteSessionsRequest",
@@ -315,6 +343,9 @@ __all__ = [
     "SuggestionEventRequest",
     "SuggestionQuestion",
     "SuggestionSet",
+    "TemporaryAttachment",
+    "TemporaryAttachmentImageRef",
+    "TemporaryAttachmentStatus",
     "TitleGenMessage",
     "UpdateSessionRequest",
 ]

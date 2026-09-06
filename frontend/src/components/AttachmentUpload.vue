@@ -133,6 +133,34 @@ const addFiles = async (files: File[]) => {
 
 const emitFiles = () => emit('update:files', [...attachments.value]);
 
+type UploadPayload = { id: string; status?: TemporaryAttachmentStatus; error_message?: string };
+
+function isUploadPayload(value: unknown): value is UploadPayload {
+  return typeof value === 'object' && value !== null && typeof (value as { id?: unknown }).id === 'string';
+}
+
+function unwrapUpload(response: unknown): UploadPayload | null {
+  if (isUploadPayload(response)) {
+    return response;
+  }
+  if (typeof response === 'object' && response !== null && 'data' in response) {
+    const nested = (response as { data?: unknown }).data;
+    if (isUploadPayload(nested)) {
+      return nested;
+    }
+  }
+  return null;
+}
+
+function patchAttachment(localId: string, patch: Partial<AttachmentFile>): AttachmentFile | null {
+  const index = attachments.value.findIndex((item) => item.id === localId);
+  if (index < 0) return null;
+  const next: AttachmentFile = { ...attachments.value[index], ...patch };
+  attachments.value.splice(index, 1, next);
+  emitFiles();
+  return next;
+}
+
 const uploadAttachment = async (attachment: AttachmentFile) => {
   if (!props.sessionId) return;
   try {
@@ -143,25 +171,32 @@ const uploadAttachment = async (attachment: AttachmentFile) => {
       props.agentSourceTenantId,
       'auto',
       (progress) => {
-        attachment.progress = progress;
-        emitFiles();
+        patchAttachment(attachment.id, { progress });
       },
     );
-    attachment.documentId = response.data.id;
-    if (disposed || !attachments.value.some(item => item.id === attachment.id)) {
-      await deleteTemporaryAttachment(props.sessionId, response.data.id).catch(() => undefined);
+    const payload = unwrapUpload(response);
+    if (!payload) {
+      patchAttachment(attachment.id, {
+        status: 'failed',
+        error: t('chat.attachmentUploadFailed'),
+      });
       return;
     }
-    attachment.status = response.data.status;
-    attachment.progress = 100;
-    emitFiles();
-    if (attachment.status !== 'ready' && attachment.status !== 'failed') {
-      scheduleStatusPoll(attachment);
+    if (disposed || !attachments.value.some((item) => item.id === attachment.id)) {
+      await deleteTemporaryAttachment(props.sessionId, payload.id).catch(() => undefined);
+      return;
     }
-  } catch (error: any) {
-    attachment.status = 'failed';
-    attachment.error = error?.message || t('chat.attachmentUploadFailed');
-    emitFiles();
+    const row = patchAttachment(attachment.id, {
+      documentId: payload.id,
+      status: payload.status ?? 'ready',
+      progress: 100,
+    });
+    if (row && row.status !== 'ready' && row.status !== 'failed') {
+      scheduleStatusPoll(row);
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : t('chat.attachmentUploadFailed');
+    patchAttachment(attachment.id, { status: 'failed', error: message });
   }
 };
 

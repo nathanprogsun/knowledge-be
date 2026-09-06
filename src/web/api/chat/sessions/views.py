@@ -12,7 +12,13 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 from src.core.chat.sessions.types import SessionInfo
-from src.core.contracts.sessions import Session
+from src.core.contracts.sessions import (
+    Session,
+    TemporaryAttachment,
+    TemporaryAttachmentImageRef,
+    TemporaryAttachmentStatus,
+)
+from src.core.knowledge.documents.temporary_document import TemporaryDocumentInfo
 
 
 class SessionEnvelope(BaseModel):
@@ -56,6 +62,24 @@ class PinSessionEnvelope(BaseModel):
 
     success: bool
     is_pinned: bool
+
+
+class TemporaryAttachmentEnvelope(BaseModel):
+    """``{"success": true, "data": {...}}`` - one attachment."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: TemporaryAttachment
+
+
+class TemporaryAttachmentListEnvelope(BaseModel):
+    """``{"success": true, "data": [...]}`` - session attachment list."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool
+    data: list[TemporaryAttachment]
 
 
 def session_to_contract(info: SessionInfo) -> Session:
@@ -106,11 +130,68 @@ def delete_session_response(message: str) -> DeleteSessionResponse:
     return DeleteSessionResponse(success=True, message=message)
 
 
+def _attachment_status(raw: str) -> TemporaryAttachmentStatus:
+    """Narrow a stored status onto the wire literal."""
+    match raw:
+        case "uploaded" | "processing" | "ready" | "failed":
+            return raw
+        case _:
+            return "uploaded"
+
+
+def attachment_to_contract(info: TemporaryDocumentInfo) -> TemporaryAttachment:
+    """Project the service attachment onto the frozen wire contract."""
+    image_refs: list[TemporaryAttachmentImageRef] | None = None
+    if info.image_refs:
+        image_refs = [
+            TemporaryAttachmentImageRef(
+                original_ref=image.original_ref or None,
+                url=image.url,
+                mime_type=image.mime_type or None,
+            )
+            for image in info.image_refs
+        ]
+    return TemporaryAttachment(
+        id=info.id,
+        session_id=info.session_id,
+        file_name=info.file_name,
+        file_type=info.file_type,
+        file_size=info.file_size,
+        mime_type=info.mime_type or None,
+        status=_attachment_status(info.status),
+        token_count=info.token_count,
+        chunk_count=info.chunk_count,
+        image_refs=image_refs,
+        error_message=info.error_message,
+        expires_at=info.expires_at,
+    )
+
+
+def attachment_envelope(info: TemporaryDocumentInfo) -> TemporaryAttachmentEnvelope:
+    """Wrap one attachment in the success envelope."""
+    return TemporaryAttachmentEnvelope(success=True, data=attachment_to_contract(info))
+
+
+def attachment_list_envelope(
+    rows: list[TemporaryDocumentInfo],
+) -> TemporaryAttachmentListEnvelope:
+    """Wrap the session attachment list in the success envelope."""
+    return TemporaryAttachmentListEnvelope(
+        success=True,
+        data=[attachment_to_contract(row) for row in rows],
+    )
+
+
 __all__ = [
     "DeleteSessionResponse",
     "PinSessionEnvelope",
     "SessionEnvelope",
     "SessionListEnvelope",
+    "TemporaryAttachmentEnvelope",
+    "TemporaryAttachmentListEnvelope",
+    "attachment_envelope",
+    "attachment_list_envelope",
+    "attachment_to_contract",
     "delete_session_response",
     "session_envelope",
     "session_list_envelope",

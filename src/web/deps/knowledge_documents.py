@@ -24,9 +24,11 @@ from src.core.knowledge.documents.factory import (
     build_documents_orchestrator,
     build_knowledge_service,
     build_span_tracker,
+    build_temporary_document_service,
 )
 from src.core.knowledge.documents.service.knowledge_service import KnowledgeService
 from src.core.knowledge.documents.span_tracker import SpanTracker
+from src.core.knowledge.documents.temporary_document import TemporaryDocumentService
 from src.core.knowledge.knowledge_bases.factory import build_kb_service
 from src.web.deps.session import SessionDep
 
@@ -37,6 +39,17 @@ def get_knowledge_service(session: SessionDep) -> KnowledgeService:
 
 
 KnowledgeServiceDep = Annotated[KnowledgeService, Depends(get_knowledge_service)]
+
+
+def get_temporary_document_service(session: SessionDep) -> TemporaryDocumentService:
+    """Build a per-request ``TemporaryDocumentService`` on the shared session."""
+    return build_temporary_document_service(session)
+
+
+TemporaryDocumentServiceDep = Annotated[
+    TemporaryDocumentService,
+    Depends(get_temporary_document_service),
+]
 
 
 def get_span_tracker(session: SessionDep) -> SpanTracker:
@@ -95,7 +108,9 @@ __all__ = [
     "KnowledgeDocumentsDep",
     "KnowledgeServiceDep",
     "SpanTrackerDep",
+    "TemporaryDocumentServiceDep",
     "get_documents_orchestrator",
     "get_knowledge_service",
     "get_span_tracker",
+    "get_temporary_document_service",
 ]

@@ -3724,6 +3724,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/sessions/{session_id}/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Session Attachments
+         * @description List live attachments of a session the caller owns.
+         */
+        get: operations["list_session_attachments_api_v1_sessions__session_id__attachments_get"];
+        put?: never;
+        /**
+         * Upload Session Attachment
+         * @description Upload a session attachment and persist its bytes.
+         */
+        post: operations["upload_session_attachment_api_v1_sessions__session_id__attachments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Session Attachment
+         * @description Return one attachment of a session the caller owns.
+         */
+        get: operations["get_session_attachment_api_v1_sessions__session_id__attachments__attachment_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Session Attachment
+         * @description Soft-delete one attachment of a session the caller owns.
+         */
+        delete: operations["delete_session_attachment_api_v1_sessions__session_id__attachments__attachment_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/{session_id}/attachments/{attachment_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Session Attachment
+         * @description Stream the stored bytes for an owned session attachment.
+         */
+        get: operations["preview_session_attachment_api_v1_sessions__session_id__attachments__attachment_id__preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/sessions/{session_id}/stop": {
         parameters: {
             query?: never;
@@ -6710,6 +6778,17 @@ export interface components {
              * @default
              */
             minio_path_prefix: string;
+        };
+        /** Body_upload_session_attachment_api_v1_sessions__session_id__attachments_post */
+        Body_upload_session_attachment_api_v1_sessions__session_id__attachments_post: {
+            /** File */
+            file: string;
+            /** Agent Id */
+            agent_id?: string | null;
+            /** Agent Source Tenant Id */
+            agent_source_tenant_id?: string | null;
+            /** Parser Engine */
+            parser_engine?: string | null;
         };
         /** ChangePasswordRequest */
         ChangePasswordRequest: {
@@ -12535,6 +12614,67 @@ export interface components {
             /** Success */
             success: boolean;
             data: components["schemas"]["TagList"];
+        };
+        /** TemporaryAttachment */
+        TemporaryAttachment: {
+            /** Id */
+            id: string;
+            /** Session Id */
+            session_id: string;
+            /** File Name */
+            file_name: string;
+            /** File Type */
+            file_type: string;
+            /** File Size */
+            file_size: number;
+            /** Mime Type */
+            mime_type?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "uploaded" | "processing" | "ready" | "failed";
+            /** Token Count */
+            token_count: number;
+            /** Chunk Count */
+            chunk_count: number;
+            /** Image Refs */
+            image_refs?: components["schemas"]["TemporaryAttachmentImageRef"][] | null;
+            /** Error Message */
+            error_message?: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+        };
+        /**
+         * TemporaryAttachmentEnvelope
+         * @description ``{"success": true, "data": {...}}`` - one attachment.
+         */
+        TemporaryAttachmentEnvelope: {
+            /** Success */
+            success: boolean;
+            data: components["schemas"]["TemporaryAttachment"];
+        };
+        /** TemporaryAttachmentImageRef */
+        TemporaryAttachmentImageRef: {
+            /** Original Ref */
+            original_ref?: string | null;
+            /** Url */
+            url: string;
+            /** Mime Type */
+            mime_type?: string | null;
+        };
+        /**
+         * TemporaryAttachmentListEnvelope
+         * @description ``{"success": true, "data": [...]}`` - session attachment list.
+         */
+        TemporaryAttachmentListEnvelope: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data: components["schemas"]["TemporaryAttachment"][];
         };
         /**
          * Tenant
@@ -21558,6 +21698,183 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PinSessionEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_session_attachments_api_v1_sessions__session_id__attachments_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemporaryAttachmentListEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_session_attachment_api_v1_sessions__session_id__attachments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_session_attachment_api_v1_sessions__session_id__attachments_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemporaryAttachmentEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_session_attachment_api_v1_sessions__session_id__attachments__attachment_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemporaryAttachmentEnvelope"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_session_attachment_api_v1_sessions__session_id__attachments__attachment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteSessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_session_attachment_api_v1_sessions__session_id__attachments__attachment_id__preview_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                authorization?: string | null;
+                "X-API-Key"?: string | null;
+            };
+            path: {
+                session_id: string;
+                attachment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
