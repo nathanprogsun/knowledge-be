@@ -436,6 +436,10 @@ export interface paths {
          *
          *     Mirrors Go's ``AutoSetup``: idempotent — the default account is
          *     created once, and later calls reuse it and mint a fresh token pair.
+         *
+         *     The endpoint is unauthenticated by design and therefore gated by
+         *     ``Settings.auto_setup_enabled``; when disabled it reads as 404 so a
+         *     public deployment does not advertise a bootstrap surface.
          */
         post: operations["auto_setup_api_v1_auth_auto_setup_post"];
         delete?: never;
@@ -2317,10 +2321,11 @@ export interface paths {
          * Serve Kb File
          * @description Serve a knowledge-base-scoped stored object.
          *
-         *     The owner tenant of the knowledge base is authoritative: the object
-         *     path must belong to that tenant, and the file is fetched through the
-         *     owner tenant's storage config. This keeps shared-KB images reachable
-         *     by any tenant the KB is shared with.
+         *     The caller must either own the knowledge base or hold a share grant
+         *     on it; sharing a KB makes its stored objects (e.g. embedded images)
+         *     reachable to the receiving tenants. The owner tenant stays
+         *     authoritative for the storage lookup: the object path must belong to
+         *     that tenant, and the file is fetched through its storage config.
          */
         get: operations["serve_kb_file_api_v1_knowledge_bases__kb_id__files_get"];
         put?: never;
@@ -6651,6 +6656,8 @@ export interface components {
             vlm_config?: components["schemas"]["VLMConfig"] | null;
             asr_config?: components["schemas"]["ASRConfig"] | null;
             storage_provider_config?: components["schemas"]["StorageProviderConfig"] | null;
+            /** Storage Backend Id */
+            storage_backend_id?: string | null;
             storage_config?: components["schemas"]["LegacyStorageConfig"] | null;
             extract_config?: components["schemas"]["ExtractConfig"] | null;
             faq_config?: components["schemas"]["FAQConfig"] | null;
@@ -10984,17 +10991,16 @@ export interface components {
         };
         /**
          * SessionListEnvelope
-         * @description ``{"success": true, "data": {"items": [...], ...}}`` - paged list.
+         * @description ``{"success": true, "data": [...], "total": n, "page": n, "page_size": n}``.
+         *
+         *     The list payload is a flat array at ``data`` with the paging
+         *     counters as envelope siblings, matching the upstream contract.
          */
         SessionListEnvelope: {
             /** Success */
             success: boolean;
-            data: components["schemas"]["SessionListResponse"];
-        };
-        /** SessionListResponse */
-        SessionListResponse: {
-            /** Items */
-            items: components["schemas"]["Session"][];
+            /** Data */
+            data: components["schemas"]["Session"][];
             /** Total */
             total: number;
             /** Page */
@@ -14059,6 +14065,7 @@ export interface operations {
             query: {
                 code: string;
                 redirect_uri: string;
+                state: string;
             };
             header?: never;
             path?: never;

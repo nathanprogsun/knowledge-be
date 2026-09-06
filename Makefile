@@ -1,4 +1,4 @@
-.PHONY: help install sync lint typecheck format format-fix test migrate clean dev-app openapi frontend-install frontend-typecheck frontend-test frontend-build check check-layer check-singleton check-endpoint check-schema check-imports check-sql check-pr-leak check-map-from-db check-exception-types check-agent-notes
+.PHONY: help install sync lint typecheck format format-fix test migrate clean dev-app openapi frontend-install frontend-typecheck frontend-test frontend-build check check-layer check-singleton check-endpoint check-schema check-imports check-sql check-pr-leak check-map-from-db check-exception-types check-agent-notes check-feature-map
 
 help:
 	@echo "Targets:"
@@ -35,9 +35,12 @@ typecheck:
 	uv run mypy
 
 # Ratchet gate: mypy may only improve vs the recorded baseline. CI runs
-# this instead of raw mypy until the backlog is burned down.
+# this instead of raw mypy until the backlog is burned down. Runs via uv so
+# the mypy that produces the numbers is the project venv's, not whatever a
+# global python happens to resolve (a mismatched mypy reports phantom
+# import-not-found regressions and fails the gate incorrectly).
 check-mypy-baseline:
-	python scripts/check_mypy_baseline.py
+	uv run python scripts/check_mypy_baseline.py
 
 test:
 	uv run pytest
@@ -51,15 +54,15 @@ clean:
 # ── Anti-drift checks ───────────────────────────────────────────────────
 
 INFRA_DOMAINS := datasources,initialization,mcp_services,models,storage_backends,vector_stores,web_search
+PRODUCT_DOMAINS := favorites,chat,organizations,channels,knowledge,knowledge_bases,agents,evaluation,sharing,me,files,cloud
 
-check: check-layer check-singleton check-endpoint check-schema check-imports check-sql check-pr-leak check-map-from-db check-agent-notes check-mypy-baseline check-exception-types
+check: check-layer check-singleton check-endpoint check-schema check-imports check-sql check-pr-leak check-map-from-db check-agent-notes check-mypy-baseline check-exception-types check-feature-map
 	@echo "All anti-drift checks passed"
 
-# Layer check covers every shipped domain. Endpoint coverage can only
-# verify domains whose upstream docs/api/*.md table is fully aligned;
-# the residual gaps are tracked in the v0.2 release notes.
+# Layer check covers auth/tenant, infra, and product domains. `ai` and
+# `workers` stay out until the retrieval Any backlog is cleared.
 check-layer:
-	python scripts/check_layer_violation.py --src-root src/ --domains $(AUTH_TENANT_DOMAINS),$(INFRA_DOMAINS)
+	python scripts/check_layer_violation.py --src-root src/ --domains $(AUTH_TENANT_DOMAINS),$(INFRA_DOMAINS),$(PRODUCT_DOMAINS)
 
 check-singleton:
 	bash scripts/run_check_service_singleton.sh --src-root src/
@@ -87,6 +90,9 @@ check-exception-types:
 
 check-agent-notes:
 	python scripts/verify_agent_notes.py --repo-root .
+
+check-feature-map:
+	python scripts/check_feature_map.py --repo-root .
 
 dev-app:
 	uv run uvicorn src.main:app --reload --host 0.0.0.0 --port 8000

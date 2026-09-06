@@ -31,13 +31,19 @@ from datetime import UTC, datetime
 import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.routing import BaseRoute
 
 from src.ai.graph.neo4j_repo import build_graph_repository
 from src.ai.mcp_transport import MCPConnectionManager
 from src.app_context.registry import LifeSpanService
 from src.app_logging import configure_logging, logger
 from src.common.oidc_client import OidcClient
-from src.common.telemetry import instrument_engine, is_file_exporter, is_tracing_enabled, setup_tracing
+from src.common.telemetry import (
+    instrument_engine,
+    is_file_exporter,
+    is_tracing_enabled,
+    setup_tracing,
+)
 from src.core.infra.mcp_services.oauth import (
     InMemorySecretStore,
     OAuthManager,
@@ -46,9 +52,7 @@ from src.core.infra.mcp_services.oauth import (
 from src.core.infra.mcp_services.types import MCPServiceInfo
 from src.core.infra.web_search.registry import build_web_search_client_registry
 from src.db.base import DatabaseEngine
-from src.db.dao.audit_log_repository import AuditLogRepository
 from src.settings import get_settings
-from src.workers.settings import get_worker_settings
 from src.web.api.agents.router import router as agents_router
 from src.web.api.agents.skill_views import skill_router as skills_router
 from src.web.api.auth.router import router as auth_router
@@ -116,6 +120,7 @@ from src.web.api.system.router import router as system_router
 from src.web.api.system.service_views import router as system_service_router
 from src.web.api.tenants.router import router as tenants_router
 from src.web.exception_handler import register_exception_handlers
+from src.workers.settings import get_worker_settings
 
 
 @asynccontextmanager
@@ -301,7 +306,7 @@ def create_app() -> FastAPI:
         """
         routes: set[str] = set()
 
-        def _walk(route_list: list, prefix: str = "") -> None:
+        def _walk(route_list: list[BaseRoute], prefix: str = "") -> None:
             for r in route_list:
                 path = getattr(r, "path", None)
                 methods = getattr(r, "methods", None)

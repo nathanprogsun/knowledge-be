@@ -24,10 +24,10 @@ harder.
 from __future__ import annotations
 
 from src.common.exception import ValidationError
+from src.core.system.types import FavoriteInfo
 from src.db.dao.user_resource_favorite_repository import UserResourceFavoriteRepository
 from src.db.models.user_resource_favorite import (
     FAVORITE_RESOURCE_TYPES,
-    UserResourceFavorite,
 )
 
 
@@ -50,7 +50,7 @@ class UserResourceFavoriteService:
         user_id: str,
         tenant_id: int,
         resource_type: str,
-    ) -> list[UserResourceFavorite]:
+    ) -> list[FavoriteInfo]:
         """Return the caller's starred resources of one type, newest first.
 
         Raises :class:`ValidationError` (``favorite.invalid_type``)
@@ -58,11 +58,12 @@ class UserResourceFavoriteService:
         maps it to ``400 Bad Request``.
         """
         self._ensure_valid_resource_type(resource_type)
-        return await self._repo.list_by_user(
+        rows = await self._repo.list_by_user(
             user_id=user_id,
             tenant_id=tenant_id,
             resource_type=resource_type,
         )
+        return [FavoriteInfo.map_from_db(row) for row in rows]
 
     # ── Add ─────────────────────────────────────────────────────────
 
@@ -73,7 +74,7 @@ class UserResourceFavoriteService:
         tenant_id: int,
         resource_type: str,
         resource_id: str,
-    ) -> UserResourceFavorite | None:
+    ) -> FavoriteInfo | None:
         """Star one resource. Idempotent — a duplicate no-ops.
 
         Returns the persisted row, or ``None`` when the favorite was
@@ -82,12 +83,13 @@ class UserResourceFavoriteService:
         """
         self._ensure_valid_resource_type(resource_type)
         self._ensure_non_empty_id(resource_id)
-        return await self._repo.add(
+        row = await self._repo.add(
             user_id=user_id,
             tenant_id=tenant_id,
             resource_type=resource_type,
             resource_id=resource_id,
         )
+        return FavoriteInfo.map_from_db(row) if row is not None else None
 
     # ── Remove ──────────────────────────────────────────────────────
 

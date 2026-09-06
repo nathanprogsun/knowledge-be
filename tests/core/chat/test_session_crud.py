@@ -11,16 +11,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
+from src.ai.llm.types import Chat
 from src.common.exception import NotFoundError, ValidationError
 from src.common.pagination import Pagination
-from src.core.chat.sessions.factory import (
-    build_session_service,
-    build_session_service_with_title,
-)
+from src.core.chat.sessions.factory import build_session_service
 from src.core.chat.sessions.service.session_service import (
     ChatFactoryLike,
     SessionListQuery,
@@ -201,7 +199,7 @@ class _FakeChat:
 
     def __init__(self, content: str) -> None:
         self._content = content
-        self.calls: list[list[Any]] = []
+        self.calls: list[tuple[list[Any], Any]] = []
 
     async def chat(self, messages: list[Any], options: Any) -> Any:
         from src.ai.llm.types import ChatResponse
@@ -209,7 +207,7 @@ class _FakeChat:
         self.calls.append((messages, options))
         return ChatResponse(content=self._content)
 
-    def chat_stream(self, messages: list[Any], options: Any):  # pragma: no cover
+    def chat_stream(self, messages: list[Any], options: Any) -> Any:  # pragma: no cover
         raise NotImplementedError
 
     def get_model_name(self) -> str:  # pragma: no cover
@@ -226,10 +224,10 @@ class _FakeChatFactory(ChatFactoryLike):
         self._chat = chat
         self.calls: list[tuple[int, str]] = []
 
-    async def resolve_chat(self, *, tenant_id: int, model_id: str = "") -> tuple[_FakeChat, str]:
+    async def resolve_chat(self, *, tenant_id: int, model_id: str = "") -> tuple[Chat, str]:
         self.calls.append((tenant_id, model_id))
         resolved = model_id or "resolved-model"
-        return self._chat, resolved
+        return cast(Chat, self._chat), resolved
 
 
 # ── Helpers ──────────────────────────────────────────────────────────
@@ -315,49 +313,47 @@ async def test_create_inserts_row_with_stamped_timestamps() -> None:
     # Arrange
     repo = _FakeSessionRepo()
     service = _service(session_repo=repo)
-    payload = _row(title="hello", description="greeting")
+    session_id = "sess-create-1"
 
     # Act
-    created = await service.create(payload)
+    created = await service.create(
+        title="hello",
+        description="greeting",
+        session_id=session_id,
+    )
 
     # Assert
-    assert created.id == payload.id
+    assert created.id == session_id
     assert created.created_at == created.updated_at
     assert created.is_pinned is False
     assert created.pinned_at is None
     assert created.user_id == "user-1"
-    assert created in repo.store.values()
+    stored = repo.store[session_id]
+    assert stored.title == "hello"
+    assert stored.description == "greeting"
 
 
-async def test_create_rejects_cross_tenant_session() -> None:
+async def test_create_uses_service_tenant_and_owner() -> None:
     # Arrange
-    service = _service(tenant_id=2)
-    payload = _row(tenant_id=999)
+    repo = _FakeSessionRepo()
+    service = _service(tenant_id=2, user_id="owner-2", session_repo=repo)
 
-    # Act / Assert
-    with pytest.raises(ValidationError) as exc:
-        await service.create(payload)
-    assert exc.value.code == "session.tenant_mismatch"
+    # Act
+    created = await service.create(title="hello")
+
+    # Assert
+    assert created.tenant_id == 2
+    assert created.user_id == "owner-2"
+    assert repo.store[created.id].tenant_id == 2
 
 
 async def test_create_mints_uuid_when_id_missing() -> None:
     # Arrange
     repo = _FakeSessionRepo()
     service = _service(session_repo=repo)
-    payload = Session(
-        id="",
-        tenant_id=1,
-        title=None,
-        description=None,
-        user_id="user-1",
-        is_pinned=False,
-        pinned_at=None,
-        created_at=_NOW,
-        updated_at=_NOW,
-    )
 
     # Act
-    created = await service.create(payload)
+    created = await service.create()
 
     # Assert
     assert created.id
@@ -522,14 +518,13 @@ async def test_update_overwrites_mutable_columns() -> None:
     row = _row(title="old", description="old desc")
     repo.store[row.id] = row
     service = _service(session_repo=repo)
-    new_payload = _row(
-        id=row.id,
+
+    # Act
+    updated = await service.update(
+        session_id=row.id,
         title="new",
         description="new desc",
     )
-
-    # Act
-    updated = await service.update(new_payload)
 
     # Assert
     assert updated.title == "new"
@@ -538,14 +533,14 @@ async def test_update_overwrites_mutable_columns() -> None:
     assert updated.created_at == row.created_at
 
 
-async def test_update_rejects_cross_tenant_payload() -> None:
+async def test_update_raises_when_session_missing() -> None:
     # Arrange
-    service = _service(tenant_id=2)
+    service = _service()
 
     # Act / Assert
-    with pytest.raises(ValidationError) as exc:
-        await service.update(_row(tenant_id=999))
-    assert exc.value.code == "session.tenant_mismatch"
+    with pytest.raises(NotFoundError) as exc:
+        await service.update(session_id="missing", title="new")
+    assert exc.value.code == "session.not_found"
 
 
 async def test_delete_returns_true_for_owned_row() -> None:
@@ -664,14 +659,6 @@ async def test_generate_title_returns_existing_title() -> None:
     row = _row(title="already there")
     repo.store[row.id] = row
     message_repo = _FakeMessageRepo()
-    service = build_session_service_with_title(
-        session=None,  # type: ignore[arg-type]
-        tenant_id=1,
-        user_id="user-1",
-        chat_factory=_FakeChatFactory(_FakeChat("should-not-call")),
-        title_generator=TitleGenerator(),
-    ).__class__  # placeholder
-    # Build the real service via the same factory but on the fake repos.
     service = _title_service(repo, message_repo, _FakeChatFactory(_FakeChat("unused")))
 
     # Act

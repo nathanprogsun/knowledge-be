@@ -1,0 +1,30 @@
+{
+  "api_auth_config": {
+    "error": "<urlopen error [Errno 61] Connection refused>",
+    "ok": false,
+    "status": null,
+    "url": "http://127.0.0.1:8000/api/v1/auth/config"
+  },
+  "at": "2026-09-03T17:07:54.583728+00:00",
+  "env_file": true,
+  "feature_headings": [
+    {
+      "file": ".agents/skills/kb-verify-flow/features/knowledge-base-list.md",
+      "missing": [],
+      "ok": true
+    },
+    {
+      "file": ".agents/skills/kb-verify-flow/features/login.md",
+      "missing": [],
+      "ok": true
+    }
+  ],
+  "frontend_node_modules": true,
+  "step": "doctor",
+  "web_login": {
+    "error": "<urlopen error [Errno 61] Connection refused>",
+    "ok": false,
+    "status": null,
+    "url": "http://127.0.0.1:5173/login"
+  }
+}

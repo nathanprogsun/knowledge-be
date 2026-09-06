@@ -2,7 +2,9 @@ import { del, get, getDown, postUpload } from '@/utils/request';
 
 export type TemporaryAttachmentStatus = 'uploaded' | 'processing' | 'ready' | 'failed';
 
-export interface TemporaryAttachment {
+// No TemporaryAttachment schema is exported yet; this is the client
+// view of the upload/status payload.
+export type TemporaryAttachment = {
   id: string;
   session_id: string;
   file_name: string;
@@ -15,12 +17,12 @@ export interface TemporaryAttachment {
   image_refs?: Array<{ original_ref?: string; url: string; mime_type?: string }>;
   error_message?: string;
   expires_at: string;
-}
+};
 
-interface AttachmentResponse {
+type AttachmentResponse = {
   success: boolean;
   data: TemporaryAttachment;
-}
+};
 
 export function uploadTemporaryAttachment(
   sessionId: string,

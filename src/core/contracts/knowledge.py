@@ -175,6 +175,9 @@ class CreateKnowledgeBaseRequest(BaseModel):
     vlm_config: VLMConfig | None = Field(default=None)
     asr_config: ASRConfig | None = Field(default=None)
     storage_provider_config: StorageProviderConfig | None = Field(default=None)
+    # Binds the knowledge base to a concrete storage backend row at
+    # creation; when omitted the service resolves the tenant default.
+    storage_backend_id: str | None = Field(default=None)
     storage_config: LegacyStorageConfig | None = Field(default=None)
     extract_config: ExtractConfig | None = Field(default=None)
     faq_config: FAQConfig | None = Field(default=None)

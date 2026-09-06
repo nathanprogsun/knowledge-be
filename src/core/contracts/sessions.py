@@ -42,15 +42,6 @@ class UpdateSessionRequest(BaseModel):
     description: str | None = Field(default=None)
 
 
-class SessionListResponse(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    items: list[Session]
-    total: int
-    page: int
-    page_size: int
-
-
 class ListSessionsQuery(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -316,7 +307,6 @@ __all__ = [
     "PinSessionResponse",
     "SearchMessagesRequest",
     "Session",
-    "SessionListResponse",
     "StopGenerationRequest",
     "SuggestionAttribution",
     "SuggestionEventRequest",

@@ -42,6 +42,7 @@ from src.core.channels.embed.types import (
     EMBED_SUPPORTED_LOCALES,
     EMBED_WIDGET_POSITIONS,
     EmbedChannelInfo,
+    EmbedChannelOwnedInfo,
 )
 from src.core.channels.embed.webhook import validate_embed_webhook_url
 from src.db.dao.embed_channel_repository import EmbedChannelRepository
@@ -279,10 +280,11 @@ class EmbedChannelService:
         row = await self._get_owned_row(tenant_id=tenant_id, channel_id=channel_id)
         return EmbedChannelInfo.map_from_db(row)
 
-    async def get_owned_channel(self, *, tenant_id: int, channel_id: str) -> EmbedChannel:
-        """Return the raw row (with secrets) for internal callers."""
+    async def get_owned_channel(self, *, tenant_id: int, channel_id: str) -> EmbedChannelOwnedInfo:
+        """Return an admin projection of the channel (with secrets flags)."""
         self._require_channel_id(channel_id)
-        return await self._get_owned_row(tenant_id=tenant_id, channel_id=channel_id)
+        row = await self._get_owned_row(tenant_id=tenant_id, channel_id=channel_id)
+        return EmbedChannelOwnedInfo.map_from_db(row)
 
     async def list_channels_by_agent(
         self, *, tenant_id: int, agent_id: str

@@ -252,10 +252,8 @@ def test_list_sessions_envelope_matches_reference(session_seed: SessionSeed) -> 
     """GET /sessions answers 200 with the reference list envelope.
 
     The reference list endpoint flattens ``data`` to an array plus
-    sibling ``total`` / ``page`` / ``page_size`` keys. The current web
-    layer wraps the list in ``data.items`` (a ``SessionListResponse``
-    paged payload). This assertion is the contract check — a divergence
-    here is a reported finding.
+    sibling ``total`` / ``page`` / ``page_size`` keys; the web layer
+    must emit exactly that shape.
     """
     status, keys = _endpoint_spec("GET", "/api/v1/sessions")
     response = session_seed.client.get("/api/v1/sessions")
@@ -265,11 +263,11 @@ def test_list_sessions_envelope_matches_reference(session_seed: SessionSeed) -> 
 
 
 def test_list_sessions_payload_conforms_to_view_model(session_seed: SessionSeed) -> None:
-    """The list endpoint's ``data`` payload matches the view-model shape."""
+    """The list endpoint's ``data`` payload is a flat array of sessions."""
     response = session_seed.client.get("/api/v1/sessions")
     assert response.status_code == 200, response.text
     body = response.json()
-    assert isinstance(body, dict) and isinstance(body.get("data"), dict)
+    assert isinstance(body, dict) and isinstance(body.get("data"), list)
     SessionListEnvelope.model_validate(body)
 
 

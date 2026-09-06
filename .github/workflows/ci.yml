@@ -26,7 +26,9 @@ jobs:
         with:
           version: "0.10.9"
       - name: Lint (ruff check)
-        run: uv run ruff check .
+        # ruff lives in the `dev` extra. A bare `uv run ruff` builds the
+        # default extra-less venv and then fails to spawn the binary.
+        run: uv run --extra dev ruff check .
 
   hygiene:
     name: hygiene
@@ -53,7 +55,7 @@ jobs:
         with:
           version: "0.10.9"
       - name: Format (ruff format --check)
-        run: uv run ruff format --check .
+        run: uv run --extra dev ruff format --check .
 
   typecheck:
     name: typecheck
@@ -75,6 +77,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PYTHON_VERSION: "3.11"
+      UV_PYTHON: "3.11"
+      # jieba 0.42.1 emits compile-time SyntaxWarning; pytest's
+      # filterwarnings=error would turn that into a collection
+      # SyntaxError before conftest can ignore the module.
+      PYTHONWARNINGS: "ignore::SyntaxWarning"
     steps:
       - uses: actions/checkout@v4
       - name: Install uv
@@ -86,10 +93,21 @@ jobs:
       - name: Sync dependencies
         run: uv sync --all-extras
       - name: Run pytest with coverage report
-        # Integration suites (tests/integration) need live Postgres/Redis
-        # and are excluded until the CI job grows a services: block —
-        # tracked in AGENTS.md §14.
-        run: uv run pytest -q --ignore=tests/integration --cov=src --cov-report=term-missing --cov-report=xml
+        # Live-Postgres suites stay out of this job until it grows a
+        # services: block (AGENTS.md §14). That includes tests/integration,
+        # tests/contract, tests/db, share-repo files that still live
+        # under tests/core, and any test_integration_* case.
+        run: >
+          uv run pytest -q
+          --ignore=tests/integration
+          --ignore=tests/contract
+          --ignore=tests/db
+          --ignore=tests/core/sharing/test_agent_share.py
+          --ignore=tests/core/sharing/test_kb_share.py
+          -k "not integration"
+          --cov=src
+          --cov-report=term-missing
+          --cov-report=xml
 
   check:
     name: anti-drift check
@@ -126,14 +144,13 @@ jobs:
         run: npm ci
         working-directory: frontend
       - name: Contract drift check (openapi-typescript)
-        # Regenerate from the live FastAPI schema and fail if the
-        # committed schema.ts differs — hand-edits and backend drift
-        # both surface here.
+        # Export runs from the repo root. The frontend working
+        # directory would look for frontend/scripts/export_openapi.py.
+        # Then codegen and the drift diff stay inside frontend/.
         run: |
           uv run python scripts/export_openapi.py --output docs/api/openapi.json
-          npm run gen:api
-          git diff --exit-code -- src/api/__generated__/schema.ts
-        working-directory: frontend
+          npm --prefix frontend run gen:api
+          git diff --exit-code -- frontend/src/api/__generated__/schema.ts
       - name: Type-check (vue-tsc)
         run: npm run type-check
         working-directory: frontend

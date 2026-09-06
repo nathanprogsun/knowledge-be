@@ -1,11 +1,11 @@
 import { get, post, put, del } from '@/utils/request'
-import type { CreatedTenantAPIKey, TenantAPIKey, TenantAPIKeyCapability } from '@/api/tenant'
+import type { TenantAPIKey, TenantAPIKeyCapability } from '@/api/tenant'
 import type { components } from '@/api/__generated__/schema'
 
 /** OpenAPI-derived aliases. Keep view-model extensions in dedicated
  *  ``*View`` interfaces so the wire shape stays aligned with the
  *  generated schema. */
-export type SystemInfo = components['schemas']['SystemInfo']
+export type SystemInfo = components['schemas']['SystemInfoWireData']
 
 export interface CreatePlatformAPIKeyPayload {
   name: string
@@ -19,10 +19,10 @@ export async function listPlatformAPIKeys(): Promise<{ success: boolean; data?: 
 
 export async function createPlatformAPIKey(
   payload: CreatePlatformAPIKeyPayload,
-): Promise<{ success: boolean; data?: CreatedTenantAPIKey }> {
+): Promise<{ success: boolean; data?: components['schemas']['CreatedPlatformAPIKeyResponse'] }> {
   return await post('/api/v1/system/admin/api-keys', payload) as unknown as {
     success: boolean
-    data?: CreatedTenantAPIKey
+    data?: components['schemas']['CreatedPlatformAPIKeyResponse']
   }
 }
 

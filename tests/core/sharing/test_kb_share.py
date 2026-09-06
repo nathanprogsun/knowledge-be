@@ -10,7 +10,9 @@ import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 
+import pytest
 import pytest_asyncio
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
@@ -30,8 +32,12 @@ async def session() -> AsyncIterator[AsyncSession]:
     engine = create_async_engine(settings.database_url, poolclass=NullPool)
     factory = async_sessionmaker(engine, expire_on_commit=False)
     try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
         async with factory() as s:
             yield s
+    except OSError as exc:
+        pytest.skip(f"integration database unavailable: {exc}")
     finally:
         await engine.dispose()
 

@@ -36,8 +36,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
 
-import jieba
-
+from src.common.jieba_compat import jieba
 from src.core.evaluation.dataset import QAPair
 
 # ── Structural seams ───────────────────────────────────────────────────

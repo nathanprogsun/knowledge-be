@@ -80,8 +80,13 @@ def _integration_settings() -> None:
     role matrix (covered separately by unit tests). The header-auth
     principal carries no membership rows, so with enforcement on every
     tenant-scoped call would 403.
+
+    Header auth is off by default in production settings; the suite
+    authenticates entirely through the X-User-Id/X-Tenant-ID/X-Roles
+    headers, so it opts the channel in explicitly.
     """
     os.environ["RBAC_ENFORCED"] = "false"
+    os.environ["HEADER_AUTH_ENABLED"] = "true"
     reset_settings_cache()
 
 

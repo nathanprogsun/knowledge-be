@@ -5,7 +5,7 @@ from __future__ import annotations
 import secrets
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Header, Query, Request
+from fastapi import APIRouter, Header, Query, Request, Response
 from pydantic import BaseModel, ConfigDict
 
 from src.common.exception import GoneError, NotFoundError, UnauthorizedError, ValidationError
@@ -319,13 +319,30 @@ async def oidc_config() -> OIDCMetaConfig:
     )
 
 
+# Cookie binding the OIDC state nonce to the browser that started the
+# login; read back on the provider's callback redirect. SameSite=Lax is
+# required — the provider's redirect is a cross-site top-level GET.
+_OIDC_STATE_COOKIE = "oidc_state_nonce"
+_OIDC_STATE_COOKIE_MAX_AGE = 600  # matches the signed-state freshness window
+
+
 @router.get("/oidc/url", response_model=OIDCAuthorizeURLResponse)
 async def oidc_url(
     oidc_service: OidcServiceDep,
+    request: Request,
+    response: Response,
     redirect_uri: str = Query(...),
 ) -> OIDCAuthorizeURLResponse:
     """Build the provider authorize URL + signed state."""
     result = await oidc_service.get_authorization_url(redirect_uri=redirect_uri)
+    response.set_cookie(
+        _OIDC_STATE_COOKIE,
+        result.nonce,
+        max_age=_OIDC_STATE_COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+    )
     return OIDCAuthorizeURLResponse(
         success=True,
         provider_display_name=result.provider_display_name,
@@ -337,13 +354,20 @@ async def oidc_url(
 @router.get("/oidc/callback", response_model=OIDCCallbackResponse)
 async def oidc_callback(
     oidc_service: OidcServiceDep,
+    request: Request,
+    response: Response,
     code: str = Query(...),
     redirect_uri: str = Query(...),
+    state: str = Query(...),
 ) -> OIDCCallbackResponse:
     """Exchange an OIDC authorization code for a session."""
+    expected_nonce = request.cookies.get(_OIDC_STATE_COOKIE, "")
+    response.delete_cookie(_OIDC_STATE_COOKIE, httponly=True, samesite="lax")
     result = await oidc_service.login_with_oidc(
         code=code,
         redirect_uri=redirect_uri,
+        state=state,
+        expected_nonce=expected_nonce,
     )
     if not result.success or result.user is None:
         return OIDCCallbackResponse(
@@ -398,7 +422,16 @@ async def auto_setup(
 
     Mirrors Go's ``AutoSetup``: idempotent — the default account is
     created once, and later calls reuse it and mint a fresh token pair.
+
+    The endpoint is unauthenticated by design and therefore gated by
+    ``Settings.auto_setup_enabled``; when disabled it reads as 404 so a
+    public deployment does not advertise a bootstrap surface.
     """
+    if not get_settings().auto_setup_enabled:
+        raise NotFoundError(
+            code="auth.auto_setup_disabled",
+            message="auto-setup is disabled",
+        )
     user_row = await auth_service.get_user_row_by_email(AUTO_SETUP_DEFAULT_EMAIL)
     if user_row is None:
         user_row = await auth_service.create_user(

@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
-"""Diff upstream SQL migrations against knowledge-be Pydantic
-``TableModel`` classes.
+"""Diff schema migrations against knowledge-be Pydantic ``TableModel``
+classes.
 
-Reference documentation: ``migrations/{versioned,sqlite,mysql,paradedb}/*.up.sql``.
+Schema sources, in resolution order:
+
+- ``migrations/**/*.up.sql`` — raw SQL reference migrations
+  (``CREATE TABLE`` plus ``ALTER TABLE ... ADD COLUMN``).
+- ``alembic/versions/*.py`` — this repo's own Alembic migrations
+  (``op.create_table`` plus ``op.add_column``).
+
+When neither source exists the check FAILS instead of passing vacuously:
+a schema gate that finds nothing to check must not report success.
 
 Rules:
 
-1. For every ``CREATE TABLE`` in the migrations (and ``ALTER TABLE ... ADD COLUMN``
-   that contributes additional columns), there MUST be a TableModel class in
-   ``src/db/models/`` whose ``table`` literal equals the SQL table name.
+1. For every table created in the migrations (and columns added later
+   via ``ALTER TABLE ADD COLUMN`` / ``op.add_column``), there MUST be a
+   TableModel class in ``src/db/models/`` whose ``table`` literal equals
+   the table name.
 
-2. For every column defined in a migration's ``CREATE TABLE`` body (or added
-   later via ``ALTER TABLE ADD COLUMN``), there MUST be a field of the same
-   name on the corresponding TableModel.
+2. For every column defined in the migration, there MUST be a field of
+   the same name on the corresponding TableModel.
 
-3. Field types are compared loosely with the SQL type equivalence map in
-   ``_SQL_TYPE_MAP``. ``str <-> VARCHAR/TEXT``, ``int <-> INTEGER/BIGINT/SERIAL``,
+3. Field types are compared loosely with the type equivalence maps.
+   ``str <-> VARCHAR/TEXT``, ``int <-> INTEGER/BIGINT/SERIAL``,
    ``datetime <-> TIMESTAMP/...``, ``bool <-> BOOLEAN``, etc.
 
 A baseline file (``docs/migration/baselines/db_models_pr1.json``) may be
@@ -32,8 +40,8 @@ Usage::
 Exit codes:
     0 = every migration table has a matching TableModel with full column
         coverage
-    1 = any missing model, missing field, type drift, or duplicate
-        CREATE TABLE on different tables of the same name
+    1 = any missing model, missing field, type drift, duplicate
+        CREATE TABLE, or no schema source found at all
 """
 
 from __future__ import annotations
@@ -70,10 +78,10 @@ def resolve_src_root(explicit: str | None) -> Path | None:
     return None
 
 
-DEFAULT_MIGRATIONS_ROOT = Path(__file__).resolve().parents[3] / "migrations"
-DEFAULT_BASELINE = (
-    Path(__file__).resolve().parents[3] / "docs/migration/baselines/db_models_pr1.json"
-)
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_MIGRATIONS_ROOT = _REPO_ROOT / "migrations"
+DEFAULT_ALEMBIC_ROOT = _REPO_ROOT / "alembic" / "versions"
+DEFAULT_BASELINE = _REPO_ROOT / "docs/migration/baselines/db_models_pr1.json"
 
 
 def _resolve_path(explicit: str | None, default: Path) -> Path | None:
@@ -142,9 +150,9 @@ _TYPE_EQUIVALENCE: dict[str, set[str]] = {
     "bool": {"bool"},
     "datetime": {"datetime"},
     "float": {"float"},
-    # SQLite stores JSON as TEXT and PG stores it as JSONB; both are valid
-    # choices for a Python model that uses ``dict``.
-    "dict": {"dict", "str"},
+    # JSON columns legitimately project as ``dict`` (objects) or ``list``
+    # (arrays) in the Python model; SQLite stores JSON as TEXT.
+    "dict": {"dict", "str", "list"},
 }
 
 
@@ -152,6 +160,24 @@ def _types_compatible(sql_family: str, model_family: str) -> bool:
     if sql_family == model_family:
         return True
     return model_family in _TYPE_EQUIVALENCE.get(sql_family, {sql_family})
+
+
+_PY_FAMILIES = {"str", "int", "bool", "datetime", "float", "dict", "list"}
+
+
+def _column_family(col: Column) -> str:
+    """Reduce a column's declared type to a Python family.
+
+    SQL migrations carry raw SQL type names; Alembic ``sa.Column``
+    extraction stores the Python family directly (or a ``sa.*`` type
+    name from ``_SA_TYPE_MAP``). All three spellings land here.
+    """
+    base = col.sql_type.lower()
+    if base in _PY_FAMILIES:
+        return base
+    if base in _SA_TYPE_MAP:
+        return _SA_TYPE_MAP[base]
+    return _sql_type_to_python(base)
 
 
 def _strip_comments(text: str) -> str:
@@ -323,6 +349,173 @@ def parse_all_migrations(root: Path) -> dict[str, list[Table]]:
 
 
 # ─────────────────────────────────────────────────────────────────────────
+# Alembic migration parsing (alembic/versions/*.py)
+# ─────────────────────────────────────────────────────────────────────────
+
+_SA_TYPE_MAP: dict[str, str] = {
+    "string": "str",
+    "text": "str",
+    "unicode": "str",
+    "unicodetext": "str",
+    "char": "str",
+    "integer": "int",
+    "biginteger": "int",
+    "smallinteger": "int",
+    "boolean": "bool",
+    "datetime": "datetime",
+    "date": "datetime",
+    "time": "datetime",
+    "float": "float",
+    "numeric": "float",
+    "decimal": "float",
+    "json": "dict",
+    "jsonb": "dict",
+}
+
+
+def _type_expr_name(node: ast.AST) -> str | None:
+    """Reduce a ``sa.Column`` type expression to a type-family name.
+
+    Handles direct constructors (``sa.String(36)``), dialect-qualified
+    ones (``postgresql.JSONB()``), and module-level named variables
+    (``preferences_json``) whose initializer is resolved separately.
+    """
+    if isinstance(node, ast.Call):
+        return _type_expr_name(node.func)
+    if isinstance(node, ast.Attribute):
+        return node.attr.lower()
+    if isinstance(node, ast.Name):
+        return None  # a named variable; resolved via the file's assignments
+    return None
+
+
+def _collect_named_types(tree: ast.Module) -> dict[str, str]:
+    """Map module-level names to type families for ``sa.JSON().with_variant(...)``.
+
+    Alembic files frequently hoist composite dialect types into
+    module-level variables (e.g. a JSON/JSONB variant); without resolving
+    those names the columns that reference them would lose type checking.
+    """
+    out: dict[str, str] = {}
+    for stmt in tree.body:
+        if not isinstance(stmt, ast.Assign):
+            continue
+        if not all(isinstance(t, ast.Name) for t in stmt.targets):
+            continue
+        # Walk through .with_variant(...) wrappers to the base type.
+        node: ast.AST = stmt.value
+        while isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            if node.func.attr == "with_variant":
+                node = node.func.value
+                continue
+            break
+        name = _type_expr_name(node)
+        if name and name in _SA_TYPE_MAP:
+            for t in stmt.targets:
+                assert isinstance(t, ast.Name)
+                out[t.id] = _SA_TYPE_MAP[name]
+    return out
+
+
+def _sa_column_from_call(call: ast.Call, named_types: dict[str, str]) -> Column | None:
+    """Extract a ``Column`` from an ``sa.Column("name", TypeExpr, ...)`` call."""
+    if not call.args or not isinstance(call.args[0], ast.Constant):
+        return None
+    col_name = call.args[0].value
+    if not isinstance(col_name, str):
+        return None
+    sql_family: str = "str"  # structural default when the type is opaque
+    nullable = True
+    if len(call.args) >= 2:
+        type_node = call.args[1]
+        family = _type_expr_name(type_node)
+        if family is not None:
+            sql_family = _SA_TYPE_MAP.get(family, "str")
+        elif isinstance(type_node, ast.Name):
+            sql_family = named_types.get(type_node.id, "str")
+    for kw in call.keywords:
+        if kw.arg == "nullable" and isinstance(kw.value, ast.Constant):
+            nullable = bool(kw.value.value)
+    return Column(name=col_name, sql_type=sql_family, nullable=nullable, lineno=call.lineno)
+
+
+def _is_call_to(call: ast.Call, func_name: str) -> bool:
+    """True for ``op.<func_name>(...)`` calls."""
+    return (
+        isinstance(call.func, ast.Attribute)
+        and call.func.attr == func_name
+        and isinstance(call.func.value, ast.Name)
+        and call.func.value.id == "op"
+    )
+
+
+def parse_alembic_file(file: Path) -> list[Table]:
+    """Parse one Alembic revision for ``op.create_table`` / ``op.add_column``."""
+    try:
+        tree = ast.parse(file.read_text(encoding="utf-8"), filename=str(file))
+    except (OSError, SyntaxError):
+        return []
+    named_types = _collect_named_types(tree)
+    by_name: dict[str, Table] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if _is_call_to(node, "create_table"):
+            if not node.args or not isinstance(node.args[0], ast.Constant):
+                continue
+            tname = node.args[0].value
+            if not isinstance(tname, str):
+                continue
+            table = by_name.setdefault(tname, Table(name=tname, file=file, lineno=node.lineno))
+            for arg in node.args[1:]:
+                if isinstance(arg, ast.Call) and _is_sa_column(arg):
+                    col = _sa_column_from_call(arg, named_types)
+                    if col is not None and not any(c.name == col.name for c in table.columns):
+                        table.columns.append(col)
+        elif _is_call_to(node, "add_column"):
+            if not node.args or not isinstance(node.args[0], ast.Constant):
+                continue
+            tname = node.args[0].value
+            if not isinstance(tname, str) or len(node.args) < 2:
+                continue
+            col_node = node.args[1]
+            if not isinstance(col_node, ast.Call) or not _is_sa_column(col_node):
+                continue
+            col = _sa_column_from_call(col_node, named_types)
+            if col is None:
+                continue
+            table = by_name.setdefault(tname, Table(name=tname, file=file, lineno=node.lineno))
+            if not any(c.name == col.name for c in table.columns):
+                table.columns.append(col)
+    return list(by_name.values())
+
+
+def _is_sa_column(call: ast.Call) -> bool:
+    """True for ``sa.Column(...)`` calls."""
+    return (
+        isinstance(call.func, ast.Attribute)
+        and call.func.attr == "Column"
+        and isinstance(call.func.value, ast.Name)
+        and call.func.value.id == "sa"
+    )
+
+
+def iter_alembic_files(root: Path) -> list[Path]:
+    if not root.is_dir():
+        return []
+    return sorted(p for p in root.glob("*.py") if p.is_file() and not p.name.startswith("__"))
+
+
+def parse_all_alembic(root: Path) -> dict[str, list[Table]]:
+    """Group ``Table`` objects by table name across all Alembic revisions."""
+    out: dict[str, list[Table]] = {}
+    for file in iter_alembic_files(root):
+        for t in parse_alembic_file(file):
+            out.setdefault(t.name, []).append(t)
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────────
 # Model discovery under src/db/models/
 # ─────────────────────────────────────────────────────────────────────────
 
@@ -476,17 +669,31 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    migrations_root = _resolve_path(args.migrations_root, DEFAULT_MIGRATIONS_ROOT)
-    if migrations_root is None:
-        print("[WARN] migrations/ not found — nothing to check (exit 0).")
-        return 0
+    sql_root = _resolve_path(args.migrations_root, DEFAULT_MIGRATIONS_ROOT)
+    sql_files = iter_migration_files(sql_root) if sql_root is not None else []
+    alembic_root = _resolve_path(args.migrations_root, DEFAULT_ALEMBIC_ROOT)
+
+    tables_by_name: dict[str, list[Table]]
+    schema_root: Path
+    if sql_files:
+        assert sql_root is not None
+        schema_root = sql_root
+        tables_by_name = parse_all_migrations(sql_root)
+    elif alembic_root is not None and iter_alembic_files(alembic_root):
+        schema_root = alembic_root
+        tables_by_name = parse_all_alembic(alembic_root)
+    else:
+        print(
+            "[FAIL] no schema source found (neither migrations/*.up.sql nor"
+            " alembic/versions/*.py) — refusing to pass a vacuous check."
+        )
+        return 1
 
     src = resolve_src_root(args.src_root)
     if src is None:
-        print("[WARN] src/ not found — nothing to check (exit 0).")
-        return 0
+        print("[FAIL] src/ not found — cannot compare models to migrations.")
+        return 1
 
-    tables_by_name = parse_all_migrations(migrations_root)
     models = _scan_models(src)
 
     if not tables_by_name and not models:
@@ -508,31 +715,40 @@ def main() -> int:
         matched = models_by_table.get(tname, [])
         if not matched:
             first = instances[0]
-            rel = first.file.relative_to(migrations_root)
+            rel = first.file.relative_to(schema_root)
             errors.append(
                 f"{rel}:{first.lineno}: migration table '{tname}' has no "
                 f"corresponding TableModel under src/db/models/"
             )
             continue
         if len(matched) > 1:
-            for m in matched[1:]:
-                errors.append(
-                    f"{m.file.relative_to(src)}:{m.lineno}: duplicate TableModel "
-                    f"for table '{tname}'"
-                )
-        model = matched[0]
+            # Multiple models per table are legitimate for column-subset
+            # projections (e.g. a "Lite" read shape); flag only real
+            # duplicates — another model carrying the same field set.
+            seen_sets: list[set[str]] = []
+            for m in matched:
+                fset = {f.name for f in m.fields}
+                if fset in seen_sets:
+                    errors.append(
+                        f"{m.file.relative_to(src)}:{m.lineno}: duplicate TableModel "
+                        f"for table '{tname}' (identical field set to an earlier model)"
+                    )
+                seen_sets.append(fset)
+        # The fullest model is authoritative for column coverage; projection
+        # models intentionally carry fewer fields.
+        model = max(matched, key=lambda m: len(m.fields))
         field_map = {f.name: f for f in model.fields}
         for cname, col in sorted(col_names.items()):
             if cname not in field_map:
                 first = instances[0]
-                rel = first.file.relative_to(migrations_root)
+                rel = first.file.relative_to(schema_root)
                 errors.append(
                     f"{rel}: missing TableModel field for column "
-                    f"'{tname}.{cname}' (SQL type {col.sql_type.upper()})"
+                    f"'{tname}.{cname}' (type {col.sql_type.upper()})"
                 )
                 continue
             f = field_map[cname]
-            expected = _sql_type_to_python(col.sql_type)
+            expected = _column_family(col)
             if (
                 f.family is not None
                 and f.family not in {"ignored"}
@@ -581,8 +797,8 @@ def main() -> int:
                         )
 
     if errors:
-        for e in errors:
-            print(f"[FAIL] {e}")
+        for err in errors:
+            print(f"[FAIL] {err}")
         print(f"[FAIL] {len(errors)} schema-compatibility violation(s)")
         return 1
 

@@ -90,6 +90,7 @@ from src.web.deps.knowledge_wiki import (
     WikiLintServiceDep,
     WikiPageServiceDep,
 )
+from src.web.deps.sharing import KBShareServiceDep
 
 # Shortcut aliases for the function-arg-style principal deps.
 _PrincipalTenant = Annotated[int, Depends(get_tenant_id_dep)]
@@ -138,6 +139,7 @@ async def list_pages(
     _role: RoleViewerDep,
     kb_id: str,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiPageServiceDep,
     page_type: str = Query(default=""),
     status: str = Query(default=""),
@@ -151,7 +153,11 @@ async def list_pages(
     sort_order: str = Query(default="desc"),
 ) -> WikiEnvelope[WikiPageListData]:
     """List wiki pages with optional filtering and pagination."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+    )
 
     # Explicitly-present-but-empty ``folder_id`` means "root" (folder_id
     # = ''); an absent param means "no filter".
@@ -191,12 +197,18 @@ async def create_page(
     kb_id: str,
     body: WikiPageCreateRequest,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiPageServiceDep,
     tenant_id: _PrincipalTenant,
     user_id: _PrincipalUser,
 ) -> WikiEnvelope[WikiPageView]:
     """Create a new wiki page in the knowledge base."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+        write=True,
+    )
     tenant_id = _require_tenant(tenant_id)
 
     page_type = body.page_type.strip()
@@ -248,10 +260,15 @@ async def get_page(
     kb_id: str,
     slug: str,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiPageServiceDep,
 ) -> WikiEnvelope[WikiPageView]:
     """Retrieve a wiki page by its (hierarchical) slug."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+    )
     slug = slug.strip()
     page = await service.get_page_by_slug(knowledge_base_id=kb_id, slug=slug)
     return WikiEnvelope(success=True, data=page_to_view(page))
@@ -265,6 +282,7 @@ async def update_page(
     slug: str,
     body: WikiPageUpdateRequest,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiPageServiceDep,
     user_id: _PrincipalUser,
 ) -> WikiEnvelope[WikiPageView]:
@@ -273,7 +291,12 @@ async def update_page(
     When ``version`` > 0 it acts as an optimistic-lock guard: a mismatch
     with the stored version returns 409 together with the current version.
     """
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+        write=True,
+    )
     slug = slug.strip()
     existing = await service.get_page_by_slug(knowledge_base_id=kb_id, slug=slug)
     if body.version > 0 and body.version != existing.version:
@@ -321,10 +344,16 @@ async def delete_page(
     kb_id: str,
     slug: str,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiPageServiceDep,
 ) -> None:
     """Soft-delete a wiki page by slug."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+        write=True,
+    )
     slug = slug.strip()
     await service.delete_page(knowledge_base_id=kb_id, slug=slug)
 
@@ -336,10 +365,16 @@ async def move_page(
     kb_id: str,
     body: WikiPageMoveRequest,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiPageServiceDep,
 ) -> WikiEnvelope[WikiPageView]:
     """Relocate a page (by slug) into a folder (empty = root)."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+        write=True,
+    )
     slug = body.slug.strip()
     if not slug:
         raise ValidationError(
@@ -363,12 +398,17 @@ async def list_folders(
     _role: RoleViewerDep,
     kb_id: str,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiFolderServiceDep,
     parent_id: str = Query(default=""),
     page_types: str = Query(default=""),
 ) -> WikiEnvelope[WikiFolderListData]:
     """List the direct child folders of a parent (empty = root)."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+    )
     types = split_page_types(page_types)
     nodes = await service.list_child_folders(
         knowledge_base_id=kb_id,
@@ -391,11 +431,17 @@ async def create_folder(
     kb_id: str,
     body: WikiFolderCreateRequest,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiFolderServiceDep,
     tenant_id: _PrincipalTenant,
 ) -> WikiEnvelope[WikiFolderView]:
     """Create a new (initially empty) folder under ``parent_id``."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+        write=True,
+    )
     tenant_id = _require_tenant(tenant_id)
     folder = await service.create_folder(
         knowledge_base_id=kb_id,
@@ -414,10 +460,16 @@ async def update_folder(
     folder_id: str,
     body: WikiFolderUpdateRequest,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiFolderServiceDep,
 ) -> WikiEnvelope[WikiFolderView]:
     """Rename and/or reparent a folder; subtree caches are recomputed."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+        write=True,
+    )
     folder = await service.rename_or_move_folder(
         knowledge_base_id=kb_id,
         id=folder_id.strip(),
@@ -435,10 +487,16 @@ async def delete_folder(
     kb_id: str,
     folder_id: str,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiFolderServiceDep,
 ) -> None:
     """Delete an empty wiki folder (no pages and no child folders)."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+        write=True,
+    )
     await service.delete_folder(knowledge_base_id=kb_id, id=folder_id.strip())
 
 
@@ -451,6 +509,7 @@ async def get_index(
     _role: RoleViewerDep,
     kb_id: str,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiPageServiceDep,
     tenant_id: _PrincipalTenant,
     types: str = Query(default=""),
@@ -458,7 +517,11 @@ async def get_index(
     cursor: str = Query(default=""),
 ) -> WikiEnvelope[WikiIndexData]:
     """Return the structured wiki index (intro + per-type directory groups)."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+    )
     tenant_id = _require_tenant(tenant_id)
     response = await service.get_index_view(
         knowledge_base_id=kb_id,
@@ -479,6 +542,7 @@ async def get_graph(
     _role: RoleViewerDep,
     kb_id: str,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiPageServiceDep,
     mode: str = Query(default=""),
     center: str = Query(default=""),
@@ -487,7 +551,11 @@ async def get_graph(
     limit: int = Query(default=_GRAPH_DEFAULT_LIMIT),
 ) -> WikiEnvelope[WikiGraphData]:
     """Return a slice of the wiki link graph for visualization."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+    )
 
     mode = mode.strip() or WIKI_GRAPH_MODE_OVERVIEW
     if mode not in (WIKI_GRAPH_MODE_OVERVIEW, WIKI_GRAPH_MODE_EGO):
@@ -533,10 +601,15 @@ async def get_stats(
     _role: RoleViewerDep,
     kb_id: str,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiPageServiceDep,
 ) -> WikiEnvelope[WikiStats]:
     """Return aggregate statistics about the KB's wiki."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+    )
     stats = await service.get_stats(knowledge_base_id=kb_id)
     return WikiEnvelope(success=True, data=stats)
 
@@ -550,12 +623,17 @@ async def search_pages(
     _role: RoleViewerDep,
     kb_id: str,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiPageServiceDep,
     q: str = Query(default=""),
     limit: int = Query(default=10),
 ) -> WikiEnvelope[WikiSearchData]:
     """Full-text search over the KB's wiki pages."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+    )
     if not q.strip():
         raise ValidationError(
             code="wiki.search_query_required",
@@ -574,10 +652,16 @@ async def rebuild_links(
     _role: RoleAdminDep,
     kb_id: str,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiPageServiceDep,
 ) -> WikiEnvelope[WikiMessage]:
     """Re-parse all pages and rebuild bidirectional link references."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+        write=True,
+    )
     await service.rebuild_links(knowledge_base_id=kb_id)
     return WikiEnvelope(
         success=True,
@@ -591,10 +675,15 @@ async def lint(
     _role: RoleViewerDep,
     kb_id: str,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiLintServiceDep,
 ) -> WikiEnvelope[WikiLintReport]:
     """Run a comprehensive health check over the KB's wiki."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+    )
     report = await service.run_lint(knowledge_base_id=kb_id)
     return WikiEnvelope(success=True, data=report)
 
@@ -605,10 +694,16 @@ async def auto_fix(
     _role: RoleAdminDep,
     kb_id: str,
     kb_service: KBServiceDep,
+    kb_share_service: KBShareServiceDep,
     service: WikiLintServiceDep,
 ) -> WikiEnvelope[WikiAutoFixData]:
     """Automatically fix machine-safe wiki issues (broken links, etc.)."""
-    await require_wiki_kb(kb_id=kb_id, kb_service=kb_service)
+    await require_wiki_kb(
+        kb_id=kb_id,
+        kb_service=kb_service,
+        kb_share_service=kb_share_service,
+        write=True,
+    )
     fixed = await service.auto_fix(knowledge_base_id=kb_id)
     return WikiEnvelope(
         success=True,

@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.common.json import JsonObject, JsonValue
 from src.db.models.system.audit_log import AuditLog
 from src.db.models.system.system_setting import SystemSetting
+from src.db.models.user_resource_favorite import UserResourceFavorite
 
 
 class AuditLogInfo(BaseModel):
@@ -139,4 +140,21 @@ class SystemSettingInfo(BaseModel):
         return cls.model_validate(record)
 
 
-__all__ = ["AuditLogInfo", "SystemSettingInfo"]
+class FavoriteInfo(BaseModel):
+    """Service-side projection of a user-resource-favorite storage row."""
+
+    model_config = ConfigDict(frozen=True)
+
+    user_id: str
+    tenant_id: int
+    resource_type: str
+    resource_id: str
+    created_at: datetime
+
+    @classmethod
+    def map_from_db(cls, db: UserResourceFavorite) -> Self:
+        """Project one storage row onto the service DTO."""
+        return cls.model_validate(db.model_dump())
+
+
+__all__ = ["AuditLogInfo", "FavoriteInfo", "SystemSettingInfo"]

@@ -208,6 +208,7 @@ async def create_knowledge_base(
         vlm_config=_config_to_json(body.vlm_config),
         asr_config=_config_to_json(body.asr_config),
         storage_provider_config=_config_to_json(body.storage_provider_config),
+        storage_backend_id=body.storage_backend_id,
         storage_config=_config_to_json(body.storage_config),
         extract_config=_config_to_json(body.extract_config),
         faq_config=_config_to_json(body.faq_config),

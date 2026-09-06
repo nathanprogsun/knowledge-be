@@ -109,6 +109,11 @@ filterwarnings = [
     # The test suite uses TestClient (sync portal loop) deliberately, so
     # the import-time deprecation notice is suppressed.
     "ignore::starlette.exceptions.StarletteDeprecationWarning",
+    # jieba ships unescaped regex literals. The warning is emitted at
+    # compile time, before a module-scoped filter can match, so the
+    # ignore is global. src/common/jieba_compat.py rewrites the
+    # installed sources for builds that promote this to SyntaxError.
+    "ignore::SyntaxWarning",
 ]
 
 [tool.coverage.run]

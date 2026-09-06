@@ -310,14 +310,10 @@ async def test_share_agent_duplicate_upgrades_to_viewer() -> None:
     state.orgs["org-1"] = _org("org-1")
     state.members[("org-1", _TENANT)] = _member(org_id="org-1", tenant_id=_TENANT, role="editor")
 
-    first = await service.share_agent(
-        agent_id="agent-1",
-        organization_id="org-1",
-        user_id=_USER,
-        tenant_id=_TENANT,
-        permission="editor",
+    existing = _share(agent_id="agent-1", org_id="org-1").model_copy(
+        update={"permission": "editor"}
     )
-    state.shares[first.id] = first.model_copy(update={"permission": "editor"})
+    state.shares[existing.id] = existing
 
     second = await service.share_agent(
         agent_id="agent-1",
@@ -327,6 +323,7 @@ async def test_share_agent_duplicate_upgrades_to_viewer() -> None:
         permission="viewer",
     )
     assert second.permission == "viewer"
+    assert state.shares[existing.id].permission == "viewer"
 
 
 # ── remove_share ───────────────────────────────────────────────────

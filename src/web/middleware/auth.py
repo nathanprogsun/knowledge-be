@@ -195,8 +195,14 @@ async def _resolve_header_auth(
     not sufficient. Failure to resolve raises ``UnauthorizedError``
     (the caller in :func:`require_auth` returns ``False`` only when the
     header is **not present** - header-present-but-invalid fails closed).
+
+    The whole channel is gated by ``Settings.header_auth_enabled`` — the
+    headers assert identity and roles verbatim, so deployments must opt
+    in only behind a gateway that strips them from external traffic.
     """
     settings = get_settings()
+    if not settings.header_auth_enabled:
+        return False
     user_id = request.headers.get(settings.auth_header_user_id)
     tenant_id_raw = request.headers.get(settings.auth_header_tenant_id)
     if user_id is None or tenant_id_raw is None:

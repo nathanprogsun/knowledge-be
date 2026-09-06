@@ -37,7 +37,7 @@ from src.core.channels.embed.session import (
     sign_embed_session_handle,
     verify_embed_session_handle,
 )
-from src.core.channels.embed.types import EmbedChannelInfo
+from src.core.channels.embed.types import EmbedChannelInfo, EmbedChannelOwnedInfo
 from src.core.chat.bus import Event
 from src.core.chat.types import EventType
 from src.db.models.chunk import Chunk
@@ -202,10 +202,10 @@ class _FakeEmbedService:
         self._maybe_raise()
         return self.create_result
 
-    async def get_owned_channel(self, *, tenant_id: int, channel_id: str) -> EmbedChannel:
+    async def get_owned_channel(self, *, tenant_id: int, channel_id: str) -> EmbedChannelOwnedInfo:
         self._maybe_raise()
         if self.owned_row is not None:
-            return self.owned_row
+            return EmbedChannelOwnedInfo.map_from_db(self.owned_row)
         raise NotFoundError(
             code="embed.channel_not_found",
             message=f"embed channel {channel_id} not found",
@@ -1092,7 +1092,7 @@ def test_require_embed_session_rejects_invalid_handle() -> None:
 
 
 def test_patch_embed_chat_payload_forces_channel_fields() -> None:
-    channel = _channel_row()
+    channel = _channel_info()
     patched = patch_embed_chat_payload(
         b'{"query": "hi", "web_search_enabled": true}',
         channel,
@@ -1109,7 +1109,7 @@ def test_patch_embed_chat_payload_forces_channel_fields() -> None:
 
 
 def test_patch_embed_chat_payload_keeps_visitor_search_when_allowed() -> None:
-    channel = _channel_row(allow_web_search=True)
+    channel = _channel_info(allow_web_search=True)
     patched = patch_embed_chat_payload(
         b'{"web_search_enabled": true}',
         channel,
@@ -1121,7 +1121,7 @@ def test_patch_embed_chat_payload_keeps_visitor_search_when_allowed() -> None:
 
 
 def test_patch_embed_chat_payload_strips_uploads_when_forbidden() -> None:
-    channel = _channel_row()
+    channel = _channel_info()
     patched = patch_embed_chat_payload(
         b'{"query": "x", "images": [{"data": "a"}], "attachment_ids": ["1"]}',
         channel,
@@ -1134,7 +1134,7 @@ def test_patch_embed_chat_payload_strips_uploads_when_forbidden() -> None:
 
 def test_patch_embed_chat_payload_rejects_invalid_json() -> None:
     with pytest.raises(ValidationError) as excinfo:
-        patch_embed_chat_payload(b"nope", _channel_row(), agent_mode=False)
+        patch_embed_chat_payload(b"nope", _channel_info(), agent_mode=False)
     assert excinfo.value.code == "embed.invalid_chat_json"
 
 

@@ -23,7 +23,7 @@ from src.core.contracts.organizations import (
     SharedKnowledgeBaseListItem,
 )
 from src.core.organizations.types import SharedAgentInfo, SharedKnowledgeBaseInfo
-from src.db.models.agent_share import AgentShare as AgentShareRow
+from src.core.sharing.types import AgentShareInfo
 from src.web.api.agents.views import agent_to_contract
 from src.web.api.knowledge_bases.views import knowledge_base_to_contract
 
@@ -161,7 +161,7 @@ class AgentShareListEnvelope(BaseModel):
 
 
 def agent_share_to_contract(
-    share: AgentShareRow,
+    share: AgentShareInfo,
     *,
     org_name: str | None = None,
 ) -> AgentShare:
@@ -184,7 +184,7 @@ def agent_share_to_contract(
 
 
 def agent_share_envelope(
-    share: AgentShareRow,
+    share: AgentShareInfo,
     *,
     org_name: str | None = None,
 ) -> AgentShareEnvelope:
@@ -196,7 +196,7 @@ def agent_share_envelope(
 
 
 def agent_share_list_envelope(
-    shares: list[AgentShareRow],
+    shares: list[AgentShareInfo],
     *,
     org_names: dict[str, str],
 ) -> AgentShareListEnvelope:

@@ -18,7 +18,12 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.common.exception import ValidationError
+from src.app_context import request_context
+from src.common.exception import (
+    PermissionDeniedError,
+    UnauthorizedError,
+    ValidationError,
+)
 from src.common.json import JsonObject
 from src.core.knowledge.knowledge_bases.service.kb_service import KBService
 from src.core.knowledge.wiki.lint_service import WikiLintReport
@@ -31,6 +36,7 @@ from src.core.knowledge.wiki.types import (
     WikiPage,
     WikiStats,
 )
+from src.core.sharing.kb_share_service import KBShareService
 
 T = TypeVar("T")
 
@@ -374,14 +380,61 @@ def _index_entry_view(entry: WikiIndexEntry) -> WikiIndexEntryView:
 # ── KB gate ──────────────────────────────────────────────────────────
 
 
-async def require_wiki_kb(*, kb_id: str, kb_service: KBService) -> None:
-    """Validate the KB exists and the wiki pipeline is enabled for it.
+def _resolve_caller_tenant() -> int:
+    """Return the caller's active workspace id from the request store.
 
-    Mirrors the upstream handler's per-endpoint gate: a missing KB reads
-    as ``NotFoundError`` (404); a KB without the wiki feature enabled is
-    rejected with a ``ValidationError`` (422).
+    A wiki gate never runs without one: when the store carries no
+    tenant (e.g. a mis-configured principal channel), reject rather
+    than guess.
     """
+    raw = request_context.get_tenant_id()
+    try:
+        tenant_id = int(raw) if raw is not None else 0
+    except (TypeError, ValueError):
+        tenant_id = 0
+    if tenant_id <= 0:
+        raise UnauthorizedError(
+            code="auth.tenant_context_missing",
+            message="unauthorized: workspace context missing",
+        )
+    return tenant_id
+
+
+async def require_wiki_kb(
+    *,
+    kb_id: str,
+    kb_service: KBService,
+    kb_share_service: KBShareService,
+    write: bool = False,
+) -> None:
+    """Validate KB access and that the wiki pipeline is enabled for it.
+
+    The gate enforces tenant boundaries on top of existence: reads
+    require the caller to own the KB or hold a share grant on it;
+    mutations (``write=True``) are restricted to the owner tenant —
+    shared access is read-only. The caller's tenant is read from the
+    request context store (same source the session deps use). A
+    missing KB reads as ``NotFoundError`` (404); a KB without the wiki
+    feature enabled is rejected with a ``ValidationError`` (422).
+    """
+    tenant_id = _resolve_caller_tenant()
     kb = await kb_service.get_knowledge_base_by_id(knowledge_base_id=kb_id)
+    if write and kb.tenant_id != tenant_id:
+        raise PermissionDeniedError(
+            code="wiki.kb_forbidden",
+            message=f"forbidden: knowledge base {kb_id} not writable",
+        )
+    if not write:
+        allowed = await kb_share_service.can_access_knowledge_base(
+            tenant_id=tenant_id,
+            owner_tenant_id=kb.tenant_id,
+            knowledge_base_id=kb_id,
+        )
+        if not allowed:
+            raise PermissionDeniedError(
+                code="wiki.kb_forbidden",
+                message=f"forbidden: knowledge base {kb_id} not accessible",
+            )
     strategy = kb.indexing_strategy or {}
     if strategy.get("wiki_enabled") is not True:
         raise ValidationError(

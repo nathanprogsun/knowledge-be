@@ -28,8 +28,6 @@ captured as a session id.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 from fastapi import APIRouter, Query
 
 from src.common.exception import NotFoundError, ValidationError
@@ -39,7 +37,6 @@ from src.core.contracts.sessions import (
     CreateSessionRequest,
     UpdateSessionRequest,
 )
-from src.db.models.session import Session as SessionRow
 from src.web.api.chat.sessions.views import (
     DeleteSessionResponse,
     PinSessionEnvelope,
@@ -78,11 +75,6 @@ def _require_session_id(session_id: str) -> str:
     return session_id.strip()
 
 
-def _now() -> datetime:
-    """UTC ``now`` for constructing session rows the service re-stamps."""
-    return datetime.now(UTC)
-
-
 def _clamp_page(page: int) -> int:
     """Coerce a page value onto ``[1, inf)`` like the upstream clamp."""
     return page if page >= 1 else _DEFAULT_PAGE
@@ -108,15 +100,8 @@ async def create_session(
     supplies only the display fields (``title`` / ``description``).
     """
     row = await session_service.create(
-        SessionRow(
-            id="",
-            tenant_id=session_service.tenant_id,
-            title=body.title,
-            description=body.description,
-            user_id=session_service.user_id,
-            created_at=_now(),
-            updated_at=_now(),
-        )
+        title=body.title,
+        description=body.description,
     )
     return session_envelope(row)
 
@@ -212,14 +197,9 @@ async def update_session(
 ) -> SessionEnvelope:
     """Update a session's display fields, then return the stored row."""
     updated = await session_service.update(
-        SessionRow(
-            id=_require_session_id(session_id),
-            tenant_id=session_service.tenant_id,
-            title=body.title,
-            description=body.description,
-            created_at=_now(),
-            updated_at=_now(),
-        )
+        session_id=_require_session_id(session_id),
+        title=body.title,
+        description=body.description,
     )
     return session_envelope(updated)
 

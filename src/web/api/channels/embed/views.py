@@ -36,8 +36,7 @@ from src.core.channels.embed.service.embed_channel_service import (
     normalize_header_title_mode,
     normalize_widget_position,
 )
-from src.core.channels.embed.types import EmbedChannelInfo
-from src.db.models.embed_channel import EmbedChannel
+from src.core.channels.embed.types import EmbedChannelInfo, EmbedChannelOwnedInfo
 
 #: Cap on the channel suggested-questions ``limit`` query param.
 EMBED_SUGGESTION_LIMIT_CAP: int = 12
@@ -407,7 +406,7 @@ class EmbedSuggestionSuppressedEnvelope(BaseModel):
 # ── Projections ───────────────────────────────────────────────────────
 
 
-def _as_origins(value: JsonValue) -> list[str]:
+def _as_origins(value: JsonValue | list[str]) -> list[str]:
     """Narrow the JSONB ``allowed_origins`` column onto a concrete list."""
     if isinstance(value, list):
         return [item for item in value if isinstance(item, str)]
@@ -455,7 +454,7 @@ def embed_channel_record(
 
 
 def embed_channel_record_from_row(
-    row: EmbedChannel,
+    row: EmbedChannelOwnedInfo,
     *,
     publish_token: str = "",
 ) -> EmbedChannelRecord:
@@ -484,14 +483,14 @@ def embed_channel_record_from_row(
         allow_file_upload=row.allow_file_upload,
         default_locale=normalize_default_locale(row.default_locale),
         webhook_url=row.webhook_url,
-        has_webhook_secret=bool(row.webhook_secret),
+        has_webhook_secret=row.has_webhook_secret,
         created_at=row.created_at,
         updated_at=row.updated_at,
         publish_token=publish_token or row.publish_token or None,
     )
 
 
-def embed_public_config(channel: EmbedChannel) -> EmbedPublicConfig:
+def embed_public_config(channel: EmbedChannelInfo) -> EmbedPublicConfig:
     """Project a resolved channel onto the anonymous public config.
 
     ``display_title`` follows the upstream resolution order (page title,
@@ -535,7 +534,7 @@ def clamp_suggestion_limit(limit: int) -> int:
 
 def patch_embed_chat_payload(
     raw: bytes,
-    channel: EmbedChannel,
+    channel: EmbedChannelInfo,
     *,
     agent_mode: bool,
 ) -> dict[str, JsonValue]:
