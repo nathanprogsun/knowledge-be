@@ -8,15 +8,15 @@ rewritten to raw strings before the import runs.
 
 from __future__ import annotations
 
+import importlib
 import importlib.util
 import warnings
 from pathlib import Path
+from types import ModuleType
 
 
 def _rewrite_compile_literals(source: str) -> str:
-    return source.replace('re.compile("', 're.compile(r"').replace(
-        "re.compile('", "re.compile(r'"
-    )
+    return source.replace('re.compile("', 're.compile(r"').replace("re.compile('", "re.compile(r'")
 
 
 def _patch_installed_jieba() -> None:
@@ -36,7 +36,5 @@ def _patch_installed_jieba() -> None:
 
 
 _patch_installed_jieba()
-
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore", SyntaxWarning)
-    import jieba as jieba
+warnings.filterwarnings("ignore", category=SyntaxWarning)
+jieba: ModuleType = importlib.import_module("jieba")
