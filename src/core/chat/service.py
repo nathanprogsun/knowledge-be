@@ -27,7 +27,7 @@ import contextlib
 import logging
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from typing import Protocol, TypeVar, runtime_checkable
 
 from src.common.exception import ValidationError
 from src.core.agents.types import (
@@ -36,7 +36,10 @@ from src.core.agents.types import (
 )
 from src.core.chat.bus import Event, EventBus
 from src.core.chat.pipeline.types import Context, SearchResult
+from src.core.chat.stream.manager import StreamManager
 from src.core.chat.types import EventType
+
+_T = TypeVar("_T")
 
 logger = logging.getLogger(__name__)
 
@@ -333,6 +336,146 @@ def resolve_agent_mode(
 # ── The service ───────────────────────────────────────────────────────
 
 
+def _bind_qa_queue() -> tuple[asyncio.Queue[Event | None], EventBus]:
+    queue: asyncio.Queue[Event | None] = asyncio.Queue()
+    event_bus = EventBus()
+
+    async def _sink(event: Event) -> None:
+        await queue.put(event)
+
+    for event_type in _STREAM_EVENT_TYPES:
+        event_bus.on(event_type, _sink)
+    return queue, event_bus
+
+
+async def _run_qa_runner(
+    *,
+    runner: QARunner,
+    ctx: RequestContext,
+    session_id: str,
+    request: KnowledgeQARequestLike,
+    agent: CustomAgentInfo | None,
+    event_bus: EventBus,
+    queue: asyncio.Queue[Event | None],
+    request_id: str,
+) -> None:
+    try:
+        await runner.run(
+            ctx=ctx,
+            session_id=session_id,
+            request=request,
+            agent=agent,
+            event_bus=event_bus,
+        )
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        logger.exception("QA execution failed for session %s", session_id)
+        await queue.put(
+            Event(
+                type=EventType.ERROR,
+                session_id=session_id,
+                request_id=request_id,
+                data={
+                    "error": str(exc),
+                    "error_code": getattr(exc, "code", None),
+                    "stage": "qa_execution",
+                    "session_id": session_id,
+                },
+            )
+        )
+    finally:
+        await queue.put(None)
+
+
+async def _cancel_task(task: asyncio.Task[_T] | None) -> None:
+    if task is None or task.done():
+        return
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+
+
+async def _next_qa_event(
+    queue: asyncio.Queue[Event | None],
+    cancel_task: asyncio.Task[None] | None,
+) -> Event | None:
+    if cancel_task is None:
+        return await queue.get()
+    get_task: asyncio.Task[Event | None] = asyncio.create_task(queue.get())
+    done, _pending = await asyncio.wait(
+        {get_task, cancel_task},
+        return_when=asyncio.FIRST_COMPLETED,
+    )
+    if cancel_task in done:
+        await _cancel_task(get_task)
+        return None
+    return get_task.result()
+
+
+async def _iter_qa_events(
+    queue: asyncio.Queue[Event | None],
+    *,
+    session_id: str,
+    message_id: str,
+    stream_manager: StreamManager | None,
+) -> AsyncIterator[Event]:
+    # Stop and the model loop share this manager. The first of drain-end
+    # or cancel wins so POST /stop can interrupt tokens.
+    cancel_task: asyncio.Task[None] | None = None
+    if stream_manager is not None:
+        cancel_task = asyncio.create_task(stream_manager.wait_cancelled(session_id, message_id))
+    try:
+        while True:
+            event = await _next_qa_event(queue, cancel_task)
+            if event is None:
+                return
+            yield event
+    finally:
+        await _cancel_task(cancel_task)
+
+
+async def _open_qa_turn(
+    gateway: MessageGateway,
+    *,
+    session_id: str,
+    query: str,
+    request_id: str,
+    agent: CustomAgentInfo | None,
+    model_id: str,
+) -> tuple[str, AssistantMessage, asyncio.Queue[Event | None], EventBus]:
+    user_message_id = await gateway.create_user_message(
+        session_id=session_id,
+        query=query,
+    )
+    assistant = await gateway.create_assistant_message(
+        session_id=session_id,
+        request_id=request_id,
+        agent=agent,
+        model_id=model_id,
+    )
+    queue, event_bus = _bind_qa_queue()
+    return user_message_id, assistant, queue, event_bus
+
+
+def _agent_query_event(
+    session_id: str,
+    request_id: str,
+    user_message_id: str,
+    assistant_id: str,
+) -> Event:
+    return Event(
+        type=EventType.AGENT_QUERY,
+        session_id=session_id,
+        request_id=request_id,
+        data={
+            "session_id": session_id,
+            "assistant_message_id": assistant_id,
+            "user_message_id": user_message_id,
+        },
+    )
+
+
 class ChatService:
     """Request-scoped chat facade (one instance per request).
 
@@ -351,6 +494,7 @@ class ChatService:
         knowledge_runner: QARunner,
         agent_runner: QARunner,
         message_gateway: MessageGateway,
+        stream_manager: StreamManager | None = None,
     ) -> None:
         self._tenant_id = tenant_id
         self._user_id = user_id
@@ -360,6 +504,7 @@ class ChatService:
         self._knowledge_runner = knowledge_runner
         self._agent_runner = agent_runner
         self._message_gateway = message_gateway
+        self._stream_manager = stream_manager
 
     @property
     def tenant_id(self) -> int:
@@ -507,6 +652,33 @@ class ChatService:
 
     # ── Shared stream bridge ───────────────────────────────────────
 
+    async def _yield_qa_events(
+        self,
+        queue: asyncio.Queue[Event | None],
+        task: asyncio.Task[None],
+        session_id: str,
+        assistant: AssistantMessage,
+    ) -> AsyncIterator[Event]:
+        answer_parts: list[str] = []
+        try:
+            async for event in _iter_qa_events(
+                queue,
+                session_id=session_id,
+                message_id=assistant.id,
+                stream_manager=self._stream_manager,
+            ):
+                piece = answer_delta(event)
+                if piece:
+                    answer_parts.append(piece)
+                yield event
+        finally:
+            await _cancel_task(task)
+            await self._message_gateway.complete_assistant_message(
+                assistant_message_id=assistant.id,
+                content="".join(answer_parts),
+                is_fallback=False,
+            )
+
     async def _stream_qa(
         self,
         *,
@@ -517,93 +689,33 @@ class ChatService:
     ) -> AsyncIterator[Event]:
         # Message shells: the assistant message id rides the leading
         # agent_query event so the client can correlate the stream.
-        user_message_id = await self._message_gateway.create_user_message(
+        user_message_id, assistant, queue, event_bus = await _open_qa_turn(
+            self._message_gateway,
             session_id=session_id,
             query=request.query,
-        )
-        assistant = await self._message_gateway.create_assistant_message(
-            session_id=session_id,
             request_id=self._request_id,
             agent=agent,
             model_id=request.summary_model_id or "",
         )
-
-        queue: asyncio.Queue[Event | None] = asyncio.Queue()
-        event_bus = EventBus()
-
-        async def _sink(event: Event) -> None:
-            await queue.put(event)
-
-        for event_type in _STREAM_EVENT_TYPES:
-            event_bus.on(event_type, _sink)
-
-        yield Event(
-            type=EventType.AGENT_QUERY,
-            session_id=session_id,
-            request_id=self._request_id,
-            data={
-                "session_id": session_id,
-                "assistant_message_id": assistant.id,
-                "user_message_id": user_message_id,
-            },
-        )
-
-        ctx = RequestContext(
-            tenant_id=self._tenant_id,
-            user_id=self._user_id,
-            request_id=self._request_id,
-        )
-
-        async def _run() -> None:
-            try:
-                await runner.run(
-                    ctx=ctx,
-                    session_id=session_id,
-                    request=request,
-                    agent=agent,
-                    event_bus=event_bus,
-                )
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                logger.exception("QA execution failed for session %s", session_id)
-                await queue.put(
-                    Event(
-                        type=EventType.ERROR,
-                        session_id=session_id,
-                        request_id=self._request_id,
-                        data={
-                            "error": str(exc),
-                            "error_code": getattr(exc, "code", None),
-                            "stage": "qa_execution",
-                            "session_id": session_id,
-                        },
-                    )
-                )
-            finally:
-                await queue.put(None)
-
-        answer_parts: list[str] = []
-        task = asyncio.create_task(_run())
-        try:
-            while True:
-                event = await queue.get()
-                if event is None:
-                    break
-                piece = answer_delta(event)
-                if piece:
-                    answer_parts.append(piece)
-                yield event
-        finally:
-            if not task.done():
-                task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
-            await self._message_gateway.complete_assistant_message(
-                assistant_message_id=assistant.id,
-                content="".join(answer_parts),
-                is_fallback=False,
+        yield _agent_query_event(session_id, self._request_id, user_message_id, assistant.id)
+        task = asyncio.create_task(
+            _run_qa_runner(
+                runner=runner,
+                ctx=RequestContext(
+                    tenant_id=self._tenant_id,
+                    user_id=self._user_id,
+                    request_id=self._request_id,
+                ),
+                session_id=session_id,
+                request=request,
+                agent=agent,
+                event_bus=event_bus,
+                queue=queue,
+                request_id=self._request_id,
             )
+        )
+        async for event in self._yield_qa_events(queue, task, session_id, assistant):
+            yield event
 
 
 __all__ = [

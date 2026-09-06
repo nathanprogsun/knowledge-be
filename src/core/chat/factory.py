@@ -31,6 +31,7 @@ from src.core.chat.service import (
 )
 from src.core.chat.sessions.keyword_searcher import KeywordKnowledgeSearcher
 from src.core.chat.sessions.knowledge_qa_runner import KnowledgeQARunner
+from src.core.chat.stream.manager import StreamManager
 from src.core.infra.models.factory import build_chat_model_service
 from src.core.knowledge.chunks.factory import build_chunk_service
 from src.core.knowledge.documents.factory import build_knowledge_service
@@ -65,6 +66,7 @@ def build_chat_service(
     tenant_id: int,
     user_id: str,
     request_id: str,
+    stream_manager: StreamManager,
 ) -> ChatService:
     """Assemble a per-request ``ChatService`` on the shared session."""
     documents = build_knowledge_service(session)
@@ -84,6 +86,7 @@ def build_chat_service(
         knowledge_runner=knowledge_runner,
         agent_runner=knowledge_runner,
         message_gateway=PersistentMessageGateway(MessageRepository(session)),
+        stream_manager=stream_manager,
     )
 
 

@@ -44,6 +44,7 @@ from src.common.telemetry import (
     is_tracing_enabled,
     setup_tracing,
 )
+from src.core.chat.stream.manager import MemoryStreamManager
 from src.core.infra.mcp_services.oauth import (
     InMemorySecretStore,
     OAuthManager,
@@ -195,6 +196,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         mcp_oauth_manager_factory=_oauth_manager_factory,
         arq_redis=arq_redis,
         arq_queue_name=get_worker_settings().queue_name,
+        stream_manager=MemoryStreamManager(),
     )
     app.state.lifespan_service = lifespan_service
 

@@ -10,22 +10,24 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Request
 
 from src.app_context import request_context
+from src.app_context.registry import get_stream_manager_from_lifespan
 from src.common.exception import ValidationError
 from src.core.chat.factory import build_chat_service
 from src.core.chat.service import ChatService
 from src.web.deps.session import SessionDep
 
 
-def get_chat_service(session: SessionDep) -> ChatService:
+def get_chat_service(request: Request, session: SessionDep) -> ChatService:
     """Build a per-request ``ChatService`` on the shared session."""
     return build_chat_service(
         session,
         tenant_id=_require_context_tenant(),
         user_id=request_context.get_user_id() or "",
         request_id=request_context.get_request_id() or "",
+        stream_manager=get_stream_manager_from_lifespan(request.app),
     )
 
 

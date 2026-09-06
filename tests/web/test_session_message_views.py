@@ -23,12 +23,14 @@ from fastapi.params import Depends
 from fastapi.testclient import TestClient
 
 from src.app_context import request_context
+from src.app_context.registry import LifeSpanService
 from src.common.exception import NotFoundError, ValidationError
 from src.common.pagination import PaginationResponse
 from src.core.chat.messages import (
     ChatHistoryKBStats,
     MessageSearchResult,
 )
+from src.core.chat.stream.manager import MemoryStreamManager
 from src.db.models.message import Message as MessageRow
 from src.db.models.message_suggestion import (
     SUGGESTION_STATUS_GENERATING,
@@ -407,6 +409,23 @@ def test_stop_session_returns_200() -> None:
     assert response.json() == {"success": True, "message": "Generation stopped"}
     session_service.get.assert_awaited_once_with("sess-1")
     stop_service.stop.assert_awaited_once_with("sess-1", "msg-1")
+
+
+def test_stop_marks_shared_stream_manager_cancelled() -> None:
+    session_service = AsyncMock()
+    session_service.get = AsyncMock(return_value=_session_row())
+    manager = MemoryStreamManager()
+    app = _build_app(session_service=session_service)
+    app.state.lifespan_service = LifeSpanService(stream_manager=manager)
+
+    with _client(app) as client:
+        response = client.post(
+            "/api/v1/sessions/sess-1/stop",
+            json={"message_id": "msg-1"},
+        )
+
+    assert response.status_code == 200
+    assert manager.is_cancelled("sess-1", "msg-1")
 
 
 def test_stop_unknown_session_returns_404() -> None:
