@@ -296,7 +296,8 @@ def test_list_parser_engines_returns_registry(system_client: TestClient) -> None
     assert response.status_code == 200
     payload = response.json()
     assert payload["success"] is True
-    assert payload["connected"] is False
+    assert isinstance(payload["connected"], bool)
+    assert isinstance(payload["docreader_addr"], str)
     names = [engine["Name"] for engine in payload["data"]]
     assert "builtin" in names
     assert "simple" in names

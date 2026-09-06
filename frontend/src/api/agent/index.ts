@@ -1,5 +1,6 @@
 import { get, post, put, del } from "../../utils/request";
 import type { components } from '@/api/__generated__/schema';
+import { agentWritePayload } from './writePayload';
 
 type Schema = components['schemas'];
 
@@ -75,11 +76,11 @@ export function getAgentById(id: string) {
 }
 
 export function createAgent(data: CreateAgentRequest) {
-  return post<{ data: CustomAgent }>('/api/v1/agents', data);
+  return post<{ data: CustomAgent }>('/api/v1/agents', agentWritePayload(data));
 }
 
 export function updateAgent(id: string, data: UpdateAgentRequest) {
-  return put<{ data: CustomAgent }>(`/api/v1/agents/${id}`, data);
+  return put<{ data: CustomAgent }>(`/api/v1/agents/${id}`, agentWritePayload(data));
 }
 
 export function deleteAgent(id: string) {

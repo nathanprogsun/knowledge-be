@@ -694,7 +694,7 @@ async def test_summary_raises_not_found_for_missing_document() -> None:
     assert exc_info.value.code == "knowledge.not_found"
 
 
-async def test_summary_requires_configured_summary_model() -> None:
+async def test_summary_without_kb_model_still_needs_text_chunks() -> None:
     tenant_id = 7
     kb = _sample_kb(id="kb-1", tenant_id=tenant_id, summary_model_id="")
     doc = _sample_doc(id="kn-1", tenant_id=tenant_id, knowledge_base_id="kb-1")
@@ -711,7 +711,7 @@ async def test_summary_requires_configured_summary_model() -> None:
             kb_service=_make_kb_service(kb),
             prompt="Summarize.",
         )
-    assert exc_info.value.code == "knowledge.summary_model_not_configured"
+    assert exc_info.value.code == "knowledge.summary_no_text_chunks"
 
 
 async def test_summary_raises_when_no_enabled_text_chunks() -> None:

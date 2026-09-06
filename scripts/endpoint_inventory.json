@@ -1,5 +1,5 @@
 {
-  "total_paths": 231,
+  "total_paths": 243,
   "endpoints": [
     {
       "method": "POST",
@@ -390,6 +390,14 @@
       "path": "/api/v1/initialization/asr/check"
     },
     {
+      "method": "GET",
+      "path": "/api/v1/initialization/config/{kb_id}"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/initialization/config/{kb_id}"
+    },
+    {
       "method": "POST",
       "path": "/api/v1/initialization/embedding/test"
     },
@@ -530,6 +538,10 @@
       "path": "/api/v1/knowledge-bases/{id}/move-targets"
     },
     {
+      "method": "PUT",
+      "path": "/api/v1/knowledge-bases/{id}/pin"
+    },
+    {
       "method": "GET",
       "path": "/api/v1/knowledge-bases/{id}/tags"
     },
@@ -558,6 +570,10 @@
       "path": "/api/v1/knowledge-search"
     },
     {
+      "method": "GET",
+      "path": "/api/v1/knowledge/batch"
+    },
+    {
       "method": "POST",
       "path": "/api/v1/knowledge/batch-delete"
     },
@@ -572,6 +588,10 @@
     {
       "method": "GET",
       "path": "/api/v1/knowledge/move/progress/{task_id}"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/search"
     },
     {
       "method": "PUT",
@@ -598,8 +618,24 @@
       "path": "/api/v1/knowledge/{id}/clone"
     },
     {
+      "method": "GET",
+      "path": "/api/v1/knowledge/{id}/download"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/{id}/preview"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge/{id}/regenerate-summary"
+    },
+    {
       "method": "POST",
       "path": "/api/v1/knowledge/{id}/reparse"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/{id}/spans"
     },
     {
       "method": "POST",
@@ -727,7 +763,19 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/me/invitations"
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/me/invitations/pending-count"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/me/invitations/{invitation_id}/accept"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/me/invitations/{invitation_id}/decline"
     },
     {
       "method": "GET",
@@ -908,6 +956,10 @@
     {
       "method": "POST",
       "path": "/api/v1/sessions/{session_id}/pin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/sessions/{session_id}/stop"
     },
     {
       "method": "POST",

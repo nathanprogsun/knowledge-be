@@ -19,14 +19,16 @@ Deferred seams (neutral wording): the built-in agent registry (a
 startup-loaded preset catalog) and the suggested-question generator
 (which needs the chunk / wiki / tag / knowledge scopes and the
 knowledge-base service). Until the registry is ported the service
-recognises built-in ids from a fixed constant so built-in rows can never
-be edited or deleted, and every read falls back to the stored row.
+recognises built-in ids from a fixed constant so built-in identity
+fields cannot change and the rows cannot be deleted. Config-only
+updates stay allowed. Every read falls back to the stored row.
 """
 
 from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Protocol, runtime_checkable
 
 from src.common.exception import ConflictError, NotFoundError, ValidationError
 from src.common.json import JsonObject, JsonValue
@@ -214,19 +216,28 @@ class CustomAgentService:
         """
         _require_tenant_id(tenant_id)
         _require_agent_id(agent_id)
-        existing = await self._get_live_agent(tenant_id=tenant_id, agent_id=agent_id)
-        if existing.is_builtin:
+        existing = await self._load_agent_for_update(
+            tenant_id=tenant_id,
+            agent_id=agent_id,
+        )
+        if existing.is_builtin and _builtin_identity_changed(
+            existing,
+            name=name,
+            description=description,
+            avatar=avatar,
+        ):
             raise ConflictError(
                 code="agent.cannot_modify_builtin",
                 message="cannot modify built-in agent basic info",
             )
         patch: dict[str, JsonObject | str | datetime] = {"updated_at": _now()}
-        if name is not None:
-            patch["name"] = _require_name(name)
-        if description is not None:
-            patch["description"] = description
-        if avatar is not None:
-            patch["avatar"] = avatar
+        if not existing.is_builtin:
+            if name is not None:
+                patch["name"] = _require_name(name)
+            if description is not None:
+                patch["description"] = description
+            if avatar is not None:
+                patch["avatar"] = avatar
         if config is not None:
             resolved_config = _apply_config_defaults(config)
             _validate_config(resolved_config)
@@ -290,6 +301,33 @@ class CustomAgentService:
 
     # ── Shared fetch ────────────────────────────────────────────────
 
+    async def _load_agent_for_update(self, *, tenant_id: int, agent_id: str) -> CustomAgent:
+        """Return the stored row, inserting a built-in preset on first save."""
+        row = await self._agent_repo.get_by_id_and_tenant(id=agent_id, tenant_id=tenant_id)
+        if row is not None:
+            return row
+        builtin = get_builtin_agent(agent_id, tenant_id)
+        if builtin is None:
+            raise NotFoundError(
+                code=_NOT_FOUND_CODE,
+                message=f"custom agent {agent_id} not found",
+            )
+        now = _now()
+        return await self._agent_repo.create(
+            CustomAgent(
+                id=builtin.id,
+                name=builtin.name,
+                description=builtin.description,
+                avatar=builtin.avatar,
+                is_builtin=True,
+                tenant_id=tenant_id,
+                created_by=None,
+                config=builtin.config,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+
     async def _get_live_agent(self, *, tenant_id: int, agent_id: str) -> CustomAgent:
         """Fetch a live row, raising ``NotFoundError`` when absent."""
         row = await self._agent_repo.get_by_id_and_tenant(id=agent_id, tenant_id=tenant_id)
@@ -320,6 +358,28 @@ def _require_agent_id(agent_id: str) -> None:
             code="agent.id_required",
             message="agent ID cannot be empty",
         )
+
+
+@runtime_checkable
+class _NamedAgent(Protocol):
+    name: str
+    description: str | None
+    avatar: str | None
+
+
+def _builtin_identity_changed(
+    existing: _NamedAgent,
+    *,
+    name: str | None,
+    description: str | None,
+    avatar: str | None,
+) -> bool:
+    """Return whether the request tries to rename or re-skin a built-in."""
+    if name is not None and name.strip() != existing.name:
+        return True
+    if description is not None and (description or "") != (existing.description or ""):
+        return True
+    return avatar is not None and (avatar or "") != (existing.avatar or "")
 
 
 def _require_name(name: str) -> str:

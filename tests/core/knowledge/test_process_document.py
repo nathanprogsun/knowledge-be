@@ -864,6 +864,33 @@ class TestPipelineRun:
         # No chunks to enrich -> no post-process fan-out.
         assert harness.dispatcher.payloads == []
 
+    async def test_chunks_complete_when_post_process_unwired(self) -> None:
+        tid = make_test_tenant_id()
+        row = _row(tenant_id=tid)
+        kb = _kb(tenant_id=tid, chunking_config={"chunk_size": 20, "chunk_overlap": 0})
+        text = "alpha beta gamma delta\n\n" * 20
+        harness = _make_pipeline(
+            row=row,
+            kb=kb,
+            reader_result=ParseResult(markdown_content=text),
+            embedder=_FakeEmbedder(),
+            engine=_FakeEngine(),
+            with_dispatcher=False,
+        )
+
+        outcome = await _run(
+            harness.pipeline,
+            tenant_id=tid,
+            knowledge_id=row.id,
+            knowledge_base_id=row.knowledge_base_id,
+        )
+
+        assert outcome.parse_status == PARSE_STATUS_COMPLETED
+        assert outcome.enable_status == "enabled"
+        assert outcome.text_chunk_count > 0
+        assert harness.knowledge_repo.rows[row.id].parse_status == PARSE_STATUS_COMPLETED
+        assert harness.dispatcher.payloads == []
+
     async def test_completed_document_is_skipped_idempotently(self) -> None:
         # Arrange
         tid = make_test_tenant_id()
@@ -1299,11 +1326,11 @@ class TestPipelineIntegration:
         )
 
         # Assert
-        assert outcome.parse_status == PARSE_STATUS_PROCESSING
+        assert outcome.parse_status == PARSE_STATUS_COMPLETED
         assert outcome.enable_status == "enabled"
         persisted = await knowledge_repo.get_by_id(tid, row.id)
         assert persisted is not None
-        assert persisted.parse_status == PARSE_STATUS_PROCESSING
+        assert persisted.parse_status == PARSE_STATUS_COMPLETED
         assert persisted.enable_status == "enabled"
         assert persisted.storage_size == 99
         chunks = await chunk_repo.list_by_knowledge_id(tid, row.id)

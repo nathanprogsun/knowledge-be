@@ -1027,6 +1027,27 @@ class TestResolveChatModelId:
         assert result == "override-model"
 
     @pytest.mark.asyncio
+    async def test_override_stands_in_when_agent_model_missing(self) -> None:
+        agent = _make_agent()
+        agent = AgentInfo(
+            id=agent.id,
+            tenant_id=agent.tenant_id,
+            config={**agent.config, "model_id": ""},
+        )
+        req = _make_request(custom_agent=agent, summary_model_id="override-model")
+        service = _StubModelService(
+            models={"override-model": ModelInfo(id="override-model", type="knowledge_qa")}
+        )
+        result = await resolve_chat_model_id(
+            ctx=_Ctx(),
+            req=req,
+            knowledge_base_ids=[],
+            knowledge_ids=[],
+            model_service=service,
+        )
+        assert result == "override-model"
+
+    @pytest.mark.asyncio
     async def test_missing_agent_model_raises(self) -> None:
         agent = _make_agent()
         agent = AgentInfo(

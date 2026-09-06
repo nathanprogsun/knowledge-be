@@ -506,6 +506,18 @@
       "domain": "initialization"
     },
     {
+      "method": "GET",
+      "path": "/api/v1/initialization/config/{kb_id}",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/initialization/config/{kb_id}",
+      "file": "src/web/api/infra/initialization/router.py",
+      "domain": "initialization"
+    },
+    {
       "method": "POST",
       "path": "/api/v1/initialization/embedding/test",
       "file": "src/web/api/infra/initialization/router.py",
@@ -716,6 +728,12 @@
       "domain": "knowledge_bases"
     },
     {
+      "method": "PUT",
+      "path": "/api/v1/knowledge-bases/{id}/pin",
+      "file": "src/web/api/knowledge_bases/router.py",
+      "domain": "knowledge_bases"
+    },
+    {
       "method": "GET",
       "path": "/api/v1/knowledge-bases/{id}/tags",
       "file": "src/web/api/knowledge/tags/router.py",
@@ -758,6 +776,12 @@
       "domain": "chat"
     },
     {
+      "method": "GET",
+      "path": "/api/v1/knowledge/batch",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
       "method": "POST",
       "path": "/api/v1/knowledge/batch-delete",
       "file": "src/web/api/knowledge/documents/router.py",
@@ -778,6 +802,12 @@
     {
       "method": "GET",
       "path": "/api/v1/knowledge/move/progress/{task_id}",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/search",
       "file": "src/web/api/knowledge/documents/router.py",
       "domain": "knowledge"
     },
@@ -818,8 +848,32 @@
       "domain": "knowledge"
     },
     {
+      "method": "GET",
+      "path": "/api/v1/knowledge/{id}/download",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/{id}/preview",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/knowledge/{id}/regenerate-summary",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
       "method": "POST",
       "path": "/api/v1/knowledge/{id}/reparse",
+      "file": "src/web/api/knowledge/documents/router.py",
+      "domain": "knowledge"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/knowledge/{id}/spans",
       "file": "src/web/api/knowledge/documents/router.py",
       "domain": "knowledge"
     },
@@ -1005,7 +1059,25 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/me/invitations",
+      "file": "src/web/api/me/router.py",
+      "domain": "me"
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/me/invitations/pending-count",
+      "file": "src/web/api/me/router.py",
+      "domain": "me"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/me/invitations/{invitation_id}/accept",
+      "file": "src/web/api/me/router.py",
+      "domain": "me"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/me/invitations/{invitation_id}/decline",
       "file": "src/web/api/me/router.py",
       "domain": "me"
     },
@@ -1270,6 +1342,12 @@
     {
       "method": "POST",
       "path": "/api/v1/sessions/{session_id}/pin",
+      "file": "src/web/api/chat/sessions/router.py",
+      "domain": "chat"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/sessions/{session_id}/stop",
       "file": "src/web/api/chat/sessions/router.py",
       "domain": "chat"
     },
@@ -1603,6 +1681,11 @@
       "domain": "auth"
     },
     {
+      "name": "build_chat_model_service",
+      "file": "src/core/infra/models/factory.py",
+      "domain": "models"
+    },
+    {
       "name": "build_chat_service",
       "file": "src/core/chat/factory.py",
       "domain": "chat"
@@ -1688,6 +1771,11 @@
       "domain": "chat"
     },
     {
+      "name": "build_message_suggestion_service",
+      "file": "src/core/chat/messages/factory.py",
+      "domain": "chat"
+    },
+    {
       "name": "build_model_service",
       "file": "src/core/infra/models/factory.py",
       "domain": "models"
@@ -1716,6 +1804,11 @@
       "name": "build_shared_resource_service",
       "file": "src/core/organizations/factory.py",
       "domain": "organizations"
+    },
+    {
+      "name": "build_stop_stream_service",
+      "file": "src/core/chat/sessions/factory.py",
+      "domain": "chat"
     },
     {
       "name": "build_storage_backend_service",

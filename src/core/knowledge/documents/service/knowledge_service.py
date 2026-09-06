@@ -27,13 +27,20 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Protocol, runtime_checkable
 
 from src.common.exception import NotFoundError, ValidationError
 from src.common.json import BindParams, JsonObject, JsonValue
 from src.common.pagination import PaginationResponse
 from src.core.contracts.knowledge import Knowledge
+from src.core.knowledge.documents.create_common import (
+    MANUAL_CONTENT_MAX_LENGTH,
+    clean_markdown,
+)
+from src.core.knowledge.documents.create_manual import normalize_manual_status
 from src.core.knowledge.documents.types import (
     CHANNEL_WEB,
+    KNOWLEDGE_TYPE_MANUAL,
     PARSE_STATUS_PENDING,
     SUMMARY_STATUS_NONE,
     DocumentListFilter,
@@ -46,6 +53,7 @@ _NOT_FOUND_CODE = "knowledge.not_found"
 # Pagination cap mirrors ``src.common.pagination.Pagination.page_size``
 # and the upstream handler's ``maxListPageSize = 100`` constant.
 _MAX_PAGE_SIZE = 100
+_MAX_SEARCH_FILE_TYPES = 20
 
 # ``custom_metadata`` field rules mirror the upstream update validation.
 _MAX_CUSTOM_METADATA_FIELDS = 20
@@ -88,13 +96,12 @@ def _is_custom_metadata_scalar(value: JsonValue) -> bool:
     return value is None or isinstance(value, (bool, int, float, str))
 
 
-def _to_knowledge(row: Document) -> Knowledge:
+def _to_knowledge(row: Document, *, knowledge_base_name: str | None = None) -> Knowledge:
     """Project a persisted ``documents`` row onto the wire shape.
 
     Storage-only columns (``pending_subtasks_count``,
-    ``custom_metadata``, ``last_faq_import_result``) and the joined /
-    relation fields (``knowledge_base_name``, ``tags``, ``tag_id``) are
-    deliberately absent from the wire projection.
+    ``custom_metadata``, ``last_faq_import_result``) stay off the wire.
+    ``knowledge_base_name`` is filled only by cross-KB search.
     """
     return Knowledge(
         id=row.id,
@@ -121,7 +128,41 @@ def _to_knowledge(row: Document) -> Knowledge:
         processed_at=row.processed_at,
         error_message=row.error_message,
         deleted_at=row.deleted_at,
+        knowledge_base_name=knowledge_base_name,
     )
+
+
+def _require_search_page(
+    *,
+    keyword: str,
+    recent: bool,
+    offset: int,
+    limit: int,
+    file_types: list[str],
+) -> str:
+    """Validate search paging and return the trimmed keyword."""
+    trimmed = keyword.strip()
+    if not trimmed and not recent:
+        raise ValidationError(
+            code="knowledge.search_keyword_required",
+            message="keyword is required unless recent=true",
+        )
+    if offset < 0:
+        raise ValidationError(
+            code="knowledge.invalid_offset",
+            message="offset must be >= 0",
+        )
+    if limit < 1 or limit > _MAX_PAGE_SIZE:
+        raise ValidationError(
+            code="knowledge.invalid_page_size",
+            message="limit must be between 1 and 100",
+        )
+    if len(file_types) > _MAX_SEARCH_FILE_TYPES:
+        raise ValidationError(
+            code="knowledge.too_many_file_types",
+            message=f"too many file_types (max {_MAX_SEARCH_FILE_TYPES})",
+        )
+    return trimmed
 
 
 def _build_document_row(
@@ -183,11 +224,64 @@ def _build_document_row(
     )
 
 
+def _manual_update_changes(
+    row: Document,
+    *,
+    content: str | None,
+    status: str | None,
+    process_config: JsonObject | None,
+) -> BindParams:
+    """Patch manual metadata. File documents reject these fields."""
+    if content is None and status is None and process_config is None:
+        return {}
+    if row.type != KNOWLEDGE_TYPE_MANUAL:
+        raise ValidationError(
+            code="knowledge.manual_fields_unsupported",
+            message="content and status apply only to manual documents",
+        )
+    metadata: JsonObject = dict(row.metadata or {})
+    if content is not None:
+        clean = clean_markdown(content)
+        if not clean.strip():
+            raise ValidationError(
+                code="knowledge.content_required",
+                message="内容不能为空",
+            )
+        if len(clean) > MANUAL_CONTENT_MAX_LENGTH:
+            raise ValidationError(
+                code="knowledge.content_too_long",
+                message=f"内容长度超出限制（最多{MANUAL_CONTENT_MAX_LENGTH}个字符）",
+            )
+        metadata["content"] = clean
+        raw_version = metadata.get("version")
+        metadata["version"] = raw_version + 1 if isinstance(raw_version, int) else 1
+    normalized_status = normalize_manual_status(status) if status is not None else None
+    if normalized_status is not None:
+        metadata["status"] = normalized_status
+    if process_config is not None:
+        metadata["process_overrides"] = process_config
+    metadata["updated_at"] = datetime.now(UTC).isoformat()
+    return {"metadata": metadata}
+
+
+@runtime_checkable
+class SummaryRefresher(Protocol):
+    """Generates a document summary and returns the updated row."""
+
+    async def refresh(self, *, tenant_id: int, knowledge_id: str) -> Knowledge: ...
+
+
 class KnowledgeService:
     """Stateless document service, constructed per request."""
 
-    def __init__(self, *, knowledge_repo: KnowledgeRepository) -> None:
+    def __init__(
+        self,
+        *,
+        knowledge_repo: KnowledgeRepository,
+        summary_refresher: SummaryRefresher | None = None,
+    ) -> None:
         self._knowledge_repo = knowledge_repo
+        self._summary_refresher = summary_refresher
 
     # ── Create ──────────────────────────────────────────────────────
 
@@ -366,6 +460,35 @@ class KnowledgeService:
             data=[_to_knowledge(row) for row in rows],
         )
 
+    async def search_documents(
+        self,
+        *,
+        tenant_id: int,
+        keyword: str,
+        offset: int,
+        limit: int,
+        file_types: list[str],
+        recent: bool,
+    ) -> tuple[list[Knowledge], int]:
+        """Search live documents across document-type knowledge bases."""
+        _require_tenant_id(tenant_id)
+        trimmed = _require_search_page(
+            keyword=keyword,
+            recent=recent,
+            offset=offset,
+            limit=limit,
+            file_types=file_types,
+        )
+        pairs, total = await self._knowledge_repo.search_across_document_kbs(
+            tenant_id,
+            keyword=trimmed,
+            offset=offset,
+            limit=limit,
+            file_types=file_types,
+        )
+        items = [_to_knowledge(row, knowledge_base_name=name) for row, name in pairs]
+        return items, total
+
     # ── Counts ──────────────────────────────────────────────────────
 
     async def count_documents(self, *, tenant_id: int, knowledge_base_id: str) -> int:
@@ -412,14 +535,18 @@ class KnowledgeService:
         title: str | None = None,
         description: str | None = None,
         custom_metadata: JsonObject | None = None,
+        content: str | None = None,
+        status: str | None = None,
+        process_config: JsonObject | None = None,
     ) -> Knowledge:
         """Patch a document's mutable fields, returning the new shape.
 
         Mirrors the upstream update semantics: a non-empty ``title`` /
         ``description`` replaces the stored value; ``custom_metadata``,
         when provided, is validated against the upstream field rules and
-        then stored wholesale. Omitted fields are left untouched; an
-        update that changes nothing resolves the row without a write.
+        then stored wholesale. Manual rows also accept ``content`` /
+        ``status``. Omitted fields are left untouched; an update that
+        changes nothing resolves the row without a write.
         """
         _require_tenant_id(tenant_id)
         _require_document_id(id)
@@ -437,11 +564,35 @@ class KnowledgeService:
         if custom_metadata is not None:
             self._validate_custom_metadata(custom_metadata)
             changes["custom_metadata"] = custom_metadata
+        changes.update(
+            _manual_update_changes(
+                row, content=content, status=status, process_config=process_config
+            )
+        )
         if not changes:
             return _to_knowledge(row)
         updated = row.model_copy(update={**changes, "updated_at": datetime.now(UTC)})
         persisted = await self._knowledge_repo.update(updated)
         return _to_knowledge(persisted)
+
+    async def request_summary_refresh(self, *, tenant_id: int, id: str) -> Knowledge:
+        """Generate the document summary and return the updated row.
+
+        A missing refresher is a configuration error, not a queued job.
+        The drawer polls ``summary_status``; a pending row with no worker
+        would spin forever.
+        """
+        _require_tenant_id(tenant_id)
+        _require_document_id(id)
+        if self._summary_refresher is None:
+            raise ValidationError(
+                code="knowledge.summary_generation_unavailable",
+                message="summary generation is not available",
+            )
+        return await self._summary_refresher.refresh(
+            tenant_id=tenant_id,
+            knowledge_id=id,
+        )
 
     # ── Delete ──────────────────────────────────────────────────────
 

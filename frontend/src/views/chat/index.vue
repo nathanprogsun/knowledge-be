@@ -344,14 +344,23 @@ const handleAnswerRenderComplete = (message, ready) => {
     message.answerFullyRendered = Boolean(ready);
 };
 
+const precedingUserQuery = (message) => {
+    const index = messagesList.findIndex((row) => row.id === message.id);
+    if (index <= 0) return '';
+    const previous = messagesList[index - 1];
+    return previous?.role === 'user' ? (previous.content || '') : '';
+};
+
 const loadFollowUpSuggestions = async (message, ensure = false, regenerate = false) => {
     const messageId = resolveAssistantMessageId(message);
     const targetSessionId = session_id.value;
     if (!messageId || !targetSessionId || message.suggestionsDismissed) return;
     message.suggestionLoading = true;
     try {
+        const query = precedingUserQuery(message);
+        const answer = typeof message.content === 'string' ? message.content : '';
         let response = ensure
-            ? await ensureMessageSuggestions(targetSessionId, messageId, regenerate)
+            ? await ensureMessageSuggestions(targetSessionId, messageId, regenerate, { query, answer })
             : await getMessageSuggestions(targetSessionId, messageId);
         let set = response?.data;
         for (let attempt = 0; set?.status === 'generating' && attempt < 120; attempt++) {

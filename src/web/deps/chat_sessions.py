@@ -24,12 +24,19 @@ from fastapi import Depends
 
 from src.app_context import request_context
 from src.common.exception import ValidationError
-from src.core.chat.messages.factory import build_message_service
+from src.core.chat.messages.factory import (
+    build_message_service,
+    build_message_suggestion_service,
+)
 from src.core.chat.messages.service.message_service import MessageServiceImpl
 from src.core.chat.messages.suggestion_service import MessageSuggestionService
 from src.core.chat.pipeline.types import Context
-from src.core.chat.sessions.factory import build_session_service
+from src.core.chat.sessions.factory import (
+    build_session_service,
+    build_stop_stream_service,
+)
 from src.core.chat.sessions.service.session_service import SessionService
+from src.core.chat.sessions.stop import StopStreamService
 from src.web.deps.session import SessionDep
 
 
@@ -105,14 +112,17 @@ def get_message_context() -> Context:
     return _RequestContext(tenant_id=_resolve_context_tenant())
 
 
-def get_message_suggestion_service() -> MessageSuggestionService:
-    """Return the per-request suggestion service (stateless stub).
+def get_message_suggestion_service(session: SessionDep) -> MessageSuggestionService:
+    """Build the per-request follow-up suggestion service."""
+    return build_message_suggestion_service(
+        session,
+        tenant_id=_resolve_context_tenant(),
+    )
 
-    The full suggestion-generation pipeline lands in a later PR;
-    today the service surface exists so the wire shape and routing
-    can be exercised against a stable interface.
-    """
-    return MessageSuggestionService()
+
+def get_stop_stream_service() -> StopStreamService:
+    """Build the per-request stream-stop facade."""
+    return build_stop_stream_service()
 
 
 SessionServiceDep = Annotated[SessionService, Depends(get_session_service)]
@@ -121,6 +131,7 @@ MessageContextDep = Annotated[Context, Depends(get_message_context)]
 MessageSuggestionServiceDep = Annotated[
     MessageSuggestionService, Depends(get_message_suggestion_service)
 ]
+StopStreamServiceDep = Annotated[StopStreamService, Depends(get_stop_stream_service)]
 
 
 __all__ = [
@@ -128,8 +139,10 @@ __all__ = [
     "MessageServiceDep",
     "MessageSuggestionServiceDep",
     "SessionServiceDep",
+    "StopStreamServiceDep",
     "get_message_context",
     "get_message_service",
     "get_message_suggestion_service",
     "get_session_service",
+    "get_stop_stream_service",
 ]

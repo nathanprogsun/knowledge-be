@@ -20,11 +20,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
 from src.app_logging import logger
+from src.common.json import JsonObject, JsonValue
 from src.core.knowledge.documents.process_document import (
     DocumentProcessPipeline,
     ProcessOutcome,
@@ -33,7 +33,8 @@ from src.core.knowledge.documents.process_document import (
     process_document as _core_process_document,
 )
 from src.workers.base import WorkerContext
-from src.workers.registry import JsonValue, register_task
+from src.workers.registry import register_task
+from src.workers.runtime_ctx import document_process_runtime_from_ctx
 
 # Default question count when the payload omits one — mirrors the
 # shared ingestion default used by the web layer.
@@ -72,7 +73,7 @@ async def task_document_process(
     *,
     pipeline: DocumentProcessPipeline | None = None,
     **payload: JsonValue,
-) -> dict[str, Any]:
+) -> JsonObject:
     """ARQ handler for the ``document_process`` task.
 
     Parses the ARQ payload into :class:`DocumentProcessTaskPayload`,
@@ -83,33 +84,64 @@ async def task_document_process(
     deferred seams short-circuit before any external work.
     """
     parsed = DocumentProcessTaskPayload.model_validate(payload)
+    source_url = parsed.url or parsed.file_url
     logger.info(
         "document_process: tenant={} knowledge={} kb={} file_path={!r} url={!r}",
         parsed.tenant_id,
         parsed.knowledge_id,
         parsed.knowledge_base_id,
         parsed.file_path,
-        parsed.url,
+        source_url,
     )
 
-    outcome = await _core_process_document(
+    outcome = await _run_document_process(
+        ctx,
+        parsed=parsed,
+        source_url=source_url,
+        pipeline=pipeline,
+    )
+    return _serialise_outcome(outcome)
+
+
+async def _run_document_process(
+    ctx: WorkerContext,
+    *,
+    parsed: DocumentProcessTaskPayload,
+    source_url: str,
+    pipeline: DocumentProcessPipeline | None,
+) -> ProcessOutcome:
+    """Prefer the worker-wired runtime; tests still inject or patch the core."""
+    runtime = None if pipeline is not None else document_process_runtime_from_ctx(ctx)
+    if runtime is not None:
+        return await runtime.run_document_process(
+            tenant_id=parsed.tenant_id,
+            knowledge_id=parsed.knowledge_id,
+            knowledge_base_id=parsed.knowledge_base_id,
+            file_path=parsed.file_path,
+            file_name=parsed.file_name,
+            file_type=parsed.file_type,
+            url=source_url,
+            enable_multimodel=parsed.enable_multimodel,
+            language=parsed.language,
+            request_id=parsed.request_id,
+        )
+    return await _core_process_document(
         tenant_id=parsed.tenant_id,
         knowledge_id=parsed.knowledge_id,
         knowledge_base_id=parsed.knowledge_base_id,
         file_path=parsed.file_path,
         file_name=parsed.file_name,
         file_type=parsed.file_type,
-        url=parsed.url,
+        url=source_url,
         enable_multimodel=parsed.enable_multimodel,
         language=parsed.language,
         request_id=parsed.request_id,
         now=datetime.now(UTC),
         pipeline=pipeline,
     )
-    return _serialise_outcome(outcome)
 
 
-def _serialise_outcome(outcome: ProcessOutcome) -> dict[str, Any]:
+def _serialise_outcome(outcome: ProcessOutcome) -> JsonObject:
     """Project a :class:`ProcessOutcome` onto a JSON-serialisable dict."""
     return {
         "parse_status": outcome.parse_status,

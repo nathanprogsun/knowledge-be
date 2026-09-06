@@ -184,6 +184,7 @@ async def test_task_delegates_to_core_process_document() -> None:
     assert captured["enable_multimodel"] is True
     assert captured["language"] == "en-US"
     assert captured["request_id"] == "req-1"
+    assert captured["url"] == ""
     assert captured["pipeline"] is None
 
     assert result == {
@@ -195,6 +196,26 @@ async def test_task_delegates_to_core_process_document() -> None:
         "text_chunk_count": 0,
         "skipped": False,
     }
+
+
+async def test_task_uses_file_url_when_url_blank() -> None:
+    captured: dict[str, Any] = {}
+
+    async def _fake_core(**kwargs: Any) -> ProcessOutcome:
+        captured.update(kwargs)
+        return ProcessOutcome(parse_status="pending")
+
+    with patch(
+        "src.workers.tasks.document_process._core_process_document",
+        side_effect=_fake_core,
+    ):
+        await task_document_process(
+            _make_ctx(),
+            **_base_payload(),
+            file_url="https://cdn.example.com/a.pdf",
+        )
+
+    assert captured["url"] == "https://cdn.example.com/a.pdf"
 
 
 async def test_task_forwards_injected_pipeline() -> None:

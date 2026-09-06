@@ -232,6 +232,7 @@ def _suggestion_to_contract(
         status=suggestion_set.status,
         language=suggestion_set.locale or None,
         questions=parsed_questions,
+        allow_regenerate=suggestion_set.allow_regenerate,
         created_at=suggestion_set.created_at,
         updated_at=suggestion_set.updated_at,
     )

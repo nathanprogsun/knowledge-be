@@ -52,7 +52,7 @@ from src.db.dao.knowledge_repository import KnowledgeRepository
 from src.db.dao.knowledge_tag_repository import TagRepository
 
 
-def _normalize_status(status: str | None) -> str:
+def normalize_manual_status(status: str | None) -> str:
     """Normalise a manual-knowledge status; blank defaults to ``draft``."""
     normalized = (status or "").strip().lower()
     if not normalized:
@@ -100,7 +100,7 @@ async def create_knowledge_from_manual(
             code="knowledge.title_invalid",
             message="标题包含非法字符或超出长度限制",
         )
-    status = _normalize_status(status)
+    status = normalize_manual_status(status)
     kb = await kb_service.get_knowledge_base_by_id(knowledge_base_id=kb_id)
     stamp = now or datetime.now(UTC)
     display_title = safe_title or f"Knowledge-{stamp:%Y%m%d-%H%M%S}"
@@ -159,4 +159,4 @@ async def create_knowledge_from_manual(
     return to_knowledge(persisted)
 
 
-__all__ = ["create_knowledge_from_manual"]
+__all__ = ["create_knowledge_from_manual", "normalize_manual_status"]

@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from typing import cast
 
 import httpx
+from arq.connections import ArqRedis
 from fastapi import FastAPI
 
 from src.ai.mcp_transport import MCPConnectionManager
@@ -62,6 +63,8 @@ class LifeSpanService:
     mcp_oauth_secret_store: InMemorySecretStore | None = None
     mcp_oauth_http_client: httpx.AsyncClient | None = None
     mcp_oauth_manager_factory: Callable[[MCPServiceInfo], Awaitable[OAuthManager]] | None = None
+    arq_redis: ArqRedis | None = None
+    arq_queue_name: str = "arq:queue"
 
 
 def get_lifespan_service(app: FastAPI) -> LifeSpanService:

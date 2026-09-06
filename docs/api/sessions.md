@@ -15,4 +15,5 @@ Routes registered under `/api/v1/sessions`. Path parameters use FastAPI `{name}`
 | POST | `/sessions/{session_id}/messages/{message_id}/suggestions` |
 | DELETE | `/sessions/{session_id}/pin` |
 | POST | `/sessions/{session_id}/pin` |
+| POST | `/sessions/{session_id}/stop` |
 | POST | `/sessions/{session_id}/suggestion-events` |

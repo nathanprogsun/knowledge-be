@@ -86,6 +86,23 @@ class KnowledgeDuplicateEnvelope(BaseModel):
     data: KnowledgeDuplicateResponse
 
 
+class KnowledgeBasePinData(BaseModel):
+    """Inner payload of the pin toggle."""
+
+    model_config = ConfigDict(frozen=True)
+
+    is_pinned: bool
+
+
+class KnowledgeBasePinEnvelope(BaseModel):
+    """``{"success": true, "data": {"is_pinned": ...}}``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    success: bool = True
+    data: KnowledgeBasePinData
+
+
 class HybridSearchEnvelope(BaseModel):
     """``{"success": true, "data": [...]}`` - hybrid-search responses."""
 
@@ -186,6 +203,8 @@ __all__ = [
     "HybridSearchEnvelope",
     "KnowledgeBaseEnvelope",
     "KnowledgeBaseListEnvelope",
+    "KnowledgeBasePinData",
+    "KnowledgeBasePinEnvelope",
     "KnowledgeCopyEnvelope",
     "KnowledgeDuplicateEnvelope",
     "knowledge_base_envelope",

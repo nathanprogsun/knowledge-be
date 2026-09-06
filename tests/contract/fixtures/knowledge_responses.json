@@ -266,7 +266,10 @@
       "title",
       "description",
       "tag_id",
-      "enable_status"
+      "enable_status",
+      "content",
+      "status",
+      "process_config"
     ],
     "CreateTagRequest": [
       "name",

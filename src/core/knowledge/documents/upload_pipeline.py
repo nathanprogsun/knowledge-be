@@ -363,6 +363,7 @@ class DocumentProcessPayload(BaseModel):
     file_path: str
     file_name: str
     file_type: str
+    url: str = ""
     enable_multimodel: bool = False
     enable_question_generation: bool = False
     question_count: int = DEFAULT_QUESTION_COUNT

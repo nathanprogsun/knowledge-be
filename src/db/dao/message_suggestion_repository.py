@@ -234,7 +234,6 @@ class MessageSuggestionRepository(GenericRepository[MessageSuggestionSet]):
             "lease_until": lease_until,
             "questions": [],
             "now": now,
-            "generating": SUGGESTION_STATUS_GENERATING,
         }
         if existing.status == SUGGESTION_STATUS_READY and regenerate:
             where = "id = :id and status = :ready"
@@ -243,6 +242,7 @@ class MessageSuggestionRepository(GenericRepository[MessageSuggestionSet]):
             where = (
                 "id = :id and (status <> :generating or lease_until is null or lease_until < :now)"
             )
+            params["generating"] = SUGGESTION_STATUS_GENERATING
         stmt = text(
             f"update {_TABLE_NAME} set "
             "status = :status, lease_until = :lease_until, suppression_reason = '', "

@@ -1,24 +1,9 @@
 """Knowledge document HTTP endpoints.
 
-Document (knowledge) lifecycle: upload creates (file / URL / passage /
-manual), CRUD on ``/knowledge``, and the lifecycle actions (reparse,
-cancel-parse, clone, move) plus the move-progress read. Route and role
-mapping follows the upstream knowledge handler:
-
-- KB-scoped uploads and list live under ``/knowledge-bases/{id}/knowledge``;
-- per-document routes address ``/knowledge/{id}``;
-- ``/move``, ``/move/progress/{task_id}``, ``/batch-delete``,
-  ``/batch-reparse`` and ``/tags`` sit outside the ``{id}``
-  group so a literal segment is never captured as an id;
-- reads are Viewer+, every mutation Contributor+.
-
-Cross-workspace ids read as 404 rather than 403 so the id space is not
-enumerable; the move-progress task id carries the owning workspace and
-is guarded by ``require_task_progress_tenant`` before any read.
-
-Query-parameter descriptions are intentionally Chinese (mirrors the
-upstream swagger annotations). RUF001 flags the full-width punctuation;
-suppressed file-wide for the same reason as ``src/web/api/system/router.py``.
+KB-scoped uploads live under ``/knowledge-bases/{id}/knowledge``.
+Per-document routes address ``/knowledge/{id}``. Literal collection
+paths sit outside ``{id}``. Reads are Viewer+; mutations Contributor+.
+Query-parameter descriptions stay Chinese (upstream swagger).
 """
 
 from __future__ import annotations
@@ -26,12 +11,12 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi.responses import Response
 
 from src.common.exception import (
-    NotFoundError,
     PermissionDeniedError,
     UnauthorizedError,
     ValidationError,
@@ -45,6 +30,7 @@ from src.core.contracts.knowledge import (
     UpdateKnowledgeRequest,
 )
 from src.core.knowledge.documents.types import DocumentListFilter
+from src.web.api.knowledge.documents import document_reads
 from src.web.api.knowledge.documents.views import (
     BatchDeleteData,
     BatchDeleteEnvelope,
@@ -55,9 +41,11 @@ from src.web.api.knowledge.documents.views import (
     CloneKnowledgeRequest,
     CreatePassageKnowledgeRequest,
     DeleteEnvelope,
-    DeleteResult,
+    KnowledgeBatchEnvelope,
     KnowledgeEnvelope,
     KnowledgeListEnvelope,
+    KnowledgeSearchEnvelope,
+    KnowledgeSpansEnvelope,
     KnowledgeTagBatchEnvelope,
     KnowledgeTagBatchUpdateRequest,
     KnowledgeTaskEnvelope,
@@ -71,8 +59,10 @@ from src.web.deps.knowledge_bases import KBServiceDep
 from src.web.deps.knowledge_documents import (
     KnowledgeDocumentsDep,
     KnowledgeServiceDep,
+    SpanTrackerDep,
 )
 from src.web.deps.knowledge_tags import TagServiceDep
+from src.web.deps.session import SessionDep
 from src.web.deps.task_progress import TaskProgressTenantDep
 
 # Function-arg-style principal dep aliases.
@@ -354,6 +344,44 @@ async def list_documents(
 # ── Cross-document static routes (declared before /{id}) ──────────────
 
 
+@documents_router.get("/batch", response_model=KnowledgeBatchEnvelope)
+async def batch_query_documents(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+    service: KnowledgeServiceDep,
+    tenant_id: _PrincipalTenant,
+    ids: Annotated[list[str] | None, Query()] = None,
+    kb_id: str | None = Query(default=None),
+    agent_id: str | None = Query(default=None),
+    agent_source_tenant_id: str | None = Query(default=None),
+) -> KnowledgeBatchEnvelope:
+    """Return documents for ``ids``. Agent query params are accepted unused."""
+    del agent_id, agent_source_tenant_id
+    return await document_reads.batch_query(
+        service=service,
+        tenant_id=_require_tenant(tenant_id),
+        ids=ids or [],
+        kb_id=kb_id,
+        max_batch=_MAX_BATCH,
+    )
+
+
+@documents_router.get("/search", response_model=KnowledgeSearchEnvelope)
+async def search_knowledge_documents(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+    service: KnowledgeServiceDep,
+    tenant_id: _PrincipalTenant,
+    params: Annotated[document_reads.SearchQuery, Depends()],
+) -> KnowledgeSearchEnvelope:
+    """Keyword file search for the chat @ picker. Agent params are unused."""
+    return await document_reads.search_knowledge_documents(
+        service=service,
+        tenant_id=_require_tenant(tenant_id),
+        params=params,
+    )
+
+
 @documents_router.post("/batch-delete", response_model=BatchDeleteEnvelope)
 async def batch_delete_documents(
     _auth: AuthDep,
@@ -364,13 +392,7 @@ async def batch_delete_documents(
     kb_service: KBServiceDep,
     tenant_id: _PrincipalTenant,
 ) -> BatchDeleteEnvelope:
-    """Soft-delete a batch of documents under one knowledge base.
-
-    Validates that every id exists and belongs to ``kb_id`` (cross-KB
-    deletion is rejected), then runs the cascade delete synchronously and
-    answers with a task id so the wire contract matches the async
-    upstream submission.
-    """
+    """Soft-delete a batch of documents under one knowledge base."""
     tenant_id = _require_tenant(tenant_id)
     ids = _dedupe_ids(body.ids)
     if not ids:
@@ -418,12 +440,7 @@ async def batch_reparse_documents(
     kb_service: KBServiceDep,
     tenant_id: _PrincipalTenant,
 ) -> BatchReparseEnvelope:
-    """Reset and re-submit a batch of documents under one knowledge base.
-
-    Each document is validated to exist and belong to ``kb_id``, then
-    reset for a fresh parse attempt; the response carries a task id and
-    the submitted count.
-    """
+    """Reset and re-submit a batch of documents under one knowledge base."""
     tenant_id = _require_tenant(tenant_id)
     ids = _dedupe_ids(body.ids)
     if not ids:
@@ -476,13 +493,7 @@ async def update_knowledge_tag_batch(
     kb_service: KBServiceDep,
     tenant_id: _PrincipalTenant,
 ) -> KnowledgeTagBatchEnvelope:
-    """Replace the tag bindings of many documents in one request.
-
-    An explicit ``kb_id`` narrows the authorized scope; without one the
-    knowledge base is inferred from the first updated document (shared-KB
-    resolution). Every tag must exist and belong to the same knowledge
-    base as the document it is bound to.
-    """
+    """Replace the tag bindings of many documents in one request."""
     tenant_id = _require_tenant(tenant_id)
     updates = body.updates
     if not updates:
@@ -559,6 +570,42 @@ async def get_document(
     return KnowledgeEnvelope(success=True, data=knowledge)
 
 
+@documents_router.get("/{id}/spans", response_model=KnowledgeSpansEnvelope)
+async def get_document_spans(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+    id: str,
+    service: KnowledgeServiceDep,
+    tracker: SpanTrackerDep,
+    tenant_id: _PrincipalTenant,
+    attempt: int | None = Query(default=None, ge=1),
+) -> KnowledgeSpansEnvelope:
+    """Return the processing-span tree for one document."""
+    return await document_reads.read_spans(
+        service=service,
+        tracker=tracker,
+        tenant_id=_require_tenant(tenant_id),
+        knowledge_id=id,
+        attempt=attempt,
+    )
+
+
+@documents_router.post("/{id}/regenerate-summary", response_model=KnowledgeTaskEnvelope)
+async def regenerate_document_summary(
+    _auth: AuthDep,
+    _contributor: RoleContributorDep,
+    id: str,
+    service: KnowledgeServiceDep,
+    tenant_id: _PrincipalTenant,
+) -> KnowledgeTaskEnvelope:
+    """Queue a summary refresh for one document."""
+    return await document_reads.regenerate_summary(
+        service=service,
+        tenant_id=_require_tenant(tenant_id),
+        knowledge_id=id,
+    )
+
+
 @documents_router.put("/{id}", response_model=KnowledgeUpdatedEnvelope)
 async def update_document(
     _auth: AuthDep,
@@ -568,19 +615,53 @@ async def update_document(
     service: KnowledgeServiceDep,
     tenant_id: _PrincipalTenant,
 ) -> KnowledgeUpdatedEnvelope:
-    """Update a document's mutable fields (title / description)."""
-    tenant_id = _require_tenant(tenant_id)
-    knowledge = await service.update_document(
-        tenant_id=tenant_id,
-        id=id,
-        title=body.title,
-        description=body.description,
+    """Update a document's mutable fields, including manual content."""
+    return await document_reads.update_document(
+        service=service,
+        tenant_id=_require_tenant(tenant_id),
+        knowledge_id=id,
+        body=body,
     )
-    return KnowledgeUpdatedEnvelope(
-        success=True,
-        message="Knowledge updated successfully",
-        data=knowledge,
+
+
+async def _stream_knowledge_file(
+    service: KnowledgeServiceDep,
+    session: SessionDep,
+    tenant_id: int,
+    knowledge_id: str,
+    disposition: Literal["attachment", "inline"],
+) -> Response:
+    return await document_reads.stream_document(
+        service=service,
+        session=session,
+        tenant_id=_require_tenant(tenant_id),
+        knowledge_id=knowledge_id,
+        disposition=disposition,
     )
+
+
+@documents_router.get("/{id}/download")
+async def download_document(
+    _auth: AuthDep,
+    _contributor: RoleContributorDep,
+    id: str,
+    service: KnowledgeServiceDep,
+    session: SessionDep,
+    tenant_id: _PrincipalTenant,
+) -> Response:
+    return await _stream_knowledge_file(service, session, tenant_id, id, "attachment")
+
+
+@documents_router.get("/{id}/preview")
+async def preview_document(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+    id: str,
+    service: KnowledgeServiceDep,
+    session: SessionDep,
+    tenant_id: _PrincipalTenant,
+) -> Response:
+    return await _stream_knowledge_file(service, session, tenant_id, id, "inline")
 
 
 @documents_router.delete("/{id}", response_model=DeleteEnvelope)
@@ -591,13 +672,10 @@ async def delete_document(
     service: KnowledgeDocumentsDep,
     tenant_id: _PrincipalTenant,
 ) -> DeleteEnvelope:
-    """Soft-delete a document and cascade its chunks."""
-    tenant_id = _require_tenant(tenant_id)
-    deleted = await service.delete(tenant_id=tenant_id, id=id)
-    return DeleteEnvelope(
-        success=True,
-        message="Knowledge deleted",
-        data=DeleteResult(deleted=deleted),
+    return await document_reads.delete_document(
+        service=service,
+        tenant_id=_require_tenant(tenant_id),
+        knowledge_id=id,
     )
 
 
@@ -610,17 +688,11 @@ async def reparse_document(
     tenant_id: _PrincipalTenant,
     body: ReparseRequest | None = None,
 ) -> KnowledgeTaskEnvelope:
-    """Reset a document for a fresh parse attempt."""
-    tenant_id = _require_tenant(tenant_id)
-    knowledge = await service.reparse(
-        tenant_id=tenant_id,
+    return await document_reads.reparse_document(
+        service=service,
+        tenant_id=_require_tenant(tenant_id),
         knowledge_id=id,
-        process_overrides=body.process_config if body is not None else None,
-    )
-    return KnowledgeTaskEnvelope(
-        success=True,
-        message="Knowledge reparse task submitted",
-        data=knowledge,
+        body=body,
     )
 
 
@@ -632,13 +704,10 @@ async def cancel_document_parse(
     service: KnowledgeDocumentsDep,
     tenant_id: _PrincipalTenant,
 ) -> KnowledgeTaskEnvelope:
-    """Cancel an in-flight document parse."""
-    tenant_id = _require_tenant(tenant_id)
-    knowledge = await service.cancel_parse(tenant_id=tenant_id, knowledge_id=id)
-    return KnowledgeTaskEnvelope(
-        success=True,
-        message="Knowledge parse cancelled",
-        data=knowledge,
+    return await document_reads.cancel_document_parse(
+        service=service,
+        tenant_id=_require_tenant(tenant_id),
+        knowledge_id=id,
     )
 
 
@@ -677,12 +746,7 @@ async def move_documents(
     service: KnowledgeDocumentsDep,
     tenant_id: _PrincipalTenant,
 ) -> MoveEnvelope:
-    """Move documents into another knowledge base (runs synchronously).
-
-    The response carries a workspace-embedded task id so the progress
-    endpoint keeps the upstream wire contract; the async task record and
-    broker land with the task infrastructure.
-    """
+    """Move documents into another knowledge base (runs synchronously)."""
     tenant_id = _require_tenant(tenant_id)
     if body.source_kb_id == body.target_kb_id:
         raise ValidationError(
@@ -722,14 +786,7 @@ async def get_move_progress(
     _guard: TaskProgressTenantDep,
     task_id: str,
 ) -> None:
-    """Return a move task's progress, scoped to the caller's workspace.
-
-    The tenant guard rejects malformed task ids and hides cross-workspace
-    tasks as not-found. Progress records land with the async task
-    infrastructure; until then a well-formed in-workspace task resolves
-    to no record and answers not-found.
-    """
-    raise NotFoundError(code="task_progress.not_found", message="task not found")
+    return document_reads.move_progress_missing()
 
 
 __all__ = ["documents_router", "kb_documents_router"]

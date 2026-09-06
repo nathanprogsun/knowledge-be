@@ -316,6 +316,7 @@ class Knowledge(BaseModel):
     processed_at: datetime | None = Field(default=None)
     error_message: str | None = Field(default=None)
     deleted_at: datetime | None = Field(default=None)
+    knowledge_base_name: str | None = Field(default=None)
 
 
 class CreateKnowledgeFromURLRequest(BaseModel):
@@ -361,6 +362,9 @@ class UpdateKnowledgeRequest(BaseModel):
     description: str | None = Field(default=None)
     tag_id: str | None = Field(default=None)
     enable_status: str | None = Field(default=None)
+    content: str | None = Field(default=None)
+    status: str | None = Field(default=None)
+    process_config: JsonObject | None = Field(default=None)
 
 
 class UpdateKnowledgeImageRequest(BaseModel):

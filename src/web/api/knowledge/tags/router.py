@@ -75,7 +75,7 @@ async def list_tags(
     service: TagServiceDep,
     tenant_id: _PrincipalTenant,
     page: int = Query(default=1, ge=1, description="页码"),
-    page_size: int = Query(default=20, ge=1, le=100, description="每页数量"),
+    page_size: int = Query(default=20, ge=1, le=1000, description="每页数量"),
     keyword: str = Query(default="", description="关键词搜索"),
 ) -> TagListEnvelope:
     """Return one page of the knowledge base's tags plus usage stats."""

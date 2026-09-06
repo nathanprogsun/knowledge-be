@@ -39,6 +39,7 @@ from src.common.exception import ValidationError
 from src.common.json import JsonObject
 from src.common.oidc_client import validate_ssrf_safe_url
 from src.core.contracts.infra import StorageProviderStatus
+from src.core.system.docreader_probe import probe_docreader
 from src.core.system.parser_engine import (
     ParserEngineInfo,
     list_all_engines,
@@ -48,6 +49,7 @@ from src.core.system.storage_allowlist import (
     build_storage_provider_statuses,
     supported_providers,
 )
+from src.settings import get_settings
 from src.web.deps import AuthDep, RoleAdminDep, RoleViewerDep
 
 router = APIRouter(prefix="/system", tags=["system"])
@@ -192,13 +194,15 @@ async def list_parser_engines(
     is a deferred seam (returns the local registry only until the
     transport layer lands).
     """
-    engines = list_all_engines(docreader_connected=False)
+    settings = get_settings()
+    connected = await probe_docreader(settings.docreader_addr)
+    engines = list_all_engines(docreader_connected=connected)
     return ParserEnginesResponse(
         success=True,
         data=engines,
-        docreader_addr="",
-        docreader_transport="",
-        connected=False,
+        docreader_addr=settings.docreader_addr,
+        docreader_transport=settings.docreader_transport,
+        connected=connected,
     )
 
 

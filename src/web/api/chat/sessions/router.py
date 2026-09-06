@@ -15,6 +15,7 @@ Method          Path                                   Handler
 ``DELETE ``    ``/sessions/batch``                     batch delete
 ``POST   ``    ``/sessions/{session_id}/pin``          pin
 ``DELETE ``    ``/sessions/{session_id}/pin``          unpin
+``POST   ``    ``/sessions/{session_id}/stop``         stop generation
 ==============  ====================================  ====================
 
 Sessions are per-user chat state (Viewer+ surface, mirroring the
@@ -35,6 +36,7 @@ from src.core.chat.sessions.service.session_service import SessionListQuery
 from src.core.contracts.sessions import (
     BatchDeleteSessionsRequest,
     CreateSessionRequest,
+    StopGenerationRequest,
     UpdateSessionRequest,
 )
 from src.web.api.chat.sessions.views import (
@@ -51,6 +53,7 @@ from src.web.deps.chat_sessions import (
     MessageContextDep,
     MessageServiceDep,
     SessionServiceDep,
+    StopStreamServiceDep,
 )
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -63,6 +66,7 @@ _DELETE_MESSAGE = "Session deleted successfully"
 _DELETE_ALL_MESSAGE = "All sessions deleted successfully"
 _BATCH_DELETE_MESSAGE = "Sessions deleted successfully"
 _CLEAR_MESSAGES_MESSAGE = "Session messages cleared successfully"
+_STOP_MESSAGE = "Generation stopped"
 
 
 def _require_session_id(session_id: str) -> str:
@@ -259,6 +263,22 @@ async def unpin_session(
     """Unpin a session for the caller (404 when absent or not owned)."""
     await _set_pinned(session_service, session_id, False)
     return PinSessionEnvelope(success=True, is_pinned=False)
+
+
+@router.post("/{session_id}/stop", response_model=DeleteSessionResponse)
+async def stop_session(
+    _auth: AuthDep,
+    _viewer: RoleViewerDep,
+    session_id: str,
+    body: StopGenerationRequest,
+    session_service: SessionServiceDep,
+    stop_service: StopStreamServiceDep,
+) -> DeleteSessionResponse:
+    """Acknowledge a composer stop. The SPA already aborted the SSE client."""
+    sid = _require_session_id(session_id)
+    await session_service.get(sid)
+    await stop_service.stop(sid, body.message_id)
+    return delete_session_response(_STOP_MESSAGE)
 
 
 async def _set_pinned(

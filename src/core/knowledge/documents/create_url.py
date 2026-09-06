@@ -5,9 +5,9 @@
 Standalone create-variant: routes a URL import to the direct-file path
 when the URL (or the caller's ``file_name`` / ``file_type`` hints) points
 at a downloadable file, otherwise creates a web ``url`` knowledge row.
-The record is persisted through the merged repositories; the file
-download, storage wiring, and the async processing enqueue are deferred
-seams that land with the storage and worker domains.
+The record is persisted through the merged repositories. When a
+dispatcher is injected, the row is submitted for async parse the same
+way file create already does.
 
 Behaviour mirrors the upstream create-from-URL service:
 
@@ -49,7 +49,11 @@ from src.core.knowledge.documents.create_common import (
     validate_input,
     validate_knowledge_tags,
 )
-from src.core.knowledge.documents.types import PARSE_STATUS_PENDING
+from src.core.knowledge.documents.types import PARSE_STATUS_FAILED, PARSE_STATUS_PENDING
+from src.core.knowledge.documents.upload_pipeline import (
+    DocumentProcessPayload,
+    DocumentTaskDispatcher,
+)
 from src.core.knowledge.knowledge_bases.service.kb_service import KBService
 from src.core.knowledge.knowledge_bases.types import KNOWLEDGE_BASE_TYPE_FAQ
 from src.db.dao.knowledge_repository import KnowledgeRepository
@@ -57,6 +61,7 @@ from src.db.dao.knowledge_tag_repository import TagRepository
 from src.db.models.knowledge import Document
 
 _INVALID_URL_MESSAGE = "无效或非安全的URL"
+_ENQUEUE_FAILED_MESSAGE = "Failed to enqueue processing task"
 
 
 class URLGuard(Protocol):
@@ -263,6 +268,97 @@ async def _create_from_file_url(
     return to_knowledge(persisted)
 
 
+async def _dispatch_created_url(
+    *,
+    knowledge: Knowledge,
+    dispatcher: DocumentTaskDispatcher | None,
+    knowledge_repo: KnowledgeRepository,
+    tenant_id: int,
+    url: str,
+    enable_multimodel: bool,
+) -> Knowledge:
+    """Submit the new URL row for parse, or leave it pending when unwired."""
+    if dispatcher is None:
+        return knowledge
+    payload = DocumentProcessPayload(
+        tenant_id=tenant_id,
+        knowledge_id=knowledge.id,
+        knowledge_base_id=knowledge.knowledge_base_id,
+        file_path=knowledge.file_path or "",
+        file_name=knowledge.file_name or "",
+        file_type=knowledge.file_type or "",
+        url=url,
+        enable_multimodel=enable_multimodel,
+    )
+    try:
+        await dispatcher.dispatch(payload=payload)
+    except Exception:
+        updated = await knowledge_repo.update_columns(
+            knowledge.id,
+            {
+                "parse_status": PARSE_STATUS_FAILED,
+                "error_message": _ENQUEUE_FAILED_MESSAGE,
+            },
+        )
+        if updated is not None:
+            return to_knowledge(updated)
+        return knowledge.model_copy(
+            update={
+                "parse_status": PARSE_STATUS_FAILED,
+                "error_message": _ENQUEUE_FAILED_MESSAGE,
+            }
+        )
+    return knowledge
+
+
+async def _persist_url_row(
+    *,
+    tenant_id: int,
+    kb_id: str,
+    url: str,
+    file_name: str | None,
+    file_type: str | None,
+    title: str | None,
+    tag_ids: list[str] | None,
+    channel: str | None,
+    knowledge_repo: KnowledgeRepository,
+    kb_service: KBService,
+    tag_repo: TagRepository | None,
+    url_guard: URLGuard | None,
+    now: datetime,
+) -> Knowledge:
+    """Insert the URL or file-URL row before the parse job is submitted."""
+    if is_file_url(url, file_name or "", file_type or ""):
+        return await _create_from_file_url(
+            tenant_id=tenant_id,
+            kb_id=kb_id,
+            file_url=url,
+            file_name=file_name,
+            file_type=file_type,
+            title=title,
+            tag_ids=tag_ids,
+            channel=channel,
+            knowledge_repo=knowledge_repo,
+            kb_service=kb_service,
+            tag_repo=tag_repo,
+            url_guard=url_guard,
+            now=now,
+        )
+    return await _create_from_web_url(
+        tenant_id=tenant_id,
+        kb_id=kb_id,
+        url=url,
+        title=title,
+        tag_ids=tag_ids,
+        channel=channel,
+        knowledge_repo=knowledge_repo,
+        kb_service=kb_service,
+        tag_repo=tag_repo,
+        url_guard=url_guard,
+        now=now,
+    )
+
+
 async def create_knowledge_from_url(
     *,
     tenant_id: int,
@@ -278,37 +374,23 @@ async def create_knowledge_from_url(
     kb_service: KBService,
     tag_repo: TagRepository | None = None,
     url_guard: URLGuard | None = None,
+    dispatcher: DocumentTaskDispatcher | None = None,
     now: datetime | None = None,
 ) -> Knowledge:
     """Create a knowledge entry from a URL, routing file URLs separately.
 
-    ``enable_multimodel`` is reserved for the deferred process-config
-    resolution and does not affect the persisted row.
+    ``enable_multimodel`` is forwarded to the parse job when a dispatcher
+    is wired. It does not change the persisted row.
     """
     require_tenant_id(tenant_id)
     require_knowledge_base_id(kb_id)
     _require_url(url)
-    stamp = now or datetime.now(UTC)
-    if is_file_url(url, file_name or "", file_type or ""):
-        return await _create_from_file_url(
-            tenant_id=tenant_id,
-            kb_id=kb_id,
-            file_url=url,
-            file_name=file_name,
-            file_type=file_type,
-            title=title,
-            tag_ids=tag_ids,
-            channel=channel,
-            knowledge_repo=knowledge_repo,
-            kb_service=kb_service,
-            tag_repo=tag_repo,
-            url_guard=url_guard,
-            now=stamp,
-        )
-    return await _create_from_web_url(
+    created = await _persist_url_row(
         tenant_id=tenant_id,
         kb_id=kb_id,
         url=url,
+        file_name=file_name,
+        file_type=file_type,
         title=title,
         tag_ids=tag_ids,
         channel=channel,
@@ -316,7 +398,15 @@ async def create_knowledge_from_url(
         kb_service=kb_service,
         tag_repo=tag_repo,
         url_guard=url_guard,
-        now=stamp,
+        now=now or datetime.now(UTC),
+    )
+    return await _dispatch_created_url(
+        knowledge=created,
+        dispatcher=dispatcher,
+        knowledge_repo=knowledge_repo,
+        tenant_id=tenant_id,
+        url=url,
+        enable_multimodel=bool(enable_multimodel),
     )
 
 

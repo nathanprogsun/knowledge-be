@@ -27,6 +27,7 @@ from src.core.chat.service import (
     MessageGateway,
     QARunner,
     TagScope,
+    answer_delta,
     build_tag_scopes,
     merge_knowledge_targets,
     resolve_agent_mode,
@@ -123,6 +124,7 @@ class _Gateway(MessageGateway):
     def __init__(self) -> None:
         self.user_messages: list[str] = []
         self.assistant_messages: list[str] = []
+        self.completed: list[tuple[str, str]] = []
 
     async def create_user_message(self, *, session_id: str, query: str) -> str:
         self.user_messages.append(session_id)
@@ -149,7 +151,8 @@ class _Gateway(MessageGateway):
         content: str,
         is_fallback: bool = False,
     ) -> None:
-        return None
+        del is_fallback
+        self.completed.append((assistant_message_id, content))
 
 
 class _QARequest:
@@ -198,6 +201,7 @@ def _service(
     agents: dict[str, CustomAgentInfo] | None = None,
     searcher: _Searcher | None = None,
     runner: _Runner | None = None,
+    gateway: _Gateway | None = None,
 ) -> ChatService:
     return ChatService(
         tenant_id=7,
@@ -207,7 +211,7 @@ def _service(
         searcher=searcher or _Searcher(),
         knowledge_runner=runner or _Runner(),
         agent_runner=runner or _Runner(),
-        message_gateway=_Gateway(),
+        message_gateway=gateway or _Gateway(),
     )
 
 
@@ -286,9 +290,20 @@ async def test_search_knowledge_rejects_no_target() -> None:
 # ── stream_knowledge_qa / stream_agent_qa ─────────────────────────────
 
 
+def test_answer_delta_reads_final_answer_content() -> None:
+    event = Event(
+        type=EventType.AGENT_FINAL_ANSWER,
+        session_id="s1",
+        data={"content": "月报"},
+    )
+    assert answer_delta(event) == "月报"
+    assert answer_delta(Event(type=EventType.AGENT_THOUGHT, session_id="s1", data={})) == ""
+
+
 async def test_stream_knowledge_qa_emits_agent_query_first() -> None:
     runner = _Runner()
-    service = _service(runner=runner)
+    gateway = _Gateway()
+    service = _service(runner=runner, gateway=gateway)
     stream = await service.stream_knowledge_qa(session_id="s1", request=_QARequest(query="hello"))
 
     events: list[Event] = []
@@ -299,6 +314,7 @@ async def test_stream_knowledge_qa_emits_agent_query_first() -> None:
     assert events[0].data is not None
     assert events[0].data["assistant_message_id"].startswith("assistant-")
     assert [e.type for e in events[1:]] == [EventType.AGENT_THOUGHT, EventType.AGENT_COMPLETE]
+    assert gateway.completed == [("assistant-1", "")]
 
 
 async def test_stream_knowledge_qa_rejects_blank_session() -> None:

@@ -206,7 +206,13 @@ async def serve_kb_file(
         ) from exc
 
 
+resolve_file_service_for_path = _resolve_file_service
+content_type_for_storage_path = _content_type_for_path
+
+
 __all__ = [
     "bare_files_router",
+    "content_type_for_storage_path",
     "kb_files_router",
+    "resolve_file_service_for_path",
 ]

@@ -475,6 +475,38 @@ async def test_update_agent_rejects_builtin(
     assert excinfo.value.code == "agent.cannot_modify_builtin"
 
 
+async def test_update_agent_allows_builtin_config(
+    service: CustomAgentService,
+    rows: dict[tuple[str, int], CustomAgent],
+) -> None:
+    _seed_builtin(rows, tenant_id=1001)
+
+    updated = await service.update_agent(
+        tenant_id=1001,
+        agent_id="builtin-quick-answer",
+        name="快速问答",
+        config=_config(model_id="model-qa"),
+    )
+
+    assert updated.name == "快速问答"
+    assert updated.config["model_id"] == "model-qa"
+    assert updated.is_builtin is True
+
+
+async def test_update_agent_materializes_missing_builtin(
+    service: CustomAgentService,
+) -> None:
+    updated = await service.update_agent(
+        tenant_id=1001,
+        agent_id="builtin-quick-answer",
+        name="快速问答",
+        config=_config(model_id="model-qa"),
+    )
+
+    assert updated.is_builtin is True
+    assert updated.config["model_id"] == "model-qa"
+
+
 async def test_update_agent_raises_not_found(
     service: CustomAgentService,
 ) -> None:

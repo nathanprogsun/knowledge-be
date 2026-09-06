@@ -19,6 +19,11 @@ from functools import lru_cache
 from arq.connections import RedisSettings
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from src.common.arq_redis import redis_settings_from_url
+from src.settings import get_settings
+
+_DEFAULT_REDIS_URL = "redis://localhost:6379"
+
 
 class WorkerSettings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -29,7 +34,7 @@ class WorkerSettings(BaseSettings):
     )
 
     # Redis connection.
-    redis_url: str = "redis://localhost:6379"
+    redis_url: str = _DEFAULT_REDIS_URL
     # Pool tuning applied on top of the parsed URL.
     max_connections: int = 10
     conn_timeout: int = 1
@@ -53,7 +58,7 @@ class WorkerSettings(BaseSettings):
     @property
     def redis_settings(self) -> RedisSettings:
         """arq RedisSettings derived from ``redis_url`` plus pool tuning."""
-        base = RedisSettings.from_dsn(self.redis_url)
+        base = redis_settings_from_url(self.redis_url)
         return replace(
             base,
             max_connections=self.max_connections,
@@ -70,7 +75,13 @@ def get_worker_settings() -> WorkerSettings:
     Lazy-initialized on first call and cached via ``lru_cache``. Tests
     can reset with ``reset_worker_settings_cache()``.
     """
-    return WorkerSettings()
+    settings = WorkerSettings()
+    if settings.redis_url != _DEFAULT_REDIS_URL:
+        return settings
+    app_redis = get_settings().redis_url
+    if not app_redis or app_redis == settings.redis_url:
+        return settings
+    return settings.model_copy(update={"redis_url": app_redis})
 
 
 def reset_worker_settings_cache() -> None:
